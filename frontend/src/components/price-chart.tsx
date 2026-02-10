@@ -3,10 +3,12 @@ import {
   createChart,
   createSeriesMarkers,
   type IChartApi,
+  type ISeriesApi,
+  type SeriesType,
+  type Time,
   ColorType,
   CandlestickSeries,
   LineSeries,
-  AreaSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
 
@@ -80,6 +82,102 @@ function RsiLegend({ values, latest }: { values: LegendValues | null; latest: Le
     </div>
   )
 }
+
+// ─── Bollinger Band fill primitive ───────────────────────────────────
+// Draws a semi-transparent polygon between upper and lower BB values
+// using drawBackground so the fill renders behind the gridlines.
+
+interface BandPoint {
+  time: string
+  upper: number
+  lower: number
+}
+
+class BandFillRenderer {
+  private _source: BandFillPrimitive
+
+  constructor(source: BandFillPrimitive) {
+    this._source = source
+  }
+
+  draw() {
+    // intentionally empty — all drawing is in drawBackground
+  }
+
+  drawBackground(target: { useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T }) {
+    const { chart, series, data } = this._source
+    if (!chart || !series || !data.length) return
+
+    const timeScale = chart.timeScale()
+    target.useMediaCoordinateSpace(({ context: ctx }) => {
+      const upper: Array<{ x: number; y: number }> = []
+      const lower: Array<{ x: number; y: number }> = []
+
+      for (const d of data) {
+        const x = timeScale.timeToCoordinate(d.time as unknown as Time)
+        const yU = series.priceToCoordinate(d.upper)
+        const yL = series.priceToCoordinate(d.lower)
+        if (x === null || yU === null || yL === null) continue
+        upper.push({ x, y: yU })
+        lower.push({ x, y: yL })
+      }
+
+      if (upper.length < 2) return
+
+      ctx.beginPath()
+      ctx.moveTo(upper[0].x, upper[0].y)
+      for (let i = 1; i < upper.length; i++) ctx.lineTo(upper[i].x, upper[i].y)
+      for (let i = lower.length - 1; i >= 0; i--) ctx.lineTo(lower[i].x, lower[i].y)
+      ctx.closePath()
+      ctx.fillStyle = "rgba(96, 165, 250, 0.18)"
+      ctx.fill()
+    })
+  }
+}
+
+class BandFillPaneView {
+  private _renderer: BandFillRenderer
+
+  constructor(source: BandFillPrimitive) {
+    this._renderer = new BandFillRenderer(source)
+  }
+
+  zOrder() {
+    return "bottom" as const
+  }
+
+  renderer() {
+    return this._renderer
+  }
+}
+
+class BandFillPrimitive {
+  data: BandPoint[]
+  chart: IChartApi | null = null
+  series: ISeriesApi<SeriesType> | null = null
+  private _views: readonly [BandFillPaneView]
+
+  constructor(data: BandPoint[]) {
+    this.data = data
+    this._views = [new BandFillPaneView(this)]
+  }
+
+  attached({ chart, series }: { chart: IChartApi; series: ISeriesApi<SeriesType> }) {
+    this.chart = chart
+    this.series = series
+  }
+
+  detached() {
+    this.chart = null
+    this.series = null
+  }
+
+  paneViews() {
+    return this._views
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
 
 export function PriceChart({ prices, indicators, annotations }: PriceChartProps) {
   const mainRef = useRef<HTMLDivElement>(null)
@@ -273,29 +371,30 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
 
     // Overlay indicators
     if (indicators.length) {
-      // Bollinger Bands — filled area between upper and lower
-      // Upper band fills down with color, lower band fills down with bg to erase below
+      // Bollinger Bands — line series for borders + custom primitive for band fill
       const bbData = indicators.filter((i) => i.bb_upper !== null && i.bb_lower !== null)
 
-      const bbUpperArea = mainChart.addSeries(AreaSeries, {
-        topColor: "rgba(96, 165, 250, 0.12)",
-        bottomColor: "rgba(96, 165, 250, 0.12)",
-        lineColor: "rgba(96, 165, 250, 0.4)",
+      const bbUpperLine = mainChart.addSeries(LineSeries, {
+        color: "rgba(96, 165, 250, 0.4)",
         lineWidth: 1,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
       })
-      bbUpperArea.setData(bbData.map((i) => ({ time: i.date, value: i.bb_upper! })))
+      bbUpperLine.setData(bbData.map((i) => ({ time: i.date, value: i.bb_upper! })))
 
-      const bbLowerArea = mainChart.addSeries(AreaSeries, {
-        topColor: theme.bg,
-        bottomColor: theme.bg,
-        lineColor: "rgba(96, 165, 250, 0.4)",
+      const bbLowerLine = mainChart.addSeries(LineSeries, {
+        color: "rgba(96, 165, 250, 0.4)",
         lineWidth: 1,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
       })
-      bbLowerArea.setData(bbData.map((i) => ({ time: i.date, value: i.bb_lower! })))
+      bbLowerLine.setData(bbData.map((i) => ({ time: i.date, value: i.bb_lower! })))
+
+      // Attach band fill primitive to the upper BB line series
+      const bandFill = new BandFillPrimitive(
+        bbData.map((i) => ({ time: i.date, upper: i.bb_upper!, lower: i.bb_lower! }))
+      )
+      bbUpperLine.attachPrimitive(bandFill as any)
 
       // SMA lines
       const sma20 = mainChart.addSeries(LineSeries, {
