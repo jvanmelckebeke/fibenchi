@@ -1,11 +1,12 @@
 import { Link, Outlet, useLocation } from "react-router-dom"
-import { LayoutDashboard, FolderOpen, Sun, Moon } from "lucide-react"
+import { LayoutDashboard, FolderOpen, LineChart, Sun, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useEffect, useState } from "react"
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/groups", label: "Groups", icon: FolderOpen },
+  { to: "/pseudo-etfs", label: "Pseudo-ETFs", icon: LineChart },
 ]
 
 function ThemeToggle() {

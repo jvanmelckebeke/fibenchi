@@ -80,6 +80,34 @@ export interface SyncResult {
   synced: number
 }
 
+export interface PseudoETF {
+  id: number
+  name: string
+  description: string | null
+  base_date: string
+  base_value: number
+  created_at: string
+  constituents: Asset[]
+}
+
+export interface PseudoETFCreate {
+  name: string
+  description?: string
+  base_date: string
+  base_value?: number
+}
+
+export interface PseudoETFUpdate {
+  name?: string
+  description?: string
+  base_date?: string
+}
+
+export interface PerformancePoint {
+  date: string
+  value: number
+}
+
 // API client
 
 const BASE = "/api"
@@ -147,5 +175,23 @@ export const api = {
       }),
     delete: (symbol: string, id: number) =>
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
+  },
+  pseudoEtfs: {
+    list: () => request<PseudoETF[]>("/pseudo-etfs"),
+    create: (data: PseudoETFCreate) =>
+      request<PseudoETF>("/pseudo-etfs", { method: "POST", body: JSON.stringify(data) }),
+    get: (id: number) => request<PseudoETF>(`/pseudo-etfs/${id}`),
+    update: (id: number, data: PseudoETFUpdate) =>
+      request<PseudoETF>(`/pseudo-etfs/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: number) =>
+      request<void>(`/pseudo-etfs/${id}`, { method: "DELETE" }),
+    addConstituents: (id: number, assetIds: number[]) =>
+      request<PseudoETF>(`/pseudo-etfs/${id}/constituents`, {
+        method: "POST",
+        body: JSON.stringify({ asset_ids: assetIds }),
+      }),
+    removeConstituent: (etfId: number, assetId: number) =>
+      request<PseudoETF>(`/pseudo-etfs/${etfId}/constituents/${assetId}`, { method: "DELETE" }),
+    performance: (id: number) => request<PerformancePoint[]>(`/pseudo-etfs/${id}/performance`),
   },
 }

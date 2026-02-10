@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type AnnotationCreate } from "./api"
+import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
 
 // Keys
 export const keys = {
@@ -10,6 +10,9 @@ export const keys = {
   groups: ["groups"] as const,
   thesis: (symbol: string) => ["thesis", symbol] as const,
   annotations: (symbol: string) => ["annotations", symbol] as const,
+  pseudoEtfs: ["pseudo-etfs"] as const,
+  pseudoEtf: (id: number) => ["pseudo-etfs", id] as const,
+  pseudoEtfPerformance: (id: number) => ["pseudo-etfs", id, "performance"] as const,
 }
 
 // Assets
@@ -147,5 +150,74 @@ export function useDeleteAnnotation(symbol: string) {
   return useMutation({
     mutationFn: (id: number) => api.annotations.delete(symbol, id),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.annotations(symbol) }),
+  })
+}
+
+// Pseudo-ETFs
+export function usePseudoEtfs() {
+  return useQuery({ queryKey: keys.pseudoEtfs, queryFn: api.pseudoEtfs.list })
+}
+
+export function usePseudoEtf(id: number) {
+  return useQuery({
+    queryKey: keys.pseudoEtf(id),
+    queryFn: () => api.pseudoEtfs.get(id),
+    enabled: !!id,
+  })
+}
+
+export function useCreatePseudoEtf() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: PseudoETFCreate) => api.pseudoEtfs.create(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfs }),
+  })
+}
+
+export function useUpdatePseudoEtf() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: PseudoETFUpdate }) => api.pseudoEtfs.update(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfs }),
+  })
+}
+
+export function useDeletePseudoEtf() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.pseudoEtfs.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfs }),
+  })
+}
+
+export function useAddPseudoEtfConstituents() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ etfId, assetIds }: { etfId: number; assetIds: number[] }) =>
+      api.pseudoEtfs.addConstituents(etfId, assetIds),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: keys.pseudoEtfs })
+      qc.invalidateQueries({ queryKey: keys.pseudoEtfPerformance(vars.etfId) })
+    },
+  })
+}
+
+export function useRemovePseudoEtfConstituent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ etfId, assetId }: { etfId: number; assetId: number }) =>
+      api.pseudoEtfs.removeConstituent(etfId, assetId),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: keys.pseudoEtfs })
+      qc.invalidateQueries({ queryKey: keys.pseudoEtfPerformance(vars.etfId) })
+    },
+  })
+}
+
+export function usePseudoEtfPerformance(id: number) {
+  return useQuery({
+    queryKey: keys.pseudoEtfPerformance(id),
+    queryFn: () => api.pseudoEtfs.performance(id),
+    enabled: !!id,
   })
 }
