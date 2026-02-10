@@ -54,7 +54,7 @@ def test_macd_keys():
 def test_compute_indicators_columns():
     df = _make_price_df()
     result = compute_indicators(df)
-    expected_cols = {"close", "rsi", "sma_20", "sma_50", "macd", "macd_signal", "macd_hist"}
+    expected_cols = {"close", "rsi", "sma_20", "sma_50", "bb_upper", "bb_middle", "bb_lower", "macd", "macd_signal", "macd_hist"}
     assert set(result.columns) == expected_cols
 
 

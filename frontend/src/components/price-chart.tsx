@@ -3,14 +3,13 @@ import {
   createChart,
   createSeriesMarkers,
   type IChartApi,
-  type ISeriesApi,
-  type SeriesType,
-  type Time,
   ColorType,
   CandlestickSeries,
   LineSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
+import { BandFillPrimitive } from "./chart/bollinger-band-fill"
+import { Legend, RsiLegend, type LegendValues } from "./chart/chart-legends"
 
 interface PriceChartProps {
   prices: Price[]
@@ -27,157 +26,6 @@ function getThemeColors() {
     border: dark ? "#3f3f46" : "#e4e4e7",
   }
 }
-
-interface LegendValues {
-  o?: number
-  h?: number
-  l?: number
-  c?: number
-  sma20?: number
-  sma50?: number
-  bbUpper?: number
-  bbLower?: number
-  rsi?: number
-}
-
-function Legend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
-  const v = values ?? latest
-  const changeColor = v.c !== undefined && v.o !== undefined
-    ? v.c >= v.o ? "text-green-500" : "text-red-500"
-    : ""
-
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
-      {v.o !== undefined && (
-        <>
-          <span className="text-muted-foreground">O <span className={changeColor}>{v.o.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">H <span className={changeColor}>{v.h!.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">L <span className={changeColor}>{v.l!.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">C <span className={changeColor}>{v.c!.toFixed(2)}</span></span>
-        </>
-      )}
-      {v.sma20 !== undefined && (
-        <span><span className="inline-block w-2 h-0.5 bg-teal-500 mr-1 align-middle" />SMA 20 <span className="text-teal-500">{v.sma20.toFixed(2)}</span></span>
-      )}
-      {v.sma50 !== undefined && (
-        <span><span className="inline-block w-2 h-0.5 bg-violet-500 mr-1 align-middle" />SMA 50 <span className="text-violet-500">{v.sma50.toFixed(2)}</span></span>
-      )}
-      {v.bbUpper !== undefined && v.bbLower !== undefined && (
-        <span className="text-blue-400">BB <span>{v.bbUpper.toFixed(2)}</span> / <span>{v.bbLower.toFixed(2)}</span></span>
-      )}
-    </div>
-  )
-}
-
-function RsiLegend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
-  const rsi = (values ?? latest).rsi
-  const color = rsi !== undefined
-    ? rsi >= 70 ? "text-red-500" : rsi <= 30 ? "text-green-500" : "text-violet-500"
-    : "text-muted-foreground"
-
-  return (
-    <div className="text-xs tabular-nums">
-      <span className="text-muted-foreground">RSI(14) </span>
-      {rsi !== undefined && <span className={color}>{rsi.toFixed(2)}</span>}
-    </div>
-  )
-}
-
-// ─── Bollinger Band fill primitive ───────────────────────────────────
-// Draws a semi-transparent polygon between upper and lower BB values
-// using drawBackground so the fill renders behind the gridlines.
-
-interface BandPoint {
-  time: string
-  upper: number
-  lower: number
-}
-
-class BandFillRenderer {
-  private _source: BandFillPrimitive
-
-  constructor(source: BandFillPrimitive) {
-    this._source = source
-  }
-
-  draw() {
-    // intentionally empty — all drawing is in drawBackground
-  }
-
-  drawBackground(target: { useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T }) {
-    const { chart, series, data } = this._source
-    if (!chart || !series || !data.length) return
-
-    const timeScale = chart.timeScale()
-    target.useMediaCoordinateSpace(({ context: ctx }) => {
-      const upper: Array<{ x: number; y: number }> = []
-      const lower: Array<{ x: number; y: number }> = []
-
-      for (const d of data) {
-        const x = timeScale.timeToCoordinate(d.time as unknown as Time)
-        const yU = series.priceToCoordinate(d.upper)
-        const yL = series.priceToCoordinate(d.lower)
-        if (x === null || yU === null || yL === null) continue
-        upper.push({ x, y: yU })
-        lower.push({ x, y: yL })
-      }
-
-      if (upper.length < 2) return
-
-      ctx.beginPath()
-      ctx.moveTo(upper[0].x, upper[0].y)
-      for (let i = 1; i < upper.length; i++) ctx.lineTo(upper[i].x, upper[i].y)
-      for (let i = lower.length - 1; i >= 0; i--) ctx.lineTo(lower[i].x, lower[i].y)
-      ctx.closePath()
-      ctx.fillStyle = "rgba(96, 165, 250, 0.18)"
-      ctx.fill()
-    })
-  }
-}
-
-class BandFillPaneView {
-  private _renderer: BandFillRenderer
-
-  constructor(source: BandFillPrimitive) {
-    this._renderer = new BandFillRenderer(source)
-  }
-
-  zOrder() {
-    return "bottom" as const
-  }
-
-  renderer() {
-    return this._renderer
-  }
-}
-
-class BandFillPrimitive {
-  data: BandPoint[]
-  chart: IChartApi | null = null
-  series: ISeriesApi<SeriesType> | null = null
-  private _views: readonly [BandFillPaneView]
-
-  constructor(data: BandPoint[]) {
-    this.data = data
-    this._views = [new BandFillPaneView(this)]
-  }
-
-  attached({ chart, series }: { chart: IChartApi; series: ISeriesApi<SeriesType> }) {
-    this.chart = chart
-    this.series = series
-  }
-
-  detached() {
-    this.chart = null
-    this.series = null
-  }
-
-  paneViews() {
-    return this._views
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────
 
 export function PriceChart({ prices, indicators, annotations }: PriceChartProps) {
   const mainRef = useRef<HTMLDivElement>(null)

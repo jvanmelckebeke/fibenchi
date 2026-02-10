@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
-from app.routers import annotations, assets, groups, prices, pseudo_etfs, thesis
+from app.routers import annotations, assets, groups, holdings, prices, pseudo_etfs, thesis
 from app.services.price_sync import sync_all_prices
 
 logger = logging.getLogger(__name__)
@@ -60,6 +60,7 @@ app = FastAPI(title="fibenchi", lifespan=lifespan)
 app.include_router(assets.router)
 app.include_router(groups.router)
 app.include_router(prices.router)
+app.include_router(holdings.router)
 app.include_router(thesis.router)
 app.include_router(annotations.router)
 app.include_router(pseudo_etfs.router)
