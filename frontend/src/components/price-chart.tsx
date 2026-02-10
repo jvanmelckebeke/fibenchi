@@ -375,10 +375,22 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
     }
   }, [prices, indicators, annotations, syncCharts])
 
+  const resetView = useCallback(() => {
+    mainChartRef.current?.timeScale().fitContent()
+    rsiChartRef.current?.timeScale().fitContent()
+  }, [])
+
   return (
     <div className="mb-4">
-      <div className="px-1 py-1">
+      <div className="flex items-center justify-between px-1 py-1">
         <Legend values={hoverValues} latest={latestValues.current} />
+        <button
+          onClick={resetView}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
+          title="Reset chart view"
+        >
+          Reset view
+        </button>
       </div>
       <div ref={mainRef} className="w-full rounded-t-md overflow-hidden" />
       <div className="px-1 py-1">
