@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.pseudo_etf import PseudoETF, pseudo_etf_constituents
+from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfThesis, pseudo_etf_constituents
 from app.models.asset import Asset
 from app.schemas.pseudo_etf import (
     PseudoETFCreate,
@@ -12,6 +12,8 @@ from app.schemas.pseudo_etf import (
     PseudoETFResponse,
     PerformancePoint,
 )
+from app.schemas.thesis import ThesisResponse, ThesisUpdate
+from app.schemas.annotation import AnnotationCreate, AnnotationResponse
 from app.services.pseudo_etf import calculate_performance
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
@@ -122,3 +124,93 @@ async def get_performance(etf_id: int, db: AsyncSession = Depends(get_db)):
         return []
 
     return await calculate_performance(db, asset_ids, etf.base_date, float(etf.base_value))
+
+
+# --- Thesis ---
+
+@router.get("/{etf_id}/thesis", response_model=ThesisResponse)
+async def get_etf_thesis(etf_id: int, db: AsyncSession = Depends(get_db)):
+    etf = await db.get(PseudoETF, etf_id)
+    if not etf:
+        raise HTTPException(404, "Pseudo-ETF not found")
+
+    result = await db.execute(select(PseudoEtfThesis).where(PseudoEtfThesis.pseudo_etf_id == etf_id))
+    thesis = result.scalar_one_or_none()
+    if not thesis:
+        return ThesisResponse(content="", updated_at=etf.created_at)
+    return thesis
+
+
+@router.put("/{etf_id}/thesis", response_model=ThesisResponse)
+async def update_etf_thesis(etf_id: int, data: ThesisUpdate, db: AsyncSession = Depends(get_db)):
+    etf = await db.get(PseudoETF, etf_id)
+    if not etf:
+        raise HTTPException(404, "Pseudo-ETF not found")
+
+    result = await db.execute(select(PseudoEtfThesis).where(PseudoEtfThesis.pseudo_etf_id == etf_id))
+    thesis = result.scalar_one_or_none()
+
+    if thesis:
+        thesis.content = data.content
+    else:
+        thesis = PseudoEtfThesis(pseudo_etf_id=etf_id, content=data.content)
+        db.add(thesis)
+
+    await db.commit()
+    await db.refresh(thesis)
+    return thesis
+
+
+# --- Annotations ---
+
+@router.get("/{etf_id}/annotations", response_model=list[AnnotationResponse])
+async def list_etf_annotations(etf_id: int, db: AsyncSession = Depends(get_db)):
+    etf = await db.get(PseudoETF, etf_id)
+    if not etf:
+        raise HTTPException(404, "Pseudo-ETF not found")
+
+    result = await db.execute(
+        select(PseudoEtfAnnotation)
+        .where(PseudoEtfAnnotation.pseudo_etf_id == etf_id)
+        .order_by(PseudoEtfAnnotation.date)
+    )
+    return result.scalars().all()
+
+
+@router.post("/{etf_id}/annotations", response_model=AnnotationResponse, status_code=201)
+async def create_etf_annotation(etf_id: int, data: AnnotationCreate, db: AsyncSession = Depends(get_db)):
+    etf = await db.get(PseudoETF, etf_id)
+    if not etf:
+        raise HTTPException(404, "Pseudo-ETF not found")
+
+    annotation = PseudoEtfAnnotation(
+        pseudo_etf_id=etf_id,
+        date=data.date,
+        title=data.title,
+        body=data.body,
+        color=data.color,
+    )
+    db.add(annotation)
+    await db.commit()
+    await db.refresh(annotation)
+    return annotation
+
+
+@router.delete("/{etf_id}/annotations/{annotation_id}", status_code=204)
+async def delete_etf_annotation(etf_id: int, annotation_id: int, db: AsyncSession = Depends(get_db)):
+    etf = await db.get(PseudoETF, etf_id)
+    if not etf:
+        raise HTTPException(404, "Pseudo-ETF not found")
+
+    result = await db.execute(
+        select(PseudoEtfAnnotation).where(
+            PseudoEtfAnnotation.id == annotation_id,
+            PseudoEtfAnnotation.pseudo_etf_id == etf_id,
+        )
+    )
+    annotation = result.scalar_one_or_none()
+    if not annotation:
+        raise HTTPException(404, "Annotation not found")
+
+    await db.delete(annotation)
+    await db.commit()

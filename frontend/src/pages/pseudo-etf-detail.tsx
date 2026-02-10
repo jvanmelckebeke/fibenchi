@@ -1,16 +1,31 @@
-import { useEffect, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, Link } from "react-router-dom"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, UserPlus, X, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ThesisEditor } from "@/components/thesis-editor"
+import { AnnotationsList } from "@/components/annotations-list"
 import {
   createChart,
   type IChartApi,
   ColorType,
   LineSeries,
 } from "lightweight-charts"
-import { usePseudoEtf, usePseudoEtfPerformance } from "@/lib/queries"
+import {
+  usePseudoEtf,
+  usePseudoEtfPerformance,
+  useAssets,
+  useAddPseudoEtfConstituents,
+  useRemovePseudoEtfConstituent,
+  useCreateAsset,
+  usePseudoEtfThesis,
+  useUpdatePseudoEtfThesis,
+  usePseudoEtfAnnotations,
+  useCreatePseudoEtfAnnotation,
+  useDeletePseudoEtfAnnotation,
+} from "@/lib/queries"
 
 export function PseudoEtfDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -34,33 +49,17 @@ export function PseudoEtfDetailPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>Base: {etf.base_date} = {etf.base_value}</span>
-        <span>Constituents: {etf.constituents.length}</span>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {etf.constituents.map((a) => (
-          <Link key={a.id} to={`/asset/${a.symbol}`}>
-            <Badge variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
-              {a.symbol}
-            </Badge>
-          </Link>
-        ))}
+      <div className="text-sm text-muted-foreground">
+        Base: {etf.base_date} = {etf.base_value}
       </div>
 
       {isLoading && <p className="text-muted-foreground">Calculating performance...</p>}
 
       {performance && performance.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Performance (indexed to {etf.base_value})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PerformanceChart data={performance} baseValue={etf.base_value} />
-            <PerformanceStats data={performance} baseValue={etf.base_value} />
-          </CardContent>
-        </Card>
+        <>
+          <PerformanceChart data={performance} baseValue={etf.base_value} />
+          <PerformanceStats data={performance} baseValue={etf.base_value} />
+        </>
       )}
 
       {performance && performance.length === 0 && (
@@ -68,6 +67,13 @@ export function PseudoEtfDetailPage() {
           No performance data. Make sure constituent stocks have price history from {etf.base_date}.
         </p>
       )}
+
+      <Holdings etfId={etfId} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ThesisSection etfId={etfId} />
+        <AnnotationsSection etfId={etfId} />
+      </div>
     </div>
   )
 }
@@ -94,6 +100,7 @@ function PerformanceChart({ data, baseValue }: { data: { date: string; value: nu
       },
       rightPriceScale: { borderColor: dark ? "#3f3f46" : "#e4e4e7" },
       timeScale: { borderColor: dark ? "#3f3f46" : "#e4e4e7", timeVisible: false },
+      crosshair: { mode: 0 },
     })
 
     const last = data[data.length - 1]
@@ -135,7 +142,7 @@ function PerformanceChart({ data, baseValue }: { data: { date: string; value: nu
     }
   }, [data, baseValue])
 
-  return <div ref={ref} className="w-full" />
+  return <div ref={ref} className="w-full rounded-md overflow-hidden" />
 }
 
 function PerformanceStats({ data, baseValue }: { data: { date: string; value: number }[]; baseValue: number }) {
@@ -145,7 +152,7 @@ function PerformanceStats({ data, baseValue }: { data: { date: string; value: nu
   const totalReturn = ((last.value - baseValue) / baseValue) * 100
 
   return (
-    <div className="flex gap-6 mt-3 text-sm">
+    <div className="flex gap-6 text-sm">
       <div>
         <span className="text-muted-foreground">Current: </span>
         <span className="font-medium">{last.value.toFixed(2)}</span>
@@ -161,5 +168,177 @@ function PerformanceStats({ data, baseValue }: { data: { date: string; value: nu
         <span className="font-medium">{data[0].date} to {last.date}</span>
       </div>
     </div>
+  )
+}
+
+function Holdings({ etfId }: { etfId: number }) {
+  const { data: etf } = usePseudoEtf(etfId)
+  const removeConstituent = useRemovePseudoEtfConstituent()
+  const [addingAsset, setAddingAsset] = useState(false)
+
+  if (!etf) return null
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base">Holdings ({etf.constituents.length})</CardTitle>
+        <Button size="sm" variant="ghost" onClick={() => setAddingAsset(!addingAsset)}>
+          <UserPlus className="h-3.5 w-3.5 mr-1" />
+          Add
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {addingAsset && (
+          <AddConstituentPicker
+            etfId={etfId}
+            existingIds={etf.constituents.map((a) => a.id)}
+            onClose={() => setAddingAsset(false)}
+          />
+        )}
+
+        {etf.constituents.length === 0 && !addingAsset && (
+          <p className="text-sm text-muted-foreground italic">No constituents. Add stocks to this basket.</p>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {etf.constituents.map((asset) => (
+            <div key={asset.id} className="flex items-center gap-1 group/asset">
+              <Link to={`/asset/${asset.symbol}`}>
+                <Badge variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+                  {asset.symbol}
+                </Badge>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 opacity-0 group-hover/asset:opacity-100 transition-opacity"
+                onClick={() => removeConstituent.mutate({ etfId, assetId: asset.id })}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function AddConstituentPicker({
+  etfId,
+  existingIds,
+  onClose,
+}: {
+  etfId: number
+  existingIds: number[]
+  onClose: () => void
+}) {
+  const { data: allAssets } = useAssets()
+  const addConstituents = useAddPseudoEtfConstituents()
+  const createAsset = useCreateAsset()
+  const available = allAssets?.filter((a) => !existingIds.includes(a.id)) ?? []
+  const [selected, setSelected] = useState<number[]>([])
+  const [newTicker, setNewTicker] = useState("")
+  const [tickerError, setTickerError] = useState("")
+
+  const toggle = (id: number) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const handleAdd = () => {
+    if (!selected.length) return
+    addConstituents.mutate({ etfId, assetIds: selected }, { onSuccess: () => onClose() })
+  }
+
+  const handleNewTicker = () => {
+    const sym = newTicker.trim().toUpperCase()
+    if (!sym) return
+    setTickerError("")
+    createAsset.mutate(
+      { symbol: sym, watchlisted: false },
+      {
+        onSuccess: (asset) => {
+          addConstituents.mutate(
+            { etfId, assetIds: [asset.id] },
+            { onSuccess: () => { setNewTicker(""); onClose() } }
+          )
+        },
+        onError: (err) => setTickerError(err.message),
+      }
+    )
+  }
+
+  return (
+    <div className="p-3 rounded-md border bg-muted/30 space-y-3">
+      <div className="flex gap-2 items-center">
+        <Input
+          placeholder="New ticker (e.g. AAPL)"
+          value={newTicker}
+          onChange={(e) => { setNewTicker(e.target.value); setTickerError("") }}
+          onKeyDown={(e) => e.key === "Enter" && handleNewTicker()}
+          className="w-48"
+        />
+        <Button size="sm" onClick={handleNewTicker} disabled={!newTicker.trim() || createAsset.isPending}>
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          {createAsset.isPending ? "Adding..." : "Add new"}
+        </Button>
+        {tickerError && <span className="text-xs text-destructive">{tickerError}</span>}
+      </div>
+
+      {available.length > 0 && (
+        <>
+          <p className="text-xs text-muted-foreground">Or pick existing assets:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {available.map((a) => (
+              <Badge
+                key={a.id}
+                variant={selected.includes(a.id) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggle(a.id)}
+              >
+                {a.symbol}
+              </Badge>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="flex justify-end gap-1">
+        <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
+        {selected.length > 0 && (
+          <Button size="sm" onClick={handleAdd} disabled={addConstituents.isPending}>
+            Add ({selected.length})
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ThesisSection({ etfId }: { etfId: number }) {
+  const { data: thesis } = usePseudoEtfThesis(etfId)
+  const updateThesis = useUpdatePseudoEtfThesis(etfId)
+
+  return (
+    <ThesisEditor
+      thesis={thesis}
+      onSave={(content) => updateThesis.mutate(content)}
+      isSaving={updateThesis.isPending}
+    />
+  )
+}
+
+function AnnotationsSection({ etfId }: { etfId: number }) {
+  const { data: annotations } = usePseudoEtfAnnotations(etfId)
+  const createAnnotation = useCreatePseudoEtfAnnotation(etfId)
+  const deleteAnnotation = useDeletePseudoEtfAnnotation(etfId)
+
+  return (
+    <AnnotationsList
+      annotations={annotations}
+      onCreate={(data) => createAnnotation.mutate(data)}
+      onDelete={(id) => deleteAnnotation.mutate(id)}
+      isCreating={createAnnotation.isPending}
+    />
   )
 }

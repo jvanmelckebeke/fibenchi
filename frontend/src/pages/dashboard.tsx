@@ -9,7 +9,8 @@ import { useAssets, useCreateAsset, useDeleteAsset } from "@/lib/queries"
 import { SparklineChart } from "@/components/sparkline"
 
 export function DashboardPage() {
-  const { data: assets, isLoading } = useAssets()
+  const { data: allAssets, isLoading } = useAssets()
+  const assets = allAssets?.filter((a) => a.watchlisted)
   const createAsset = useCreateAsset()
   const deleteAsset = useDeleteAsset()
   const [symbol, setSymbol] = useState("")

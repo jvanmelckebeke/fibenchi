@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
 
+// Pseudo-ETF thesis/annotation keys are defined inline below
+
 // Keys
 export const keys = {
   assets: ["assets"] as const,
@@ -13,6 +15,8 @@ export const keys = {
   pseudoEtfs: ["pseudo-etfs"] as const,
   pseudoEtf: (id: number) => ["pseudo-etfs", id] as const,
   pseudoEtfPerformance: (id: number) => ["pseudo-etfs", id, "performance"] as const,
+  pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
+  pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
 }
 
 // Assets
@@ -219,5 +223,47 @@ export function usePseudoEtfPerformance(id: number) {
     queryKey: keys.pseudoEtfPerformance(id),
     queryFn: () => api.pseudoEtfs.performance(id),
     enabled: !!id,
+  })
+}
+
+// Pseudo-ETF Thesis
+export function usePseudoEtfThesis(id: number) {
+  return useQuery({
+    queryKey: keys.pseudoEtfThesis(id),
+    queryFn: () => api.pseudoEtfs.thesis.get(id),
+    enabled: !!id,
+  })
+}
+
+export function useUpdatePseudoEtfThesis(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (content: string) => api.pseudoEtfs.thesis.update(id, content),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfThesis(id) }),
+  })
+}
+
+// Pseudo-ETF Annotations
+export function usePseudoEtfAnnotations(id: number) {
+  return useQuery({
+    queryKey: keys.pseudoEtfAnnotations(id),
+    queryFn: () => api.pseudoEtfs.annotations.list(id),
+    enabled: !!id,
+  })
+}
+
+export function useCreatePseudoEtfAnnotation(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: AnnotationCreate) => api.pseudoEtfs.annotations.create(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfAnnotations(id) }),
+  })
+}
+
+export function useDeletePseudoEtfAnnotation(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (annotationId: number) => api.pseudoEtfs.annotations.delete(id, annotationId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfAnnotations(id) }),
   })
 }

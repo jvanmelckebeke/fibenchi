@@ -6,6 +6,8 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 
 from app.config import settings
+from sqlalchemy import text
+
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
 from app.routers import annotations, assets, groups, prices, pseudo_etfs, thesis
@@ -31,6 +33,10 @@ async def scheduled_refresh():
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migration: add watchlisted column to existing assets table
+        await conn.execute(text(
+            "ALTER TABLE assets ADD COLUMN IF NOT EXISTS watchlisted BOOLEAN DEFAULT TRUE NOT NULL"
+        ))
 
     # Parse cron expression (minute hour day month dow)
     parts = settings.refresh_cron.split()

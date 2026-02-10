@@ -5,26 +5,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { useAnnotations, useCreateAnnotation, useDeleteAnnotation } from "@/lib/queries"
+import type { Annotation, AnnotationCreate } from "@/lib/api"
 
-export function AnnotationsList({ symbol }: { symbol: string }) {
-  const { data: annotations } = useAnnotations(symbol)
-  const createAnnotation = useCreateAnnotation(symbol)
-  const deleteAnnotation = useDeleteAnnotation(symbol)
+interface AnnotationsListProps {
+  annotations: Annotation[] | undefined
+  onCreate: (data: AnnotationCreate) => void
+  onDelete: (id: number) => void
+  isCreating: boolean
+}
+
+export function AnnotationsList({ annotations, onCreate, onDelete, isCreating }: AnnotationsListProps) {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ date: "", title: "", body: "", color: "#3b82f6" })
 
   const handleAdd = () => {
     if (!form.date || !form.title) return
-    createAnnotation.mutate(
-      { date: form.date, title: form.title, body: form.body || undefined, color: form.color },
-      {
-        onSuccess: () => {
-          setForm({ date: "", title: "", body: "", color: "#3b82f6" })
-          setAdding(false)
-        },
-      }
-    )
+    onCreate({ date: form.date, title: form.title, body: form.body || undefined, color: form.color })
+    setForm({ date: "", title: "", body: "", color: "#3b82f6" })
+    setAdding(false)
   }
 
   return (
@@ -68,7 +66,7 @@ export function AnnotationsList({ symbol }: { symbol: string }) {
               <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleAdd} disabled={createAnnotation.isPending}>
+              <Button size="sm" onClick={handleAdd} disabled={isCreating}>
                 Save
               </Button>
             </div>
@@ -98,7 +96,7 @@ export function AnnotationsList({ symbol }: { symbol: string }) {
               variant="ghost"
               size="icon"
               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => deleteAnnotation.mutate(a.id)}
+              onClick={() => onDelete(a.id)}
             >
               <Trash2 className="h-3 w-3" />
             </Button>

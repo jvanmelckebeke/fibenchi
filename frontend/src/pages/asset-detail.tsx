@@ -5,7 +5,16 @@ import { Button } from "@/components/ui/button"
 import { PriceChart } from "@/components/price-chart"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
-import { usePrices, useIndicators, useRefreshPrices, useAnnotations } from "@/lib/queries"
+import {
+  usePrices,
+  useIndicators,
+  useRefreshPrices,
+  useAnnotations,
+  useCreateAnnotation,
+  useDeleteAnnotation,
+  useThesis,
+  useUpdateThesis,
+} from "@/lib/queries"
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
@@ -20,8 +29,8 @@ export function AssetDetailPage() {
       <Header symbol={symbol} period={period} setPeriod={setPeriod} />
       <ChartSection symbol={symbol} period={period} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ThesisEditor symbol={symbol} />
-        <AnnotationsList symbol={symbol} />
+        <ThesisSection symbol={symbol} />
+        <AnnotationsSection symbol={symbol} />
       </div>
     </div>
   )
@@ -94,4 +103,32 @@ function ChartSection({ symbol, period }: { symbol: string; period: string }) {
   }
 
   return <PriceChart prices={prices} indicators={indicators ?? []} annotations={annotations ?? []} />
+}
+
+function ThesisSection({ symbol }: { symbol: string }) {
+  const { data: thesis } = useThesis(symbol)
+  const updateThesis = useUpdateThesis(symbol)
+
+  return (
+    <ThesisEditor
+      thesis={thesis}
+      onSave={(content) => updateThesis.mutate(content)}
+      isSaving={updateThesis.isPending}
+    />
+  )
+}
+
+function AnnotationsSection({ symbol }: { symbol: string }) {
+  const { data: annotations } = useAnnotations(symbol)
+  const createAnnotation = useCreateAnnotation(symbol)
+  const deleteAnnotation = useDeleteAnnotation(symbol)
+
+  return (
+    <AnnotationsList
+      annotations={annotations}
+      onCreate={(data) => createAnnotation.mutate(data)}
+      onDelete={(id) => deleteAnnotation.mutate(id)}
+      isCreating={createAnnotation.isPending}
+    />
+  )
 }

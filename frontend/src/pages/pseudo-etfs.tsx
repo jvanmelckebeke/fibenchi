@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { Plus, Trash2, Pencil, X, UserPlus } from "lucide-react"
+import { Plus, Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,9 +11,6 @@ import {
   useCreatePseudoEtf,
   useUpdatePseudoEtf,
   useDeletePseudoEtf,
-  useAssets,
-  useAddPseudoEtfConstituents,
-  useRemovePseudoEtfConstituent,
 } from "@/lib/queries"
 import type { PseudoETF } from "@/lib/api"
 
@@ -102,11 +99,9 @@ function CreateForm({ onClose }: { onClose: () => void }) {
 function EtfCard({ etf }: { etf: PseudoETF }) {
   const deleteEtf = useDeletePseudoEtf()
   const updateEtf = useUpdatePseudoEtf()
-  const removeConstituent = useRemovePseudoEtfConstituent()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(etf.name)
   const [description, setDescription] = useState(etf.description ?? "")
-  const [addingAsset, setAddingAsset] = useState(false)
 
   const handleSave = () => {
     updateEtf.mutate(
@@ -132,23 +127,18 @@ function EtfCard({ etf }: { etf: PseudoETF }) {
             </div>
           </div>
         ) : (
-          <div>
-            <Link to={`/pseudo-etf/${etf.id}`} className="hover:underline">
-              <CardTitle className="text-base">{etf.name}</CardTitle>
-            </Link>
+          <Link to={`/pseudo-etf/${etf.id}`} className="hover:underline flex-1">
+            <CardTitle className="text-base">{etf.name}</CardTitle>
             {etf.description && (
               <p className="text-xs text-muted-foreground mt-1">{etf.description}</p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              Base: {etf.base_date} = {etf.base_value}
+              Base: {etf.base_date} = {etf.base_value} · {etf.constituents.length} constituents
             </p>
-          </div>
+          </Link>
         )}
         {!editing && (
           <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setAddingAsset(!addingAsset)}>
-              <UserPlus className="h-3.5 w-3.5" />
-            </Button>
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(true)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -158,98 +148,17 @@ function EtfCard({ etf }: { etf: PseudoETF }) {
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-2">
-        {addingAsset && (
-          <AddConstituentPicker
-            etfId={etf.id}
-            existingIds={etf.constituents.map((a) => a.id)}
-            onClose={() => setAddingAsset(false)}
-          />
-        )}
-
-        {etf.constituents.length === 0 && (
-          <p className="text-sm text-muted-foreground italic">No constituents. Add stocks to this basket.</p>
-        )}
-
-        <div className="flex flex-wrap gap-2">
+      <CardContent>
+        <div className="flex flex-wrap gap-1.5">
           {etf.constituents.map((asset) => (
-            <div key={asset.id} className="flex items-center gap-1 group/asset">
-              <Link to={`/asset/${asset.symbol}`}>
-                <Badge variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
-                  {asset.symbol}
-                </Badge>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 opacity-0 group-hover/asset:opacity-100 transition-opacity"
-                onClick={() => removeConstituent.mutate({ etfId: etf.id, assetId: asset.id })}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
+            <Link key={asset.id} to={`/asset/${asset.symbol}`}>
+              <Badge variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+                {asset.symbol}
+              </Badge>
+            </Link>
           ))}
         </div>
-
-        {etf.constituents.length > 0 && (
-          <Link to={`/pseudo-etf/${etf.id}`}>
-            <Button variant="outline" size="sm" className="mt-2">
-              View Performance
-            </Button>
-          </Link>
-        )}
       </CardContent>
     </Card>
-  )
-}
-
-function AddConstituentPicker({
-  etfId,
-  existingIds,
-  onClose,
-}: {
-  etfId: number
-  existingIds: number[]
-  onClose: () => void
-}) {
-  const { data: allAssets } = useAssets()
-  const addConstituents = useAddPseudoEtfConstituents()
-  const available = allAssets?.filter((a) => !existingIds.includes(a.id)) ?? []
-  const [selected, setSelected] = useState<number[]>([])
-
-  const toggle = (id: number) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-  }
-
-  const handleAdd = () => {
-    if (!selected.length) return
-    addConstituents.mutate({ etfId, assetIds: selected }, { onSuccess: () => onClose() })
-  }
-
-  return (
-    <div className="p-3 rounded-md border bg-muted/30 space-y-2">
-      {available.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No more assets to add. Add assets from the dashboard first.</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {available.map((a) => (
-            <Badge
-              key={a.id}
-              variant={selected.includes(a.id) ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => toggle(a.id)}
-            >
-              {a.symbol}
-            </Badge>
-          ))}
-        </div>
-      )}
-      <div className="flex justify-end gap-1">
-        <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button size="sm" onClick={handleAdd} disabled={!selected.length || addConstituents.isPending}>
-          Add ({selected.length})
-        </Button>
-      </div>
-    </div>
   )
 }

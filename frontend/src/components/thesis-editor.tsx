@@ -2,11 +2,15 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { useThesis, useUpdateThesis } from "@/lib/queries"
+import type { Thesis } from "@/lib/api"
 
-export function ThesisEditor({ symbol }: { symbol: string }) {
-  const { data: thesis } = useThesis(symbol)
-  const updateThesis = useUpdateThesis(symbol)
+interface ThesisEditorProps {
+  thesis: Thesis | undefined
+  onSave: (content: string) => void
+  isSaving: boolean
+}
+
+export function ThesisEditor({ thesis, onSave, isSaving }: ThesisEditorProps) {
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState("")
 
@@ -16,7 +20,8 @@ export function ThesisEditor({ symbol }: { symbol: string }) {
   }
 
   const handleSave = () => {
-    updateThesis.mutate(content, { onSuccess: () => setEditing(false) })
+    onSave(content)
+    setEditing(false)
   }
 
   return (
@@ -28,7 +33,7 @@ export function ThesisEditor({ symbol }: { symbol: string }) {
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={updateThesis.isPending}>
+            <Button size="sm" onClick={handleSave} disabled={isSaving}>
               Save
             </Button>
           </div>

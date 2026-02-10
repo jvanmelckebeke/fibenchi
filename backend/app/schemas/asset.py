@@ -9,6 +9,7 @@ class AssetCreate(BaseModel):
     symbol: str
     name: str | None = None
     type: AssetType = AssetType.STOCK
+    watchlisted: bool = True
 
 
 class AssetResponse(BaseModel):
@@ -16,6 +17,7 @@ class AssetResponse(BaseModel):
     symbol: str
     name: str
     type: AssetType
+    watchlisted: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

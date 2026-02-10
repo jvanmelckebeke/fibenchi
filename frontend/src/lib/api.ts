@@ -7,6 +7,7 @@ export interface Asset {
   symbol: string
   name: string
   type: AssetType
+  watchlisted: boolean
   created_at: string
 }
 
@@ -14,6 +15,7 @@ export interface AssetCreate {
   symbol: string
   name?: string
   type?: AssetType
+  watchlisted?: boolean
 }
 
 export interface Group {
@@ -196,5 +198,23 @@ export const api = {
     removeConstituent: (etfId: number, assetId: number) =>
       request<PseudoETF>(`/pseudo-etfs/${etfId}/constituents/${assetId}`, { method: "DELETE" }),
     performance: (id: number) => request<PerformancePoint[]>(`/pseudo-etfs/${id}/performance`),
+    thesis: {
+      get: (id: number) => request<Thesis>(`/pseudo-etfs/${id}/thesis`),
+      update: (id: number, content: string) =>
+        request<Thesis>(`/pseudo-etfs/${id}/thesis`, {
+          method: "PUT",
+          body: JSON.stringify({ content }),
+        }),
+    },
+    annotations: {
+      list: (id: number) => request<Annotation[]>(`/pseudo-etfs/${id}/annotations`),
+      create: (id: number, data: AnnotationCreate) =>
+        request<Annotation>(`/pseudo-etfs/${id}/annotations`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      delete: (id: number, annotationId: number) =>
+        request<void>(`/pseudo-etfs/${id}/annotations/${annotationId}`, { method: "DELETE" }),
+    },
   },
 }

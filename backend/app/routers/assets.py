@@ -21,8 +21,14 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
     symbol = data.symbol.upper()
 
     existing = await db.execute(select(Asset).where(Asset.symbol == symbol))
-    if existing.scalar_one_or_none():
-        raise HTTPException(400, f"Asset {symbol} already exists")
+    asset = existing.scalar_one_or_none()
+    if asset:
+        # If asset already exists but caller wants it watchlisted, update that
+        if data.watchlisted and not asset.watchlisted:
+            asset.watchlisted = True
+            await db.commit()
+            await db.refresh(asset)
+        return asset
 
     name = data.name
     asset_type = data.type
@@ -35,7 +41,7 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
         if info["type"] == "ETF":
             asset_type = AssetType.ETF
 
-    asset = Asset(symbol=symbol, name=name, type=asset_type)
+    asset = Asset(symbol=symbol, name=name, type=asset_type, watchlisted=data.watchlisted)
     db.add(asset)
     await db.commit()
     await db.refresh(asset)
@@ -48,5 +54,5 @@ async def delete_asset(symbol: str, db: AsyncSession = Depends(get_db)):
     asset = result.scalar_one_or_none()
     if not asset:
         raise HTTPException(404, f"Asset {symbol} not found")
-    await db.delete(asset)
+    asset.watchlisted = False
     await db.commit()
