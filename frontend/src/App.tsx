@@ -1,12 +1,17 @@
-export function App() {
+import { Routes, Route } from "react-router-dom"
+import { Layout } from "@/components/layout"
+import { DashboardPage } from "@/pages/dashboard"
+import { AssetDetailPage } from "@/pages/asset-detail"
+import { GroupsPage } from "@/pages/groups"
+
+export default function App() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold text-foreground">fibenchi</h1>
-        <p className="text-muted-foreground">Watchlist &amp; research tool</p>
-      </div>
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="/asset/:symbol" element={<AssetDetailPage />} />
+        <Route path="/groups" element={<GroupsPage />} />
+      </Route>
+    </Routes>
   )
 }
-
-export default App
