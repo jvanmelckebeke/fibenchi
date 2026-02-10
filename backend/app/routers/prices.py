@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Asset, PriceHistory
-from app.schemas.price import IndicatorResponse, PriceResponse
+from app.schemas.price import EtfHoldingsResponse, IndicatorResponse, PriceResponse
 from app.services.indicators import compute_indicators
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
+from app.services.yahoo import fetch_etf_holdings
 
 import pandas as pd
 
@@ -118,6 +119,17 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
         ))
 
     return rows
+
+
+@router.get("/holdings", response_model=EtfHoldingsResponse)
+async def get_holdings(symbol: str, db: AsyncSession = Depends(get_db)):
+    asset = await _get_asset(symbol, db)
+    if asset.type.value != "etf":
+        raise HTTPException(400, f"{symbol} is not an ETF")
+    data = fetch_etf_holdings(symbol)
+    if not data:
+        raise HTTPException(404, f"No holdings data for {symbol}")
+    return data
 
 
 @router.post("/refresh", status_code=200)

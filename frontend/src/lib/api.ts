@@ -85,6 +85,23 @@ export interface SyncResult {
   synced: number
 }
 
+export interface Holding {
+  symbol: string
+  name: string
+  percent: number
+}
+
+export interface SectorWeighting {
+  sector: string
+  percent: number
+}
+
+export interface EtfHoldings {
+  top_holdings: Holding[]
+  sector_weightings: SectorWeighting[]
+  total_percent: number
+}
+
 export interface PseudoETF {
   id: number
   name: string
@@ -146,6 +163,8 @@ export const api = {
       request<Indicator[]>(`/assets/${symbol}/indicators${period ? `?period=${period}` : ""}`),
     refresh: (symbol: string) =>
       request<SyncResult>(`/assets/${symbol}/refresh`, { method: "POST" }),
+    holdings: (symbol: string) =>
+      request<EtfHoldings>(`/assets/${symbol}/holdings`),
   },
   groups: {
     list: () => request<Group[]>("/groups"),

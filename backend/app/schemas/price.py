@@ -26,3 +26,20 @@ class IndicatorResponse(BaseModel):
     macd: float | None = None
     macd_signal: float | None = None
     macd_hist: float | None = None
+
+
+class HoldingResponse(BaseModel):
+    symbol: str
+    name: str
+    percent: float
+
+
+class SectorWeighting(BaseModel):
+    sector: str
+    percent: float
+
+
+class EtfHoldingsResponse(BaseModel):
+    top_holdings: list[HoldingResponse]
+    sector_weightings: list[SectorWeighting]
+    total_percent: float

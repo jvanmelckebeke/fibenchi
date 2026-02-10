@@ -57,6 +57,59 @@ def validate_symbol(symbol: str) -> dict | None:
     }
 
 
+def fetch_etf_holdings(symbol: str) -> dict | None:
+    """Fetch ETF top holdings and sector weightings from Yahoo Finance.
+
+    Returns None if the symbol is not an ETF or data is unavailable.
+    """
+    ticker = Ticker(symbol)
+    info = ticker.fund_holding_info.get(symbol)
+
+    if not info or isinstance(info, str):
+        return None
+
+    holdings = []
+    for h in info.get("holdings", []):
+        holdings.append({
+            "symbol": h.get("symbol", ""),
+            "name": h.get("holdingName", ""),
+            "percent": round(h.get("holdingPercent", 0) * 100, 2),
+        })
+
+    sector_map = {
+        "realestate": "Real Estate",
+        "consumer_cyclical": "Consumer Cyclical",
+        "basic_materials": "Basic Materials",
+        "consumer_defensive": "Consumer Defensive",
+        "technology": "Technology",
+        "communication_services": "Communication Services",
+        "financial_services": "Financial Services",
+        "utilities": "Utilities",
+        "industrials": "Industrials",
+        "energy": "Energy",
+        "healthcare": "Healthcare",
+    }
+
+    sectors = []
+    for entry in info.get("sectorWeightings", []):
+        for key, val in entry.items():
+            pct = round(val * 100, 2)
+            if pct > 0:
+                sectors.append({
+                    "sector": sector_map.get(key, key),
+                    "percent": pct,
+                })
+    sectors.sort(key=lambda s: s["percent"], reverse=True)
+
+    total = round(sum(h["percent"] for h in holdings), 2)
+
+    return {
+        "top_holdings": holdings,
+        "sector_weightings": sectors,
+        "total_percent": total,
+    }
+
+
 def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
     """Fetch history for multiple symbols in one batch call."""
     if not symbols:

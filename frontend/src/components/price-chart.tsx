@@ -140,6 +140,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
     }
 
     // Sync crosshair on hover + update legend
+    // Both handlers snap the crosshair on BOTH charts to the actual data values
     mainChart.subscribeCrosshairMove((param) => {
       if (param.time) {
         const key = String(param.time)
@@ -152,6 +153,10 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       syncingRef.current = true
       if (param.time) {
         const key = String(param.time)
+        const closeVal = closeByTime.current.get(key)
+        if (closeVal !== undefined) {
+          mainChart.setCrosshairPosition(closeVal, param.time, candleSeries)
+        }
         const rsiVal = rsiByTime.current.get(key)
         if (rsiVal !== undefined) {
           rsiChart.setCrosshairPosition(rsiVal, param.time, rsiSeries)
@@ -174,6 +179,10 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       syncingRef.current = true
       if (param.time) {
         const key = String(param.time)
+        const rsiVal = rsiByTime.current.get(key)
+        if (rsiVal !== undefined) {
+          rsiChart.setCrosshairPosition(rsiVal, param.time, rsiSeries)
+        }
         const closeVal = closeByTime.current.get(key)
         if (closeVal !== undefined) {
           mainChart.setCrosshairPosition(closeVal, param.time, candleSeries)
@@ -240,7 +249,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       },
       rightPriceScale: { borderColor: theme.border },
       timeScale: { borderColor: theme.border, visible: false },
-      crosshair: { mode: 0 },
+      crosshair: { mode: 1 },
     })
 
     const candleSeries = mainChart.addSeries(CandlestickSeries, {
@@ -350,7 +359,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
         scaleMargins: { top: 0.05, bottom: 0.05 },
       },
       timeScale: { borderColor: theme.border, timeVisible: false },
-      crosshair: { mode: 0 },
+      crosshair: { mode: 1 },
     })
 
     const rsiSeries = rsiChart.addSeries(LineSeries, {
