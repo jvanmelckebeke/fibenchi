@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import {
   createChart,
   createSeriesMarkers,
@@ -13,7 +13,6 @@ interface PriceChartProps {
   prices: Price[]
   indicators: Indicator[]
   annotations: Annotation[]
-  onAnnotationClick?: (date: string) => void
 }
 
 function getThemeColors() {
@@ -26,27 +25,188 @@ function getThemeColors() {
   }
 }
 
+interface LegendValues {
+  o?: number
+  h?: number
+  l?: number
+  c?: number
+  sma20?: number
+  sma50?: number
+  rsi?: number
+}
+
+function Legend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
+  const v = values ?? latest
+  const changeColor = v.c !== undefined && v.o !== undefined
+    ? v.c >= v.o ? "text-green-500" : "text-red-500"
+    : ""
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
+      {v.o !== undefined && (
+        <>
+          <span className="text-muted-foreground">O <span className={changeColor}>{v.o.toFixed(2)}</span></span>
+          <span className="text-muted-foreground">H <span className={changeColor}>{v.h!.toFixed(2)}</span></span>
+          <span className="text-muted-foreground">L <span className={changeColor}>{v.l!.toFixed(2)}</span></span>
+          <span className="text-muted-foreground">C <span className={changeColor}>{v.c!.toFixed(2)}</span></span>
+        </>
+      )}
+      {v.sma20 !== undefined && (
+        <span><span className="inline-block w-2 h-0.5 bg-teal-500 mr-1 align-middle" />SMA 20 <span className="text-teal-500">{v.sma20.toFixed(2)}</span></span>
+      )}
+      {v.sma50 !== undefined && (
+        <span><span className="inline-block w-2 h-0.5 bg-violet-500 mr-1 align-middle" />SMA 50 <span className="text-violet-500">{v.sma50.toFixed(2)}</span></span>
+      )}
+    </div>
+  )
+}
+
+function RsiLegend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
+  const rsi = (values ?? latest).rsi
+  const color = rsi !== undefined
+    ? rsi >= 70 ? "text-red-500" : rsi <= 30 ? "text-green-500" : "text-violet-500"
+    : "text-muted-foreground"
+
+  return (
+    <div className="text-xs tabular-nums">
+      <span className="text-muted-foreground">RSI(14) </span>
+      {rsi !== undefined && <span className={color}>{rsi.toFixed(2)}</span>}
+    </div>
+  )
+}
+
 export function PriceChart({ prices, indicators, annotations }: PriceChartProps) {
   const mainRef = useRef<HTMLDivElement>(null)
   const rsiRef = useRef<HTMLDivElement>(null)
   const mainChartRef = useRef<IChartApi | null>(null)
   const rsiChartRef = useRef<IChartApi | null>(null)
+  const [hoverValues, setHoverValues] = useState<LegendValues | null>(null)
 
-  const syncCharts = useCallback(() => {
-    const main = mainChartRef.current
-    const rsi = rsiChartRef.current
-    if (!main || !rsi) return
+  // Build lookup maps
+  const closeByTime = useRef(new Map<string, number>())
+  const ohlcByTime = useRef(new Map<string, { o: number; h: number; l: number; c: number }>())
+  const sma20ByTime = useRef(new Map<string, number>())
+  const sma50ByTime = useRef(new Map<string, number>())
+  const rsiByTime = useRef(new Map<string, number>())
 
-    main.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (range) rsi.timeScale().setVisibleLogicalRange(range)
+  // Compute latest values for default legend display
+  const latestValues = useRef<LegendValues>({})
+
+  const syncingRef = useRef(false)
+
+  const syncCharts = useCallback((
+    mainChart: IChartApi,
+    rsiChart: IChartApi,
+    candleSeries: ReturnType<IChartApi["addSeries"]>,
+    rsiSeries: ReturnType<IChartApi["addSeries"]>,
+  ) => {
+    // Sync visible range by time (not logical index) to handle different data lengths
+    mainChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      if (syncingRef.current) return
+      syncingRef.current = true
+      const timeRange = mainChart.timeScale().getVisibleRange()
+      if (timeRange) rsiChart.timeScale().setVisibleRange(timeRange)
+      syncingRef.current = false
     })
-    rsi.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (range) main.timeScale().setVisibleLogicalRange(range)
+    rsiChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      if (syncingRef.current) return
+      syncingRef.current = true
+      const timeRange = rsiChart.timeScale().getVisibleRange()
+      if (timeRange) mainChart.timeScale().setVisibleRange(timeRange)
+      syncingRef.current = false
+    })
+
+    const getValuesForTime = (key: string): LegendValues => {
+      const ohlc = ohlcByTime.current.get(key)
+      return {
+        o: ohlc?.o,
+        h: ohlc?.h,
+        l: ohlc?.l,
+        c: ohlc?.c,
+        sma20: sma20ByTime.current.get(key),
+        sma50: sma50ByTime.current.get(key),
+        rsi: rsiByTime.current.get(key),
+      }
+    }
+
+    // Sync crosshair on hover + update legend
+    mainChart.subscribeCrosshairMove((param) => {
+      if (param.time) {
+        const key = String(param.time)
+        setHoverValues(getValuesForTime(key))
+      } else {
+        setHoverValues(null)
+      }
+
+      if (syncingRef.current) return
+      syncingRef.current = true
+      if (param.time) {
+        const key = String(param.time)
+        const rsiVal = rsiByTime.current.get(key)
+        if (rsiVal !== undefined) {
+          rsiChart.setCrosshairPosition(rsiVal, param.time, rsiSeries)
+        }
+      } else {
+        rsiChart.clearCrosshairPosition()
+      }
+      syncingRef.current = false
+    })
+
+    rsiChart.subscribeCrosshairMove((param) => {
+      if (param.time) {
+        const key = String(param.time)
+        setHoverValues(getValuesForTime(key))
+      } else {
+        setHoverValues(null)
+      }
+
+      if (syncingRef.current) return
+      syncingRef.current = true
+      if (param.time) {
+        const key = String(param.time)
+        const closeVal = closeByTime.current.get(key)
+        if (closeVal !== undefined) {
+          mainChart.setCrosshairPosition(closeVal, param.time, candleSeries)
+        }
+      } else {
+        mainChart.clearCrosshairPosition()
+      }
+      syncingRef.current = false
     })
   }, [])
 
   useEffect(() => {
     if (!mainRef.current || !rsiRef.current || !prices.length) return
+
+    // Build lookup maps
+    closeByTime.current.clear()
+    ohlcByTime.current.clear()
+    sma20ByTime.current.clear()
+    sma50ByTime.current.clear()
+    rsiByTime.current.clear()
+
+    for (const p of prices) {
+      closeByTime.current.set(p.date, p.close)
+      ohlcByTime.current.set(p.date, { o: p.open, h: p.high, l: p.low, c: p.close })
+    }
+    for (const i of indicators) {
+      if (i.sma_20 !== null) sma20ByTime.current.set(i.date, i.sma_20)
+      if (i.sma_50 !== null) sma50ByTime.current.set(i.date, i.sma_50)
+      if (i.rsi !== null) rsiByTime.current.set(i.date, i.rsi)
+    }
+
+    // Latest values for default legend
+    const lastPrice = prices[prices.length - 1]
+    const lastIndicators = [...indicators].reverse()
+    latestValues.current = {
+      o: lastPrice.open,
+      h: lastPrice.high,
+      l: lastPrice.low,
+      c: lastPrice.close,
+      sma20: lastIndicators.find((i) => i.sma_20 !== null)?.sma_20 ?? undefined,
+      sma50: lastIndicators.find((i) => i.sma_50 !== null)?.sma_50 ?? undefined,
+      rsi: lastIndicators.find((i) => i.rsi !== null)?.rsi ?? undefined,
+    }
 
     const theme = getThemeColors()
 
@@ -63,10 +223,8 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
         horzLines: { color: theme.grid },
       },
       rightPriceScale: { borderColor: theme.border },
-      timeScale: { borderColor: theme.border, timeVisible: false },
-      crosshair: {
-        mode: 0,
-      },
+      timeScale: { borderColor: theme.border, visible: false },
+      crosshair: { mode: 0 },
     })
 
     const candleSeries = mainChart.addSeries(CandlestickSeries, {
@@ -145,14 +303,22 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
         vertLines: { color: theme.grid },
         horzLines: { color: theme.grid },
       },
-      rightPriceScale: { borderColor: theme.border },
-      timeScale: { borderColor: theme.border, visible: false },
+      rightPriceScale: {
+        borderColor: theme.border,
+        autoScale: false,
+        scaleMargins: { top: 0.05, bottom: 0.05 },
+      },
+      timeScale: { borderColor: theme.border, timeVisible: false },
+      crosshair: { mode: 0 },
     })
 
     const rsiSeries = rsiChart.addSeries(LineSeries, {
       color: "#8b5cf6",
       lineWidth: 2,
       priceLineVisible: false,
+      autoscaleInfoProvider: () => ({
+        priceRange: { minValue: 0, maxValue: 100 },
+      }),
     })
 
     rsiSeries.setData(
@@ -168,6 +334,9 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       lineStyle: 2,
       priceLineVisible: false,
       crosshairMarkerVisible: false,
+      autoscaleInfoProvider: () => ({
+        priceRange: { minValue: 0, maxValue: 100 },
+      }),
     })
     const oversold = rsiChart.addSeries(LineSeries, {
       color: "rgba(34, 197, 94, 0.5)",
@@ -175,6 +344,9 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       lineStyle: 2,
       priceLineVisible: false,
       crosshairMarkerVisible: false,
+      autoscaleInfoProvider: () => ({
+        priceRange: { minValue: 0, maxValue: 100 },
+      }),
     })
 
     const rsiDates = indicators.filter((i) => i.rsi !== null).map((i) => i.date)
@@ -186,7 +358,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
     rsiChart.timeScale().fitContent()
     rsiChartRef.current = rsiChart
 
-    syncCharts()
+    syncCharts(mainChart, rsiChart, candleSeries, rsiSeries)
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -207,9 +379,14 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
   }, [prices, indicators, annotations, syncCharts])
 
   return (
-    <div className="space-y-0">
+    <div className="mb-4">
+      <div className="px-1 py-1">
+        <Legend values={hoverValues} latest={latestValues.current} />
+      </div>
       <div ref={mainRef} className="w-full rounded-t-md overflow-hidden" />
-      <div className="text-xs text-muted-foreground px-1 py-0.5 bg-muted/30">RSI (14)</div>
+      <div className="px-1 py-1">
+        <RsiLegend values={hoverValues} latest={latestValues.current} />
+      </div>
       <div ref={rsiRef} className="w-full rounded-b-md overflow-hidden" />
     </div>
   )
