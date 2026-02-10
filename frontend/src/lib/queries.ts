@@ -6,6 +6,7 @@ import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type Annotat
 // Keys
 export const keys = {
   portfolioIndex: (period?: string) => ["portfolio-index", period] as const,
+  portfolioPerformers: (period?: string) => ["portfolio-performers", period] as const,
   assets: ["assets"] as const,
   asset: (symbol: string) => ["assets", symbol] as const,
   prices: (symbol: string, period?: string) => ["prices", symbol, period] as const,
@@ -27,6 +28,13 @@ export function usePortfolioIndex(period?: string) {
   return useQuery({
     queryKey: keys.portfolioIndex(period),
     queryFn: () => api.portfolio.index(period),
+  })
+}
+
+export function usePortfolioPerformers(period?: string) {
+  return useQuery({
+    queryKey: keys.portfolioPerformers(period),
+    queryFn: () => api.portfolio.performers(period),
   })
 }
 

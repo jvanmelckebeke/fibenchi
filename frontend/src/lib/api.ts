@@ -121,6 +121,13 @@ export interface PortfolioIndex {
   change_pct: number
 }
 
+export interface AssetPerformance {
+  symbol: string
+  name: string
+  type: string
+  change_pct: number
+}
+
 export interface PseudoETF {
   id: number
   name: string
@@ -171,6 +178,8 @@ export const api = {
   portfolio: {
     index: (period?: string) =>
       request<PortfolioIndex>(`/portfolio/index${period ? `?period=${period}` : ""}`),
+    performers: (period?: string) =>
+      request<AssetPerformance[]>(`/portfolio/performers${period ? `?period=${period}` : ""}`),
   },
   assets: {
     list: () => request<Asset[]>("/assets"),
