@@ -12,7 +12,7 @@ FROM base AS dev
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 EXPOSE 5173
-CMD ["pnpm", "dev", "--host"]
+CMD ["sh", "docker-entrypoint.sh"]
 
 # Build
 FROM base AS build
