@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useParams, Link } from "react-router-dom"
-import { ArrowLeft, RefreshCw } from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PriceChart } from "@/components/price-chart"
@@ -100,7 +100,12 @@ function ChartSection({ symbol, period }: { symbol: string; period: string }) {
   const { data: annotations } = useAnnotations(symbol)
 
   if (pricesLoading || indicatorsLoading) {
-    return <div className="h-[520px] flex items-center justify-center text-muted-foreground">Loading chart...</div>
+    return (
+      <div className="h-[520px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span className="text-sm">Loading chart...</span>
+      </div>
+    )
   }
 
   if (!prices?.length) {
@@ -147,7 +152,12 @@ function HoldingsSection({ symbol }: { symbol: string }) {
   const { data: indicators, isLoading: indicatorsLoading } = useHoldingsIndicators(symbol, !!data?.top_holdings.length)
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground">Loading holdings...</div>
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground py-4">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Loading holdings...</span>
+      </div>
+    )
   }
   if (!data || (!data.top_holdings.length && !data.sector_weightings.length)) {
     return null
