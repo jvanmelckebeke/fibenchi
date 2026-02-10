@@ -12,7 +12,9 @@ router = APIRouter(prefix="/api/assets", tags=["assets"])
 
 @router.get("", response_model=list[AssetResponse])
 async def list_assets(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Asset).order_by(Asset.symbol))
+    result = await db.execute(
+        select(Asset).where(Asset.watchlisted == True).order_by(Asset.symbol)  # noqa: E712
+    )
     return result.scalars().all()
 
 
