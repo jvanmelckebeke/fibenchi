@@ -102,6 +102,17 @@ export interface EtfHoldings {
   total_percent: number
 }
 
+export interface HoldingIndicator {
+  symbol: string
+  close: number | null
+  change_pct: number | null
+  rsi: number | null
+  sma_20: number | null
+  sma_50: number | null
+  macd_signal_dir: string | null
+  bb_position: string | null
+}
+
 export interface PseudoETF {
   id: number
   name: string
@@ -165,6 +176,8 @@ export const api = {
       request<SyncResult>(`/assets/${symbol}/refresh${period ? `?period=${period}` : ""}`, { method: "POST" }),
     holdings: (symbol: string) =>
       request<EtfHoldings>(`/assets/${symbol}/holdings`),
+    holdingsIndicators: (symbol: string) =>
+      request<HoldingIndicator[]>(`/assets/${symbol}/holdings/indicators`),
   },
   groups: {
     list: () => request<Group[]>("/groups"),

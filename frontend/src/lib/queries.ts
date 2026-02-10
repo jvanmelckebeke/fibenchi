@@ -10,6 +10,7 @@ export const keys = {
   prices: (symbol: string, period?: string) => ["prices", symbol, period] as const,
   indicators: (symbol: string, period?: string) => ["indicators", symbol, period] as const,
   etfHoldings: (symbol: string) => ["etf-holdings", symbol] as const,
+  holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
   groups: ["groups"] as const,
   thesis: (symbol: string) => ["thesis", symbol] as const,
   annotations: (symbol: string) => ["annotations", symbol] as const,
@@ -64,6 +65,15 @@ export function useEtfHoldings(symbol: string, enabled: boolean) {
     queryFn: () => api.prices.holdings(symbol),
     enabled: !!symbol && enabled,
     staleTime: 24 * 60 * 60 * 1000, // cache 24h — holdings don't change often
+  })
+}
+
+export function useHoldingsIndicators(symbol: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.holdingsIndicators(symbol),
+    queryFn: () => api.prices.holdingsIndicators(symbol),
+    enabled: !!symbol && enabled,
+    staleTime: 5 * 60 * 1000, // cache 5 min
   })
 }
 

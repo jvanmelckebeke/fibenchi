@@ -43,3 +43,14 @@ class EtfHoldingsResponse(BaseModel):
     top_holdings: list[HoldingResponse]
     sector_weightings: list[SectorWeighting]
     total_percent: float
+
+
+class HoldingIndicatorResponse(BaseModel):
+    symbol: str
+    close: float | None = None
+    change_pct: float | None = None
+    rsi: float | None = None
+    sma_20: float | None = None
+    sma_50: float | None = None
+    macd_signal_dir: str | None = None  # "bullish" | "bearish"
+    bb_position: str | None = None  # "above" | "upper" | "middle" | "lower" | "below"
