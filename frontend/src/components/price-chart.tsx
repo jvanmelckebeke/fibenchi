@@ -195,14 +195,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       },
       rightPriceScale: { borderColor: theme.border },
       timeScale: { borderColor: theme.border, visible: false },
-      crosshair: { mode: 1 },
-      handleScroll: {
-        pressedMouseMove: true,
-        vertTouchDrag: false,
-      },
-      handleScale: {
-        axisPressedMouseMove: { time: true, price: true },
-      },
+      crosshair: { mode: 0 },
     })
 
     const candleSeries = mainChart.addSeries(CandlestickSeries, {
@@ -313,14 +306,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
         scaleMargins: { top: 0.05, bottom: 0.05 },
       },
       timeScale: { borderColor: theme.border, timeVisible: false },
-      crosshair: { mode: 1 },
-      handleScroll: {
-        pressedMouseMove: true,
-        vertTouchDrag: false,
-      },
-      handleScale: {
-        axisPressedMouseMove: { time: true, price: true },
-      },
+      crosshair: { mode: 0 },
     })
 
     const rsiSeries = rsiChart.addSeries(LineSeries, {
