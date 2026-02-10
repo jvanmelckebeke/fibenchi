@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from app.config import settings
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
-from app.routers import annotations, assets, groups, prices, thesis
+from app.routers import annotations, assets, groups, prices, pseudo_etfs, thesis
 from app.services.price_sync import sync_all_prices
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,7 @@ app.include_router(groups.router)
 app.include_router(prices.router)
 app.include_router(thesis.router)
 app.include_router(annotations.router)
+app.include_router(pseudo_etfs.router)
 
 
 @app.get("/api/health")
