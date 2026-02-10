@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom"
 import { Layout } from "@/components/layout"
+import { PortfolioPage } from "@/pages/portfolio"
 import { DashboardPage } from "@/pages/dashboard"
 import { AssetDetailPage } from "@/pages/asset-detail"
 import { GroupsPage } from "@/pages/groups"
@@ -10,7 +11,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<DashboardPage />} />
+        <Route index element={<PortfolioPage />} />
+        <Route path="/watchlist" element={<DashboardPage />} />
         <Route path="/asset/:symbol" element={<AssetDetailPage />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/pseudo-etfs" element={<PseudoEtfsPage />} />

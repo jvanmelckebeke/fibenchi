@@ -113,6 +113,14 @@ export interface HoldingIndicator {
   bb_position: string | null
 }
 
+export interface PortfolioIndex {
+  dates: string[]
+  values: number[]
+  current: number
+  change: number
+  change_pct: number
+}
+
 export interface PseudoETF {
   id: number
   name: string
@@ -158,8 +166,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
-// Assets
+// Portfolio & Assets
 export const api = {
+  portfolio: {
+    index: (period?: string) =>
+      request<PortfolioIndex>(`/portfolio/index${period ? `?period=${period}` : ""}`),
+  },
   assets: {
     list: () => request<Asset[]>("/assets"),
     create: (data: AssetCreate) =>

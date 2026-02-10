@@ -5,6 +5,7 @@ import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type Annotat
 
 // Keys
 export const keys = {
+  portfolioIndex: (period?: string) => ["portfolio-index", period] as const,
   assets: ["assets"] as const,
   asset: (symbol: string) => ["assets", symbol] as const,
   prices: (symbol: string, period?: string) => ["prices", symbol, period] as const,
@@ -19,6 +20,14 @@ export const keys = {
   pseudoEtfPerformance: (id: number) => ["pseudo-etfs", id, "performance"] as const,
   pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
+}
+
+// Portfolio
+export function usePortfolioIndex(period?: string) {
+  return useQuery({
+    queryKey: keys.portfolioIndex(period),
+    queryFn: () => api.portfolio.index(period),
+  })
 }
 
 // Assets
