@@ -23,12 +23,12 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(Asset).where(Asset.symbol == symbol))
     asset = existing.scalar_one_or_none()
     if asset:
-        # If asset already exists but caller wants it watchlisted, update that
-        if data.watchlisted and not asset.watchlisted:
+        if not asset.watchlisted and data.watchlisted:
             asset.watchlisted = True
             await db.commit()
             await db.refresh(asset)
-        return asset
+            return asset
+        raise HTTPException(400, f"Asset with symbol {symbol} already exists")
 
     name = data.name
     asset_type = data.type
