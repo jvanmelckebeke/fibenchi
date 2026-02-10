@@ -21,7 +21,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://fibenchi:fibenchi@db:5432/fibenchi
       REFRESH_CRON: ${REFRESH_CRON:-0 23 * * *}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "18000:8000"
     volumes:
       - ./backend:/app
     depends_on:
