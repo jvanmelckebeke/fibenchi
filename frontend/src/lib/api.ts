@@ -161,8 +161,8 @@ export const api = {
       request<Price[]>(`/assets/${symbol}/prices${period ? `?period=${period}` : ""}`),
     indicators: (symbol: string, period?: string) =>
       request<Indicator[]>(`/assets/${symbol}/indicators${period ? `?period=${period}` : ""}`),
-    refresh: (symbol: string) =>
-      request<SyncResult>(`/assets/${symbol}/refresh`, { method: "POST" }),
+    refresh: (symbol: string, period?: string) =>
+      request<SyncResult>(`/assets/${symbol}/refresh${period ? `?period=${period}` : ""}`, { method: "POST" }),
     holdings: (symbol: string) =>
       request<EtfHoldings>(`/assets/${symbol}/holdings`),
   },

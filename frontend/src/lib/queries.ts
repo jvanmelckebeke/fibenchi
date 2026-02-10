@@ -70,7 +70,7 @@ export function useEtfHoldings(symbol: string, enabled: boolean) {
 export function useRefreshPrices(symbol: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api.prices.refresh(symbol),
+    mutationFn: (period?: string) => api.prices.refresh(symbol, period),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.prices(symbol) })
       qc.invalidateQueries({ queryKey: keys.indicators(symbol) })

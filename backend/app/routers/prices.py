@@ -39,7 +39,7 @@ async def _get_asset(symbol: str, db: AsyncSession) -> Asset:
 
 
 async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[PriceHistory]:
-    """Load all prices from DB, syncing from Yahoo if none exist."""
+    """Load all prices from DB, fetching from Yahoo if the requested period isn't covered."""
     result = await db.execute(
         select(PriceHistory)
         .where(PriceHistory.asset_id == asset.id)
@@ -47,10 +47,17 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
     )
     prices = result.scalars().all()
 
+    needed_start = _display_start(period)
+
     if not prices:
         count = await sync_asset_prices(db, asset, period=period)
         if count == 0:
             raise HTTPException(404, f"No price data available for {asset.symbol}")
+    elif prices[0].date > needed_start:
+        # DB has data but doesn't go back far enough for the requested period
+        await sync_asset_prices_range(db, asset, needed_start, date.today())
+
+    if not prices or prices[0].date > needed_start:
         result = await db.execute(
             select(PriceHistory)
             .where(PriceHistory.asset_id == asset.id)

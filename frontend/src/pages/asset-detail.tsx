@@ -82,7 +82,7 @@ function Header({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => refresh.mutate()}
+          onClick={() => refresh.mutate(period)}
           disabled={refresh.isPending}
         >
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />
