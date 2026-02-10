@@ -17,6 +17,14 @@ async def sync_asset_prices(db: AsyncSession, asset: Asset, period: str = "3mo")
     return await _upsert_prices(db, asset.id, df)
 
 
+async def sync_asset_prices_range(
+    db: AsyncSession, asset: Asset, start: date, end: date
+) -> int:
+    """Fetch and upsert price data for a date range. Returns number of rows upserted."""
+    df = fetch_history(asset.symbol, start=start, end=end)
+    return await _upsert_prices(db, asset.id, df)
+
+
 async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int]:
     """Fetch and upsert prices for all watchlist assets. Returns {symbol: count}."""
     result = await db.execute(select(Asset))

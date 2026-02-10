@@ -49,6 +49,9 @@ export interface Indicator {
   rsi: number | null
   sma_20: number | null
   sma_50: number | null
+  bb_upper: number | null
+  bb_middle: number | null
+  bb_lower: number | null
   macd: number | null
   macd_signal: number | null
   macd_hist: number | null

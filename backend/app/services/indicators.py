@@ -22,6 +22,17 @@ def ema(data: pd.Series, period: int) -> pd.Series:
     return data.ewm(span=period, adjust=False).mean()
 
 
+def bollinger_bands(
+    closes: pd.Series, period: int = 20, std_dev: float = 2.0
+) -> dict[str, pd.Series]:
+    """Bollinger Bands: middle (SMA), upper (SMA + 2*std), lower (SMA - 2*std)."""
+    middle = sma(closes, period)
+    rolling_std = closes.rolling(window=period).std()
+    upper = middle + (rolling_std * std_dev)
+    lower = middle - (rolling_std * std_dev)
+    return {"upper": upper, "middle": middle, "lower": lower}
+
+
 def macd(closes: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> dict[str, pd.Series]:
     """MACD line, signal line, and histogram."""
     macd_line = ema(closes, fast) - ema(closes, slow)
@@ -34,16 +45,19 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Compute all indicators and return a DataFrame with indicator columns.
 
     Input df must have a 'close' column (and 'high'/'low' for some indicators).
-    Returns DataFrame indexed by date with: close, rsi, sma_20, sma_50, macd, macd_signal, macd_hist.
     """
     closes = df["close"]
     macd_data = macd(closes)
+    bb_data = bollinger_bands(closes)
 
     result = pd.DataFrame(index=df.index)
     result["close"] = closes
     result["rsi"] = rsi(closes)
     result["sma_20"] = sma(closes, 20)
     result["sma_50"] = sma(closes, 50)
+    result["bb_upper"] = bb_data["upper"]
+    result["bb_middle"] = bb_data["middle"]
+    result["bb_lower"] = bb_data["lower"]
     result["macd"] = macd_data["macd"]
     result["macd_signal"] = macd_data["signal"]
     result["macd_hist"] = macd_data["histogram"]

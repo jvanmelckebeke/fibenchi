@@ -6,6 +6,7 @@ import {
   ColorType,
   CandlestickSeries,
   LineSeries,
+  AreaSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
 
@@ -32,6 +33,8 @@ interface LegendValues {
   c?: number
   sma20?: number
   sma50?: number
+  bbUpper?: number
+  bbLower?: number
   rsi?: number
 }
 
@@ -56,6 +59,9 @@ function Legend({ values, latest }: { values: LegendValues | null; latest: Legen
       )}
       {v.sma50 !== undefined && (
         <span><span className="inline-block w-2 h-0.5 bg-violet-500 mr-1 align-middle" />SMA 50 <span className="text-violet-500">{v.sma50.toFixed(2)}</span></span>
+      )}
+      {v.bbUpper !== undefined && v.bbLower !== undefined && (
+        <span className="text-blue-400">BB <span>{v.bbUpper.toFixed(2)}</span> / <span>{v.bbLower.toFixed(2)}</span></span>
       )}
     </div>
   )
@@ -87,6 +93,8 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
   const ohlcByTime = useRef(new Map<string, { o: number; h: number; l: number; c: number }>())
   const sma20ByTime = useRef(new Map<string, number>())
   const sma50ByTime = useRef(new Map<string, number>())
+  const bbUpperByTime = useRef(new Map<string, number>())
+  const bbLowerByTime = useRef(new Map<string, number>())
   const rsiByTime = useRef(new Map<string, number>())
 
   // Compute latest values for default legend display
@@ -125,6 +133,8 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
         c: ohlc?.c,
         sma20: sma20ByTime.current.get(key),
         sma50: sma50ByTime.current.get(key),
+        bbUpper: bbUpperByTime.current.get(key),
+        bbLower: bbLowerByTime.current.get(key),
         rsi: rsiByTime.current.get(key),
       }
     }
@@ -183,6 +193,8 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
     ohlcByTime.current.clear()
     sma20ByTime.current.clear()
     sma50ByTime.current.clear()
+    bbUpperByTime.current.clear()
+    bbLowerByTime.current.clear()
     rsiByTime.current.clear()
 
     for (const p of prices) {
@@ -192,6 +204,8 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
     for (const i of indicators) {
       if (i.sma_20 !== null) sma20ByTime.current.set(i.date, i.sma_20)
       if (i.sma_50 !== null) sma50ByTime.current.set(i.date, i.sma_50)
+      if (i.bb_upper !== null) bbUpperByTime.current.set(i.date, i.bb_upper)
+      if (i.bb_lower !== null) bbLowerByTime.current.set(i.date, i.bb_lower)
       if (i.rsi !== null) rsiByTime.current.set(i.date, i.rsi)
     }
 
@@ -205,6 +219,8 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       c: lastPrice.close,
       sma20: lastIndicators.find((i) => i.sma_20 !== null)?.sma_20 ?? undefined,
       sma50: lastIndicators.find((i) => i.sma_50 !== null)?.sma_50 ?? undefined,
+      bbUpper: lastIndicators.find((i) => i.bb_upper !== null)?.bb_upper ?? undefined,
+      bbLower: lastIndicators.find((i) => i.bb_lower !== null)?.bb_lower ?? undefined,
       rsi: lastIndicators.find((i) => i.rsi !== null)?.rsi ?? undefined,
     }
 
@@ -246,8 +262,33 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       }))
     )
 
-    // SMA lines
+    // Overlay indicators
     if (indicators.length) {
+      // Bollinger Bands — filled area between upper and lower
+      // Upper band fills down with color, lower band fills down with bg to erase below
+      const bbData = indicators.filter((i) => i.bb_upper !== null && i.bb_lower !== null)
+
+      const bbUpperArea = mainChart.addSeries(AreaSeries, {
+        topColor: "rgba(96, 165, 250, 0.12)",
+        bottomColor: "rgba(96, 165, 250, 0.12)",
+        lineColor: "rgba(96, 165, 250, 0.4)",
+        lineWidth: 1,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+      bbUpperArea.setData(bbData.map((i) => ({ time: i.date, value: i.bb_upper! })))
+
+      const bbLowerArea = mainChart.addSeries(AreaSeries, {
+        topColor: theme.bg,
+        bottomColor: theme.bg,
+        lineColor: "rgba(96, 165, 250, 0.4)",
+        lineWidth: 1,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+      bbLowerArea.setData(bbData.map((i) => ({ time: i.date, value: i.bb_lower! })))
+
+      // SMA lines
       const sma20 = mainChart.addSeries(LineSeries, {
         color: "#14b8a6",
         lineWidth: 1,
