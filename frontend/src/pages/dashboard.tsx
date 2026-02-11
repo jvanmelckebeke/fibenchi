@@ -136,7 +136,7 @@ function AssetCard({
             <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="min-w-48">
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"
             onClick={(e) => {
