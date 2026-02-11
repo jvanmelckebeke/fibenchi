@@ -49,6 +49,12 @@ export function RsiGauge({ symbol }: { symbol: string }) {
   return (
     <div className="mt-2 space-y-0.5">
       <div className="relative h-1.5 w-full rounded-full bg-muted overflow-hidden">
+        {/* Zone backgrounds */}
+        <div className="absolute inset-0 flex">
+          <div className="w-[30%] bg-amber-500/15" />
+          <div className="w-[40%]" />
+          <div className="w-[30%] bg-red-500/15" />
+        </div>
         {/* Marker */}
         <div
           className="absolute top-0 h-full w-1 rounded-full"
