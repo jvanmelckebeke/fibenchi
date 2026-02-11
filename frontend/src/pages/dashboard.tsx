@@ -145,7 +145,7 @@ function AssetCard({
             }}
           >
             <Trash2 className="h-3.5 w-3.5 mr-2" />
-            Remove from watchlist
+            Remove
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
