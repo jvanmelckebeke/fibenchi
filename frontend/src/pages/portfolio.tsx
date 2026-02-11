@@ -84,6 +84,18 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
         vertLine: { visible: false },
         horzLine: { visible: false },
       },
+      handleScroll: {
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+        mouseWheel: false,
+        pressedMouseMove: true,
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: false,
+        axisDoubleClickReset: { time: true, price: false },
+      },
     })
 
     const series = chart.addSeries(AreaSeries, {

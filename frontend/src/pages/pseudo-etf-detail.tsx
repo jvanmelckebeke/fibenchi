@@ -158,6 +158,18 @@ function StackedAreaChart({
       rightPriceScale: { borderColor: dark ? "#3f3f46" : "#e4e4e7" },
       timeScale: { borderColor: dark ? "#3f3f46" : "#e4e4e7", timeVisible: false },
       crosshair: { mode: 0 },
+      handleScroll: {
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+        mouseWheel: false,
+        pressedMouseMove: true,
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: false,
+        axisDoubleClickReset: { time: true, price: false },
+      },
     })
 
     // Build cumulative series: for position i, value = sum of symbols 0..i
