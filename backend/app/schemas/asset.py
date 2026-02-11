@@ -12,6 +12,14 @@ class AssetCreate(BaseModel):
     watchlisted: bool = True
 
 
+class TagBrief(BaseModel):
+    id: int
+    name: str
+    color: str
+
+    model_config = {"from_attributes": True}
+
+
 class AssetResponse(BaseModel):
     id: int
     symbol: str
@@ -19,5 +27,6 @@ class AssetResponse(BaseModel):
     type: AssetType
     watchlisted: bool
     created_at: datetime
+    tags: list[TagBrief] = []
 
     model_config = {"from_attributes": True}

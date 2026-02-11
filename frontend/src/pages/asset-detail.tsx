@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card"
 import { PriceChart } from "@/components/price-chart"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
+import { TagInput } from "@/components/tag-input"
 import type { EtfHoldings, HoldingIndicator } from "@/lib/api"
 import {
   useAssets,
@@ -40,10 +41,13 @@ export function AssetDetailPage() {
       <ChartSection symbol={symbol} period={period} />
       {isEtf && <HoldingsSection symbol={symbol} />}
       {isWatchlisted && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ThesisSection symbol={symbol} />
-          <AnnotationsSection symbol={symbol} />
-        </div>
+        <>
+          <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ThesisSection symbol={symbol} />
+            <AnnotationsSection symbol={symbol} />
+          </div>
+        </>
       )}
     </div>
   )

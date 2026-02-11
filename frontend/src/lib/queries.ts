@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
+import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
 
 // Pseudo-ETF thesis/annotation keys are defined inline below
 
@@ -13,6 +13,7 @@ export const keys = {
   indicators: (symbol: string, period?: string) => ["indicators", symbol, period] as const,
   etfHoldings: (symbol: string) => ["etf-holdings", symbol] as const,
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
+  tags: ["tags"] as const,
   groups: ["groups"] as const,
   thesis: (symbol: string) => ["thesis", symbol] as const,
   annotations: (symbol: string) => ["annotations", symbol] as const,
@@ -102,6 +103,43 @@ export function useRefreshPrices(symbol: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.prices(symbol) })
       qc.invalidateQueries({ queryKey: keys.indicators(symbol) })
+    },
+  })
+}
+
+// Tags
+export function useTags() {
+  return useQuery({ queryKey: keys.tags, queryFn: api.tags.list })
+}
+
+export function useCreateTag() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: TagCreate) => api.tags.create(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tags }),
+  })
+}
+
+export function useAttachTag() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ symbol, tagId }: { symbol: string; tagId: number }) =>
+      api.tags.attach(symbol, tagId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.assets })
+      qc.invalidateQueries({ queryKey: keys.tags })
+    },
+  })
+}
+
+export function useDetachTag() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ symbol, tagId }: { symbol: string; tagId: number }) =>
+      api.tags.detach(symbol, tagId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.assets })
+      qc.invalidateQueries({ queryKey: keys.tags })
     },
   })
 }

@@ -5,15 +5,29 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useDeleteAsset } from "@/lib/queries"
+import { useAssets, useCreateAsset, useDeleteAsset, useTags } from "@/lib/queries"
 import { SparklineChart } from "@/components/sparkline"
+import { TagBadge } from "@/components/tag-badge"
+import type { TagBrief } from "@/lib/api"
 
 export function DashboardPage() {
   const { data: allAssets, isLoading } = useAssets()
-  const assets = allAssets?.filter((a) => a.watchlisted)
+  const { data: allTags } = useTags()
   const createAsset = useCreateAsset()
   const deleteAsset = useDeleteAsset()
   const [symbol, setSymbol] = useState("")
+  const [selectedTags, setSelectedTags] = useState<number[]>([])
+
+  const watchlisted = allAssets?.filter((a) => a.watchlisted)
+  const assets = watchlisted?.filter((a) => {
+    if (selectedTags.length === 0) return true
+    return a.tags.some((t) => selectedTags.includes(t.id))
+  })
+
+  const toggleTag = (id: number) =>
+    setSelectedTags((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+    )
 
   const handleAdd = () => {
     const s = symbol.trim().toUpperCase()
@@ -39,6 +53,28 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {allTags && allTags.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {allTags.map((tag) => (
+            <TagBadge
+              key={tag.id}
+              name={tag.name}
+              color={tag.color}
+              active={selectedTags.length === 0 || selectedTags.includes(tag.id)}
+              onClick={() => toggleTag(tag.id)}
+            />
+          ))}
+          {selectedTags.length > 0 && (
+            <button
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setSelectedTags([])}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {createAsset.isError && (
         <p className="text-sm text-destructive">{createAsset.error.message}</p>
       )}
@@ -59,6 +95,7 @@ export function DashboardPage() {
             symbol={asset.symbol}
             name={asset.name}
             type={asset.type}
+            tags={asset.tags}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
           />
         ))}
@@ -71,11 +108,13 @@ function AssetCard({
   symbol,
   name,
   type,
+  tags,
   onDelete,
 }: {
   symbol: string
   name: string
   type: string
+  tags: TagBrief[]
   onDelete: () => void
 }) {
   return (
@@ -100,6 +139,13 @@ function AssetCard({
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground truncate">{name}</p>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {tags.map((tag) => (
+                <TagBadge key={tag.id} name={tag.name} color={tag.color} />
+              ))}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="pt-0">
           <SparklineChart symbol={symbol} />

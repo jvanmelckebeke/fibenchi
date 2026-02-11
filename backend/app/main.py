@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
-from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, thesis
+from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, tags, thesis
 from app.services.price_sync import sync_all_prices
 
 logger = logging.getLogger(__name__)
@@ -99,6 +99,10 @@ app = FastAPI(
             "description": "User-defined groups for organizing assets into named collections (e.g. 'Tech', 'Dividend').",
         },
         {
+            "name": "tags",
+            "description": "Colored labels for categorizing assets (e.g. 'tech', 'growth', 'dividend'). Tags can be attached to assets and used for dashboard filtering.",
+        },
+        {
             "name": "thesis",
             "description": "Free-text investment thesis per asset. Supports Markdown content.",
         },
@@ -115,6 +119,8 @@ app = FastAPI(
 
 app.include_router(assets.router)
 app.include_router(groups.router)
+app.include_router(tags.router)
+app.include_router(tags.asset_tag_router)
 app.include_router(portfolio.router)
 app.include_router(prices.router)
 app.include_router(holdings.router)

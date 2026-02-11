@@ -2,6 +2,30 @@
 
 export type AssetType = "stock" | "etf"
 
+export interface TagBrief {
+  id: number
+  name: string
+  color: string
+}
+
+export interface Tag {
+  id: number
+  name: string
+  color: string
+  created_at: string
+  assets: Asset[]
+}
+
+export interface TagCreate {
+  name: string
+  color?: string
+}
+
+export interface TagUpdate {
+  name?: string
+  color?: string
+}
+
 export interface Asset {
   id: number
   symbol: string
@@ -9,6 +33,7 @@ export interface Asset {
   type: AssetType
   watchlisted: boolean
   created_at: string
+  tags: TagBrief[]
 }
 
 export interface AssetCreate {
@@ -218,6 +243,19 @@ export const api = {
       request<EtfHoldings>(`/assets/${symbol}/holdings`),
     holdingsIndicators: (symbol: string) =>
       request<HoldingIndicator[]>(`/assets/${symbol}/holdings/indicators`),
+  },
+  tags: {
+    list: () => request<Tag[]>("/tags"),
+    create: (data: TagCreate) =>
+      request<Tag>("/tags", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: TagUpdate) =>
+      request<Tag>(`/tags/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: number) =>
+      request<void>(`/tags/${id}`, { method: "DELETE" }),
+    attach: (symbol: string, tagId: number) =>
+      request<TagBrief[]>(`/assets/${symbol}/tags/${tagId}`, { method: "POST" }),
+    detach: (symbol: string, tagId: number) =>
+      request<TagBrief[]>(`/assets/${symbol}/tags/${tagId}`, { method: "DELETE" }),
   },
   groups: {
     list: () => request<Group[]>("/groups"),
