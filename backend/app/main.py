@@ -37,6 +37,10 @@ async def lifespan(app: FastAPI):
         await conn.execute(text(
             "ALTER TABLE assets ADD COLUMN IF NOT EXISTS watchlisted BOOLEAN DEFAULT TRUE NOT NULL"
         ))
+        # Migration: add currency column to existing assets table
+        await conn.execute(text(
+            "ALTER TABLE assets ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD' NOT NULL"
+        ))
 
     # Parse cron expression (minute hour day month dow)
     parts = settings.refresh_cron.split()

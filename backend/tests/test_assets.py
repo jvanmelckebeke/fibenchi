@@ -22,6 +22,7 @@ async def test_create_asset_with_name(client):
     assert data["symbol"] == "AAPL"
     assert data["name"] == "Apple Inc."
     assert data["type"] == "stock"
+    assert data["currency"] == "USD"
 
 
 async def test_create_asset_auto_resolve(client):
@@ -31,6 +32,18 @@ async def test_create_asset_auto_resolve(client):
     assert resp.status_code == 201
     assert resp.json()["symbol"] == "NVDA"
     assert resp.json()["name"] == "NVIDIA Corporation"
+    assert resp.json()["currency"] == "USD"
+
+
+async def test_create_asset_with_currency(client):
+    mock_info = {"symbol": "VWCE.DE", "name": "Vanguard FTSE All-World", "type": "ETF", "currency": "EUR"}
+    with patch("app.routers.assets.validate_symbol", return_value=mock_info):
+        resp = await client.post("/api/assets", json={"symbol": "vwce.de"})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["symbol"] == "VWCE.DE"
+    assert data["currency"] == "EUR"
+    assert data["type"] == "etf"
 
 
 async def test_create_asset_invalid_symbol(client):

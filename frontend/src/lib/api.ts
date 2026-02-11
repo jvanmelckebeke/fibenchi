@@ -32,6 +32,7 @@ export interface Asset {
   name: string
   type: AssetType
   watchlisted: boolean
+  currency: string
   created_at: string
   tags: TagBrief[]
 }

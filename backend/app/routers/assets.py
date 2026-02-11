@@ -34,16 +34,18 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
 
     name = data.name
     asset_type = data.type
+    currency = "USD"
 
     if not name:
         info = validate_symbol(symbol)
         if not info:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
         name = info["name"]
+        currency = info.get("currency", "USD")
         if info["type"] == "ETF":
             asset_type = AssetType.ETF
 
-    asset = Asset(symbol=symbol, name=name, type=asset_type, watchlisted=data.watchlisted)
+    asset = Asset(symbol=symbol, name=name, type=asset_type, watchlisted=data.watchlisted, currency=currency)
     db.add(asset)
     await db.commit()
     await db.refresh(asset)

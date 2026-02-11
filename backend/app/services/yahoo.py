@@ -50,10 +50,17 @@ def validate_symbol(symbol: str) -> dict | None:
     if not quote or isinstance(quote, str):
         return None
 
+    # Extract currency from price data
+    price_data = ticker.price.get(symbol, {})
+    currency = "USD"
+    if isinstance(price_data, dict):
+        currency = price_data.get("currency", "USD") or "USD"
+
     return {
         "symbol": symbol.upper(),
         "name": quote.get("shortName") or quote.get("longName") or symbol.upper(),
         "type": quote.get("quoteType", "EQUITY"),
+        "currency": currency,
     }
 
 
