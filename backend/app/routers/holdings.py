@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Asset
 from app.schemas.price import EtfHoldingsResponse, HoldingIndicatorResponse
 from app.services.indicators import compute_indicators
-from app.services.yahoo import batch_fetch_history, fetch_etf_holdings
+from app.services.yahoo import batch_fetch_currencies, batch_fetch_history, fetch_etf_holdings
 
 router = APIRouter(prefix="/api/assets/{symbol}/holdings", tags=["holdings"])
 
@@ -61,12 +61,14 @@ async def get_holdings_indicators(symbol: str, db: AsyncSession = Depends(get_db
 
     # Batch fetch ~3 months of history (enough for SMA50 warmup)
     histories = batch_fetch_history(holding_symbols, period="3mo")
+    currencies = batch_fetch_currencies(holding_symbols)
 
     results = []
     for sym in holding_symbols:
+        currency = currencies.get(sym, "USD")
         df = histories.get(sym)
         if df is None or df.empty or len(df) < 2:
-            results.append(HoldingIndicatorResponse(symbol=sym))
+            results.append(HoldingIndicatorResponse(symbol=sym, currency=currency))
             continue
 
         indicators = compute_indicators(df)
@@ -87,6 +89,7 @@ async def get_holdings_indicators(symbol: str, db: AsyncSession = Depends(get_db
 
         results.append(HoldingIndicatorResponse(
             symbol=sym,
+            currency=currency,
             close=round(latest["close"], 2),
             change_pct=change_pct,
             rsi=round(latest["rsi"], 2) if pd.notna(latest["rsi"]) else None,

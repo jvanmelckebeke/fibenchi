@@ -48,6 +48,7 @@ class PerformanceBreakdownPoint(BaseModel):
 class ConstituentIndicatorResponse(BaseModel):
     symbol: str
     name: str | None = None
+    currency: str = "USD"
     weight_pct: float | None = None
     close: float | None = None
     change_pct: float | None = None

@@ -7,6 +7,7 @@ import { PriceChart } from "@/components/price-chart"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
+import { formatPrice } from "@/lib/format"
 import type { EtfHoldings, HoldingIndicator } from "@/lib/api"
 import {
   useAssets,
@@ -228,7 +229,7 @@ function TopHoldingsCard({
       </h3>
       <div className="overflow-x-auto">
         <div className="min-w-[700px] space-y-0">
-          <div className="grid grid-cols-[4rem_1fr_3.5rem_4rem_4rem_3.5rem_3.5rem_4rem_3.5rem] text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2">
+          <div className="grid grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem] text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2">
             <span>Symbol</span>
             <span>Company</span>
             <span className="text-right">%</span>
@@ -249,7 +250,7 @@ function TopHoldingsCard({
             const bbPos = ind?.bb_position
 
             return (
-              <div key={h.symbol} className="grid grid-cols-[4rem_1fr_3.5rem_4rem_4rem_3.5rem_3.5rem_4rem_3.5rem] text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center">
+              <div key={h.symbol} className="grid grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem] text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center">
                 <a href={`/asset/${h.symbol}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-primary hover:underline">{h.symbol}</a>
                 <span className="text-muted-foreground truncate text-xs">{h.name}</span>
                 <span className="text-right font-medium text-xs">{h.percent.toFixed(1)}%</span>
@@ -257,7 +258,7 @@ function TopHoldingsCard({
                   <span className="col-span-6 text-right text-xs text-muted-foreground animate-pulse">Loading...</span>
                 ) : (
                   <>
-                    <IndicatorCell value={ind?.close != null ? ind.close.toFixed(0) : null} />
+                    <IndicatorCell value={ind?.close != null ? formatPrice(ind.close, ind.currency, 0) : null} />
                     <IndicatorCell value={chg.text} className={chg.className} />
                     <IndicatorCell value={rsiVal != null ? rsiVal.toFixed(0) : null} className={rsiColor} />
                     <IndicatorCell

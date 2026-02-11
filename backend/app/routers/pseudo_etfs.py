@@ -19,7 +19,7 @@ from app.schemas.thesis import ThesisResponse, ThesisUpdate
 from app.schemas.annotation import AnnotationCreate, AnnotationResponse
 from app.services.pseudo_etf import calculate_performance
 from app.services.indicators import compute_indicators
-from app.services.yahoo import batch_fetch_history
+from app.services.yahoo import batch_fetch_currencies, batch_fetch_history
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
 
@@ -171,14 +171,17 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
     symbol_to_name = {a.symbol: a.name for a in etf.constituents}
 
     histories = batch_fetch_history(symbols, period="3mo")
+    currencies = batch_fetch_currencies(symbols)
 
     results = []
     for sym in symbols:
+        currency = currencies.get(sym, "USD")
         df = histories.get(sym)
         if df is None or df.empty or len(df) < 2:
             results.append(ConstituentIndicatorResponse(
                 symbol=sym,
                 name=symbol_to_name.get(sym),
+                currency=currency,
                 weight_pct=weight_map.get(sym),
             ))
             continue
@@ -202,6 +205,7 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
         results.append(ConstituentIndicatorResponse(
             symbol=sym,
             name=symbol_to_name.get(sym),
+            currency=currency,
             weight_pct=weight_map.get(sym),
             close=round(latest["close"], 2),
             change_pct=change_pct,

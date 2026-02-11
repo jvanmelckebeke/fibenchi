@@ -130,6 +130,7 @@ export interface EtfHoldings {
 
 export interface HoldingIndicator {
   symbol: string
+  currency: string
   close: number | null
   change_pct: number | null
   rsi: number | null
@@ -191,6 +192,7 @@ export interface PerformanceBreakdownPoint {
 export interface ConstituentIndicator {
   symbol: string
   name: string | null
+  currency: string
   weight_pct: number | null
   close: number | null
   change_pct: number | null
