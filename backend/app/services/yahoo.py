@@ -117,6 +117,27 @@ def fetch_etf_holdings(symbol: str) -> dict | None:
     }
 
 
+def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
+    """Fetch currencies for multiple symbols in one batch call.
+
+    Returns a dict mapping symbol -> currency code (e.g. "USD", "EUR").
+    """
+    if not symbols:
+        return {}
+
+    ticker = Ticker(symbols)
+    price_data = ticker.price
+
+    result = {}
+    for sym in symbols:
+        info = price_data.get(sym, {})
+        if isinstance(info, dict):
+            currency = info.get("currency", "USD") or "USD"
+            result[sym] = currency
+
+    return result
+
+
 def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
     """Fetch history for multiple symbols in one batch call."""
     if not symbols:
