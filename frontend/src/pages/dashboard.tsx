@@ -1,7 +1,13 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { Plus, Trash2, TrendingUp } from "lucide-react"
+import { MoreVertical, Plus, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -119,17 +125,30 @@ function AssetCard({
 }) {
   return (
     <Card className="group relative hover:border-primary/50 transition-colors">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute right-2 top-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={(e) => {
-          e.preventDefault()
-          onDelete()
-        }}
-      >
-        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onClick={(e) => e.preventDefault()}
+          >
+            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-48">
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={(e) => {
+              e.preventDefault()
+              onDelete()
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-2" />
+            Remove
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Link to={`/asset/${symbol}`}>
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
