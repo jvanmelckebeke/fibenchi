@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useAssets, useCreateAsset, useDeleteAsset, useTags } from "@/lib/queries"
 import { SparklineChart } from "@/components/sparkline"
+import { RsiGauge } from "@/components/rsi-gauge"
 import { TagBadge } from "@/components/tag-badge"
 import type { TagBrief } from "@/lib/api"
 
@@ -166,8 +167,9 @@ function AssetCard({
             </div>
           )}
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 space-y-2">
           <SparklineChart symbol={symbol} />
+          <RsiGauge symbol={symbol} />
         </CardContent>
       </Link>
     </Card>
