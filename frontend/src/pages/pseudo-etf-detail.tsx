@@ -150,6 +150,7 @@ function StackedAreaChart({
       layout: {
         background: { type: ColorType.Solid, color: dark ? "#18181b" : "#ffffff" },
         textColor: dark ? "#a1a1aa" : "#71717a",
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: dark ? "#27272a" : "#f4f4f5" },
