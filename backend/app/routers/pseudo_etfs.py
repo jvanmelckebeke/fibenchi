@@ -24,13 +24,13 @@ from app.services.yahoo import batch_fetch_history
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
 
 
-@router.get("", response_model=list[PseudoETFResponse])
+@router.get("", response_model=list[PseudoETFResponse], summary="List all pseudo-ETFs")
 async def list_pseudo_etfs(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(PseudoETF).order_by(PseudoETF.name))
     return result.scalars().all()
 
 
-@router.post("", response_model=PseudoETFResponse, status_code=201)
+@router.post("", response_model=PseudoETFResponse, status_code=201, summary="Create a pseudo-ETF basket")
 async def create_pseudo_etf(data: PseudoETFCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(PseudoETF).where(PseudoETF.name == data.name))
     if existing.scalar_one_or_none():
@@ -48,7 +48,7 @@ async def create_pseudo_etf(data: PseudoETFCreate, db: AsyncSession = Depends(ge
     return etf
 
 
-@router.get("/{etf_id}", response_model=PseudoETFResponse)
+@router.get("/{etf_id}", response_model=PseudoETFResponse, summary="Get a pseudo-ETF by ID")
 async def get_pseudo_etf(etf_id: int, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -56,7 +56,7 @@ async def get_pseudo_etf(etf_id: int, db: AsyncSession = Depends(get_db)):
     return etf
 
 
-@router.put("/{etf_id}", response_model=PseudoETFResponse)
+@router.put("/{etf_id}", response_model=PseudoETFResponse, summary="Update a pseudo-ETF")
 async def update_pseudo_etf(etf_id: int, data: PseudoETFUpdate, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -70,7 +70,7 @@ async def update_pseudo_etf(etf_id: int, data: PseudoETFUpdate, db: AsyncSession
     return etf
 
 
-@router.delete("/{etf_id}", status_code=204)
+@router.delete("/{etf_id}", status_code=204, summary="Delete a pseudo-ETF")
 async def delete_pseudo_etf(etf_id: int, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -79,7 +79,7 @@ async def delete_pseudo_etf(etf_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
 
-@router.post("/{etf_id}/constituents", response_model=PseudoETFResponse)
+@router.post("/{etf_id}/constituents", response_model=PseudoETFResponse, summary="Add constituent assets to a pseudo-ETF")
 async def add_constituents(
     etf_id: int, data: PseudoETFAddConstituents, db: AsyncSession = Depends(get_db)
 ):
@@ -100,7 +100,7 @@ async def add_constituents(
     return etf
 
 
-@router.delete("/{etf_id}/constituents/{asset_id}", response_model=PseudoETFResponse)
+@router.delete("/{etf_id}/constituents/{asset_id}", response_model=PseudoETFResponse, summary="Remove a constituent from a pseudo-ETF")
 async def remove_constituent(
     etf_id: int, asset_id: int, db: AsyncSession = Depends(get_db)
 ):
@@ -118,7 +118,7 @@ async def remove_constituent(
     return etf
 
 
-@router.get("/{etf_id}/performance", response_model=list[PerformanceBreakdownPoint])
+@router.get("/{etf_id}/performance", response_model=list[PerformanceBreakdownPoint], summary="Get indexed performance with per-constituent breakdown")
 async def get_performance(etf_id: int, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -144,7 +144,7 @@ def _bb_position(close: float, upper: float, middle: float, lower: float) -> str
         return "below"
 
 
-@router.get("/{etf_id}/constituents/indicators", response_model=list[ConstituentIndicatorResponse])
+@router.get("/{etf_id}/constituents/indicators", response_model=list[ConstituentIndicatorResponse], summary="Get technical indicators for each constituent")
 async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get_db)):
     """Return latest indicator snapshot for each constituent of a pseudo-ETF."""
     etf = await db.get(PseudoETF, etf_id)
@@ -217,7 +217,7 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
 
 # --- Thesis ---
 
-@router.get("/{etf_id}/thesis", response_model=ThesisResponse)
+@router.get("/{etf_id}/thesis", response_model=ThesisResponse, summary="Get pseudo-ETF investment thesis")
 async def get_etf_thesis(etf_id: int, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -230,7 +230,7 @@ async def get_etf_thesis(etf_id: int, db: AsyncSession = Depends(get_db)):
     return thesis
 
 
-@router.put("/{etf_id}/thesis", response_model=ThesisResponse)
+@router.put("/{etf_id}/thesis", response_model=ThesisResponse, summary="Create or update pseudo-ETF thesis")
 async def update_etf_thesis(etf_id: int, data: ThesisUpdate, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -252,7 +252,7 @@ async def update_etf_thesis(etf_id: int, data: ThesisUpdate, db: AsyncSession = 
 
 # --- Annotations ---
 
-@router.get("/{etf_id}/annotations", response_model=list[AnnotationResponse])
+@router.get("/{etf_id}/annotations", response_model=list[AnnotationResponse], summary="List pseudo-ETF chart annotations")
 async def list_etf_annotations(etf_id: int, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -266,7 +266,7 @@ async def list_etf_annotations(etf_id: int, db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.post("/{etf_id}/annotations", response_model=AnnotationResponse, status_code=201)
+@router.post("/{etf_id}/annotations", response_model=AnnotationResponse, status_code=201, summary="Create a pseudo-ETF chart annotation")
 async def create_etf_annotation(etf_id: int, data: AnnotationCreate, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:
@@ -285,7 +285,7 @@ async def create_etf_annotation(etf_id: int, data: AnnotationCreate, db: AsyncSe
     return annotation
 
 
-@router.delete("/{etf_id}/annotations/{annotation_id}", status_code=204)
+@router.delete("/{etf_id}/annotations/{annotation_id}", status_code=204, summary="Delete a pseudo-ETF chart annotation")
 async def delete_etf_annotation(etf_id: int, annotation_id: int, db: AsyncSession = Depends(get_db)):
     etf = await db.get(PseudoETF, etf_id)
     if not etf:

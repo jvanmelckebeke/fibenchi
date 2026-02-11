@@ -97,7 +97,7 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
     return prices
 
 
-@router.get("/prices", response_model=list[PriceResponse])
+@router.get("/prices", response_model=list[PriceResponse], summary="Get OHLCV price history")
 async def get_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
     asset = await _find_asset(symbol, db)
 
@@ -124,7 +124,7 @@ async def get_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depend
     return rows
 
 
-@router.get("/indicators", response_model=list[IndicatorResponse])
+@router.get("/indicators", response_model=list[IndicatorResponse], summary="Get technical indicators (RSI, SMA, MACD, Bollinger)")
 async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
     asset = await _find_asset(symbol, db)
     start = _display_start(period)
@@ -180,7 +180,7 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
     return rows
 
 
-@router.post("/refresh", status_code=200)
+@router.post("/refresh", status_code=200, summary="Force-refresh prices from Yahoo Finance")
 async def refresh_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
     asset = await _get_asset(symbol, db)
     count = await sync_asset_prices(db, asset, period=period)

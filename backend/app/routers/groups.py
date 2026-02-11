@@ -9,13 +9,13 @@ from app.schemas.group import GroupAddAssets, GroupCreate, GroupResponse, GroupU
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 
-@router.get("", response_model=list[GroupResponse])
+@router.get("", response_model=list[GroupResponse], summary="List all groups")
 async def list_groups(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Group).order_by(Group.name))
     return result.scalars().all()
 
 
-@router.post("", response_model=GroupResponse, status_code=201)
+@router.post("", response_model=GroupResponse, status_code=201, summary="Create a group")
 async def create_group(data: GroupCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(select(Group).where(Group.name == data.name))
     if existing.scalar_one_or_none():
@@ -28,7 +28,7 @@ async def create_group(data: GroupCreate, db: AsyncSession = Depends(get_db)):
     return group
 
 
-@router.get("/{group_id}", response_model=GroupResponse)
+@router.get("/{group_id}", response_model=GroupResponse, summary="Get a group by ID")
 async def get_group(group_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Group).where(Group.id == group_id))
     group = result.scalar_one_or_none()
@@ -37,7 +37,7 @@ async def get_group(group_id: int, db: AsyncSession = Depends(get_db)):
     return group
 
 
-@router.put("/{group_id}", response_model=GroupResponse)
+@router.put("/{group_id}", response_model=GroupResponse, summary="Update a group")
 async def update_group(group_id: int, data: GroupUpdate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Group).where(Group.id == group_id))
     group = result.scalar_one_or_none()
@@ -54,7 +54,7 @@ async def update_group(group_id: int, data: GroupUpdate, db: AsyncSession = Depe
     return group
 
 
-@router.delete("/{group_id}", status_code=204)
+@router.delete("/{group_id}", status_code=204, summary="Delete a group")
 async def delete_group(group_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Group).where(Group.id == group_id))
     group = result.scalar_one_or_none()
@@ -64,7 +64,7 @@ async def delete_group(group_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
 
-@router.post("/{group_id}/assets", response_model=GroupResponse)
+@router.post("/{group_id}/assets", response_model=GroupResponse, summary="Add assets to a group")
 async def add_assets_to_group(group_id: int, data: GroupAddAssets, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Group).where(Group.id == group_id))
     group = result.scalar_one_or_none()
@@ -84,7 +84,7 @@ async def add_assets_to_group(group_id: int, data: GroupAddAssets, db: AsyncSess
     return group
 
 
-@router.delete("/{group_id}/assets/{asset_id}", response_model=GroupResponse)
+@router.delete("/{group_id}/assets/{asset_id}", response_model=GroupResponse, summary="Remove an asset from a group")
 async def remove_asset_from_group(group_id: int, asset_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Group).where(Group.id == group_id))
     group = result.scalar_one_or_none()

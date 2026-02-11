@@ -39,7 +39,7 @@ async def _get_watchlisted_ids(db: AsyncSession) -> list[int]:
     return list(result.scalars().all())
 
 
-@router.get("/index", response_model=PortfolioIndexResponse)
+@router.get("/index", response_model=PortfolioIndexResponse, summary="Get composite portfolio index")
 async def get_portfolio_index(period: str = "1y", db: AsyncSession = Depends(get_db)):
     """Compute equal-weight composite index of all watchlisted assets."""
     days = _PERIOD_DAYS.get(period, 365)
@@ -75,7 +75,7 @@ async def get_portfolio_index(period: str = "1y", db: AsyncSession = Depends(get
     )
 
 
-@router.get("/performers", response_model=list[AssetPerformance])
+@router.get("/performers", response_model=list[AssetPerformance], summary="Get top and bottom performers by return")
 async def get_performers(period: str = "1y", db: AsyncSession = Depends(get_db)):
     """Return watchlisted assets ranked by period return (best first)."""
     days = _PERIOD_DAYS.get(period, 365)
