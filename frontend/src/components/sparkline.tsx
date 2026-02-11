@@ -50,7 +50,16 @@ export function SparklineChart({ symbol, currency = "USD" }: { symbol: string; c
     chart.timeScale().fitContent()
     chartRef.current = chart
 
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        chart.applyOptions({ width: entry.contentRect.width })
+        chart.timeScale().fitContent()
+      }
+    })
+    resizeObserver.observe(containerRef.current)
+
     return () => {
+      resizeObserver.disconnect()
       chart.remove()
       chartRef.current = null
     }
