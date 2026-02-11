@@ -14,6 +14,7 @@ import {
   ColorType,
   AreaSeries,
   LineSeries,
+  HistogramSeries,
 } from "lightweight-charts"
 import type { PerformanceBreakdownPoint } from "@/lib/api"
 import {
@@ -38,11 +39,81 @@ const STACK_COLORS = [
   "#7c3aed", "#0284c7", "#be123c", "#15803d", "#a21caf",
 ]
 
+function getChartTheme() {
+  const dark = document.documentElement.classList.contains("dark")
+  return {
+    bg: dark ? "#18181b" : "#ffffff",
+    text: dark ? "#a1a1aa" : "#71717a",
+    grid: dark ? "#27272a" : "#f4f4f5",
+    border: dark ? "#3f3f46" : "#e4e4e7",
+    dark,
+  }
+}
+
+function baseChartOptions(container: HTMLElement, height: number) {
+  const theme = getChartTheme()
+  return {
+    width: container.clientWidth,
+    height,
+    layout: {
+      background: { type: ColorType.Solid, color: theme.bg },
+      textColor: theme.text,
+      attributionLogo: false,
+    },
+    grid: {
+      vertLines: { color: theme.grid },
+      horzLines: { color: theme.grid },
+    },
+    rightPriceScale: { borderColor: theme.border },
+    timeScale: { borderColor: theme.border, timeVisible: false },
+    crosshair: { mode: 0 as const },
+    handleScroll: {
+      horzTouchDrag: true,
+      vertTouchDrag: false,
+      mouseWheel: false,
+      pressedMouseMove: true,
+    },
+    handleScale: {
+      mouseWheel: true,
+      pinch: true,
+      axisPressedMouseMove: false as const,
+      axisDoubleClickReset: { time: true, price: false },
+    },
+  }
+}
+
+interface SharedChartProps {
+  data: PerformanceBreakdownPoint[]
+  sortedSymbols: string[]
+  symbolColorMap: Map<string, string>
+}
+
 export function PseudoEtfDetailPage() {
   const { id } = useParams<{ id: string }>()
   const etfId = Number(id)
   const { data: etf } = usePseudoEtf(etfId)
   const { data: performance, isLoading } = usePseudoEtfPerformance(etfId)
+
+  const sortedSymbols = useMemo(() => {
+    if (!performance?.length) return []
+    const avgMap = new Map<string, number>()
+    for (const point of performance) {
+      for (const [sym, val] of Object.entries(point.breakdown)) {
+        avgMap.set(sym, (avgMap.get(sym) ?? 0) + val)
+      }
+    }
+    return [...avgMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([sym]) => sym)
+  }, [performance])
+
+  const symbolColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    sortedSymbols.forEach((sym, i) => {
+      map.set(sym, STACK_COLORS[i % STACK_COLORS.length])
+    })
+    return map
+  }, [sortedSymbols])
 
   if (!etf) return null
 
@@ -73,8 +144,11 @@ export function PseudoEtfDetailPage() {
 
       {performance && performance.length > 0 && (
         <>
-          <StackedAreaChart data={performance} baseValue={etf.base_value} />
+          <StackedAreaChart data={performance} baseValue={etf.base_value} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
           <PerformanceStats data={performance} baseValue={etf.base_value} />
+          {performance.length > 1 && (
+            <DailyContributionChart data={performance} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
+          )}
         </>
       )}
 
@@ -95,45 +169,20 @@ export function PseudoEtfDetailPage() {
 function StackedAreaChart({
   data,
   baseValue,
-}: {
-  data: PerformanceBreakdownPoint[]
-  baseValue: number
-}) {
+  sortedSymbols,
+  symbolColorMap,
+}: SharedChartProps & { baseValue: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const topSeriesRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
   const [hoverData, setHoverData] = useState<{ total: number; breakdown: Record<string, number> } | null>(null)
 
-  // Lookup maps for crosshair snap
   const totalByTime = useRef(new Map<string, number>())
   const breakdownByTime = useRef(new Map<string, Record<string, number>>())
-
-  // Sort symbols by average contribution (largest first = bottom of stack)
-  const sortedSymbols = useMemo(() => {
-    const avgMap = new Map<string, number>()
-    for (const point of data) {
-      for (const [sym, val] of Object.entries(point.breakdown)) {
-        avgMap.set(sym, (avgMap.get(sym) ?? 0) + val)
-      }
-    }
-    // Sort descending by total contribution — largest at bottom
-    return [...avgMap.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([sym]) => sym)
-  }, [data])
-
-  const symbolColorMap = useMemo(() => {
-    const map = new Map<string, string>()
-    sortedSymbols.forEach((sym, i) => {
-      map.set(sym, STACK_COLORS[i % STACK_COLORS.length])
-    })
-    return map
-  }, [sortedSymbols])
 
   useEffect(() => {
     if (!ref.current || !data.length || !sortedSymbols.length) return
 
-    // Build lookup maps
     totalByTime.current.clear()
     breakdownByTime.current.clear()
     for (const point of data) {
@@ -141,39 +190,9 @@ function StackedAreaChart({
       breakdownByTime.current.set(point.date, point.breakdown)
     }
 
-    const dark = document.documentElement.classList.contains("dark")
-
-    const chart = createChart(ref.current, {
-      width: ref.current.clientWidth,
-      height: 440,
-      layout: {
-        background: { type: ColorType.Solid, color: dark ? "#18181b" : "#ffffff" },
-        textColor: dark ? "#a1a1aa" : "#71717a",
-        attributionLogo: false,
-      },
-      grid: {
-        vertLines: { color: dark ? "#27272a" : "#f4f4f5" },
-        horzLines: { color: dark ? "#27272a" : "#f4f4f5" },
-      },
-      rightPriceScale: { borderColor: dark ? "#3f3f46" : "#e4e4e7" },
-      timeScale: { borderColor: dark ? "#3f3f46" : "#e4e4e7", timeVisible: false },
-      crosshair: { mode: 0 },
-      handleScroll: {
-        horzTouchDrag: true,
-        vertTouchDrag: false,
-        mouseWheel: false,
-        pressedMouseMove: true,
-      },
-      handleScale: {
-        mouseWheel: true,
-        pinch: true,
-        axisPressedMouseMove: false,
-        axisDoubleClickReset: { time: true, price: false },
-      },
-    })
+    const chart = createChart(ref.current, baseChartOptions(ref.current, 440))
 
     // Build cumulative series: for position i, value = sum of symbols 0..i
-    // Draw from top (highest cumulative) to bottom (lowest) so each area covers those below
     const cumulativeData: { symbol: string; points: { time: string; value: number }[] }[] = []
 
     for (let i = sortedSymbols.length - 1; i >= 0; i--) {
@@ -187,12 +206,11 @@ function StackedAreaChart({
       cumulativeData.push({ symbol: sortedSymbols[i], points })
     }
 
-    // Draw top-to-bottom (highest cumulative first)
     let topSeries: ReturnType<IChartApi["addSeries"]> | null = null
     for (let idx = 0; idx < cumulativeData.length; idx++) {
       const { symbol, points } = cumulativeData[idx]
       const color = symbolColorMap.get(symbol) ?? STACK_COLORS[0]
-      const isTop = idx === 0 // topmost series = total value
+      const isTop = idx === 0
       const series = chart.addSeries(AreaSeries, {
         lineColor: color,
         topColor: color,
@@ -207,8 +225,9 @@ function StackedAreaChart({
     topSeriesRef.current = topSeries
 
     // Base value reference line
+    const theme = getChartTheme()
     const baseLine = chart.addSeries(LineSeries, {
-      color: dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
+      color: theme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
@@ -226,8 +245,6 @@ function StackedAreaChart({
         if (total !== undefined && breakdown) {
           setHoverData({ total, breakdown })
         }
-
-        // Snap crosshair to the total-value series
         if (!snapping && total !== undefined && topSeries) {
           snapping = true
           chart.setCrosshairPosition(total, param.time, topSeries)
@@ -256,37 +273,206 @@ function StackedAreaChart({
     }
   }, [data, baseValue, sortedSymbols, symbolColorMap])
 
-  // Show hover values or latest values as default
   const lastPoint = data[data.length - 1]
   const displayData = hoverData ?? (lastPoint ? { total: lastPoint.value, breakdown: lastPoint.breakdown } : null)
 
   return (
     <div className="space-y-2">
       <div ref={ref} className="w-full rounded-md overflow-hidden" />
-      <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 items-center">
-        {sortedSymbols.map((sym) => {
-          const val = displayData?.breakdown[sym]
-          return (
-            <div key={sym} className="flex items-center gap-1.5 text-xs">
-              <div
-                className="w-3 h-3 rounded-sm flex-shrink-0"
-                style={{ backgroundColor: symbolColorMap.get(sym) }}
-              />
-              <Link to={`/asset/${sym}`} className="hover:underline text-muted-foreground hover:text-foreground">
-                {sym}
-              </Link>
-              {val !== undefined && (
-                <span className="font-mono text-muted-foreground">{val.toFixed(2)}</span>
-              )}
-            </div>
-          )
-        })}
-        {displayData && (
-          <div className="flex items-center gap-1.5 text-xs font-medium ml-auto">
-            Total: {displayData.total.toFixed(2)}
-          </div>
-        )}
-      </div>
+      <SymbolLegend
+        sortedSymbols={sortedSymbols}
+        symbolColorMap={symbolColorMap}
+        values={displayData ? sortedSymbols.map((sym) => displayData.breakdown[sym]?.toFixed(2)) : undefined}
+        suffix={displayData ? <span className="text-xs font-medium ml-auto">Total: {displayData.total.toFixed(2)}</span> : undefined}
+      />
+    </div>
+  )
+}
+
+function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: SharedChartProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const [hoverData, setHoverData] = useState<{ date: string; deltas: Record<string, number>; total: number } | null>(null)
+
+  const deltasByTime = useRef(new Map<string, Record<string, number>>())
+
+  useEffect(() => {
+    if (!ref.current || data.length < 2 || !sortedSymbols.length) return
+
+    deltasByTime.current.clear()
+
+    // Compute daily deltas per symbol
+    const dailyData: { date: string; deltas: Record<string, number> }[] = []
+    for (let d = 1; d < data.length; d++) {
+      const deltas: Record<string, number> = {}
+      for (const sym of sortedSymbols) {
+        deltas[sym] = (data[d].breakdown[sym] ?? 0) - (data[d - 1].breakdown[sym] ?? 0)
+      }
+      dailyData.push({ date: data[d].date, deltas })
+      deltasByTime.current.set(data[d].date, deltas)
+    }
+
+    // Compute positive and negative cumulative stacks per day
+    // posCum[day][i] = running sum of max(0, delta) for symbols 0..i
+    // negCum[day][i] = running sum of min(0, delta) for symbols 0..i
+    const posCum: number[][] = []
+    const negCum: number[][] = []
+    for (const { deltas } of dailyData) {
+      const pos: number[] = []
+      const neg: number[] = []
+      let posSum = 0
+      let negSum = 0
+      for (const sym of sortedSymbols) {
+        const delta = deltas[sym]
+        if (delta > 0) posSum += delta
+        if (delta < 0) negSum += delta
+        pos.push(posSum)
+        neg.push(negSum)
+      }
+      posCum.push(pos)
+      negCum.push(neg)
+    }
+
+    const chart = createChart(ref.current, baseChartOptions(ref.current, 250))
+
+    // Draw positive stack: outermost first (i = N-1 → 0)
+    for (let i = sortedSymbols.length - 1; i >= 0; i--) {
+      const sym = sortedSymbols[i]
+      const color = symbolColorMap.get(sym) ?? STACK_COLORS[0]
+      const series = chart.addSeries(HistogramSeries, {
+        color,
+        priceLineVisible: false,
+        base: 0,
+      })
+      series.setData(
+        dailyData.map((d, dayIdx) => ({
+          time: d.date,
+          value: posCum[dayIdx][i],
+        }))
+      )
+    }
+
+    // Draw negative stack: outermost first (i = N-1 → 0)
+    for (let i = sortedSymbols.length - 1; i >= 0; i--) {
+      const sym = sortedSymbols[i]
+      const color = symbolColorMap.get(sym) ?? STACK_COLORS[0]
+      const series = chart.addSeries(HistogramSeries, {
+        color,
+        priceLineVisible: false,
+        base: 0,
+      })
+      series.setData(
+        dailyData.map((d, dayIdx) => ({
+          time: d.date,
+          value: negCum[dayIdx][i],
+        }))
+      )
+    }
+
+    // Crosshair
+    chart.subscribeCrosshairMove((param) => {
+      if (param.time) {
+        const key = String(param.time)
+        const deltas = deltasByTime.current.get(key)
+        if (deltas) {
+          const total = Object.values(deltas).reduce((s, v) => s + v, 0)
+          setHoverData({ date: key, deltas, total })
+        }
+      } else {
+        setHoverData(null)
+      }
+    })
+
+    chart.timeScale().fitContent()
+    chartRef.current = chart
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        chart.applyOptions({ width: entry.contentRect.width })
+      }
+    })
+    resizeObserver.observe(ref.current)
+
+    return () => {
+      resizeObserver.disconnect()
+      chart.remove()
+      chartRef.current = null
+    }
+  }, [data, sortedSymbols, symbolColorMap])
+
+  // Default to latest day (computed from props, not refs)
+  const latestDeltas = useMemo(() => {
+    if (data.length < 2 || !sortedSymbols.length) return null
+    const last = data[data.length - 1]
+    const prev = data[data.length - 2]
+    const deltas: Record<string, number> = {}
+    for (const sym of sortedSymbols) {
+      deltas[sym] = (last.breakdown[sym] ?? 0) - (prev.breakdown[sym] ?? 0)
+    }
+    const total = Object.values(deltas).reduce((s, v) => s + v, 0)
+    return { date: last.date, deltas, total }
+  }, [data, sortedSymbols])
+  const displayData = hoverData ?? latestDeltas
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold px-1">Daily Contribution</h3>
+      <div ref={ref} className="w-full rounded-md overflow-hidden" />
+      <SymbolLegend
+        sortedSymbols={sortedSymbols}
+        symbolColorMap={symbolColorMap}
+        values={displayData ? sortedSymbols.map((sym) => {
+          const v = displayData.deltas[sym]
+          return v !== undefined ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : undefined
+        }) : undefined}
+        valueColors={displayData ? sortedSymbols.map((sym) => {
+          const v = displayData.deltas[sym]
+          return v !== undefined ? (v >= 0 ? "text-emerald-500" : "text-red-500") : undefined
+        }) : undefined}
+        suffix={displayData ? (
+          <span className="text-xs font-medium ml-auto">
+            Net: <span className={displayData.total >= 0 ? "text-emerald-500" : "text-red-500"}>
+              {displayData.total >= 0 ? "+" : ""}{displayData.total.toFixed(2)}
+            </span>
+          </span>
+        ) : undefined}
+      />
+    </div>
+  )
+}
+
+function SymbolLegend({
+  sortedSymbols,
+  symbolColorMap,
+  values,
+  valueColors,
+  suffix,
+}: {
+  sortedSymbols: string[]
+  symbolColorMap: Map<string, string>
+  values?: (string | undefined)[]
+  valueColors?: (string | undefined)[]
+  suffix?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 items-center">
+      {sortedSymbols.map((sym, idx) => (
+        <div key={sym} className="flex items-center gap-1.5 text-xs">
+          <div
+            className="w-3 h-3 rounded-sm flex-shrink-0"
+            style={{ backgroundColor: symbolColorMap.get(sym) }}
+          />
+          <Link to={`/asset/${sym}`} className="hover:underline text-muted-foreground hover:text-foreground">
+            {sym}
+          </Link>
+          {values?.[idx] !== undefined && (
+            <span className={`font-mono ${valueColors?.[idx] ?? "text-muted-foreground"}`}>
+              {values[idx]}
+            </span>
+          )}
+        </div>
+      ))}
+      {suffix}
     </div>
   )
 }
