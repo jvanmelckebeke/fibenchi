@@ -1,9 +1,22 @@
 import { useIndicators } from "@/lib/queries"
 
-function getZoneColor(rsi: number): { bar: string; text: string } {
-  if (rsi < 30) return { bar: "bg-emerald-500", text: "text-emerald-500" }
-  if (rsi > 70) return { bar: "bg-red-500", text: "text-red-500" }
-  return { bar: "bg-zinc-400 dark:bg-zinc-500", text: "text-muted-foreground" }
+// Gradual color: center (50) is neutral, extremes get more intense
+function getMarkerColor(rsi: number): string {
+  if (rsi <= 20) return "rgb(239, 68, 68)"       // red-500
+  if (rsi <= 30) return "rgb(245, 158, 11)"       // amber-500
+  if (rsi <= 40) return "rgb(161, 161, 170)"      // zinc-400
+  if (rsi <= 60) return "rgb(161, 161, 170)"      // zinc-400
+  if (rsi <= 70) return "rgb(245, 158, 11)"        // amber-500
+  if (rsi <= 80) return "rgb(249, 115, 22)"        // orange-500
+  return "rgb(239, 68, 68)"                        // red-500
+}
+
+function getTextClass(rsi: number): string {
+  if (rsi <= 20) return "text-red-500"
+  if (rsi <= 30) return "text-amber-500"
+  if (rsi <= 70) return "text-muted-foreground"
+  if (rsi <= 80) return "text-orange-500"
+  return "text-red-500"
 }
 
 function getZoneLabel(rsi: number): string {
@@ -29,30 +42,25 @@ export function RsiGauge({ symbol }: { symbol: string }) {
   }
 
   const pct = Math.max(0, Math.min(100, latestRsi))
-  const zone = getZoneColor(pct)
+  const markerColor = getMarkerColor(pct)
+  const textClass = getTextClass(pct)
   const label = getZoneLabel(pct)
 
   return (
-    <div className="space-y-0.5">
+    <div className="mt-2 space-y-0.5">
       <div className="relative h-1.5 w-full rounded-full bg-muted overflow-hidden">
-        {/* Zone background gradient */}
-        <div className="absolute inset-0 flex">
-          <div className="w-[30%] bg-emerald-500/15" />
-          <div className="w-[40%]" />
-          <div className="w-[30%] bg-red-500/15" />
-        </div>
         {/* Marker */}
         <div
-          className={`absolute top-0 h-full w-1 rounded-full ${zone.bar}`}
-          style={{ left: `calc(${pct}% - 2px)` }}
+          className="absolute top-0 h-full w-1 rounded-full"
+          style={{ left: `calc(${pct}% - 2px)`, backgroundColor: markerColor }}
         />
       </div>
       <div className="flex items-center justify-between">
-        <span className={`text-[10px] font-medium tabular-nums ${zone.text}`}>
+        <span className={`text-[10px] font-medium tabular-nums ${textClass}`}>
           RSI {pct.toFixed(0)}
         </span>
         {label && (
-          <span className={`text-[10px] ${zone.text}`}>{label}</span>
+          <span className={`text-[10px] ${textClass}`}>{label}</span>
         )}
       </div>
     </div>
