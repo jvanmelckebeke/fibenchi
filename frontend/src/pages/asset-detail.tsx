@@ -43,10 +43,8 @@ export function AssetDetailPage() {
       {isWatchlisted && (
         <>
           <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ThesisSection symbol={symbol} />
-            <AnnotationsSection symbol={symbol} />
-          </div>
+          <AnnotationsSection symbol={symbol} />
+          <ThesisSection symbol={symbol} />
         </>
       )}
     </div>

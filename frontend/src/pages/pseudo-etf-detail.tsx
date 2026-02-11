@@ -85,10 +85,8 @@ export function PseudoEtfDetailPage() {
 
       <HoldingsTable etfId={etfId} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ThesisSection etfId={etfId} />
-        <AnnotationsSection etfId={etfId} />
-      </div>
+      <AnnotationsSection etfId={etfId} />
+      <ThesisSection etfId={etfId} />
     </div>
   )
 }
