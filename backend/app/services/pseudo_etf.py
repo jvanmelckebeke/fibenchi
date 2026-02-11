@@ -17,6 +17,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.asset import Asset
 from app.models.price import PriceHistory
 
 
@@ -28,10 +29,19 @@ async def calculate_performance(
     asset_ids: list[int],
     base_date: date,
     base_value: float = 100.0,
+    include_breakdown: bool = False,
 ) -> list[dict]:
     """Calculate equal-weight indexed performance for a basket of assets."""
     if not asset_ids:
         return []
+
+    # Build asset_id -> symbol map if breakdown requested
+    symbol_map: dict[int, str] = {}
+    if include_breakdown:
+        asset_stmt = select(Asset).where(Asset.id.in_(asset_ids))
+        asset_result = await db.execute(asset_stmt)
+        for a in asset_result.scalars().all():
+            symbol_map[a.id] = a.symbol
 
     # Fetch all price history from base_date for the constituents
     stmt = (
@@ -79,7 +89,16 @@ async def calculate_performance(
             shares = allocation_per_asset / prices
 
         portfolio_value = float((shares * prices).sum())
-        results.append({"date": current_date, "value": round(portfolio_value, 4)})
+        point: dict = {"date": current_date, "value": round(portfolio_value, 4)}
+
+        if include_breakdown:
+            constituent_values = shares * prices
+            point["breakdown"] = {
+                symbol_map.get(aid, str(aid)): round(float(val), 4)
+                for aid, val in constituent_values.items()
+            }
+
+        results.append(point)
         prev_month = current_date.month
 
     return results

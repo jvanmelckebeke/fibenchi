@@ -37,3 +37,22 @@ class PseudoETFResponse(BaseModel):
 class PerformancePoint(BaseModel):
     date: date
     value: float
+
+
+class PerformanceBreakdownPoint(BaseModel):
+    date: date
+    value: float
+    breakdown: dict[str, float] = {}
+
+
+class ConstituentIndicatorResponse(BaseModel):
+    symbol: str
+    name: str | None = None
+    weight_pct: float | None = None
+    close: float | None = None
+    change_pct: float | None = None
+    rsi: float | None = None
+    sma_20: float | None = None
+    sma_50: float | None = None
+    macd_signal_dir: str | None = None
+    bb_position: str | None = None

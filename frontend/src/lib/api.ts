@@ -156,6 +156,25 @@ export interface PerformancePoint {
   value: number
 }
 
+export interface PerformanceBreakdownPoint {
+  date: string
+  value: number
+  breakdown: Record<string, number>
+}
+
+export interface ConstituentIndicator {
+  symbol: string
+  name: string | null
+  weight_pct: number | null
+  close: number | null
+  change_pct: number | null
+  rsi: number | null
+  sma_20: number | null
+  sma_50: number | null
+  macd_signal_dir: string | null
+  bb_position: string | null
+}
+
 // API client
 
 const BASE = "/api"
@@ -250,7 +269,8 @@ export const api = {
       }),
     removeConstituent: (etfId: number, assetId: number) =>
       request<PseudoETF>(`/pseudo-etfs/${etfId}/constituents/${assetId}`, { method: "DELETE" }),
-    performance: (id: number) => request<PerformancePoint[]>(`/pseudo-etfs/${id}/performance`),
+    performance: (id: number) => request<PerformanceBreakdownPoint[]>(`/pseudo-etfs/${id}/performance`),
+    constituentsIndicators: (id: number) => request<ConstituentIndicator[]>(`/pseudo-etfs/${id}/constituents/indicators`),
     thesis: {
       get: (id: number) => request<Thesis>(`/pseudo-etfs/${id}/thesis`),
       update: (id: number, content: string) =>
