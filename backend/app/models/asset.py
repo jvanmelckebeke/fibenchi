@@ -20,6 +20,7 @@ class Asset(Base):
     name: Mapped[str] = mapped_column(String(200))
     type: Mapped[AssetType] = mapped_column(Enum(AssetType))
     watchlisted: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    currency: Mapped[str] = mapped_column(String(10), default="USD", server_default="USD")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     prices: Mapped[list["PriceHistory"]] = relationship(back_populates="asset", cascade="all, delete-orphan")

@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react"
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
 import { usePrices } from "@/lib/queries"
+import { formatPrice } from "@/lib/format"
 
-export function SparklineChart({ symbol }: { symbol: string }) {
+export function SparklineChart({ symbol, currency = "USD" }: { symbol: string; currency?: string }) {
   const { data: prices } = usePrices(symbol, "3mo")
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -67,7 +68,7 @@ export function SparklineChart({ symbol }: { symbol: string }) {
     <div>
       <div ref={containerRef} className="w-full" />
       <div className="flex items-center justify-between mt-1">
-        <span className="text-sm font-medium">${last.close.toFixed(2)}</span>
+        <span className="text-sm font-medium">{formatPrice(last.close, currency)}</span>
         <span className={`text-xs font-medium ${change >= 0 ? "text-green-500" : "text-red-500"}`}>
           {change >= 0 ? "+" : ""}
           {change.toFixed(1)}%

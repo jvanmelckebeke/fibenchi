@@ -50,10 +50,17 @@ def validate_symbol(symbol: str) -> dict | None:
     if not quote or isinstance(quote, str):
         return None
 
+    # Extract currency from price data
+    price_data = ticker.price.get(symbol, {})
+    currency = "USD"
+    if isinstance(price_data, dict):
+        currency = price_data.get("currency", "USD") or "USD"
+
     return {
         "symbol": symbol.upper(),
         "name": quote.get("shortName") or quote.get("longName") or symbol.upper(),
         "type": quote.get("quoteType", "EQUITY"),
+        "currency": currency,
     }
 
 
@@ -108,6 +115,27 @@ def fetch_etf_holdings(symbol: str) -> dict | None:
         "sector_weightings": sectors,
         "total_percent": total,
     }
+
+
+def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
+    """Fetch currencies for multiple symbols in one batch call.
+
+    Returns a dict mapping symbol -> currency code (e.g. "USD", "EUR").
+    """
+    if not symbols:
+        return {}
+
+    ticker = Ticker(symbols)
+    price_data = ticker.price
+
+    result = {}
+    for sym in symbols:
+        info = price_data.get(sym, {})
+        if isinstance(info, dict):
+            currency = info.get("currency", "USD") or "USD"
+            result[sym] = currency
+
+    return result
 
 
 def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:

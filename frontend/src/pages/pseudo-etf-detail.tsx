@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, UserPlus, X, Plus, Loader2 } from "lucide-react"
+import { formatPrice } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -359,7 +360,7 @@ function HoldingsTable({ etfId }: { etfId: number }) {
         {etf.constituents.length > 0 && (
           <div className="overflow-x-auto">
             <div className="min-w-[750px] space-y-0">
-              <div className="grid grid-cols-[4rem_1fr_3.5rem_4rem_4rem_3.5rem_3.5rem_4rem_3.5rem_2rem] text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2">
+              <div className="grid grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem_2rem] text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2">
                 <span>Symbol</span>
                 <span>Name</span>
                 <span className="text-right">Wt%</span>
@@ -381,7 +382,7 @@ function HoldingsTable({ etfId }: { etfId: number }) {
                 const bbPos = ind?.bb_position
 
                 return (
-                  <div key={asset.id} className="grid grid-cols-[4rem_1fr_3.5rem_4rem_4rem_3.5rem_3.5rem_4rem_3.5rem_2rem] text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center group/row">
+                  <div key={asset.id} className="grid grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem_2rem] text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center group/row">
                     <Link to={`/asset/${asset.symbol}`} className="font-mono text-xs text-primary hover:underline">
                       {asset.symbol}
                     </Link>
@@ -391,7 +392,7 @@ function HoldingsTable({ etfId }: { etfId: number }) {
                       <span className="col-span-6 text-right text-xs text-muted-foreground animate-pulse">Loading...</span>
                     ) : (
                       <>
-                        <IndicatorCell value={ind?.close != null ? ind.close.toFixed(0) : null} />
+                        <IndicatorCell value={ind?.close != null ? formatPrice(ind.close, ind.currency, 0) : null} />
                         <IndicatorCell value={chg.text} className={chg.className} />
                         <IndicatorCell value={rsiVal != null ? rsiVal.toFixed(0) : null} className={rsiColor} />
                         <IndicatorCell

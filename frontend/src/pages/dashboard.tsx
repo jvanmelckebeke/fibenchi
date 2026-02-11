@@ -102,6 +102,7 @@ export function DashboardPage() {
             symbol={asset.symbol}
             name={asset.name}
             type={asset.type}
+            currency={asset.currency}
             tags={asset.tags}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
           />
@@ -115,12 +116,14 @@ function AssetCard({
   symbol,
   name,
   type,
+  currency,
   tags,
   onDelete,
 }: {
   symbol: string
   name: string
   type: string
+  currency: string
   tags: TagBrief[]
   onDelete: () => void
 }) {
@@ -168,7 +171,7 @@ function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          <SparklineChart symbol={symbol} />
+          <SparklineChart symbol={symbol} currency={currency} />
           <RsiGauge symbol={symbol} />
         </CardContent>
       </Link>

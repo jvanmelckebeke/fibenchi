@@ -47,6 +47,7 @@ class EtfHoldingsResponse(BaseModel):
 
 class HoldingIndicatorResponse(BaseModel):
     symbol: str
+    currency: str = "USD"
     close: float | None = None
     change_pct: float | None = None
     rsi: float | None = None

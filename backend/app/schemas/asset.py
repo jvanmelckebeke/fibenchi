@@ -26,6 +26,7 @@ class AssetResponse(BaseModel):
     name: str
     type: AssetType
     watchlisted: bool
+    currency: str = "USD"
     created_at: datetime
     tags: list[TagBrief] = []
 
