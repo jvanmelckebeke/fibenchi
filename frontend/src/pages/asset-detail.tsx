@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useParams, Link } from "react-router-dom"
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react"
+import { ArrowLeft, Loader2, RefreshCw, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PriceChart } from "@/components/price-chart"
@@ -9,6 +9,7 @@ import { AnnotationsList } from "@/components/annotations-list"
 import type { EtfHoldings, HoldingIndicator } from "@/lib/api"
 import {
   useAssets,
+  useCreateAsset,
   usePrices,
   useIndicators,
   useRefreshPrices,
@@ -28,19 +29,22 @@ export function AssetDetailPage() {
   const [period, setPeriod] = useState<string>("1y")
   const { data: assets } = useAssets()
   const asset = assets?.find((a) => a.symbol === symbol?.toUpperCase())
+  const isWatchlisted = !!asset
   const isEtf = asset?.type === "etf"
 
   if (!symbol) return null
 
   return (
     <div className="p-6 space-y-6">
-      <Header symbol={symbol} period={period} setPeriod={setPeriod} />
+      <Header symbol={symbol} period={period} setPeriod={setPeriod} isWatchlisted={isWatchlisted} />
       <ChartSection symbol={symbol} period={period} />
       {isEtf && <HoldingsSection symbol={symbol} />}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ThesisSection symbol={symbol} />
-        <AnnotationsSection symbol={symbol} />
-      </div>
+      {isWatchlisted && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ThesisSection symbol={symbol} />
+          <AnnotationsSection symbol={symbol} />
+        </div>
+      )}
     </div>
   )
 }
@@ -49,12 +53,15 @@ function Header({
   symbol,
   period,
   setPeriod,
+  isWatchlisted,
 }: {
   symbol: string
   period: string
   setPeriod: (p: string) => void
+  isWatchlisted: boolean
 }) {
   const refresh = useRefreshPrices(symbol)
+  const createAsset = useCreateAsset()
 
   return (
     <div className="flex items-center justify-between">
@@ -65,6 +72,17 @@ function Header({
           </Button>
         </Link>
         <h1 className="text-2xl font-bold">{symbol}</h1>
+        {!isWatchlisted && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => createAsset.mutate({ symbol: symbol.toUpperCase(), watchlisted: true })}
+            disabled={createAsset.isPending}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            {createAsset.isPending ? "Adding..." : "Add to Watchlist"}
+          </Button>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <div className="flex gap-1">
@@ -80,15 +98,17 @@ function Header({
             </Button>
           ))}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refresh.mutate(period)}
-          disabled={refresh.isPending}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        {isWatchlisted && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refresh.mutate(period)}
+            disabled={refresh.isPending}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -228,7 +248,7 @@ function TopHoldingsCard({
 
             return (
               <div key={h.symbol} className="grid grid-cols-[4rem_1fr_3.5rem_4rem_4rem_3.5rem_3.5rem_4rem_3.5rem] text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center">
-                <span className="font-mono text-xs text-primary">{h.symbol}</span>
+                <a href={`/asset/${h.symbol}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-primary hover:underline">{h.symbol}</a>
                 <span className="text-muted-foreground truncate text-xs">{h.name}</span>
                 <span className="text-right font-medium text-xs">{h.percent.toFixed(1)}%</span>
                 {indicatorsLoading ? (

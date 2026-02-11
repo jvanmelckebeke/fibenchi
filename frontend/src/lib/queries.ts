@@ -19,6 +19,7 @@ export const keys = {
   pseudoEtfs: ["pseudo-etfs"] as const,
   pseudoEtf: (id: number) => ["pseudo-etfs", id] as const,
   pseudoEtfPerformance: (id: number) => ["pseudo-etfs", id, "performance"] as const,
+  pseudoEtfConstituentsIndicators: (id: number) => ["pseudo-etfs", id, "constituents-indicators"] as const,
   pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
 }
@@ -239,6 +240,7 @@ export function useAddPseudoEtfConstituents() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: keys.pseudoEtfs })
       qc.invalidateQueries({ queryKey: keys.pseudoEtfPerformance(vars.etfId) })
+      qc.invalidateQueries({ queryKey: keys.pseudoEtfConstituentsIndicators(vars.etfId) })
     },
   })
 }
@@ -251,6 +253,7 @@ export function useRemovePseudoEtfConstituent() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: keys.pseudoEtfs })
       qc.invalidateQueries({ queryKey: keys.pseudoEtfPerformance(vars.etfId) })
+      qc.invalidateQueries({ queryKey: keys.pseudoEtfConstituentsIndicators(vars.etfId) })
     },
   })
 }
@@ -260,6 +263,15 @@ export function usePseudoEtfPerformance(id: number) {
     queryKey: keys.pseudoEtfPerformance(id),
     queryFn: () => api.pseudoEtfs.performance(id),
     enabled: !!id,
+  })
+}
+
+export function usePseudoEtfConstituentsIndicators(id: number, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.pseudoEtfConstituentsIndicators(id),
+    queryFn: () => api.pseudoEtfs.constituentsIndicators(id),
+    enabled: !!id && enabled,
+    staleTime: 5 * 60 * 1000,
   })
 }
 

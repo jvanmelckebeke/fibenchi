@@ -9,6 +9,7 @@ from app.models import Asset, PriceHistory
 from app.schemas.price import IndicatorResponse, PriceResponse
 from app.services.indicators import compute_indicators
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
+from app.services.yahoo import fetch_history
 
 import pandas as pd
 
@@ -29,12 +30,41 @@ def _display_start(period: str) -> date:
     return date.today() - timedelta(days=days)
 
 
-async def _get_asset(symbol: str, db: AsyncSession) -> Asset:
+async def _find_asset(symbol: str, db: AsyncSession) -> Asset | None:
+    """Look up asset in DB, returning None if not found."""
     result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
-    asset = result.scalar_one_or_none()
+    return result.scalar_one_or_none()
+
+
+async def _get_asset(symbol: str, db: AsyncSession) -> Asset:
+    asset = await _find_asset(symbol, db)
     if not asset:
         raise HTTPException(404, f"Asset {symbol} not found")
     return asset
+
+
+def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd.DataFrame:
+    """Fetch price data from Yahoo without persisting to DB.
+
+    Used for non-watchlisted symbols viewed via ETF holdings links.
+    """
+    days = _PERIOD_DAYS.get(period, 90)
+    if warmup:
+        days += _WARMUP_DAYS
+    start_date = date.today() - timedelta(days=days)
+    try:
+        df = fetch_history(symbol.upper(), start=start_date, end=date.today())
+    except (ValueError, Exception):
+        raise HTTPException(404, f"No price data available for {symbol}")
+
+    if df.empty:
+        raise HTTPException(404, f"No price data available for {symbol}")
+
+    # Normalise index to date objects
+    if hasattr(df.index, "date"):
+        df.index = df.index.date
+
+    return df
 
 
 async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[PriceHistory]:
@@ -69,39 +99,62 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
 
 @router.get("/prices", response_model=list[PriceResponse])
 async def get_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
-    asset = await _get_asset(symbol, db)
-    prices = await _ensure_prices(db, asset, period)
+    asset = await _find_asset(symbol, db)
+
+    if asset:
+        prices = await _ensure_prices(db, asset, period)
+        start = _display_start(period)
+        return [p for p in prices if p.date >= start]
+
+    # Ephemeral: fetch directly from Yahoo, no DB persistence
+    df = _fetch_ephemeral(symbol, period)
     start = _display_start(period)
-    return [p for p in prices if p.date >= start]
+    rows = []
+    for dt, row in df.iterrows():
+        if dt < start:
+            continue
+        rows.append(PriceResponse(
+            date=dt,
+            open=round(float(row["open"]), 4),
+            high=round(float(row["high"]), 4),
+            low=round(float(row["low"]), 4),
+            close=round(float(row["close"]), 4),
+            volume=int(row["volume"]),
+        ))
+    return rows
 
 
 @router.get("/indicators", response_model=list[IndicatorResponse])
 async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
-    asset = await _get_asset(symbol, db)
-    prices = await _ensure_prices(db, asset, period)
-
+    asset = await _find_asset(symbol, db)
     start = _display_start(period)
-    warmup_start = start - timedelta(days=_WARMUP_DAYS)
 
-    # If DB doesn't have enough warmup data, fetch extra from Yahoo
-    if prices and prices[0].date > warmup_start:
-        await sync_asset_prices_range(db, asset, warmup_start, date.today())
-        result = await db.execute(
-            select(PriceHistory)
-            .where(PriceHistory.asset_id == asset.id)
-            .order_by(PriceHistory.date)
-        )
-        prices = result.scalars().all()
+    if asset:
+        prices = await _ensure_prices(db, asset, period)
+        warmup_start = start - timedelta(days=_WARMUP_DAYS)
 
-    # Build DataFrame from ALL available data for indicator computation
-    df = pd.DataFrame([{
-        "date": p.date,
-        "open": float(p.open),
-        "high": float(p.high),
-        "low": float(p.low),
-        "close": float(p.close),
-        "volume": p.volume,
-    } for p in prices]).set_index("date")
+        # If DB doesn't have enough warmup data, fetch extra from Yahoo
+        if prices and prices[0].date > warmup_start:
+            await sync_asset_prices_range(db, asset, warmup_start, date.today())
+            result = await db.execute(
+                select(PriceHistory)
+                .where(PriceHistory.asset_id == asset.id)
+                .order_by(PriceHistory.date)
+            )
+            prices = result.scalars().all()
+
+        # Build DataFrame from ALL available data for indicator computation
+        df = pd.DataFrame([{
+            "date": p.date,
+            "open": float(p.open),
+            "high": float(p.high),
+            "low": float(p.low),
+            "close": float(p.close),
+            "volume": p.volume,
+        } for p in prices]).set_index("date")
+    else:
+        # Ephemeral: fetch with warmup directly from Yahoo
+        df = _fetch_ephemeral(symbol, period, warmup=True)
 
     indicators = compute_indicators(df)
 
