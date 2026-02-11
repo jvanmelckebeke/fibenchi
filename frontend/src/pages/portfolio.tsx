@@ -75,6 +75,7 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
       layout: {
         background: { type: ColorType.Solid, color: theme.bg },
         textColor: theme.text,
+        attributionLogo: false,
       },
       grid: { vertLines: { visible: false }, horzLines: { visible: false } },
       rightPriceScale: { visible: false },

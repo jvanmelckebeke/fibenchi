@@ -188,6 +188,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       layout: {
         background: { type: ColorType.Solid, color: theme.bg },
         textColor: theme.text,
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: theme.grid },
@@ -295,6 +296,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       layout: {
         background: { type: ColorType.Solid, color: theme.bg },
         textColor: theme.text,
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: theme.grid },
