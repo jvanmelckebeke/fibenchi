@@ -9,7 +9,7 @@ from app.schemas.thesis import ThesisResponse, ThesisUpdate
 router = APIRouter(prefix="/api/assets/{symbol}/thesis", tags=["thesis"])
 
 
-@router.get("", response_model=ThesisResponse)
+@router.get("", response_model=ThesisResponse, summary="Get investment thesis for an asset")
 async def get_thesis(symbol: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
     asset = result.scalar_one_or_none()
@@ -24,7 +24,7 @@ async def get_thesis(symbol: str, db: AsyncSession = Depends(get_db)):
     return thesis
 
 
-@router.put("", response_model=ThesisResponse)
+@router.put("", response_model=ThesisResponse, summary="Create or update investment thesis")
 async def update_thesis(symbol: str, data: ThesisUpdate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
     asset = result.scalar_one_or_none()

@@ -9,7 +9,7 @@ from app.schemas.annotation import AnnotationCreate, AnnotationResponse
 router = APIRouter(prefix="/api/assets/{symbol}/annotations", tags=["annotations"])
 
 
-@router.get("", response_model=list[AnnotationResponse])
+@router.get("", response_model=list[AnnotationResponse], summary="List chart annotations for an asset")
 async def list_annotations(symbol: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
     asset = result.scalar_one_or_none()
@@ -24,7 +24,7 @@ async def list_annotations(symbol: str, db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.post("", response_model=AnnotationResponse, status_code=201)
+@router.post("", response_model=AnnotationResponse, status_code=201, summary="Create a chart annotation")
 async def create_annotation(symbol: str, data: AnnotationCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
     asset = result.scalar_one_or_none()
@@ -44,7 +44,7 @@ async def create_annotation(symbol: str, data: AnnotationCreate, db: AsyncSessio
     return annotation
 
 
-@router.delete("/{annotation_id}", status_code=204)
+@router.delete("/{annotation_id}", status_code=204, summary="Delete a chart annotation")
 async def delete_annotation(symbol: str, annotation_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
     asset = result.scalar_one_or_none()

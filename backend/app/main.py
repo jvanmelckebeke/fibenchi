@@ -55,7 +55,63 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="fibenchi", lifespan=lifespan)
+app = FastAPI(
+    title="Fibenchi",
+    summary="Investment research dashboard for tracking stocks, ETFs, and custom baskets.",
+    description=(
+        "Fibenchi is a self-hosted investment research tool. It lets you maintain a watchlist "
+        "of stocks and ETFs, view OHLCV price charts with technical indicators "
+        "(RSI, SMA, Bollinger Bands, MACD), write investment theses, and annotate charts "
+        "with dated notes.\n\n"
+        "**Pseudo-ETFs** are user-created baskets of assets with equal-weight allocation and "
+        "quarterly rebalancing. They have their own indexed performance chart, per-constituent "
+        "breakdown, and indicator snapshots.\n\n"
+        "**Key concepts:**\n"
+        "- Assets are stocks or ETFs identified by ticker symbol. Deleting an asset soft-deletes "
+        "it (sets `watchlisted=false`) to preserve pseudo-ETF relationships.\n"
+        "- Prices are sourced from Yahoo Finance and cached in PostgreSQL. A daily cron job "
+        "refreshes all watchlisted assets.\n"
+        "- Ephemeral price views allow fetching prices for non-watchlisted symbols (e.g. ETF "
+        "holdings) without persisting data.\n"
+        "- Groups are user-defined collections of assets for organization.\n"
+    ),
+    version="1.0.0",
+    lifespan=lifespan,
+    openapi_tags=[
+        {
+            "name": "assets",
+            "description": "Manage the watchlist of tracked stocks and ETFs. Assets are identified by ticker symbol and auto-validated against Yahoo Finance.",
+        },
+        {
+            "name": "prices",
+            "description": "OHLCV price data and technical indicators (RSI, SMA 20/50, Bollinger Bands, MACD) for individual assets. Supports both persisted (watchlisted) and ephemeral (non-watchlisted) price fetching.",
+        },
+        {
+            "name": "holdings",
+            "description": "ETF holdings breakdown and per-holding technical indicator snapshots. Only available for assets with type=etf.",
+        },
+        {
+            "name": "portfolio",
+            "description": "Portfolio-wide analytics: composite equal-weight index of all watchlisted assets, and top/bottom performer rankings by period return.",
+        },
+        {
+            "name": "groups",
+            "description": "User-defined groups for organizing assets into named collections (e.g. 'Tech', 'Dividend').",
+        },
+        {
+            "name": "thesis",
+            "description": "Free-text investment thesis per asset. Supports Markdown content.",
+        },
+        {
+            "name": "annotations",
+            "description": "Dated chart annotations per asset. Each annotation has a date, title, body, and color for visual markers on price charts.",
+        },
+        {
+            "name": "pseudo-etfs",
+            "description": "User-created custom baskets (pseudo-ETFs) with equal-weight allocation and quarterly rebalancing. Includes constituent management, indexed performance with per-symbol breakdown, technical indicator snapshots, thesis, and annotations.",
+        },
+    ],
+)
 
 app.include_router(assets.router)
 app.include_router(groups.router)
@@ -67,6 +123,6 @@ app.include_router(annotations.router)
 app.include_router(pseudo_etfs.router)
 
 
-@app.get("/api/health")
+@app.get("/api/health", summary="Health check", tags=["system"])
 async def health():
     return {"status": "ok"}
