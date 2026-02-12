@@ -8,6 +8,9 @@ export interface LegendValues {
   bbUpper?: number
   bbLower?: number
   rsi?: number
+  macd?: number
+  macdSignal?: number
+  macdHist?: number
 }
 
 export function Legend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
@@ -49,6 +52,26 @@ export function RsiLegend({ values, latest }: { values: LegendValues | null; lat
     <div className="text-xs tabular-nums">
       <span className="text-muted-foreground">RSI(14) </span>
       {rsi !== undefined && <span className={color}>{rsi.toFixed(2)}</span>}
+    </div>
+  )
+}
+
+export function MacdLegend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
+  const v = values ?? latest
+  const histColor = v.macdHist !== undefined
+    ? v.macdHist >= 0 ? "text-green-500" : "text-red-500"
+    : ""
+
+  return (
+    <div className="flex items-center gap-x-3 text-xs tabular-nums">
+      <span className="text-muted-foreground">MACD(12,26,9)</span>
+      {v.macd !== undefined && (
+        <>
+          <span><span className="inline-block w-2 h-0.5 bg-sky-400 mr-1 align-middle" />MACD <span className="text-sky-400">{v.macd.toFixed(2)}</span></span>
+          <span><span className="inline-block w-2 h-0.5 bg-orange-400 mr-1 align-middle" />Signal <span className="text-orange-400">{v.macdSignal!.toFixed(2)}</span></span>
+          <span className={histColor}>Hist {v.macdHist!.toFixed(2)}</span>
+        </>
+      )}
     </div>
   )
 }
