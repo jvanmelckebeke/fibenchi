@@ -3,8 +3,8 @@ import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-
 import { usePrices } from "@/lib/queries"
 import { formatPrice } from "@/lib/format"
 
-export function SparklineChart({ symbol, currency = "USD" }: { symbol: string; currency?: string }) {
-  const { data: prices } = usePrices(symbol, "3mo")
+export function SparklineChart({ symbol, currency = "USD", period = "3mo" }: { symbol: string; currency?: string; period?: string }) {
+  const { data: prices } = usePrices(symbol, period)
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
 

@@ -11,11 +11,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useDeleteAsset, useTags } from "@/lib/queries"
+import { useAssets, useCreateAsset, useDeleteAsset, useStaggeredQuotes, useTags } from "@/lib/queries"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { TagBadge } from "@/components/tag-badge"
-import type { TagBrief } from "@/lib/api"
+import type { Quote, TagBrief } from "@/lib/api"
+import { formatPrice } from "@/lib/format"
 
 export function DashboardPage() {
   const { data: allAssets, isLoading } = useAssets()
@@ -24,8 +25,11 @@ export function DashboardPage() {
   const deleteAsset = useDeleteAsset()
   const [symbol, setSymbol] = useState("")
   const [selectedTags, setSelectedTags] = useState<number[]>([])
+  const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
 
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
+  const watchlistedSymbols = watchlisted?.map((a) => a.symbol) ?? []
+  const quotes = useStaggeredQuotes(watchlistedSymbols)
   const assets = watchlisted?.filter((a) => {
     if (selectedTags.length === 0) return true
     return a.tags.some((t) => selectedTags.includes(t.id))
@@ -45,7 +49,24 @@ export function DashboardPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Watchlist</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Watchlist</h1>
+          <div className="flex rounded-md border border-border overflow-hidden">
+            {(["3mo", "6mo", "1y"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setSparklinePeriod(p)}
+                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                  sparklinePeriod === p
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {p === "3mo" ? "3M" : p === "6mo" ? "6M" : "1Y"}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-2">
           <Input
             placeholder="Add symbol (e.g. AAPL)"
@@ -104,6 +125,8 @@ export function DashboardPage() {
             type={asset.type}
             currency={asset.currency}
             tags={asset.tags}
+            quote={quotes[asset.symbol]}
+            sparklinePeriod={sparklinePeriod}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
           />
         ))}
@@ -118,6 +141,8 @@ function AssetCard({
   type,
   currency,
   tags,
+  quote,
+  sparklinePeriod,
   onDelete,
 }: {
   symbol: string
@@ -125,8 +150,15 @@ function AssetCard({
   type: string
   currency: string
   tags: TagBrief[]
+  quote?: Quote
+  sparklinePeriod: string
   onDelete: () => void
 }) {
+  const hasQuote = quote?.price != null
+  const changePct = quote?.change_percent
+  const changeColor =
+    changePct != null ? (changePct >= 0 ? "text-green-500" : "text-red-500") : "text-muted-foreground"
+
   return (
     <Card className="group relative hover:border-primary/50 transition-colors">
       <DropdownMenu>
@@ -160,8 +192,21 @@ function AssetCard({
             <Badge variant="secondary" className="text-xs">
               {type}
             </Badge>
+            {hasQuote && (
+              <span className="ml-auto text-base font-semibold tabular-nums">
+                {formatPrice(quote!.price!, currency)}
+              </span>
+            )}
           </div>
-          <p className="text-xs text-muted-foreground truncate">{name}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground truncate">{name}</p>
+            {changePct != null && (
+              <span className={`text-xs font-medium tabular-nums ${changeColor}`}>
+                {changePct >= 0 ? "+" : ""}
+                {changePct.toFixed(2)}%
+              </span>
+            )}
+          </div>
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {tags.map((tag) => (
@@ -171,7 +216,7 @@ function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          <SparklineChart symbol={symbol} currency={currency} />
+          <SparklineChart symbol={symbol} currency={currency} period={sparklinePeriod} />
           <RsiGauge symbol={symbol} />
         </CardContent>
       </Link>
