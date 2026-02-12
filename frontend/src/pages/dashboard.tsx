@@ -25,6 +25,7 @@ export function DashboardPage() {
   const deleteAsset = useDeleteAsset()
   const [symbol, setSymbol] = useState("")
   const [selectedTags, setSelectedTags] = useState<number[]>([])
+  const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
 
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
   const watchlistedSymbols = watchlisted?.map((a) => a.symbol) ?? []
@@ -48,7 +49,24 @@ export function DashboardPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Watchlist</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Watchlist</h1>
+          <div className="flex rounded-md border border-border overflow-hidden">
+            {(["3mo", "6mo", "1y"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setSparklinePeriod(p)}
+                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                  sparklinePeriod === p
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {p === "3mo" ? "3M" : p === "6mo" ? "6M" : "1Y"}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-2">
           <Input
             placeholder="Add symbol (e.g. AAPL)"
@@ -108,6 +126,7 @@ export function DashboardPage() {
             currency={asset.currency}
             tags={asset.tags}
             quote={quotes[asset.symbol]}
+            sparklinePeriod={sparklinePeriod}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
           />
         ))}
@@ -123,6 +142,7 @@ function AssetCard({
   currency,
   tags,
   quote,
+  sparklinePeriod,
   onDelete,
 }: {
   symbol: string
@@ -131,6 +151,7 @@ function AssetCard({
   currency: string
   tags: TagBrief[]
   quote?: Quote
+  sparklinePeriod: string
   onDelete: () => void
 }) {
   const hasQuote = quote?.price != null
@@ -195,7 +216,7 @@ function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          <SparklineChart symbol={symbol} currency={currency} />
+          <SparklineChart symbol={symbol} currency={currency} period={sparklinePeriod} />
           <RsiGauge symbol={symbol} />
         </CardContent>
       </Link>
