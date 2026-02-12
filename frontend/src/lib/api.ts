@@ -203,6 +203,16 @@ export interface ConstituentIndicator {
   bb_position: string | null
 }
 
+export interface Quote {
+  symbol: string
+  price: number | null
+  previous_close: number | null
+  change: number | null
+  change_percent: number | null
+  currency: string
+  market_state: string | null
+}
+
 // API client
 
 const BASE = "/api"
@@ -246,6 +256,10 @@ export const api = {
       request<EtfHoldings>(`/assets/${symbol}/holdings`),
     holdingsIndicators: (symbol: string) =>
       request<HoldingIndicator[]>(`/assets/${symbol}/holdings/indicators`),
+  },
+  quotes: {
+    list: (symbols: string[]) =>
+      request<Quote[]>(`/quotes?symbols=${symbols.join(",")}`),
   },
   tags: {
     list: () => request<Tag[]>("/tags"),

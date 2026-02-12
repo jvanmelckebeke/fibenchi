@@ -138,6 +138,43 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     return result
 
 
+def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
+    """Fetch current market quotes for multiple symbols in one batch call.
+
+    Returns a list of dicts with keys: symbol, price, previous_close, change,
+    change_percent, currency, market_state.
+    """
+    if not symbols:
+        return []
+
+    ticker = Ticker(symbols)
+    price_data = ticker.price
+
+    results = []
+    for sym in symbols:
+        info = price_data.get(sym, {})
+        if not isinstance(info, dict):
+            results.append({"symbol": sym})
+            continue
+
+        price = info.get("regularMarketPrice")
+        prev_close = info.get("regularMarketPreviousClose")
+        change = info.get("regularMarketChange")
+        change_pct = info.get("regularMarketChangePercent")
+
+        results.append({
+            "symbol": sym,
+            "price": round(float(price), 4) if price is not None else None,
+            "previous_close": round(float(prev_close), 4) if prev_close is not None else None,
+            "change": round(float(change), 4) if change is not None else None,
+            "change_percent": round(float(change_pct) * 100, 2) if change_pct is not None else None,
+            "currency": info.get("currency", "USD") or "USD",
+            "market_state": info.get("marketState"),
+        })
+
+    return results
+
+
 def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
     """Fetch history for multiple symbols in one batch call."""
     if not symbols:

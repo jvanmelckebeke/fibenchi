@@ -10,7 +10,7 @@ from sqlalchemy import select, text
 
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
-from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, tags, thesis
+from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, quotes, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.yahoo import batch_fetch_currencies
 
@@ -136,6 +136,10 @@ app = FastAPI(
             "description": "Dated chart annotations per asset. Each annotation has a date, title, body, and color for visual markers on price charts.",
         },
         {
+            "name": "quotes",
+            "description": "Real-time market quotes for one or more symbols. Lightweight endpoint for live price polling.",
+        },
+        {
             "name": "pseudo-etfs",
             "description": "User-created custom baskets (pseudo-ETFs) with equal-weight allocation and quarterly rebalancing. Includes constituent management, indexed performance with per-symbol breakdown, technical indicator snapshots, thesis, and annotations.",
         },
@@ -152,6 +156,7 @@ app.include_router(holdings.router)
 app.include_router(thesis.router)
 app.include_router(annotations.router)
 app.include_router(pseudo_etfs.router)
+app.include_router(quotes.router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])
