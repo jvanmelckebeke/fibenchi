@@ -1,13 +1,13 @@
 import { useState } from "react"
 import { useParams, Link } from "react-router-dom"
-import { ArrowLeft, Loader2, RefreshCw, Plus } from "lucide-react"
+import { ArrowLeft, ExternalLink, Loader2, RefreshCw, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PriceChart } from "@/components/price-chart"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
-import { formatPrice } from "@/lib/format"
+import { formatPrice, buildYahooFinanceUrl } from "@/lib/format"
 import type { EtfHoldings, HoldingIndicator } from "@/lib/api"
 import {
   useAssets,
@@ -75,6 +75,16 @@ function Header({
           </Button>
         </Link>
         <h1 className="text-2xl font-bold">{symbol}</h1>
+        <a
+          href={buildYahooFinanceUrl(symbol)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View on Yahoo Finance"
+        >
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </a>
         {!isWatchlisted && (
           <Button
             variant="outline"
