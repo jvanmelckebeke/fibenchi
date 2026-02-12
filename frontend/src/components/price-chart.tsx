@@ -6,10 +6,11 @@ import {
   ColorType,
   CandlestickSeries,
   LineSeries,
+  HistogramSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
 import { BandFillPrimitive } from "./chart/bollinger-band-fill"
-import { Legend, RsiLegend, type LegendValues } from "./chart/chart-legends"
+import { Legend, RsiLegend, MacdLegend, type LegendValues } from "./chart/chart-legends"
 
 interface PriceChartProps {
   prices: Price[]
@@ -30,8 +31,10 @@ function getThemeColors() {
 export function PriceChart({ prices, indicators, annotations }: PriceChartProps) {
   const mainRef = useRef<HTMLDivElement>(null)
   const rsiRef = useRef<HTMLDivElement>(null)
+  const macdRef = useRef<HTMLDivElement>(null)
   const mainChartRef = useRef<IChartApi | null>(null)
   const rsiChartRef = useRef<IChartApi | null>(null)
+  const macdChartRef = useRef<IChartApi | null>(null)
   const [hoverValues, setHoverValues] = useState<LegendValues | null>(null)
 
   // Build lookup maps
@@ -42,6 +45,9 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
   const bbUpperByTime = useRef(new Map<string, number>())
   const bbLowerByTime = useRef(new Map<string, number>())
   const rsiByTime = useRef(new Map<string, number>())
+  const macdByTime = useRef(new Map<string, number>())
+  const macdSignalByTime = useRef(new Map<string, number>())
+  const macdHistByTime = useRef(new Map<string, number>())
 
   // Compute latest values for default legend display
   const latestValues = useRef<LegendValues>({})
@@ -51,24 +57,27 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
   const syncCharts = useCallback((
     mainChart: IChartApi,
     rsiChart: IChartApi,
+    macdChart: IChartApi,
     candleSeries: ReturnType<IChartApi["addSeries"]>,
     rsiSeries: ReturnType<IChartApi["addSeries"]>,
+    macdLineSeries: ReturnType<IChartApi["addSeries"]>,
   ) => {
-    // Sync visible range by time (not logical index) to handle different data lengths
-    mainChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-      if (syncingRef.current) return
-      syncingRef.current = true
-      const timeRange = mainChart.timeScale().getVisibleRange()
-      if (timeRange) rsiChart.timeScale().setVisibleRange(timeRange)
-      syncingRef.current = false
-    })
-    rsiChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-      if (syncingRef.current) return
-      syncingRef.current = true
-      const timeRange = rsiChart.timeScale().getVisibleRange()
-      if (timeRange) mainChart.timeScale().setVisibleRange(timeRange)
-      syncingRef.current = false
-    })
+    const charts = [mainChart, rsiChart, macdChart]
+
+    // Sync visible range across all 3 charts
+    for (const source of charts) {
+      source.timeScale().subscribeVisibleLogicalRangeChange(() => {
+        if (syncingRef.current) return
+        syncingRef.current = true
+        const timeRange = source.timeScale().getVisibleRange()
+        if (timeRange) {
+          for (const target of charts) {
+            if (target !== source) target.timeScale().setVisibleRange(timeRange)
+          }
+        }
+        syncingRef.current = false
+      })
+    }
 
     const getValuesForTime = (key: string): LegendValues => {
       const ohlc = ohlcByTime.current.get(key)
@@ -82,66 +91,52 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
         bbUpper: bbUpperByTime.current.get(key),
         bbLower: bbLowerByTime.current.get(key),
         rsi: rsiByTime.current.get(key),
+        macd: macdByTime.current.get(key),
+        macdSignal: macdSignalByTime.current.get(key),
+        macdHist: macdHistByTime.current.get(key),
       }
     }
 
-    // Sync crosshair on hover + update legend
-    // Both handlers snap the crosshair on BOTH charts to the actual data values
-    mainChart.subscribeCrosshairMove((param) => {
-      if (param.time) {
-        const key = String(param.time)
-        setHoverValues(getValuesForTime(key))
-      } else {
-        setHoverValues(null)
-      }
+    // Snap crosshair on all charts to actual data values
+    const snapCrosshair = (key: string, time: Parameters<IChartApi["setCrosshairPosition"]>[1]) => {
+      const closeVal = closeByTime.current.get(key)
+      if (closeVal !== undefined) mainChart.setCrosshairPosition(closeVal, time, candleSeries)
+      const rsiVal = rsiByTime.current.get(key)
+      if (rsiVal !== undefined) rsiChart.setCrosshairPosition(rsiVal, time, rsiSeries)
+      const macdVal = macdByTime.current.get(key)
+      if (macdVal !== undefined) macdChart.setCrosshairPosition(macdVal, time, macdLineSeries)
+    }
 
-      if (syncingRef.current) return
-      syncingRef.current = true
-      if (param.time) {
-        const key = String(param.time)
-        const closeVal = closeByTime.current.get(key)
-        if (closeVal !== undefined) {
-          mainChart.setCrosshairPosition(closeVal, param.time, candleSeries)
-        }
-        const rsiVal = rsiByTime.current.get(key)
-        if (rsiVal !== undefined) {
-          rsiChart.setCrosshairPosition(rsiVal, param.time, rsiSeries)
-        }
-      } else {
-        rsiChart.clearCrosshairPosition()
+    const clearOtherCrosshairs = (source: IChartApi) => {
+      for (const chart of charts) {
+        if (chart !== source) chart.clearCrosshairPosition()
       }
-      syncingRef.current = false
-    })
+    }
 
-    rsiChart.subscribeCrosshairMove((param) => {
-      if (param.time) {
-        const key = String(param.time)
-        setHoverValues(getValuesForTime(key))
-      } else {
-        setHoverValues(null)
-      }
+    // Sync crosshair on hover + update legend for all charts
+    for (const source of charts) {
+      source.subscribeCrosshairMove((param) => {
+        if (param.time) {
+          const key = String(param.time)
+          setHoverValues(getValuesForTime(key))
+        } else {
+          setHoverValues(null)
+        }
 
-      if (syncingRef.current) return
-      syncingRef.current = true
-      if (param.time) {
-        const key = String(param.time)
-        const rsiVal = rsiByTime.current.get(key)
-        if (rsiVal !== undefined) {
-          rsiChart.setCrosshairPosition(rsiVal, param.time, rsiSeries)
+        if (syncingRef.current) return
+        syncingRef.current = true
+        if (param.time) {
+          snapCrosshair(String(param.time), param.time)
+        } else {
+          clearOtherCrosshairs(source)
         }
-        const closeVal = closeByTime.current.get(key)
-        if (closeVal !== undefined) {
-          mainChart.setCrosshairPosition(closeVal, param.time, candleSeries)
-        }
-      } else {
-        mainChart.clearCrosshairPosition()
-      }
-      syncingRef.current = false
-    })
+        syncingRef.current = false
+      })
+    }
   }, [])
 
   useEffect(() => {
-    if (!mainRef.current || !rsiRef.current || !prices.length) return
+    if (!mainRef.current || !rsiRef.current || !macdRef.current || !prices.length) return
 
     // Build lookup maps
     closeByTime.current.clear()
@@ -151,6 +146,9 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
     bbUpperByTime.current.clear()
     bbLowerByTime.current.clear()
     rsiByTime.current.clear()
+    macdByTime.current.clear()
+    macdSignalByTime.current.clear()
+    macdHistByTime.current.clear()
 
     for (const p of prices) {
       closeByTime.current.set(p.date, p.close)
@@ -162,6 +160,9 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       if (i.bb_upper !== null) bbUpperByTime.current.set(i.date, i.bb_upper)
       if (i.bb_lower !== null) bbLowerByTime.current.set(i.date, i.bb_lower)
       if (i.rsi !== null) rsiByTime.current.set(i.date, i.rsi)
+      if (i.macd !== null) macdByTime.current.set(i.date, i.macd)
+      if (i.macd_signal !== null) macdSignalByTime.current.set(i.date, i.macd_signal)
+      if (i.macd_hist !== null) macdHistByTime.current.set(i.date, i.macd_hist)
     }
 
     // Latest values for default legend
@@ -177,6 +178,9 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       bbUpper: lastIndicators.find((i) => i.bb_upper !== null)?.bb_upper ?? undefined,
       bbLower: lastIndicators.find((i) => i.bb_lower !== null)?.bb_lower ?? undefined,
       rsi: lastIndicators.find((i) => i.rsi !== null)?.rsi ?? undefined,
+      macd: lastIndicators.find((i) => i.macd !== null)?.macd ?? undefined,
+      macdSignal: lastIndicators.find((i) => i.macd_signal !== null)?.macd_signal ?? undefined,
+      macdHist: lastIndicators.find((i) => i.macd_hist !== null)?.macd_hist ?? undefined,
     }
 
     const theme = getThemeColors()
@@ -381,13 +385,98 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
     rsiChart.timeScale().fitContent()
     rsiChartRef.current = rsiChart
 
-    syncCharts(mainChart, rsiChart, candleSeries, rsiSeries)
+    // MACD chart
+    const macdChart = createChart(macdRef.current, {
+      width: macdRef.current.clientWidth,
+      height: 120,
+      layout: {
+        background: { type: ColorType.Solid, color: theme.bg },
+        textColor: theme.text,
+        attributionLogo: false,
+      },
+      grid: {
+        vertLines: { color: theme.grid },
+        horzLines: { color: theme.grid },
+      },
+      rightPriceScale: { borderColor: theme.border },
+      timeScale: { borderColor: theme.border, timeVisible: false },
+      crosshair: { mode: 0 },
+      handleScroll: {
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+        mouseWheel: false,
+        pressedMouseMove: true,
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: false,
+        axisDoubleClickReset: { time: true, price: false },
+      },
+    })
+
+    const macdData = indicators.filter((i) => i.macd !== null)
+
+    // MACD histogram (rendered first so lines draw on top)
+    const macdHistSeries = macdChart.addSeries(HistogramSeries, {
+      priceLineVisible: false,
+      base: 0,
+    })
+    macdHistSeries.setData(
+      macdData.map((i) => ({
+        time: i.date,
+        value: i.macd_hist!,
+        color: i.macd_hist! >= 0 ? "rgba(34, 197, 94, 0.6)" : "rgba(239, 68, 68, 0.6)",
+      }))
+    )
+
+    // MACD line
+    const macdLineSeries = macdChart.addSeries(LineSeries, {
+      color: "#38bdf8",
+      lineWidth: 2,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    })
+    macdLineSeries.setData(
+      macdData.map((i) => ({ time: i.date, value: i.macd! }))
+    )
+
+    // Signal line
+    const macdSignalSeries = macdChart.addSeries(LineSeries, {
+      color: "#fb923c",
+      lineWidth: 2,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    })
+    macdSignalSeries.setData(
+      indicators
+        .filter((i) => i.macd_signal !== null)
+        .map((i) => ({ time: i.date, value: i.macd_signal! }))
+    )
+
+    // Zero line
+    if (macdData.length) {
+      const zeroLine = macdChart.addSeries(LineSeries, {
+        color: "rgba(161, 161, 170, 0.3)",
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+      zeroLine.setData(macdData.map((i) => ({ time: i.date, value: 0 })))
+    }
+
+    macdChart.timeScale().fitContent()
+    macdChartRef.current = macdChart
+
+    syncCharts(mainChart, rsiChart, macdChart, candleSeries, rsiSeries, macdLineSeries)
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const w = entry.contentRect.width
         mainChart.applyOptions({ width: w })
         rsiChart.applyOptions({ width: w })
+        macdChart.applyOptions({ width: w })
       }
     })
     resizeObserver.observe(mainRef.current)
@@ -396,14 +485,17 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       resizeObserver.disconnect()
       mainChart.remove()
       rsiChart.remove()
+      macdChart.remove()
       mainChartRef.current = null
       rsiChartRef.current = null
+      macdChartRef.current = null
     }
   }, [prices, indicators, annotations, syncCharts])
 
   const resetView = useCallback(() => {
     mainChartRef.current?.timeScale().fitContent()
     rsiChartRef.current?.timeScale().fitContent()
+    macdChartRef.current?.timeScale().fitContent()
   }, [])
 
   return (
@@ -422,7 +514,11 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       <div className="px-1 py-1">
         <RsiLegend values={hoverValues} latest={latestValues.current} />
       </div>
-      <div ref={rsiRef} className="w-full rounded-b-md overflow-hidden" />
+      <div ref={rsiRef} className="w-full overflow-hidden" />
+      <div className="px-1 py-1">
+        <MacdLegend values={hoverValues} latest={latestValues.current} />
+      </div>
+      <div ref={macdRef} className="w-full rounded-b-md overflow-hidden" />
     </div>
   )
 }
