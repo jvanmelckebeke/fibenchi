@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/ui/skeleton"
 import { useIndicators } from "@/lib/queries"
 
 // Gradual color: center (50) is neutral, extremes get more intense
@@ -26,12 +27,21 @@ function getZoneLabel(rsi: number): string {
 }
 
 export function RsiGauge({ symbol }: { symbol: string }) {
-  const { data: indicators } = useIndicators(symbol)
+  const { data: indicators, isLoading } = useIndicators(symbol)
 
   const latestRsi = indicators
     ?.slice()
     .reverse()
     .find((i) => i.rsi !== null)?.rsi
+
+  if (isLoading) {
+    return (
+      <div className="mt-2 space-y-1">
+        <Skeleton className="h-1.5 w-full rounded-full" />
+        <Skeleton className="h-3 w-14 rounded" />
+      </div>
+    )
+  }
 
   if (latestRsi == null) {
     return (
