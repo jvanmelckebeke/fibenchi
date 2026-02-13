@@ -9,6 +9,7 @@ import {
   HistogramSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
+import { getChartTheme } from "@/lib/chart-utils"
 import { BandFillPrimitive } from "./chart/bollinger-band-fill"
 import { Legend, RsiLegend, MacdLegend, type LegendValues } from "./chart/chart-legends"
 
@@ -16,16 +17,6 @@ interface PriceChartProps {
   prices: Price[]
   indicators: Indicator[]
   annotations: Annotation[]
-}
-
-function getThemeColors() {
-  const dark = document.documentElement.classList.contains("dark")
-  return {
-    bg: dark ? "#18181b" : "#ffffff",
-    text: dark ? "#a1a1aa" : "#71717a",
-    grid: dark ? "#27272a" : "#f4f4f5",
-    border: dark ? "#3f3f46" : "#e4e4e7",
-  }
 }
 
 export function PriceChart({ prices, indicators, annotations }: PriceChartProps) {
@@ -183,7 +174,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       macdHist: lastIndicators.find((i) => i.macd_hist !== null)?.macd_hist ?? undefined,
     }
 
-    const theme = getThemeColors()
+    const theme = getChartTheme()
 
     // Main chart
     const mainChart = createChart(mainRef.current, {

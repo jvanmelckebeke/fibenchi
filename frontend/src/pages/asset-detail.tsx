@@ -7,8 +7,9 @@ import { PriceChart } from "@/components/price-chart"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
-import { formatPrice, buildYahooFinanceUrl } from "@/lib/format"
-import type { EtfHoldings, HoldingIndicator } from "@/lib/api"
+import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
+import { buildYahooFinanceUrl } from "@/lib/format"
+import type { EtfHoldings } from "@/lib/api"
 import {
   useAssets,
   useCreateAsset,
@@ -206,92 +207,33 @@ function HoldingsSection({ symbol }: { symbol: string }) {
   )
 }
 
-function IndicatorCell({ value, className = "" }: { value: string | null; className?: string }) {
-  return (
-    <span className={`text-right text-xs ${value === null ? "text-muted-foreground" : className}`}>
-      {value ?? "—"}
-    </span>
-  )
-}
-
-function formatChangePct(v: number | null): { text: string | null; className: string } {
-  if (v === null) return { text: null, className: "" }
-  const sign = v >= 0 ? "+" : ""
-  return {
-    text: `${sign}${v.toFixed(2)}%`,
-    className: v >= 0 ? "text-emerald-500" : "text-red-500",
-  }
-}
-
 function TopHoldingsCard({
   data,
   indicatorMap,
   indicatorsLoading,
 }: {
   data: EtfHoldings
-  indicatorMap: Map<string, HoldingIndicator>
+  indicatorMap: ReadonlyMap<string, { currency: string; close: number | null; change_pct: number | null; rsi: number | null; sma_20: number | null; macd_signal_dir: string | null; bb_position: string | null }>
   indicatorsLoading: boolean
 }) {
+  const rows: HoldingsGridRow[] = data.top_holdings.map((h) => ({
+    key: h.symbol,
+    symbol: h.symbol,
+    name: h.name,
+    percent: h.percent,
+  }))
+
   return (
     <Card className="p-4">
       <h3 className="text-sm font-semibold mb-3">
         Top {data.top_holdings.length} Holdings ({data.total_percent}% of Total Assets)
       </h3>
-      <div className="overflow-x-auto">
-        <div className="min-w-[700px] space-y-0">
-          <div className="grid grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem] text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2">
-            <span>Symbol</span>
-            <span>Company</span>
-            <span className="text-right">%</span>
-            <span className="text-right">Price</span>
-            <span className="text-right">Chg%</span>
-            <span className="text-right">RSI</span>
-            <span className="text-right">SMA20</span>
-            <span className="text-right">MACD</span>
-            <span className="text-right">BB</span>
-          </div>
-          {data.top_holdings.map((h) => {
-            const ind = indicatorMap.get(h.symbol)
-            const chg = formatChangePct(ind?.change_pct ?? null)
-            const rsiVal = ind?.rsi
-            const rsiColor = rsiVal != null ? (rsiVal > 70 ? "text-red-500" : rsiVal < 30 ? "text-emerald-500" : "") : ""
-            const smaAbove = ind?.sma_20 != null && ind?.close != null ? ind.close > ind.sma_20 : null
-            const macdDir = ind?.macd_signal_dir
-            const bbPos = ind?.bb_position
-
-            return (
-              <div key={h.symbol} className="grid grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem] text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center">
-                <a href={`/asset/${h.symbol}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-primary hover:underline">{h.symbol}</a>
-                <span className="text-muted-foreground truncate text-xs">{h.name}</span>
-                <span className="text-right font-medium text-xs">{h.percent.toFixed(1)}%</span>
-                {indicatorsLoading ? (
-                  <span className="col-span-6 text-right text-xs text-muted-foreground animate-pulse">Loading...</span>
-                ) : (
-                  <>
-                    <IndicatorCell value={ind?.close != null ? formatPrice(ind.close, ind.currency, 0) : null} />
-                    <IndicatorCell value={chg.text} className={chg.className} />
-                    <IndicatorCell value={rsiVal != null ? rsiVal.toFixed(0) : null} className={rsiColor} />
-                    <IndicatorCell
-                      value={smaAbove !== null ? (smaAbove ? "Above" : "Below") : null}
-                      className={smaAbove === true ? "text-emerald-500" : smaAbove === false ? "text-red-500" : ""}
-                    />
-                    <IndicatorCell
-                      value={macdDir != null ? (macdDir === "bullish" ? "Bull" : "Bear") : null}
-                      className={macdDir === "bullish" ? "text-emerald-500" : macdDir === "bearish" ? "text-red-500" : ""}
-                    />
-                    <IndicatorCell
-                      value={bbPos != null ? bbPos.charAt(0).toUpperCase() + bbPos.slice(1) : null}
-                      className={
-                        bbPos === "above" ? "text-red-500" : bbPos === "below" ? "text-emerald-500" : ""
-                      }
-                    />
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <HoldingsGrid
+        rows={rows}
+        indicatorMap={indicatorMap}
+        indicatorsLoading={indicatorsLoading}
+        linkTarget="_blank"
+      />
     </Card>
   )
 }
