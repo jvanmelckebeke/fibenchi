@@ -1,9 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from app.config import settings
 from sqlalchemy import select, text
@@ -162,3 +165,19 @@ app.include_router(quotes.router)
 @app.get("/api/health", summary="Health check", tags=["system"])
 async def health():
     return {"status": "ok"}
+
+
+# --- SPA static serving (production only) ---
+# In production the frontend is built into /app/static by the root Dockerfile.
+# In dev this directory doesn't exist, so the mount is skipped entirely.
+_SPA_DIR = Path(__file__).resolve().parent.parent / "static"
+
+if (_SPA_DIR / "index.html").exists():
+    app.mount("/assets", StaticFiles(directory=_SPA_DIR / "assets"), name="static-assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def _spa_fallback(path: str):
+        file = _SPA_DIR / path
+        if file.is_file() and file.resolve().is_relative_to(_SPA_DIR.resolve()):
+            return FileResponse(file)
+        return FileResponse(_SPA_DIR / "index.html")
