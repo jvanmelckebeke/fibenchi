@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { MoreVertical, Plus, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ import { RsiGauge } from "@/components/rsi-gauge"
 import { TagBadge } from "@/components/tag-badge"
 import type { Quote, TagBrief } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
+import { usePriceFlash } from "@/lib/use-price-flash"
 
 export function WatchlistPage() {
   const { data: allAssets, isLoading } = useAssets()
@@ -159,26 +160,7 @@ function AssetCard({
   const changeColor =
     changePct != null ? (changePct >= 0 ? "text-green-500" : "text-red-500") : "text-muted-foreground"
 
-  // Flash on price change
-  const prevPriceRef = useRef<number | null>(null)
-  const priceRef = useRef<HTMLSpanElement>(null)
-  const pctRef = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (lastPrice == null || prevPriceRef.current == null || lastPrice === prevPriceRef.current) {
-      prevPriceRef.current = lastPrice
-      return
-    }
-    const cls = lastPrice > prevPriceRef.current ? "flash-green" : "flash-red"
-    for (const el of [priceRef.current, pctRef.current]) {
-      if (!el) continue
-      el.classList.remove("flash-green", "flash-red")
-      // force reflow so re-adding the same class restarts the animation
-      void el.offsetWidth
-      el.classList.add(cls)
-    }
-    prevPriceRef.current = lastPrice
-  }, [lastPrice])
+  const [priceRef, pctRef] = usePriceFlash(lastPrice)
 
   return (
     <Card className="group relative hover:border-primary/50 transition-colors">
