@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react"
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
+import { Skeleton } from "@/components/ui/skeleton"
 import { usePrices } from "@/lib/queries"
 
 export function SparklineChart({ symbol, period = "3mo" }: { symbol: string; period?: string }) {
-  const { data: prices } = usePrices(symbol, period)
+  const { data: prices, isLoading } = usePrices(symbol, period)
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
 
@@ -63,6 +64,10 @@ export function SparklineChart({ symbol, period = "3mo" }: { symbol: string; per
       chartRef.current = null
     }
   }, [prices])
+
+  if (isLoading) {
+    return <Skeleton className="h-[60px] w-full rounded" />
+  }
 
   if (!prices?.length) {
     return <div className="h-[60px] flex items-center justify-center text-xs text-muted-foreground">No data</div>
