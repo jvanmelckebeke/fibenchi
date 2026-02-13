@@ -14,6 +14,15 @@ export function formatPrice(value: number, currency: string, decimals = 2): stri
   return `${currencySymbol(currency)}${value.toFixed(decimals)}`
 }
 
+export function formatChangePct(v: number | null): { text: string | null; className: string } {
+  if (v === null) return { text: null, className: "" }
+  const sign = v >= 0 ? "+" : ""
+  return {
+    text: `${sign}${v.toFixed(2)}%`,
+    className: v >= 0 ? "text-emerald-500" : "text-red-500",
+  }
+}
+
 /**
  * Build a Yahoo Finance advanced chart URL with pre-configured indicators.
  * Config includes: candlestick + volume, Bollinger Bands (20,2), RSI (14), MACD (12,26,9), 1Y daily.

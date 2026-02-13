@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
 import { Link } from "react-router-dom"
 import { Loader2, TrendingUp, TrendingDown } from "lucide-react"
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { usePortfolioIndex, usePortfolioPerformers } from "@/lib/queries"
+import { getChartTheme } from "@/lib/chart-utils"
 import type { AssetPerformance } from "@/lib/api"
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
@@ -56,18 +57,10 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
 
-  const getThemeColors = useCallback(() => {
-    const dark = document.documentElement.classList.contains("dark")
-    return {
-      bg: dark ? "#18181b" : "#ffffff",
-      text: dark ? "#a1a1aa" : "#71717a",
-    }
-  }, [])
-
   useEffect(() => {
     if (!containerRef.current || !dates.length) return
 
-    const theme = getThemeColors()
+    const theme = getChartTheme()
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
@@ -126,7 +119,7 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
       chart.remove()
       chartRef.current = null
     }
-  }, [dates, values, up, getThemeColors])
+  }, [dates, values, up])
 
   return <div ref={containerRef} className="w-full rounded-md overflow-hidden" />
 }
