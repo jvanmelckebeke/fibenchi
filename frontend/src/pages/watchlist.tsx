@@ -11,11 +11,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useDeleteAsset, usePrices, useTags } from "@/lib/queries"
+import { useAssets, useCreateAsset, useDeleteAsset, useStaggeredQuotes, useTags } from "@/lib/queries"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { TagBadge } from "@/components/tag-badge"
-import type { TagBrief } from "@/lib/api"
+import type { Quote, TagBrief } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 
 export function WatchlistPage() {
@@ -28,6 +28,8 @@ export function WatchlistPage() {
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
 
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
+  const symbols = watchlisted?.map((a) => a.symbol) ?? []
+  const quotes = useStaggeredQuotes(symbols)
   const assets = watchlisted?.filter((a) => {
     if (selectedTags.length === 0) return true
     return a.tags.some((t) => selectedTags.includes(t.id))
@@ -123,6 +125,7 @@ export function WatchlistPage() {
             type={asset.type}
             currency={asset.currency}
             tags={asset.tags}
+            quote={quotes[asset.symbol]}
             sparklinePeriod={sparklinePeriod}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
           />
@@ -138,6 +141,7 @@ function AssetCard({
   type,
   currency,
   tags,
+  quote,
   sparklinePeriod,
   onDelete,
 }: {
@@ -146,14 +150,12 @@ function AssetCard({
   type: string
   currency: string
   tags: TagBrief[]
+  quote?: Quote
   sparklinePeriod: string
   onDelete: () => void
 }) {
-  const { data: prices } = usePrices(symbol, sparklinePeriod)
-  const lastPrice = prices?.length ? prices[prices.length - 1].close : null
-  const changePct = prices?.length && prices.length > 1
-    ? ((prices[prices.length - 1].close - prices[0].close) / prices[0].close) * 100
-    : null
+  const lastPrice = quote?.price ?? null
+  const changePct = quote?.change_percent ?? null
   const changeColor =
     changePct != null ? (changePct >= 0 ? "text-green-500" : "text-red-500") : "text-muted-foreground"
 
