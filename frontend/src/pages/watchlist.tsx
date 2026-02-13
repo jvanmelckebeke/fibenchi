@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { MoreVertical, Plus, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useDeleteAsset, useStaggeredQuotes, useTags } from "@/lib/queries"
+import { useAssets, useCreateAsset, useDeleteAsset, useTags } from "@/lib/queries"
+import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { TagBadge } from "@/components/tag-badge"
@@ -28,8 +29,7 @@ export function WatchlistPage() {
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
 
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
-  const symbols = watchlisted?.map((a) => a.symbol) ?? []
-  const quotes = useStaggeredQuotes(symbols)
+  const quotes = useQuotes()
   const assets = watchlisted?.filter((a) => {
     if (selectedTags.length === 0) return true
     return a.tags.some((t) => selectedTags.includes(t.id))
@@ -159,6 +159,27 @@ function AssetCard({
   const changeColor =
     changePct != null ? (changePct >= 0 ? "text-green-500" : "text-red-500") : "text-muted-foreground"
 
+  // Flash on price change
+  const prevPriceRef = useRef<number | null>(null)
+  const priceRef = useRef<HTMLSpanElement>(null)
+  const pctRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (lastPrice == null || prevPriceRef.current == null || lastPrice === prevPriceRef.current) {
+      prevPriceRef.current = lastPrice
+      return
+    }
+    const cls = lastPrice > prevPriceRef.current ? "flash-green" : "flash-red"
+    for (const el of [priceRef.current, pctRef.current]) {
+      if (!el) continue
+      el.classList.remove("flash-green", "flash-red")
+      // force reflow so re-adding the same class restarts the animation
+      void el.offsetWidth
+      el.classList.add(cls)
+    }
+    prevPriceRef.current = lastPrice
+  }, [lastPrice])
+
   return (
     <Card className="group relative hover:border-primary/50 transition-colors">
       <DropdownMenu>
@@ -193,7 +214,7 @@ function AssetCard({
               {type}
             </Badge>
             {lastPrice != null && (
-              <span className="ml-auto text-base font-semibold tabular-nums">
+              <span ref={priceRef} className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1">
                 {formatPrice(lastPrice, currency)}
               </span>
             )}
@@ -201,7 +222,7 @@ function AssetCard({
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground truncate">{name}</p>
             {changePct != null && (
-              <span className={`text-xs font-medium tabular-nums ${changeColor}`}>
+              <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeColor}`}>
                 {changePct >= 0 ? "+" : ""}
                 {changePct.toFixed(2)}%
               </span>

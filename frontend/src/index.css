@@ -129,3 +129,14 @@
     @apply font-sans;
     }
 }
+
+@keyframes flash-green {
+  0%   { background-color: oklch(0.87 0.15 155 / 45%); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-red {
+  0%   { background-color: oklch(0.70 0.19 25 / 45%); }
+  100% { background-color: transparent; }
+}
+.flash-green { animation: flash-green 1.8s ease-out; }
+.flash-red   { animation: flash-red 1.8s ease-out; }

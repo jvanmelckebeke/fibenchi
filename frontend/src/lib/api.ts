@@ -257,10 +257,6 @@ export const api = {
     holdingsIndicators: (symbol: string) =>
       request<HoldingIndicator[]>(`/assets/${symbol}/holdings/indicators`),
   },
-  quotes: {
-    list: (symbols: string[]) =>
-      request<Quote[]>(`/quotes?symbols=${symbols.join(",")}`),
-  },
   tags: {
     list: () => request<Tag[]>("/tags"),
     create: (data: TagCreate) =>
