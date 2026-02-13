@@ -8,7 +8,9 @@ import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
-import { buildYahooFinanceUrl } from "@/lib/format"
+import { buildYahooFinanceUrl, formatPrice } from "@/lib/format"
+import { useQuotes } from "@/lib/quote-stream"
+import { usePriceFlash } from "@/lib/use-price-flash"
 import type { EtfHoldings } from "@/lib/api"
 import {
   useAssets,
@@ -39,7 +41,7 @@ export function AssetDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <Header symbol={symbol} period={period} setPeriod={setPeriod} isWatchlisted={isWatchlisted} />
+      <Header symbol={symbol} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isWatchlisted={isWatchlisted} />
       <ChartSection symbol={symbol} period={period} />
       {isEtf && <HoldingsSection symbol={symbol} />}
       {isWatchlisted && (
@@ -55,17 +57,24 @@ export function AssetDetailPage() {
 
 function Header({
   symbol,
+  currency,
   period,
   setPeriod,
   isWatchlisted,
 }: {
   symbol: string
+  currency: string
   period: string
   setPeriod: (p: string) => void
   isWatchlisted: boolean
 }) {
   const refresh = useRefreshPrices(symbol)
   const createAsset = useCreateAsset()
+  const quotes = useQuotes()
+  const quote = quotes[symbol.toUpperCase()]
+  const price = quote?.price ?? null
+  const changePct = quote?.change_percent ?? null
+  const [priceRef, pctRef] = usePriceFlash(price)
 
   return (
     <div className="flex items-center justify-between">
@@ -76,6 +85,22 @@ function Header({
           </Button>
         </Link>
         <h1 className="text-2xl font-bold">{symbol}</h1>
+        {price != null && (
+          <span ref={priceRef} className="text-xl font-semibold tabular-nums rounded px-1">
+            {formatPrice(price, currency)}
+          </span>
+        )}
+        {changePct != null && (
+          <span
+            ref={pctRef}
+            className={`text-sm font-medium tabular-nums rounded px-1 ${
+              changePct >= 0 ? "text-green-500" : "text-red-500"
+            }`}
+          >
+            {changePct >= 0 ? "+" : ""}
+            {changePct.toFixed(2)}%
+          </span>
+        )}
         <a
           href={buildYahooFinanceUrl(symbol)}
           target="_blank"
