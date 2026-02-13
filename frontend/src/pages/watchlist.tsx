@@ -18,7 +18,7 @@ import { TagBadge } from "@/components/tag-badge"
 import type { TagBrief } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 
-export function DashboardPage() {
+export function WatchlistPage() {
   const { data: allAssets, isLoading } = useAssets()
   const { data: allTags } = useTags()
   const createAsset = useCreateAsset()

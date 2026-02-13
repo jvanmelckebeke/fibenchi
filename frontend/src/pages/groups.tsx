@@ -213,7 +213,7 @@ function AddAssetToGroup({
   return (
     <div className="p-3 rounded-md border bg-muted/30 space-y-2">
       {available.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No more assets to add. Add assets from the dashboard first.</p>
+        <p className="text-sm text-muted-foreground">No more assets to add. Add assets from the watchlist first.</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {available.map((a) => (
