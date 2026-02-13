@@ -11,11 +11,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useDeleteAsset, useStaggeredQuotes, useTags } from "@/lib/queries"
+import { useAssets, useCreateAsset, useDeleteAsset, usePrices, useTags } from "@/lib/queries"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { TagBadge } from "@/components/tag-badge"
-import type { Quote, TagBrief } from "@/lib/api"
+import type { TagBrief } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 
 export function DashboardPage() {
@@ -28,8 +28,6 @@ export function DashboardPage() {
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
 
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
-  const watchlistedSymbols = watchlisted?.map((a) => a.symbol) ?? []
-  const quotes = useStaggeredQuotes(watchlistedSymbols)
   const assets = watchlisted?.filter((a) => {
     if (selectedTags.length === 0) return true
     return a.tags.some((t) => selectedTags.includes(t.id))
@@ -125,7 +123,6 @@ export function DashboardPage() {
             type={asset.type}
             currency={asset.currency}
             tags={asset.tags}
-            quote={quotes[asset.symbol]}
             sparklinePeriod={sparklinePeriod}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
           />
@@ -141,7 +138,6 @@ function AssetCard({
   type,
   currency,
   tags,
-  quote,
   sparklinePeriod,
   onDelete,
 }: {
@@ -150,12 +146,14 @@ function AssetCard({
   type: string
   currency: string
   tags: TagBrief[]
-  quote?: Quote
   sparklinePeriod: string
   onDelete: () => void
 }) {
-  const hasQuote = quote?.price != null
-  const changePct = quote?.change_percent
+  const { data: prices } = usePrices(symbol, sparklinePeriod)
+  const lastPrice = prices?.length ? prices[prices.length - 1].close : null
+  const changePct = prices?.length && prices.length > 1
+    ? ((prices[prices.length - 1].close - prices[0].close) / prices[0].close) * 100
+    : null
   const changeColor =
     changePct != null ? (changePct >= 0 ? "text-green-500" : "text-red-500") : "text-muted-foreground"
 
@@ -192,9 +190,9 @@ function AssetCard({
             <Badge variant="secondary" className="text-xs">
               {type}
             </Badge>
-            {hasQuote && (
+            {lastPrice != null && (
               <span className="ml-auto text-base font-semibold tabular-nums">
-                {formatPrice(quote!.price!, currency)}
+                {formatPrice(lastPrice, currency)}
               </span>
             )}
           </div>
@@ -216,7 +214,7 @@ function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          <SparklineChart symbol={symbol} currency={currency} period={sparklinePeriod} />
+          <SparklineChart symbol={symbol} period={sparklinePeriod} />
           <RsiGauge symbol={symbol} />
         </CardContent>
       </Link>
