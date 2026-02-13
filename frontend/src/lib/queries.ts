@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api, type Quote, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
+import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
 
 // Pseudo-ETF thesis/annotation keys are defined inline below
 
@@ -356,57 +355,3 @@ export function useDeletePseudoEtfAnnotation(id: number) {
   })
 }
 
-// Staggered Quotes
-// Fetches one quote at a time, cycling through symbols, so that N symbols
-// complete a full cycle in ~60 seconds (interval = 60_000 / N ms per tick).
-const CYCLE_MS = 60_000
-
-export function useStaggeredQuotes(symbols: string[]) {
-  const [quotes, setQuotes] = useState<Record<string, Quote>>({})
-  const indexRef = useRef(0)
-  const symbolsRef = useRef(symbols)
-  const symbolsKey = symbols.join(",")
-
-  useEffect(() => {
-    symbolsRef.current = symbols
-  }, [symbols])
-
-  const fetchOne = useCallback(async () => {
-    const syms = symbolsRef.current
-    if (syms.length === 0) return
-    const idx = indexRef.current % syms.length
-    indexRef.current = idx + 1
-    try {
-      const [quote] = await api.quotes.list([syms[idx]])
-      if (quote) {
-        setQuotes((prev) => ({ ...prev, [quote.symbol]: quote }))
-      }
-    } catch {
-      // Silently skip failed quote fetches
-    }
-  }, [])
-
-  // Initial bulk fetch for all symbols
-  useEffect(() => {
-    if (symbols.length === 0) return
-    let cancelled = false
-    api.quotes.list(symbols).then((data) => {
-      if (cancelled) return
-      const map: Record<string, Quote> = {}
-      for (const q of data) map[q.symbol] = q
-      setQuotes(map)
-    }).catch(() => {})
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbolsKey])
-
-  // Staggered interval
-  useEffect(() => {
-    if (symbols.length === 0) return
-    const interval = Math.max(1000, Math.round(CYCLE_MS / symbols.length))
-    const id = setInterval(fetchOne, interval)
-    return () => clearInterval(id)
-  }, [symbols.length, fetchOne])
-
-  return quotes
-}
