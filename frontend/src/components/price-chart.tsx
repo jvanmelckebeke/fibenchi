@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import {
   createChart,
   createSeriesMarkers,
@@ -41,7 +41,25 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
   const macdHistByTime = useRef(new Map<string, number>())
 
   // Compute latest values for default legend display
-  const latestValues = useRef<LegendValues>({})
+  const latestValues = useMemo<LegendValues>(() => {
+    if (!prices.length) return {}
+    const lastPrice = prices[prices.length - 1]
+    const lastIndicators = [...indicators].reverse()
+    return {
+      o: lastPrice.open,
+      h: lastPrice.high,
+      l: lastPrice.low,
+      c: lastPrice.close,
+      sma20: lastIndicators.find((i) => i.sma_20 !== null)?.sma_20 ?? undefined,
+      sma50: lastIndicators.find((i) => i.sma_50 !== null)?.sma_50 ?? undefined,
+      bbUpper: lastIndicators.find((i) => i.bb_upper !== null)?.bb_upper ?? undefined,
+      bbLower: lastIndicators.find((i) => i.bb_lower !== null)?.bb_lower ?? undefined,
+      rsi: lastIndicators.find((i) => i.rsi !== null)?.rsi ?? undefined,
+      macd: lastIndicators.find((i) => i.macd !== null)?.macd ?? undefined,
+      macdSignal: lastIndicators.find((i) => i.macd_signal !== null)?.macd_signal ?? undefined,
+      macdHist: lastIndicators.find((i) => i.macd_hist !== null)?.macd_hist ?? undefined,
+    }
+  }, [prices, indicators])
 
   const syncingRef = useRef(false)
 
@@ -156,24 +174,6 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       if (i.macd_hist !== null) macdHistByTime.current.set(i.date, i.macd_hist)
     }
 
-    // Latest values for default legend
-    const lastPrice = prices[prices.length - 1]
-    const lastIndicators = [...indicators].reverse()
-    latestValues.current = {
-      o: lastPrice.open,
-      h: lastPrice.high,
-      l: lastPrice.low,
-      c: lastPrice.close,
-      sma20: lastIndicators.find((i) => i.sma_20 !== null)?.sma_20 ?? undefined,
-      sma50: lastIndicators.find((i) => i.sma_50 !== null)?.sma_50 ?? undefined,
-      bbUpper: lastIndicators.find((i) => i.bb_upper !== null)?.bb_upper ?? undefined,
-      bbLower: lastIndicators.find((i) => i.bb_lower !== null)?.bb_lower ?? undefined,
-      rsi: lastIndicators.find((i) => i.rsi !== null)?.rsi ?? undefined,
-      macd: lastIndicators.find((i) => i.macd !== null)?.macd ?? undefined,
-      macdSignal: lastIndicators.find((i) => i.macd_signal !== null)?.macd_signal ?? undefined,
-      macdHist: lastIndicators.find((i) => i.macd_hist !== null)?.macd_hist ?? undefined,
-    }
-
     const theme = getChartTheme()
 
     // Main chart
@@ -250,6 +250,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       const bandFill = new BandFillPrimitive(
         bbData.map((i) => ({ time: i.date, upper: i.bb_upper!, lower: i.bb_lower! }))
       )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- lightweight-charts plugin API type mismatch
       bbUpperLine.attachPrimitive(bandFill as any)
 
       // SMA lines
@@ -492,7 +493,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between px-1 py-1">
-        <Legend values={hoverValues} latest={latestValues.current} />
+        <Legend values={hoverValues} latest={latestValues} />
         <button
           onClick={resetView}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
@@ -503,11 +504,11 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       </div>
       <div ref={mainRef} className="w-full rounded-t-md overflow-hidden" />
       <div className="px-1 py-1">
-        <RsiLegend values={hoverValues} latest={latestValues.current} />
+        <RsiLegend values={hoverValues} latest={latestValues} />
       </div>
       <div ref={rsiRef} className="w-full overflow-hidden" />
       <div className="px-1 py-1">
-        <MacdLegend values={hoverValues} latest={latestValues.current} />
+        <MacdLegend values={hoverValues} latest={latestValues} />
       </div>
       <div ref={macdRef} className="w-full rounded-b-md overflow-hidden" />
     </div>

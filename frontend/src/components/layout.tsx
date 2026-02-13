@@ -11,21 +11,15 @@ const navItems = [
 ]
 
 function ThemeToggle() {
-  const [dark, setDark] = useState(() =>
-    document.documentElement.classList.contains("dark")
-  )
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem("theme")
+    return saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
+  })
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark)
     localStorage.setItem("theme", dark ? "dark" : "light")
   }, [dark])
-
-  useEffect(() => {
-    const saved = localStorage.getItem("theme")
-    if (saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
-      setDark(true)
-    }
-  }, [])
 
   return (
     <Button variant="ghost" size="icon" onClick={() => setDark((d) => !d)}>
