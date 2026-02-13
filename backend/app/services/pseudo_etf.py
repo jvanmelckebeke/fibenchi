@@ -62,7 +62,9 @@ async def calculate_performance(
     pivot = df.pivot_table(index="date", columns="asset_id", values="close")
     pivot = pivot.sort_index()
 
-    # Drop dates where any constituent has no price (need all for equal-weight)
+    # Forward-fill gaps (weekends, holidays, cross-exchange schedule differences)
+    # then drop leading rows where any constituent hasn't started yet
+    pivot = pivot.ffill()
     pivot = pivot.dropna()
 
     if pivot.empty:

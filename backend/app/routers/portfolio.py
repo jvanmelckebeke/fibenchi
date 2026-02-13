@@ -52,7 +52,23 @@ async def get_portfolio_index(period: str = "1y", db: AsyncSession = Depends(get
             dates=[], values=[], current=0, change=0, change_pct=0,
         )
 
-    points = await calculate_performance(db, asset_ids, start_date, base_value=1000.0)
+    # Only include assets whose price history covers the requested period.
+    # Allow a small grace window so assets added a few days after start_date
+    # aren't excluded (e.g. added on a Monday when start_date was Saturday).
+    grace = start_date + timedelta(days=max(7, days // 10))
+    earliest_q = await db.execute(
+        select(PriceHistory.asset_id, func.min(PriceHistory.date))
+        .where(PriceHistory.asset_id.in_(asset_ids))
+        .group_by(PriceHistory.asset_id)
+    )
+    eligible_ids = [aid for aid, earliest in earliest_q if earliest <= grace]
+
+    if not eligible_ids:
+        return PortfolioIndexResponse(
+            dates=[], values=[], current=0, change=0, change_pct=0,
+        )
+
+    points = await calculate_performance(db, eligible_ids, start_date, base_value=1000.0)
 
     if not points:
         return PortfolioIndexResponse(
