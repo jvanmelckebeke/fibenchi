@@ -9,6 +9,12 @@ Algorithm:
    - Compute total portfolio value
    - Re-split equally across constituents
 5. Return daily indexed values.
+
+Dynamic entry mode (for portfolio overview):
+- Assets join the composite when their price first exceeds min_entry_price.
+- On entry, the current portfolio value is re-split equally among all active
+  assets (existing + new).  This prevents low-IPO-price stocks from getting
+  an outsized allocation that distorts returns.
 """
 
 from datetime import date
@@ -30,8 +36,15 @@ async def calculate_performance(
     base_date: date,
     base_value: float = 100.0,
     include_breakdown: bool = False,
+    dynamic_entry: bool = False,
+    min_entry_price: float = 10.0,
 ) -> list[dict]:
-    """Calculate equal-weight indexed performance for a basket of assets."""
+    """Calculate equal-weight indexed performance for a basket of assets.
+
+    When dynamic_entry=True, assets are added to the composite only once
+    their price first exceeds min_entry_price.  This avoids distortion from
+    penny-stock IPOs receiving a large equal-weight allocation.
+    """
     if not asset_ids:
         return []
 
@@ -63,29 +76,38 @@ async def calculate_performance(
     pivot = pivot.sort_index()
 
     # Forward-fill gaps (weekends, holidays, cross-exchange schedule differences)
-    # then drop leading rows where any constituent hasn't started yet
     pivot = pivot.ffill()
-    pivot = pivot.dropna()
 
+    if dynamic_entry:
+        return _calc_dynamic(pivot, base_value, min_entry_price, include_breakdown, symbol_map)
+    else:
+        return _calc_static(pivot, asset_ids, base_value, include_breakdown, symbol_map)
+
+
+def _calc_static(
+    pivot: pd.DataFrame,
+    asset_ids: list[int],
+    base_value: float,
+    include_breakdown: bool,
+    symbol_map: dict[int, str],
+) -> list[dict]:
+    """Original algorithm: all constituents must be present from day 1."""
+    pivot = pivot.dropna()
     if pivot.empty:
         return []
 
     n = len(asset_ids)
     allocation_per_asset = base_value / n
-
-    # Initialize: compute shares for each constituent at first available date
     first_prices = pivot.iloc[0]
-    shares = allocation_per_asset / first_prices  # Series of share counts per asset
+    shares = allocation_per_asset / first_prices
 
     results = []
     prev_month = None
 
     for dt, prices in pivot.iterrows():
-        current_date = dt if isinstance(dt, date) else dt.date() if hasattr(dt, 'date') else dt
+        current_date = dt if isinstance(dt, date) else dt.date() if hasattr(dt, "date") else dt
 
-        # Check for quarterly rebalance
         if prev_month is not None and current_date.month in QUARTER_MONTHS and current_date.month != prev_month:
-            # Rebalance: compute total value, re-split equally
             total_value = float((shares * prices).sum())
             allocation_per_asset = total_value / n
             shares = allocation_per_asset / prices
@@ -95,6 +117,70 @@ async def calculate_performance(
 
         if include_breakdown:
             constituent_values = shares * prices
+            point["breakdown"] = {
+                symbol_map.get(aid, str(aid)): round(float(val), 4)
+                for aid, val in constituent_values.items()
+            }
+
+        results.append(point)
+        prev_month = current_date.month
+
+    return results
+
+
+def _calc_dynamic(
+    pivot: pd.DataFrame,
+    base_value: float,
+    min_entry_price: float,
+    include_breakdown: bool,
+    symbol_map: dict[int, str],
+) -> list[dict]:
+    """Dynamic entry: assets join when their price first exceeds the threshold."""
+    active: set[int] = set()
+    shares = pd.Series(dtype=float)
+    portfolio_value = base_value
+    results: list[dict] = []
+    prev_month = None
+
+    for dt, prices in pivot.iterrows():
+        current_date = dt if isinstance(dt, date) else dt.date() if hasattr(dt, "date") else dt
+
+        # Identify new assets that qualify on this date
+        new_assets: set[int] = set()
+        for aid in pivot.columns:
+            if aid in active:
+                continue
+            price = prices.get(aid)
+            if pd.notna(price) and price >= min_entry_price:
+                new_assets.add(aid)
+
+        if new_assets:
+            # Compute current portfolio value from existing holdings
+            if active:
+                portfolio_value = float((shares * prices.reindex(list(active))).sum())
+
+            active |= new_assets
+            n_active = len(active)
+            allocation = portfolio_value / n_active
+            # Re-allocate across ALL active assets (existing + new)
+            active_prices = prices.reindex(list(active))
+            shares = allocation / active_prices
+
+        if not active:
+            continue
+
+        # Quarterly rebalance (only among already-active assets)
+        if prev_month is not None and current_date.month in QUARTER_MONTHS and current_date.month != prev_month:
+            n_active = len(active)
+            portfolio_value = float((shares * prices.reindex(list(active))).sum())
+            allocation = portfolio_value / n_active
+            shares = allocation / prices.reindex(list(active))
+
+        portfolio_value = float((shares * prices.reindex(list(active))).sum())
+        point: dict = {"date": current_date, "value": round(portfolio_value, 4)}
+
+        if include_breakdown:
+            constituent_values = shares * prices.reindex(list(active))
             point["breakdown"] = {
                 symbol_map.get(aid, str(aid)): round(float(val), 4)
                 for aid, val in constituent_values.items()
