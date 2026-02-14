@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Asset, Tag
@@ -13,7 +14,11 @@ asset_tag_router = APIRouter(prefix="/api/assets", tags=["tags"])
 
 @router.get("", response_model=list[TagResponse], summary="List all tags")
 async def list_tags(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Tag).order_by(Tag.name))
+    result = await db.execute(
+        select(Tag)
+        .options(selectinload(Tag.assets).selectinload(Asset.tags))
+        .order_by(Tag.name)
+    )
     return result.scalars().all()
 
 
