@@ -146,6 +146,25 @@ async def test_delete_tag_cleans_asset_association(client):
     assert aapl["tags"] == []
 
 
+async def test_list_tags_with_assets(client):
+    """Regression: listing tags that have assets must serialize the nested
+    Asset→tags relationship without MissingGreenlet errors."""
+    await _create_asset(client, "AAPL", "Apple")
+    t1 = (await client.post("/api/tags", json={"name": "tech"})).json()
+    t2 = (await client.post("/api/tags", json={"name": "growth"})).json()
+    await client.post(f"/api/assets/AAPL/tags/{t1['id']}")
+    await client.post(f"/api/assets/AAPL/tags/{t2['id']}")
+
+    resp = await client.get("/api/tags")
+    assert resp.status_code == 200
+    tags = resp.json()
+    tech = next(t for t in tags if t["name"] == "tech")
+    assert len(tech["assets"]) == 1
+    assert tech["assets"][0]["symbol"] == "AAPL"
+    # The asset nested inside the tag response must include its own tags
+    assert len(tech["assets"][0]["tags"]) == 2
+
+
 async def test_attach_tag_case_insensitive_symbol(client):
     await _create_asset(client, "AAPL", "Apple")
     tag = (await client.post("/api/tags", json={"name": "tech"})).json()
