@@ -57,6 +57,8 @@ docker compose -f docker-compose.prod.yaml up -d
 
 This exposes the app on port `18000`. Pre-built images are published to GHCR on every merge to `main`.
 
+> **Security note:** The API has no built-in authentication. Deploy behind a reverse proxy (Traefik, nginx, Caddy) or VPN when exposing to a network. Change the default database credentials in production by setting `DATABASE_URL` in your `.env`.
+
 ## Configuration
 
 Environment variables (see `.env.example`):

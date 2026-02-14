@@ -27,5 +27,8 @@ Thumbs.db
 # Docker
 data/
 
+# Examples (local only)
+examples/
+
 # Misc
 *.log
