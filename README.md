@@ -7,7 +7,7 @@ A self-hosted investment research dashboard for tracking stocks, ETFs, and custo
 ## Features
 
 - **Watchlist** — Track stocks and ETFs by ticker symbol, auto-validated against Yahoo Finance
-- **Price charts** — Candlestick charts with RSI, SMA 20/50, Bollinger Bands, and MACD via [lightweight-charts](https://github.com/nicehash/lightweight-charts)
+- **Price charts** — Candlestick charts with RSI, SMA 20/50, Bollinger Bands, and MACD via [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 - **Real-time quotes** — Server-sent events push live prices with adaptive polling (15s during market hours, slower outside)
 - **Technical indicators** — Per-asset indicator snapshots with color-coded cells
 - **Pseudo-ETFs** — Create custom baskets of assets with equal-weight allocation, quarterly rebalancing, and indexed performance tracking
