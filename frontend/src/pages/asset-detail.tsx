@@ -26,12 +26,14 @@ import {
   useThesis,
   useUpdateThesis,
 } from "@/lib/queries"
+import { useSettings } from "@/lib/settings"
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
 export function AssetDetailPage() {
   const { symbol } = useParams<{ symbol: string }>()
-  const [period, setPeriod] = useState<string>("1y")
+  const { settings } = useSettings()
+  const [period, setPeriod] = useState<string>(settings.chart_default_period)
   const { data: assets } = useAssets()
   const asset = assets?.find((a) => a.symbol === symbol?.toUpperCase())
   const isWatchlisted = !!asset
@@ -42,7 +44,16 @@ export function AssetDetailPage() {
   return (
     <div className="p-6 space-y-6">
       <Header symbol={symbol} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isWatchlisted={isWatchlisted} />
-      <ChartSection symbol={symbol} period={period} />
+      <ChartSection
+        symbol={symbol}
+        period={period}
+        showSma20={settings.detail_show_sma20}
+        showSma50={settings.detail_show_sma50}
+        showBollinger={settings.detail_show_bollinger}
+        showRsiChart={settings.detail_show_rsi_chart}
+        showMacdChart={settings.detail_show_macd_chart}
+        chartType={settings.chart_type}
+      />
       {isEtf && <HoldingsSection symbol={symbol} />}
       {isWatchlisted && (
         <>
@@ -153,7 +164,25 @@ function Header({
   )
 }
 
-function ChartSection({ symbol, period }: { symbol: string; period: string }) {
+function ChartSection({
+  symbol,
+  period,
+  showSma20,
+  showSma50,
+  showBollinger,
+  showRsiChart,
+  showMacdChart,
+  chartType,
+}: {
+  symbol: string
+  period: string
+  showSma20: boolean
+  showSma50: boolean
+  showBollinger: boolean
+  showRsiChart: boolean
+  showMacdChart: boolean
+  chartType: "candle" | "line"
+}) {
   const { data: prices, isLoading: pricesLoading } = usePrices(symbol, period)
   const { data: indicators, isLoading: indicatorsLoading } = useIndicators(symbol, period)
   const { data: annotations } = useAnnotations(symbol)
@@ -175,7 +204,19 @@ function ChartSection({ symbol, period }: { symbol: string; period: string }) {
     )
   }
 
-  return <PriceChart prices={prices} indicators={indicators ?? []} annotations={annotations ?? []} />
+  return (
+    <PriceChart
+      prices={prices}
+      indicators={indicators ?? []}
+      annotations={annotations ?? []}
+      showSma20={showSma20}
+      showSma50={showSma50}
+      showBollinger={showBollinger}
+      showRsiChart={showRsiChart}
+      showMacdChart={showMacdChart}
+      chartType={chartType}
+    />
+  )
 }
 
 function ThesisSection({ symbol }: { symbol: string }) {

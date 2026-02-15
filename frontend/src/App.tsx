@@ -6,6 +6,7 @@ import { AssetDetailPage } from "@/pages/asset-detail"
 import { GroupsPage } from "@/pages/groups"
 import { PseudoEtfsPage } from "@/pages/pseudo-etfs"
 import { PseudoEtfDetailPage } from "@/pages/pseudo-etf-detail"
+import { SettingsPage } from "@/pages/settings"
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/pseudo-etfs" element={<PseudoEtfsPage />} />
         <Route path="/pseudo-etf/:id" element={<PseudoEtfDetailPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   )
