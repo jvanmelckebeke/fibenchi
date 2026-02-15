@@ -21,6 +21,7 @@ import { TagBadge } from "@/components/tag-badge"
 import type { Quote, TagBrief } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
+import { useSettings } from "@/lib/settings"
 
 export function WatchlistPage() {
   const { data: allAssets, isLoading } = useAssets()
@@ -30,6 +31,7 @@ export function WatchlistPage() {
   const [symbol, setSymbol] = useState("")
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
+  const { settings } = useSettings()
 
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
   const quotes = useQuotes()
@@ -119,7 +121,11 @@ export function WatchlistPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className={`grid gap-4 ${
+        settings.compact_mode
+          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"
+          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      }`}>
         {assets?.map((asset) => (
           <AssetCard
             key={asset.id}
@@ -131,6 +137,9 @@ export function WatchlistPage() {
             quote={quotes[asset.symbol]}
             sparklinePeriod={sparklinePeriod}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
+            showSparkline={settings.watchlist_show_sparkline}
+            showRsi={settings.watchlist_show_rsi}
+            showMacd={settings.watchlist_show_macd}
           />
         ))}
       </div>
@@ -147,6 +156,9 @@ function AssetCard({
   quote,
   sparklinePeriod,
   onDelete,
+  showSparkline,
+  showRsi,
+  showMacd,
 }: {
   symbol: string
   name: string
@@ -156,6 +168,9 @@ function AssetCard({
   quote?: Quote
   sparklinePeriod: string
   onDelete: () => void
+  showSparkline: boolean
+  showRsi: boolean
+  showMacd: boolean
 }) {
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
@@ -225,11 +240,13 @@ function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          <SparklineChart symbol={symbol} period={sparklinePeriod} />
-          <div className="flex gap-1.5 mt-1">
-            <RsiGauge symbol={symbol} />
-            <MacdIndicator symbol={symbol} />
-          </div>
+          {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} />}
+          {(showRsi || showMacd) && (
+            <div className="flex gap-1.5 mt-1">
+              {showRsi && <RsiGauge symbol={symbol} />}
+              {showMacd && <MacdIndicator symbol={symbol} />}
+            </div>
+          )}
         </CardContent>
       </Link>
     </Card>

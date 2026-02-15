@@ -1,7 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router-dom"
-import { LayoutDashboard, FolderOpen, LineChart, List, Sun, Moon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
+import { LayoutDashboard, FolderOpen, LineChart, List, Settings } from "lucide-react"
 
 const navItems = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -9,24 +7,6 @@ const navItems = [
   { to: "/groups", label: "Groups", icon: FolderOpen },
   { to: "/pseudo-etfs", label: "Pseudo-ETFs", icon: LineChart },
 ]
-
-function ThemeToggle() {
-  const [dark, setDark] = useState(() => {
-    const saved = localStorage.getItem("theme")
-    return saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
-  })
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark)
-    localStorage.setItem("theme", dark ? "dark" : "light")
-  }, [dark])
-
-  return (
-    <Button variant="ghost" size="icon" onClick={() => setDark((d) => !d)}>
-      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </Button>
-  )
-}
 
 export function Layout() {
   const location = useLocation()
@@ -59,7 +39,17 @@ export function Layout() {
           })}
         </nav>
         <div className="border-t p-2">
-          <ThemeToggle />
+          <Link
+            to="/settings"
+            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              location.pathname === "/settings"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </Link>
         </div>
       </aside>
       <main className="flex-1 overflow-auto">

@@ -8,12 +8,12 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from app.config import settings
+from app.config import settings as app_settings
 from sqlalchemy import select, text
 
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
-from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, quotes, tags, thesis
+from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, quotes, settings as settings_router, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.yahoo import batch_fetch_currencies
 
@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
                 logger.exception("Currency backfill failed (non-fatal)")
 
     # Parse cron expression (minute hour day month dow)
-    parts = settings.refresh_cron.split()
+    parts = app_settings.refresh_cron.split()
     if len(parts) == 5:
         trigger = CronTrigger(
             minute=parts[0], hour=parts[1], day=parts[2],
@@ -75,7 +75,7 @@ async def lifespan(app: FastAPI):
         )
         scheduler.add_job(scheduled_refresh, trigger, id="price_refresh")
         scheduler.start()
-        logger.info(f"Scheduler started with cron: {settings.refresh_cron}")
+        logger.info(f"Scheduler started with cron: {app_settings.refresh_cron}")
 
     yield
 
@@ -146,6 +146,10 @@ app = FastAPI(
             "name": "pseudo-etfs",
             "description": "User-created custom baskets (pseudo-ETFs) with equal-weight allocation and quarterly rebalancing. Includes constituent management, indexed performance with per-symbol breakdown, technical indicator snapshots, thesis, and annotations.",
         },
+        {
+            "name": "settings",
+            "description": "User preference storage for indicator visibility, chart preferences, and display options.",
+        },
     ],
 )
 
@@ -160,6 +164,7 @@ app.include_router(thesis.router)
 app.include_router(annotations.router)
 app.include_router(pseudo_etfs.router)
 app.include_router(quotes.router)
+app.include_router(settings_router.router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])

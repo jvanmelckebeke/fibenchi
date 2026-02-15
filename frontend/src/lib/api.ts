@@ -304,6 +304,14 @@ export const api = {
     delete: (symbol: string, id: number) =>
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
   },
+  settings: {
+    get: () => request<{ data: Record<string, unknown> }>("/settings"),
+    update: (data: Record<string, unknown>) =>
+      request<{ data: Record<string, unknown> }>("/settings", {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      }),
+  },
   pseudoEtfs: {
     list: () => request<PseudoETF[]>("/pseudo-etfs"),
     create: (data: PseudoETFCreate) =>
