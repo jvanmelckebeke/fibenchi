@@ -226,8 +226,10 @@ function AssetCard({
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
           <SparklineChart symbol={symbol} period={sparklinePeriod} />
-          <RsiGauge symbol={symbol} />
-          <MacdIndicator symbol={symbol} />
+          <div className="flex gap-1.5 mt-1">
+            <RsiGauge symbol={symbol} />
+            <MacdIndicator symbol={symbol} />
+          </div>
         </CardContent>
       </Link>
     </Card>
