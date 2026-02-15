@@ -16,6 +16,7 @@ import { useAssets, useCreateAsset, useDeleteAsset, useTags } from "@/lib/querie
 import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
+import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
 import type { Quote, TagBrief } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
@@ -226,6 +227,7 @@ function AssetCard({
         <CardContent className="pt-0 space-y-2">
           <SparklineChart symbol={symbol} period={sparklinePeriod} />
           <RsiGauge symbol={symbol} />
+          <MacdIndicator symbol={symbol} />
         </CardContent>
       </Link>
     </Card>
