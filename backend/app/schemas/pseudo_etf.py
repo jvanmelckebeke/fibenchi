@@ -55,5 +55,11 @@ class ConstituentIndicatorResponse(BaseModel):
     rsi: float | None = None
     sma_20: float | None = None
     sma_50: float | None = None
+    macd: float | None = None
+    macd_signal: float | None = None
+    macd_hist: float | None = None
     macd_signal_dir: str | None = None
+    bb_upper: float | None = None
+    bb_middle: float | None = None
+    bb_lower: float | None = None
     bb_position: str | None = None

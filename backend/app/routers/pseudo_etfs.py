@@ -212,7 +212,13 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
             rsi=round(latest["rsi"], 2) if pd.notna(latest["rsi"]) else None,
             sma_20=round(latest["sma_20"], 2) if pd.notna(latest["sma_20"]) else None,
             sma_50=round(latest["sma_50"], 2) if pd.notna(latest["sma_50"]) else None,
+            macd=round(latest["macd"], 4) if pd.notna(latest["macd"]) else None,
+            macd_signal=round(latest["macd_signal"], 4) if pd.notna(latest["macd_signal"]) else None,
+            macd_hist=round(latest["macd_hist"], 4) if pd.notna(latest["macd_hist"]) else None,
             macd_signal_dir=macd_dir,
+            bb_upper=round(latest["bb_upper"], 2) if pd.notna(latest["bb_upper"]) else None,
+            bb_middle=round(latest["bb_middle"], 2) if pd.notna(latest["bb_middle"]) else None,
+            bb_lower=round(latest["bb_lower"], 2) if pd.notna(latest["bb_lower"]) else None,
             bb_position=bb_pos,
         ))
 

@@ -79,6 +79,25 @@ async def test_holdings_indicators_success(client):
     assert data[0]["close"] is not None
     assert data[1]["symbol"] == "MSFT"
 
+    # Verify raw numeric indicator fields are present
+    for item in data:
+        assert "macd" in item
+        assert "macd_signal" in item
+        assert "macd_hist" in item
+        assert "bb_upper" in item
+        assert "bb_middle" in item
+        assert "bb_lower" in item
+        # With 100 data points, all indicators should have values
+        assert isinstance(item["macd"], float)
+        assert isinstance(item["macd_signal"], float)
+        assert isinstance(item["macd_hist"], float)
+        assert isinstance(item["bb_upper"], float)
+        assert isinstance(item["bb_middle"], float)
+        assert isinstance(item["bb_lower"], float)
+        # Classified fields still present
+        assert "macd_signal_dir" in item
+        assert "bb_position" in item
+
 
 async def test_holdings_indicators_not_etf(client):
     """Holdings indicators endpoint returns 400 for stock assets."""
