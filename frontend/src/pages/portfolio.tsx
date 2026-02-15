@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { usePortfolioIndex, usePortfolioPerformers } from "@/lib/queries"
-import { getChartTheme } from "@/lib/chart-utils"
+import { getChartTheme, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
 import type { AssetPerformance } from "@/lib/api"
 
 const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
@@ -56,6 +56,7 @@ export function PortfolioPage() {
 function PortfolioChart({ dates, values, up }: { dates: string[]; values: number[]; up: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
+  const theme = useChartTheme()
 
   useEffect(() => {
     if (!containerRef.current || !dates.length) return
@@ -120,6 +121,11 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
       chartRef.current = null
     }
   }, [dates, values, up])
+
+  // Apply theme changes without recreating chart
+  useEffect(() => {
+    chartRef.current?.applyOptions(chartThemeOptions(theme))
+  }, [theme])
 
   return <div ref={containerRef} className="w-full rounded-md overflow-hidden" />
 }
