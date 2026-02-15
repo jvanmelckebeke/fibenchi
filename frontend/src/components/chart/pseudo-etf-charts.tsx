@@ -7,7 +7,7 @@ import {
   LineSeries,
   HistogramSeries,
 } from "lightweight-charts"
-import { baseChartOptions, getChartTheme, STACK_COLORS } from "@/lib/chart-utils"
+import { baseChartOptions, getChartTheme, useChartTheme, chartThemeOptions, STACK_COLORS } from "@/lib/chart-utils"
 import type { PerformanceBreakdownPoint } from "@/lib/api"
 
 interface SharedChartProps {
@@ -25,7 +25,9 @@ export function StackedAreaChart({
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const topSeriesRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
+  const baseLineRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
   const [hoverData, setHoverData] = useState<{ total: number; breakdown: Record<string, number> } | null>(null)
+  const theme = useChartTheme()
 
   const totalByTime = useRef(new Map<string, number>())
   const breakdownByTime = useRef(new Map<string, Record<string, number>>())
@@ -84,6 +86,7 @@ export function StackedAreaChart({
       crosshairMarkerVisible: false,
     })
     baseLine.setData(data.map((p) => ({ time: p.date, value: baseValue })))
+    baseLineRef.current = baseLine
 
     // Crosshair snap + legend update
     let snapping = false
@@ -120,8 +123,17 @@ export function StackedAreaChart({
       chart.remove()
       chartRef.current = null
       topSeriesRef.current = null
+      baseLineRef.current = null
     }
   }, [data, baseValue, sortedSymbols, symbolColorMap])
+
+  // Apply theme changes without recreating charts
+  useEffect(() => {
+    chartRef.current?.applyOptions(chartThemeOptions(theme))
+    baseLineRef.current?.applyOptions({
+      color: theme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
+    })
+  }, [theme])
 
   const lastPoint = data[data.length - 1]
   const displayData = hoverData ?? (lastPoint ? { total: lastPoint.value, breakdown: lastPoint.breakdown } : null)
@@ -143,6 +155,7 @@ export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: 
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const [hoverData, setHoverData] = useState<{ date: string; deltas: Record<string, number>; total: number } | null>(null)
+  const theme = useChartTheme()
 
   const deltasByTime = useRef(new Map<string, Record<string, number>>())
 
@@ -247,6 +260,11 @@ export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: 
       chartRef.current = null
     }
   }, [data, sortedSymbols, symbolColorMap])
+
+  // Apply theme changes without recreating charts
+  useEffect(() => {
+    chartRef.current?.applyOptions(chartThemeOptions(theme))
+  }, [theme])
 
   // Default to latest day
   const latestDeltas = useMemo(() => {

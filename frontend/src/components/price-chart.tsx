@@ -9,7 +9,7 @@ import {
   HistogramSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
-import { getChartTheme } from "@/lib/chart-utils"
+import { getChartTheme, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
 import { BandFillPrimitive } from "./chart/bollinger-band-fill"
 import { Legend, RsiLegend, MacdLegend, type LegendValues } from "./chart/chart-legends"
 
@@ -27,6 +27,7 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
   const rsiChartRef = useRef<IChartApi | null>(null)
   const macdChartRef = useRef<IChartApi | null>(null)
   const [hoverValues, setHoverValues] = useState<LegendValues | null>(null)
+  const theme = useChartTheme()
 
   // Build lookup maps
   const closeByTime = useRef(new Map<string, number>())
@@ -483,6 +484,14 @@ export function PriceChart({ prices, indicators, annotations }: PriceChartProps)
       macdChartRef.current = null
     }
   }, [prices, indicators, annotations, syncCharts])
+
+  // Apply theme changes without recreating charts
+  useEffect(() => {
+    const opts = chartThemeOptions(theme)
+    mainChartRef.current?.applyOptions(opts)
+    rsiChartRef.current?.applyOptions(opts)
+    macdChartRef.current?.applyOptions(opts)
+  }, [theme])
 
   const resetView = useCallback(() => {
     mainChartRef.current?.timeScale().fitContent()
