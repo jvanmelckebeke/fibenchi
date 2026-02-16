@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Asset, Thesis
+from app.models import Thesis
+from app.routers.deps import get_asset
 from app.schemas.thesis import ThesisResponse, ThesisUpdate
 
 router = APIRouter(prefix="/api/assets/{symbol}/thesis", tags=["thesis"])
@@ -11,10 +12,7 @@ router = APIRouter(prefix="/api/assets/{symbol}/thesis", tags=["thesis"])
 
 @router.get("", response_model=ThesisResponse, summary="Get investment thesis for an asset")
 async def get_thesis(symbol: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
-    asset = result.scalar_one_or_none()
-    if not asset:
-        raise HTTPException(404, f"Asset {symbol} not found")
+    asset = await get_asset(symbol, db)
 
     result = await db.execute(select(Thesis).where(Thesis.asset_id == asset.id))
     thesis = result.scalar_one_or_none()
@@ -26,10 +24,7 @@ async def get_thesis(symbol: str, db: AsyncSession = Depends(get_db)):
 
 @router.put("", response_model=ThesisResponse, summary="Create or update investment thesis")
 async def update_thesis(symbol: str, data: ThesisUpdate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
-    asset = result.scalar_one_or_none()
-    if not asset:
-        raise HTTPException(404, f"Asset {symbol} not found")
+    asset = await get_asset(symbol, db)
 
     result = await db.execute(select(Thesis).where(Thesis.asset_id == asset.id))
     thesis = result.scalar_one_or_none()

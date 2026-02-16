@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Asset, AssetType
+from app.routers.deps import get_asset
 from app.schemas.asset import AssetCreate, AssetResponse
 from app.services.yahoo import validate_symbol
 
@@ -63,9 +64,6 @@ async def delete_asset(symbol: str, db: AsyncSession = Depends(get_db)):
     """Set `watchlisted=false` on the asset. The row is preserved so that
     pseudo-ETF constituent relationships remain intact.
     """
-    result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
-    asset = result.scalar_one_or_none()
-    if not asset:
-        raise HTTPException(404, f"Asset {symbol} not found")
+    asset = await get_asset(symbol, db)
     asset.watchlisted = False
     await db.commit()
