@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PriceChart } from "@/components/price-chart"
 import { ChartSkeleton } from "@/components/chart-skeleton"
-import { ConnectedThesis } from "@/components/connected-thesis"
-import { ConnectedAnnotations } from "@/components/connected-annotations"
+import { ThesisEditor } from "@/components/thesis-editor"
+import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
 import { PeriodSelector } from "@/components/period-selector"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
@@ -58,15 +58,8 @@ export function AssetDetailPage() {
       {isWatchlisted && (
         <>
           <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
-          <ConnectedAnnotations
-            useAnnotationsQuery={() => useAnnotations(symbol)}
-            useCreateMutation={() => useCreateAnnotation(symbol)}
-            useDeleteMutation={() => useDeleteAnnotation(symbol)}
-          />
-          <ConnectedThesis
-            useThesisQuery={() => useThesis(symbol)}
-            useUpdateMutation={() => useUpdateThesis(symbol)}
-          />
+          <AssetAnnotations symbol={symbol} />
+          <AssetThesis symbol={symbol} />
         </>
       )}
     </div>
@@ -277,6 +270,34 @@ function TopHoldingsCard({
         linkTarget="_blank"
       />
     </Card>
+  )
+}
+
+function AssetAnnotations({ symbol }: { symbol: string }) {
+  const { data: annotations } = useAnnotations(symbol)
+  const createAnnotation = useCreateAnnotation(symbol)
+  const deleteAnnotation = useDeleteAnnotation(symbol)
+
+  return (
+    <AnnotationsList
+      annotations={annotations}
+      onCreate={(data) => createAnnotation.mutate(data)}
+      onDelete={(id) => deleteAnnotation.mutate(id)}
+      isCreating={createAnnotation.isPending}
+    />
+  )
+}
+
+function AssetThesis({ symbol }: { symbol: string }) {
+  const { data: thesis } = useThesis(symbol)
+  const updateThesis = useUpdateThesis(symbol)
+
+  return (
+    <ThesisEditor
+      thesis={thesis}
+      onSave={(content) => updateThesis.mutate(content)}
+      isSaving={updateThesis.isPending}
+    />
   )
 }
 

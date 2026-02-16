@@ -17,7 +17,9 @@ export function useChartLifecycle(
 
   // Keep a stable reference to the chartRefs array
   const chartRefsRef = useRef(chartRefs)
-  chartRefsRef.current = chartRefs
+  useEffect(() => {
+    chartRefsRef.current = chartRefs
+  })
 
   // Apply theme changes to all chart refs
   useEffect(() => {

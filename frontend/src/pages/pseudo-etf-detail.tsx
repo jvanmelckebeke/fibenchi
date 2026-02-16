@@ -3,8 +3,8 @@ import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ConnectedThesis } from "@/components/connected-thesis"
-import { ConnectedAnnotations } from "@/components/connected-annotations"
+import { ThesisEditor } from "@/components/thesis-editor"
+import { AnnotationsList } from "@/components/annotations-list"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/add-constituent-picker"
 import {
@@ -96,16 +96,37 @@ export function PseudoEtfDetailPage() {
       )}
 
       <HoldingsTable etfId={etfId} />
-      <ConnectedAnnotations
-        useAnnotationsQuery={() => usePseudoEtfAnnotations(etfId)}
-        useCreateMutation={() => useCreatePseudoEtfAnnotation(etfId)}
-        useDeleteMutation={() => useDeletePseudoEtfAnnotation(etfId)}
-      />
-      <ConnectedThesis
-        useThesisQuery={() => usePseudoEtfThesis(etfId)}
-        useUpdateMutation={() => useUpdatePseudoEtfThesis(etfId)}
-      />
+      <EtfAnnotations etfId={etfId} />
+      <EtfThesis etfId={etfId} />
     </div>
+  )
+}
+
+function EtfAnnotations({ etfId }: { etfId: number }) {
+  const { data: annotations } = usePseudoEtfAnnotations(etfId)
+  const createAnnotation = useCreatePseudoEtfAnnotation(etfId)
+  const deleteAnnotation = useDeletePseudoEtfAnnotation(etfId)
+
+  return (
+    <AnnotationsList
+      annotations={annotations}
+      onCreate={(data) => createAnnotation.mutate(data)}
+      onDelete={(id) => deleteAnnotation.mutate(id)}
+      isCreating={createAnnotation.isPending}
+    />
+  )
+}
+
+function EtfThesis({ etfId }: { etfId: number }) {
+  const { data: thesis } = usePseudoEtfThesis(etfId)
+  const updateThesis = useUpdatePseudoEtfThesis(etfId)
+
+  return (
+    <ThesisEditor
+      thesis={thesis}
+      onSave={(content) => updateThesis.mutate(content)}
+      isSaving={updateThesis.isPending}
+    />
   )
 }
 
