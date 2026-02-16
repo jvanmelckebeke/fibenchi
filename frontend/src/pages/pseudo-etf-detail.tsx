@@ -96,9 +96,37 @@ export function PseudoEtfDetailPage() {
       )}
 
       <HoldingsTable etfId={etfId} />
-      <AnnotationsSection etfId={etfId} />
-      <ThesisSection etfId={etfId} />
+      <EtfAnnotations etfId={etfId} />
+      <EtfThesis etfId={etfId} />
     </div>
+  )
+}
+
+function EtfAnnotations({ etfId }: { etfId: number }) {
+  const { data: annotations } = usePseudoEtfAnnotations(etfId)
+  const createAnnotation = useCreatePseudoEtfAnnotation(etfId)
+  const deleteAnnotation = useDeletePseudoEtfAnnotation(etfId)
+
+  return (
+    <AnnotationsList
+      annotations={annotations}
+      onCreate={(data) => createAnnotation.mutate(data)}
+      onDelete={(id) => deleteAnnotation.mutate(id)}
+      isCreating={createAnnotation.isPending}
+    />
+  )
+}
+
+function EtfThesis({ etfId }: { etfId: number }) {
+  const { data: thesis } = usePseudoEtfThesis(etfId)
+  const updateThesis = useUpdatePseudoEtfThesis(etfId)
+
+  return (
+    <ThesisEditor
+      thesis={thesis}
+      onSave={(content) => updateThesis.mutate(content)}
+      isSaving={updateThesis.isPending}
+    />
   )
 }
 
@@ -186,30 +214,3 @@ function HoldingsTable({ etfId }: { etfId: number }) {
   )
 }
 
-function ThesisSection({ etfId }: { etfId: number }) {
-  const { data: thesis } = usePseudoEtfThesis(etfId)
-  const updateThesis = useUpdatePseudoEtfThesis(etfId)
-
-  return (
-    <ThesisEditor
-      thesis={thesis}
-      onSave={(content) => updateThesis.mutate(content)}
-      isSaving={updateThesis.isPending}
-    />
-  )
-}
-
-function AnnotationsSection({ etfId }: { etfId: number }) {
-  const { data: annotations } = usePseudoEtfAnnotations(etfId)
-  const createAnnotation = useCreatePseudoEtfAnnotation(etfId)
-  const deleteAnnotation = useDeletePseudoEtfAnnotation(etfId)
-
-  return (
-    <AnnotationsList
-      annotations={annotations}
-      onCreate={(data) => createAnnotation.mutate(data)}
-      onDelete={(id) => deleteAnnotation.mutate(id)}
-      isCreating={createAnnotation.isPending}
-    />
-  )
-}

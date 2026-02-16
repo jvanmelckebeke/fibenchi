@@ -1,14 +1,7 @@
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
-import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, MoreVertical, Plus, Table, Trash2, TrendingUp } from "lucide-react"
+import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Table, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,10 +9,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAssets, useCreateAsset, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators, usePrefetchAssetDetail, useSymbolSearch } from "@/lib/queries"
+import { AddSymbolDialog } from "@/components/add-symbol-dialog"
+import { AssetActionMenu } from "@/components/asset-action-menu"
+import { useAssets, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators, usePrefetchAssetDetail } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
@@ -47,12 +42,7 @@ const SORT_LABELS: Record<WatchlistSortBy, string> = Object.fromEntries(SORT_OPT
 export function WatchlistPage() {
   const { data: allAssets, isLoading } = useAssets()
   const { data: allTags } = useTags()
-  const createAsset = useCreateAsset()
   const deleteAsset = useDeleteAsset()
-  const [symbol, setSymbol] = useState("")
-  const [debouncedQuery, setDebouncedQuery] = useState("")
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
@@ -61,14 +51,6 @@ export function WatchlistPage() {
   const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
   const { data: batchIndicators } = useWatchlistIndicators()
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
-  const { data: searchResults } = useSymbolSearch(debouncedQuery)
-  const suggestionsRef = useRef<HTMLDivElement>(null)
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(symbol.trim()), 300)
-    return () => clearTimeout(timer)
-  }, [symbol])
 
   const typeFilter = settings.watchlist_type_filter
   const sortBy = settings.watchlist_sort_by
@@ -103,57 +85,31 @@ export function WatchlistPage() {
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
     )
 
-  const handleAdd = () => {
-    const s = symbol.trim().toUpperCase()
-    if (!s) return
-    createAsset.mutate(
-      { symbol: s },
-      {
-        onSuccess: () => {
-          setSymbol("")
-          setDialogOpen(false)
-        },
-      },
-    )
-  }
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">Watchlist</h1>
           {/* Type filter */}
-          <div className="flex rounded-md border border-border overflow-hidden">
-            {([["all", "All"], ["stock", "Stocks"], ["etf", "ETFs"]] as const).map(([v, label]) => (
-              <button
-                key={v}
-                onClick={() => setTypeFilter(v)}
-                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                  typeFilter === v
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            options={[
+              { value: "all", label: "All" },
+              { value: "stock", label: "Stocks" },
+              { value: "etf", label: "ETFs" },
+            ]}
+            value={typeFilter}
+            onChange={setTypeFilter}
+          />
           {/* Sparkline period */}
-          <div className="flex rounded-md border border-border overflow-hidden">
-            {(["3mo", "6mo", "1y"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setSparklinePeriod(p)}
-                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                  sparklinePeriod === p
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                {p === "3mo" ? "3M" : p === "6mo" ? "6M" : "1Y"}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            options={[
+              { value: "3mo", label: "3M" },
+              { value: "6mo", label: "6M" },
+              { value: "1y", label: "1Y" },
+            ]}
+            value={sparklinePeriod}
+            onChange={setSparklinePeriod}
+          />
           {/* Sort */}
           <div className="flex items-center gap-1">
             <DropdownMenu>
@@ -178,84 +134,16 @@ export function WatchlistPage() {
             </DropdownMenu>
           </div>
           {/* View mode toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden">
-            <button
-              onClick={() => setViewMode("card")}
-              className={`px-2 py-1 transition-colors ${
-                viewMode === "card"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-              title="Card view"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode("table")}
-              className={`px-2 py-1 transition-colors ${
-                viewMode === "table"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-              title="Table view"
-            >
-              <Table className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <SegmentedControl
+            options={[
+              { value: "card", label: <LayoutGrid className="h-3.5 w-3.5" /> },
+              { value: "table", label: <Table className="h-3.5 w-3.5" /> },
+            ]}
+            value={viewMode}
+            onChange={setViewMode}
+          />
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); setShowSuggestions(false); createAsset.reset() } }}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              Add Symbol
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add Symbol</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="relative">
-                <Input
-                  placeholder="Search by name or symbol (e.g. AAPL, Porsche)"
-                  value={symbol}
-                  onChange={(e) => { setSymbol(e.target.value); setShowSuggestions(true) }}
-                  onKeyDown={(e) => { if (e.key === "Enter") { setShowSuggestions(false); handleAdd() } }}
-                  onFocus={() => setShowSuggestions(true)}
-                  autoFocus
-                />
-                {showSuggestions && searchResults && searchResults.length > 0 && symbol.trim() && (
-                  <div
-                    ref={suggestionsRef}
-                    className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-60 overflow-auto"
-                  >
-                    {searchResults.map((r) => (
-                      <button
-                        key={r.symbol}
-                        type="button"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { setSymbol(r.symbol); setShowSuggestions(false) }}
-                      >
-                        <span className="font-mono font-medium text-primary shrink-0">{r.symbol}</span>
-                        <span className="text-muted-foreground truncate">{r.name}</span>
-                        <Badge variant="secondary" className="ml-auto text-xs shrink-0">{r.exchange}</Badge>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {createAsset.isError && (
-                <p className="text-sm text-destructive">{createAsset.error.message}</p>
-              )}
-              <div className="flex justify-end">
-                <Button onClick={() => { setShowSuggestions(false); handleAdd() }} disabled={createAsset.isPending || !symbol.trim()}>
-                  {createAsset.isPending ? "Adding…" : "Add"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AddSymbolDialog />
       </div>
 
       {allTags && allTags.length > 0 && (
@@ -376,30 +264,10 @@ function AssetCard({
 
   return (
     <Card className="group relative hover:border-primary/50 transition-colors" onMouseEnter={onHover}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-2 top-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            onClick={(e) => e.preventDefault()}
-          >
-            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-48">
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={(e) => {
-              e.preventDefault()
-              onDelete()
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-2" />
-            Remove
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <AssetActionMenu
+        onDelete={onDelete}
+        triggerClassName="absolute right-2 top-2 h-7 w-7 opacity-0 group-hover:opacity-100 z-10"
+      />
       <Link to={`/asset/${symbol}`}>
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">

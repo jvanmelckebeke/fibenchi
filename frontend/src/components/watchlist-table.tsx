@@ -1,16 +1,10 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronRight, ChevronDown, MoreVertical, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { ChevronRight, ChevronDown } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { TagBadge } from "@/components/tag-badge"
+import { AssetActionMenu } from "@/components/asset-action-menu"
 import { PriceChart } from "@/components/price-chart"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
@@ -19,7 +13,7 @@ import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { WatchlistSortBy, SortDir } from "@/lib/settings"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
-import { usePrices, useIndicators, useAnnotations } from "@/lib/queries"
+import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
 interface WatchlistTableProps {
@@ -125,11 +119,12 @@ function getRsiColor(rsi: number): string {
 function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: IndicatorSummary }) {
   const { settings } = useSettings()
   const period = settings.chart_default_period
-  const { data: prices, isLoading: pricesLoading } = usePrices(symbol, period)
-  const { data: chartIndicators, isLoading: indicatorsLoading } = useIndicators(symbol, period)
+  const { data: detail, isLoading: detailLoading } = useAssetDetail(symbol, period)
+  const prices = detail?.prices
+  const chartIndicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
 
-  const loading = pricesLoading || indicatorsLoading
+  const loading = detailLoading
 
   return (
     <div className="flex gap-4">
@@ -291,30 +286,10 @@ function TableRow({
           )}
         </td>
         <td className={`${py} pr-2`}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete()
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                Remove
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <AssetActionMenu
+            onDelete={onDelete}
+            triggerClassName="h-6 w-6 opacity-0 group-hover:opacity-100"
+          />
         </td>
       </tr>
       {expanded && (

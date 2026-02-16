@@ -1,8 +1,8 @@
-import asyncio
 import time
 
 from fastapi import APIRouter, Query
-from yahooquery import search as yq_search
+
+from app.services.yahoo import search as yahoo_search
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -35,7 +35,7 @@ async def search_symbols(q: str = Query(..., min_length=1, max_length=50)):
     if cached is not None:
         return cached
 
-    raw = await asyncio.to_thread(yq_search, q, first_quote=False)
+    raw = await yahoo_search(q, first_quote=False)
     quotes = raw.get("quotes", [])
 
     results = []

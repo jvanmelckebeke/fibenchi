@@ -8,6 +8,7 @@ import { ChartSkeleton } from "@/components/chart-skeleton"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
+import { PeriodSelector } from "@/components/period-selector"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { buildYahooFinanceUrl, formatPrice } from "@/lib/format"
 import { useQuotes } from "@/lib/quote-stream"
@@ -16,8 +17,7 @@ import type { EtfHoldings } from "@/lib/api"
 import {
   useAssets,
   useCreateAsset,
-  usePrices,
-  useIndicators,
+  useAssetDetail,
   useRefreshPrices,
   useEtfHoldings,
   useHoldingsIndicators,
@@ -29,7 +29,6 @@ import {
 } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
-const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
 export function AssetDetailPage() {
   const { symbol } = useParams<{ symbol: string }>()
@@ -59,8 +58,8 @@ export function AssetDetailPage() {
       {isWatchlisted && (
         <>
           <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
-          <AnnotationsSection symbol={symbol} />
-          <ThesisSection symbol={symbol} />
+          <AssetAnnotations symbol={symbol} />
+          <AssetThesis symbol={symbol} />
         </>
       )}
     </div>
@@ -141,19 +140,7 @@ function Header({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex gap-1">
-          {PERIODS.map((p) => (
-            <Button
-              key={p}
-              variant={period === p ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setPeriod(p)}
-              className="text-xs"
-            >
-              {p}
-            </Button>
-          ))}
-        </div>
+        <PeriodSelector value={period} onChange={setPeriod} />
         {isWatchlisted && (
           <Button
             variant="outline"
@@ -189,11 +176,12 @@ function ChartSection({
   showMacdChart: boolean
   chartType: "candle" | "line"
 }) {
-  const { data: prices, isLoading: pricesLoading, isFetching: pricesFetching } = usePrices(symbol, period)
-  const { data: indicators, isLoading: indicatorsLoading, isFetching: indicatorsFetching } = useIndicators(symbol, period)
+  const { data: detail, isLoading: detailLoading, isFetching: detailFetching } = useAssetDetail(symbol, period)
+  const prices = detail?.prices
+  const indicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
 
-  if (pricesLoading || indicatorsLoading) {
+  if (detailLoading) {
     return <ChartSkeleton height={520} />
   }
 
@@ -207,7 +195,7 @@ function ChartSection({
 
   return (
     <div className="relative">
-      {(pricesFetching || indicatorsFetching) && (
+      {detailFetching && (
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10 rounded-t-md">
           <div className="h-full w-1/3 bg-primary animate-[slide_1s_ease-in-out_infinite]" />
         </div>
@@ -227,33 +215,6 @@ function ChartSection({
   )
 }
 
-function ThesisSection({ symbol }: { symbol: string }) {
-  const { data: thesis } = useThesis(symbol)
-  const updateThesis = useUpdateThesis(symbol)
-
-  return (
-    <ThesisEditor
-      thesis={thesis}
-      onSave={(content) => updateThesis.mutate(content)}
-      isSaving={updateThesis.isPending}
-    />
-  )
-}
-
-function AnnotationsSection({ symbol }: { symbol: string }) {
-  const { data: annotations } = useAnnotations(symbol)
-  const createAnnotation = useCreateAnnotation(symbol)
-  const deleteAnnotation = useDeleteAnnotation(symbol)
-
-  return (
-    <AnnotationsList
-      annotations={annotations}
-      onCreate={(data) => createAnnotation.mutate(data)}
-      onDelete={(id) => deleteAnnotation.mutate(id)}
-      isCreating={createAnnotation.isPending}
-    />
-  )
-}
 
 function HoldingsSection({ symbol }: { symbol: string }) {
   const { data, isLoading } = useEtfHoldings(symbol, true)
@@ -309,6 +270,34 @@ function TopHoldingsCard({
         linkTarget="_blank"
       />
     </Card>
+  )
+}
+
+function AssetAnnotations({ symbol }: { symbol: string }) {
+  const { data: annotations } = useAnnotations(symbol)
+  const createAnnotation = useCreateAnnotation(symbol)
+  const deleteAnnotation = useDeleteAnnotation(symbol)
+
+  return (
+    <AnnotationsList
+      annotations={annotations}
+      onCreate={(data) => createAnnotation.mutate(data)}
+      onDelete={(id) => deleteAnnotation.mutate(id)}
+      isCreating={createAnnotation.isPending}
+    />
+  )
+}
+
+function AssetThesis({ symbol }: { symbol: string }) {
+  const { data: thesis } = useThesis(symbol)
+  const updateThesis = useUpdateThesis(symbol)
+
+  return (
+    <ThesisEditor
+      thesis={thesis}
+      onSave={(content) => updateThesis.mutate(content)}
+      isSaving={updateThesis.isPending}
+    />
   )
 }
 

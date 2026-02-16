@@ -7,7 +7,8 @@ import {
   LineSeries,
   HistogramSeries,
 } from "lightweight-charts"
-import { baseChartOptions, getChartTheme, useChartTheme, chartThemeOptions, STACK_COLORS } from "@/lib/chart-utils"
+import { baseChartOptions, getChartTheme, STACK_COLORS } from "@/lib/chart-utils"
+import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import type { PerformanceBreakdownPoint } from "@/lib/api"
 
 interface SharedChartProps {
@@ -27,7 +28,7 @@ export function StackedAreaChart({
   const topSeriesRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
   const baseLineRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
   const [hoverData, setHoverData] = useState<{ total: number; breakdown: Record<string, number> } | null>(null)
-  const theme = useChartTheme()
+  const { theme, startLifecycle } = useChartLifecycle(ref, [chartRef])
 
   const totalByTime = useRef(new Map<string, number>())
   const breakdownByTime = useRef(new Map<string, Record<string, number>>())
@@ -111,25 +112,16 @@ export function StackedAreaChart({
     chart.timeScale().fitContent()
     chartRef.current = chart
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width })
-      }
-    })
-    resizeObserver.observe(ref.current)
-
+    const cleanup = startLifecycle([chart])
     return () => {
-      resizeObserver.disconnect()
-      chart.remove()
-      chartRef.current = null
+      cleanup()
       topSeriesRef.current = null
       baseLineRef.current = null
     }
-  }, [data, baseValue, sortedSymbols, symbolColorMap])
+  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle])
 
-  // Apply theme changes without recreating charts
+  // Apply baseLine theme color (chartThemeOptions handled by useChartLifecycle)
   useEffect(() => {
-    chartRef.current?.applyOptions(chartThemeOptions(theme))
     baseLineRef.current?.applyOptions({
       color: theme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
     })
@@ -155,7 +147,7 @@ export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: 
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const [hoverData, setHoverData] = useState<{ date: string; deltas: Record<string, number>; total: number } | null>(null)
-  const theme = useChartTheme()
+  const { startLifecycle } = useChartLifecycle(ref, [chartRef])
 
   const deltasByTime = useRef(new Map<string, Record<string, number>>())
 
@@ -247,24 +239,8 @@ export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: 
     chart.timeScale().fitContent()
     chartRef.current = chart
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width })
-      }
-    })
-    resizeObserver.observe(ref.current)
-
-    return () => {
-      resizeObserver.disconnect()
-      chart.remove()
-      chartRef.current = null
-    }
-  }, [data, sortedSymbols, symbolColorMap])
-
-  // Apply theme changes without recreating charts
-  useEffect(() => {
-    chartRef.current?.applyOptions(chartThemeOptions(theme))
-  }, [theme])
+    return startLifecycle([chart])
+  }, [data, sortedSymbols, symbolColorMap, startLifecycle])
 
   // Default to latest day
   const latestDeltas = useMemo(() => {

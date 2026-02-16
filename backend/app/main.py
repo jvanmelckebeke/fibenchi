@@ -14,8 +14,8 @@ from sqlalchemy import select, text
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
 from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis, watchlist
-from app.routers.watchlist import compute_and_cache_indicators
 from app.services.price_sync import sync_all_prices
+from app.services.watchlist import compute_and_cache_indicators
 from app.services.yahoo import batch_fetch_currencies
 
 logger = logging.getLogger(__name__)

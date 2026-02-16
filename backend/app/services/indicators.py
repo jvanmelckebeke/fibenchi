@@ -4,6 +4,16 @@ from __future__ import annotations
 
 import pandas as pd
 
+from app.services.yahoo import batch_fetch_currencies, batch_fetch_history
+from app.utils import async_threadable
+
+
+def safe_round(value, decimals: int = 2) -> float | None:
+    """Round a value if it is not NaN/None, otherwise return None."""
+    if pd.notna(value):
+        return round(value, decimals)
+    return None
+
 
 def rsi(closes: pd.Series, period: int = 14) -> pd.Series:
     """RSI (Relative Strength Index). >70 overbought, <30 oversold."""
@@ -83,16 +93,16 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     return {
         "close": round(latest["close"], 2),
         "change_pct": change_pct,
-        "rsi": round(latest["rsi"], 2) if pd.notna(latest["rsi"]) else None,
-        "sma_20": round(latest["sma_20"], 2) if pd.notna(latest["sma_20"]) else None,
-        "sma_50": round(latest["sma_50"], 2) if pd.notna(latest["sma_50"]) else None,
-        "macd": round(latest["macd"], 4) if pd.notna(latest["macd"]) else None,
-        "macd_signal": round(latest["macd_signal"], 4) if pd.notna(latest["macd_signal"]) else None,
-        "macd_hist": round(latest["macd_hist"], 4) if pd.notna(latest["macd_hist"]) else None,
+        "rsi": safe_round(latest["rsi"], 2),
+        "sma_20": safe_round(latest["sma_20"], 2),
+        "sma_50": safe_round(latest["sma_50"], 2),
+        "macd": safe_round(latest["macd"], 4),
+        "macd_signal": safe_round(latest["macd_signal"], 4),
+        "macd_hist": safe_round(latest["macd_hist"], 4),
         "macd_signal_dir": macd_dir,
-        "bb_upper": round(latest["bb_upper"], 2) if pd.notna(latest["bb_upper"]) else None,
-        "bb_middle": round(latest["bb_middle"], 2) if pd.notna(latest["bb_middle"]) else None,
-        "bb_lower": round(latest["bb_lower"], 2) if pd.notna(latest["bb_lower"]) else None,
+        "bb_upper": safe_round(latest["bb_upper"], 2),
+        "bb_middle": safe_round(latest["bb_middle"], 2),
+        "bb_lower": safe_round(latest["bb_lower"], 2),
         "bb_position": bb_pos,
     }
 
@@ -119,3 +129,35 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     result["macd_hist"] = macd_data["histogram"]
 
     return result
+
+
+@async_threadable
+def compute_batch_indicator_snapshots(
+    symbols: list[str],
+) -> list[dict]:
+    """Compute indicator snapshots for multiple symbols in batch.
+
+    Fetches ~3 months of history and currencies via Yahoo Finance, then
+    computes indicators and builds snapshots for each symbol.
+
+    Returns a list of dicts (one per symbol) with keys:
+    symbol, currency, and all build_indicator_snapshot fields.
+    """
+    if not symbols:
+        return []
+
+    histories = batch_fetch_history(symbols, period="3mo")
+    currencies = batch_fetch_currencies(symbols)
+
+    results = []
+    for sym in symbols:
+        currency = currencies.get(sym, "USD")
+        df = histories.get(sym)
+        if df is None or df.empty or len(df) < 2:
+            results.append({"symbol": sym, "currency": currency})
+            continue
+
+        snapshot = build_indicator_snapshot(compute_indicators(df))
+        results.append({"symbol": sym, "currency": currency, **snapshot})
+
+    return results

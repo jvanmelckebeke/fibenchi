@@ -2,15 +2,14 @@ import { useEffect, useRef, useState } from "react"
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
 import { Link } from "react-router-dom"
 import { Loader2, TrendingUp, TrendingDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ChartSkeleton } from "@/components/chart-skeleton"
+import { PeriodSelector } from "@/components/period-selector"
 import { usePortfolioIndex, usePortfolioPerformers, usePrefetchAssetDetail } from "@/lib/queries"
-import { getChartTheme, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
+import { getChartTheme } from "@/lib/chart-utils"
+import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import type { AssetPerformance } from "@/lib/api"
-
-const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
 export function PortfolioPage() {
   const [period, setPeriod] = useState<string>("1y")
@@ -19,18 +18,8 @@ export function PortfolioPage() {
 
   return (
     <div className="p-6 space-y-8">
-      <div className="flex justify-center gap-1">
-        {PERIODS.map((p) => (
-          <Button
-            key={p}
-            variant={period === p ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setPeriod(p)}
-            className="text-xs"
-          >
-            {p}
-          </Button>
-        ))}
+      <div className="flex justify-center">
+        <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
       {isLoading ? (
@@ -59,7 +48,7 @@ export function PortfolioPage() {
 function PortfolioChart({ dates, values, up }: { dates: string[]; values: number[]; up: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const theme = useChartTheme()
+  const { startLifecycle } = useChartLifecycle(containerRef, [chartRef])
 
   useEffect(() => {
     if (!containerRef.current || !dates.length) return
@@ -111,24 +100,8 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
     chart.timeScale().fitContent()
     chartRef.current = chart
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width })
-      }
-    })
-    resizeObserver.observe(containerRef.current)
-
-    return () => {
-      resizeObserver.disconnect()
-      chart.remove()
-      chartRef.current = null
-    }
-  }, [dates, values, up])
-
-  // Apply theme changes without recreating chart
-  useEffect(() => {
-    chartRef.current?.applyOptions(chartThemeOptions(theme))
-  }, [theme])
+    return startLifecycle([chart])
+  }, [dates, values, up, startLifecycle])
 
   return <div ref={containerRef} className="w-full rounded-md overflow-hidden" />
 }

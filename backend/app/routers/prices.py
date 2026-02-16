@@ -4,44 +4,41 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import pandas as pd
+
+from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.database import get_db
 from app.models import Asset, PriceHistory
 from app.routers.deps import find_asset, get_asset
-from app.schemas.price import IndicatorResponse, PriceResponse
-from app.services.indicators import compute_indicators
+from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
+from app.services.indicators import compute_indicators, safe_round
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
-from app.services.yahoo import fetch_history
-
-import pandas as pd
+from app.services.yahoo import fetch_history  # async via @async_threadable
+from app.utils import TTLCache
 
 router = APIRouter(prefix="/api/assets/{symbol}", tags=["prices"])
 
-# Calendar days for each period string
-_PERIOD_DAYS = {
-    "1mo": 30, "3mo": 90, "6mo": 180,
-    "1y": 365, "2y": 730, "5y": 1825,
-}
-# Extra calendar days to fetch for indicator warmup (~50 trading days for SMA50)
-_WARMUP_DAYS = 80
+# In-memory indicator cache: keyed by "SYMBOL:period:last_price_date"
+_indicator_cache: TTLCache = TTLCache(default_ttl=300, max_size=200)
 
 
 def _display_start(period: str) -> date:
     """Return the earliest date to include in the response for a given period."""
-    days = _PERIOD_DAYS.get(period, 90)
+    days = PERIOD_DAYS.get(period, 90)
     return date.today() - timedelta(days=days)
 
 
-def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd.DataFrame:
+async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd.DataFrame:
     """Fetch price data from Yahoo without persisting to DB.
 
     Used for non-watchlisted symbols viewed via ETF holdings links.
     """
-    days = _PERIOD_DAYS.get(period, 90)
+    days = PERIOD_DAYS.get(period, 90)
     if warmup:
-        days += _WARMUP_DAYS
+        days += WARMUP_DAYS
     start_date = date.today() - timedelta(days=days)
     try:
-        df = fetch_history(symbol.upper(), start=start_date, end=date.today())
+        df = await fetch_history(symbol.upper(), start=start_date, end=date.today())
     except (ValueError, Exception):
         raise HTTPException(404, f"No price data available for {symbol}")
 
@@ -71,7 +68,6 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
         if count == 0:
             raise HTTPException(404, f"No price data available for {asset.symbol}")
     elif prices[0].date > needed_start:
-        # DB has data but doesn't go back far enough for the requested period
         await sync_asset_prices_range(db, asset, needed_start, date.today())
 
     if not prices or prices[0].date > needed_start:
@@ -104,7 +100,7 @@ async def get_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depend
         return [p for p in prices if p.date >= start]
 
     # Ephemeral: fetch directly from Yahoo, no DB persistence
-    df = _fetch_ephemeral(symbol, period)
+    df = await _fetch_ephemeral(symbol, period)
     start = _display_start(period)
     rows = []
     for dt, row in df.iterrows():
@@ -136,7 +132,15 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
 
     if asset:
         prices = await _ensure_prices(db, asset, period)
-        warmup_start = start - timedelta(days=_WARMUP_DAYS)
+        last_date = prices[-1].date if prices else None
+
+        # Check indicator cache (keyed by symbol + period + last price date)
+        cache_key = f"{symbol}:{period}:{last_date}"
+        cached = _indicator_cache.get_value(cache_key)
+        if cached is not None:
+            return cached
+
+        warmup_start = start - timedelta(days=WARMUP_DAYS)
 
         # If DB doesn't have enough warmup data, fetch extra from Yahoo
         if prices and prices[0].date > warmup_start:
@@ -158,8 +162,9 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
             "volume": p.volume,
         } for p in prices]).set_index("date")
     else:
+        cache_key = None
         # Ephemeral: fetch with warmup directly from Yahoo
-        df = _fetch_ephemeral(symbol, period, warmup=True)
+        df = await _fetch_ephemeral(symbol, period, warmup=True)
 
     indicators = compute_indicators(df)
 
@@ -171,18 +176,92 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
         rows.append(IndicatorResponse(
             date=dt,
             close=round(row["close"], 4),
-            rsi=round(row["rsi"], 2) if pd.notna(row["rsi"]) else None,
-            sma_20=round(row["sma_20"], 4) if pd.notna(row["sma_20"]) else None,
-            sma_50=round(row["sma_50"], 4) if pd.notna(row["sma_50"]) else None,
-            bb_upper=round(row["bb_upper"], 4) if pd.notna(row["bb_upper"]) else None,
-            bb_middle=round(row["bb_middle"], 4) if pd.notna(row["bb_middle"]) else None,
-            bb_lower=round(row["bb_lower"], 4) if pd.notna(row["bb_lower"]) else None,
-            macd=round(row["macd"], 4) if pd.notna(row["macd"]) else None,
-            macd_signal=round(row["macd_signal"], 4) if pd.notna(row["macd_signal"]) else None,
-            macd_hist=round(row["macd_hist"], 4) if pd.notna(row["macd_hist"]) else None,
+            rsi=safe_round(row["rsi"], 2),
+            sma_20=safe_round(row["sma_20"], 4),
+            sma_50=safe_round(row["sma_50"], 4),
+            bb_upper=safe_round(row["bb_upper"], 4),
+            bb_middle=safe_round(row["bb_middle"], 4),
+            bb_lower=safe_round(row["bb_lower"], 4),
+            macd=safe_round(row["macd"], 4),
+            macd_signal=safe_round(row["macd_signal"], 4),
+            macd_hist=safe_round(row["macd_hist"], 4),
         ))
 
+    if cache_key:
+        _indicator_cache.set_value(cache_key, rows)
+
     return rows
+
+
+@router.get("/detail", response_model=AssetDetailResponse, summary="Get prices and indicators in one call")
+async def get_detail(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
+    """Return both OHLCV prices and technical indicators for a symbol in a single request.
+
+    Avoids the need for parallel `/prices` + `/indicators` calls from the frontend,
+    sharing the data-loading step.
+
+    Supported periods: `1mo`, `3mo` (default), `6mo`, `1y`, `2y`, `5y`.
+    """
+    asset = await find_asset(symbol, db)
+    start = _display_start(period)
+
+    if asset:
+        prices = await _ensure_prices(db, asset, period)
+        price_rows = [p for p in prices if p.date >= start]
+
+        last_date = prices[-1].date if prices else None
+        cache_key = f"{symbol}:{period}:{last_date}"
+        cached = _indicator_cache.get_value(cache_key)
+        if cached is not None:
+            return AssetDetailResponse(prices=price_rows, indicators=cached)
+
+        warmup_start = start - timedelta(days=WARMUP_DAYS)
+        if prices and prices[0].date > warmup_start:
+            await sync_asset_prices_range(db, asset, warmup_start, date.today())
+            result = await db.execute(
+                select(PriceHistory)
+                .where(PriceHistory.asset_id == asset.id)
+                .order_by(PriceHistory.date)
+            )
+            prices = result.scalars().all()
+
+        df = pd.DataFrame([{
+            "date": p.date, "open": float(p.open), "high": float(p.high),
+            "low": float(p.low), "close": float(p.close), "volume": p.volume,
+        } for p in prices]).set_index("date")
+    else:
+        cache_key = None
+        df = await _fetch_ephemeral(symbol, period, warmup=True)
+        price_rows = []
+        for dt, row in df.iterrows():
+            if dt < start:
+                continue
+            price_rows.append(PriceResponse(
+                date=dt,
+                open=round(float(row["open"]), 4), high=round(float(row["high"]), 4),
+                low=round(float(row["low"]), 4), close=round(float(row["close"]), 4),
+                volume=int(row["volume"]),
+            ))
+
+    indicators = compute_indicators(df)
+    indicator_rows = []
+    for dt, row in indicators.iterrows():
+        if dt < start:
+            continue
+        indicator_rows.append(IndicatorResponse(
+            date=dt, close=round(row["close"], 4),
+            rsi=safe_round(row["rsi"], 2),
+            sma_20=safe_round(row["sma_20"], 4), sma_50=safe_round(row["sma_50"], 4),
+            bb_upper=safe_round(row["bb_upper"], 4), bb_middle=safe_round(row["bb_middle"], 4),
+            bb_lower=safe_round(row["bb_lower"], 4),
+            macd=safe_round(row["macd"], 4), macd_signal=safe_round(row["macd_signal"], 4),
+            macd_hist=safe_round(row["macd_hist"], 4),
+        ))
+
+    if cache_key:
+        _indicator_cache.set_value(cache_key, indicator_rows)
+
+    return AssetDetailResponse(prices=price_rows, indicators=indicator_rows)
 
 
 @router.post("/refresh", status_code=200, summary="Force-refresh prices from Yahoo Finance")
