@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PriceChart } from "@/components/price-chart"
 import { ChartSkeleton } from "@/components/chart-skeleton"
-import { ThesisEditor } from "@/components/thesis-editor"
-import { AnnotationsList } from "@/components/annotations-list"
+import { ConnectedThesis } from "@/components/connected-thesis"
+import { ConnectedAnnotations } from "@/components/connected-annotations"
 import { TagInput } from "@/components/tag-input"
 import { PeriodSelector } from "@/components/period-selector"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
@@ -59,8 +59,15 @@ export function AssetDetailPage() {
       {isWatchlisted && (
         <>
           <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
-          <AnnotationsSection symbol={symbol} />
-          <ThesisSection symbol={symbol} />
+          <ConnectedAnnotations
+            useAnnotationsQuery={() => useAnnotations(symbol)}
+            useCreateMutation={() => useCreateAnnotation(symbol)}
+            useDeleteMutation={() => useDeleteAnnotation(symbol)}
+          />
+          <ConnectedThesis
+            useThesisQuery={() => useThesis(symbol)}
+            useUpdateMutation={() => useUpdateThesis(symbol)}
+          />
         </>
       )}
     </div>
@@ -215,33 +222,6 @@ function ChartSection({
   )
 }
 
-function ThesisSection({ symbol }: { symbol: string }) {
-  const { data: thesis } = useThesis(symbol)
-  const updateThesis = useUpdateThesis(symbol)
-
-  return (
-    <ThesisEditor
-      thesis={thesis}
-      onSave={(content) => updateThesis.mutate(content)}
-      isSaving={updateThesis.isPending}
-    />
-  )
-}
-
-function AnnotationsSection({ symbol }: { symbol: string }) {
-  const { data: annotations } = useAnnotations(symbol)
-  const createAnnotation = useCreateAnnotation(symbol)
-  const deleteAnnotation = useDeleteAnnotation(symbol)
-
-  return (
-    <AnnotationsList
-      annotations={annotations}
-      onCreate={(data) => createAnnotation.mutate(data)}
-      onDelete={(id) => deleteAnnotation.mutate(id)}
-      isCreating={createAnnotation.isPending}
-    />
-  )
-}
 
 function HoldingsSection({ symbol }: { symbol: string }) {
   const { data, isLoading } = useEtfHoldings(symbol, true)
