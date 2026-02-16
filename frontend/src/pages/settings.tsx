@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useSettings, type AppSettings } from "@/lib/settings"
+import { useSettings, type AppSettings, type MacdStyle } from "@/lib/settings"
 
 function SettingSwitch({
   id,
@@ -67,6 +67,23 @@ export function SettingsPage() {
           <SettingSwitch id="wl-sparkline" label="Sparkline Chart" settingKey="watchlist_show_sparkline" draft={draft} onChange={change} />
           <SettingSwitch id="wl-rsi" label="RSI Gauge" settingKey="watchlist_show_rsi" draft={draft} onChange={change} />
           <SettingSwitch id="wl-macd" label="MACD Indicator" settingKey="watchlist_show_macd" draft={draft} onChange={change} />
+          {draft.watchlist_show_macd && (
+            <div className="flex items-center justify-between pl-4">
+              <Label className="text-muted-foreground">MACD Style</Label>
+              <Select
+                value={draft.watchlist_macd_style}
+                onValueChange={(v) => change({ watchlist_macd_style: v as MacdStyle })}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="classic">Classic</SelectItem>
+                  <SelectItem value="divergence">Divergence</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
 
