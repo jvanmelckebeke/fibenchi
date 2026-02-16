@@ -56,9 +56,10 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Settings</h1>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
         <CardHeader>
           <CardTitle>Watchlist</CardTitle>
@@ -199,6 +200,7 @@ export function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       <div className="flex items-center justify-end gap-2">
         {isDirty && (
