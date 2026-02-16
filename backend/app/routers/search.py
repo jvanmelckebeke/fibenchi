@@ -1,14 +1,40 @@
 import asyncio
+import time
 
 from fastapi import APIRouter, Query
 from yahooquery import search as yq_search
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
+# Simple TTL cache: query -> (results, timestamp)
+_cache: dict[str, tuple[list, float]] = {}
+_CACHE_TTL = 300  # 5 minutes
+_CACHE_MAX = 200  # evict oldest when exceeded
+
+
+def _get_cached(q: str) -> list | None:
+    entry = _cache.get(q)
+    if entry and time.monotonic() - entry[1] < _CACHE_TTL:
+        return entry[0]
+    return None
+
+
+def _put_cache(q: str, results: list) -> None:
+    if len(_cache) >= _CACHE_MAX:
+        # evict oldest entry
+        oldest = min(_cache, key=lambda k: _cache[k][1])
+        del _cache[oldest]
+    _cache[q] = (results, time.monotonic())
+
 
 @router.get("")
 async def search_symbols(q: str = Query(..., min_length=1, max_length=50)):
     """Search for ticker symbols by name or symbol prefix."""
+    q_lower = q.strip().lower()
+    cached = _get_cached(q_lower)
+    if cached is not None:
+        return cached
+
     raw = await asyncio.to_thread(yq_search, q, first_quote=False)
     quotes = raw.get("quotes", [])
 
@@ -26,4 +52,5 @@ async def search_symbols(q: str = Query(..., min_length=1, max_length=50)):
         if len(results) >= 8:
             break
 
+    _put_cache(q_lower, results)
     return results
