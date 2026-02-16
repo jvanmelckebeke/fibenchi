@@ -16,7 +16,7 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
     es.addEventListener("quotes", (e) => {
       try {
         const data = JSON.parse(e.data) as QuoteMap
-        setQuotes(data)
+        setQuotes((prev) => ({ ...prev, ...data }))
       } catch {
         // ignore malformed events
       }
