@@ -8,8 +8,9 @@ import {
   HistogramSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
-import { baseChartOptions, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
+import { baseChartOptions } from "@/lib/chart-utils"
 import { useChartSync, type ChartEntry } from "@/lib/use-chart-sync"
+import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import { BandFillPrimitive } from "./chart/bollinger-band-fill"
 import { Legend, RsiLegend, MacdLegend, type LegendValues } from "./chart/chart-legends"
 
@@ -44,7 +45,7 @@ export function PriceChart({
   const mainChartRef = useRef<IChartApi | null>(null)
   const rsiChartRef = useRef<IChartApi | null>(null)
   const macdChartRef = useRef<IChartApi | null>(null)
-  const theme = useChartTheme()
+  const { startLifecycle } = useChartLifecycle(mainRef, [mainChartRef, rsiChartRef, macdChartRef])
 
   const { hoverValues, buildLookupMaps, syncCharts, setupSingleChartCrosshair } = useChartSync()
 
@@ -294,34 +295,8 @@ export function PriceChart({
       setupSingleChartCrosshair(mainChart, mainSeries)
     }
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width
-        for (const chart of createdCharts) {
-          chart.applyOptions({ width: w })
-        }
-      }
-    })
-    resizeObserver.observe(mainRef.current)
-
-    return () => {
-      resizeObserver.disconnect()
-      for (const chart of createdCharts) {
-        chart.remove()
-      }
-      mainChartRef.current = null
-      rsiChartRef.current = null
-      macdChartRef.current = null
-    }
-  }, [prices, indicators, annotations, buildLookupMaps, syncCharts, setupSingleChartCrosshair, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart, chartType, mainChartHeight])
-
-  // Apply theme changes without recreating charts
-  useEffect(() => {
-    const opts = chartThemeOptions(theme)
-    mainChartRef.current?.applyOptions(opts)
-    rsiChartRef.current?.applyOptions(opts)
-    macdChartRef.current?.applyOptions(opts)
-  }, [theme])
+    return startLifecycle(createdCharts)
+  }, [prices, indicators, annotations, buildLookupMaps, syncCharts, setupSingleChartCrosshair, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart, chartType, mainChartHeight, startLifecycle])
 
   const resetView = useCallback(() => {
     mainChartRef.current?.timeScale().fitContent()
