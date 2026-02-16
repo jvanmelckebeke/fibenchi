@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Asset, PriceHistory
 from app.routers.deps import find_asset, get_asset
 from app.schemas.price import IndicatorResponse, PriceResponse
-from app.services.indicators import compute_indicators
+from app.services.indicators import compute_indicators, safe_round
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
 from app.services.yahoo import fetch_history
 
@@ -171,15 +171,15 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
         rows.append(IndicatorResponse(
             date=dt,
             close=round(row["close"], 4),
-            rsi=round(row["rsi"], 2) if pd.notna(row["rsi"]) else None,
-            sma_20=round(row["sma_20"], 4) if pd.notna(row["sma_20"]) else None,
-            sma_50=round(row["sma_50"], 4) if pd.notna(row["sma_50"]) else None,
-            bb_upper=round(row["bb_upper"], 4) if pd.notna(row["bb_upper"]) else None,
-            bb_middle=round(row["bb_middle"], 4) if pd.notna(row["bb_middle"]) else None,
-            bb_lower=round(row["bb_lower"], 4) if pd.notna(row["bb_lower"]) else None,
-            macd=round(row["macd"], 4) if pd.notna(row["macd"]) else None,
-            macd_signal=round(row["macd_signal"], 4) if pd.notna(row["macd_signal"]) else None,
-            macd_hist=round(row["macd_hist"], 4) if pd.notna(row["macd_hist"]) else None,
+            rsi=safe_round(row["rsi"], 2),
+            sma_20=safe_round(row["sma_20"], 4),
+            sma_50=safe_round(row["sma_50"], 4),
+            bb_upper=safe_round(row["bb_upper"], 4),
+            bb_middle=safe_round(row["bb_middle"], 4),
+            bb_lower=safe_round(row["bb_lower"], 4),
+            macd=safe_round(row["macd"], 4),
+            macd_signal=safe_round(row["macd_signal"], 4),
+            macd_hist=safe_round(row["macd_hist"], 4),
         ))
 
     return rows
