@@ -44,6 +44,13 @@ export interface AssetCreate {
   watchlisted?: boolean
 }
 
+export interface SymbolSearchResult {
+  symbol: string
+  name: string
+  exchange: string
+  type: AssetType
+}
+
 export interface Group {
   id: number
   name: string
@@ -334,6 +341,7 @@ export const api = {
     indicators: () =>
       request<Record<string, IndicatorSummary>>("/watchlist/indicators"),
   },
+  search: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
   settings: {
     get: () => request<{ data: Record<string, unknown> }>("/settings"),
     update: (data: Record<string, unknown>) =>
