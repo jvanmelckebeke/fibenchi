@@ -5,6 +5,13 @@ from __future__ import annotations
 import pandas as pd
 
 
+def safe_round(value, decimals: int = 2) -> float | None:
+    """Round a value if it is not NaN/None, otherwise return None."""
+    if pd.notna(value):
+        return round(value, decimals)
+    return None
+
+
 def rsi(closes: pd.Series, period: int = 14) -> pd.Series:
     """RSI (Relative Strength Index). >70 overbought, <30 oversold."""
     delta = closes.diff()
@@ -83,16 +90,16 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     return {
         "close": round(latest["close"], 2),
         "change_pct": change_pct,
-        "rsi": round(latest["rsi"], 2) if pd.notna(latest["rsi"]) else None,
-        "sma_20": round(latest["sma_20"], 2) if pd.notna(latest["sma_20"]) else None,
-        "sma_50": round(latest["sma_50"], 2) if pd.notna(latest["sma_50"]) else None,
-        "macd": round(latest["macd"], 4) if pd.notna(latest["macd"]) else None,
-        "macd_signal": round(latest["macd_signal"], 4) if pd.notna(latest["macd_signal"]) else None,
-        "macd_hist": round(latest["macd_hist"], 4) if pd.notna(latest["macd_hist"]) else None,
+        "rsi": safe_round(latest["rsi"], 2),
+        "sma_20": safe_round(latest["sma_20"], 2),
+        "sma_50": safe_round(latest["sma_50"], 2),
+        "macd": safe_round(latest["macd"], 4),
+        "macd_signal": safe_round(latest["macd_signal"], 4),
+        "macd_hist": safe_round(latest["macd_hist"], 4),
         "macd_signal_dir": macd_dir,
-        "bb_upper": round(latest["bb_upper"], 2) if pd.notna(latest["bb_upper"]) else None,
-        "bb_middle": round(latest["bb_middle"], 2) if pd.notna(latest["bb_middle"]) else None,
-        "bb_lower": round(latest["bb_lower"], 2) if pd.notna(latest["bb_lower"]) else None,
+        "bb_upper": safe_round(latest["bb_upper"], 2),
+        "bb_middle": safe_round(latest["bb_middle"], 2),
+        "bb_lower": safe_round(latest["bb_lower"], 2),
         "bb_position": bb_pos,
     }
 
