@@ -3,10 +3,12 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, ty
 export type AssetTypeFilter = "all" | "stock" | "etf"
 export type WatchlistSortBy = "name" | "price" | "change_pct" | "rsi" | "macd_hist"
 export type SortDir = "asc" | "desc"
+export type MacdStyle = "classic" | "divergence"
 
 export interface AppSettings {
   watchlist_show_rsi: boolean
   watchlist_show_macd: boolean
+  watchlist_macd_style: MacdStyle
   watchlist_show_sparkline: boolean
   watchlist_type_filter: AssetTypeFilter
   watchlist_sort_by: WatchlistSortBy
@@ -27,6 +29,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   watchlist_show_rsi: true,
   watchlist_show_macd: true,
+  watchlist_macd_style: "divergence",
   watchlist_show_sparkline: true,
   watchlist_type_filter: "all",
   watchlist_sort_by: "name",
