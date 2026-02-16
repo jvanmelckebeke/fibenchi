@@ -291,7 +291,7 @@ export function PriceChart({
     if (chartEntries.length > 1) {
       syncCharts(chartEntries)
     } else {
-      setupSingleChartCrosshair(mainChart)
+      setupSingleChartCrosshair(mainChart, mainSeries)
     }
 
     const resizeObserver = new ResizeObserver((entries) => {
