@@ -3,6 +3,7 @@ import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.asset import AssetResponse
+from app.schemas.price import IndicatorSnapshotBase
 
 
 class PseudoETFCreate(BaseModel):
@@ -45,21 +46,8 @@ class PerformanceBreakdownPoint(BaseModel):
     breakdown: dict[str, float] = Field(default={}, description="Per-symbol contribution to the index value")
 
 
-class ConstituentIndicatorResponse(BaseModel):
+class ConstituentIndicatorResponse(IndicatorSnapshotBase):
     symbol: str = Field(description="Constituent ticker symbol")
     name: str | None = Field(default=None, description="Company name")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     weight_pct: float | None = Field(default=None, description="Current portfolio weight percentage")
-    close: float | None = Field(default=None, description="Latest closing price")
-    change_pct: float | None = Field(default=None, description="1-day percentage change")
-    rsi: float | None = Field(default=None, description="RSI (14-period)")
-    sma_20: float | None = Field(default=None, description="20-day SMA")
-    sma_50: float | None = Field(default=None, description="50-day SMA")
-    macd: float | None = Field(default=None, description="MACD line")
-    macd_signal: float | None = Field(default=None, description="MACD signal line")
-    macd_hist: float | None = Field(default=None, description="MACD histogram")
-    macd_signal_dir: str | None = Field(default=None, description="MACD direction: 'bullish' or 'bearish'")
-    bb_upper: float | None = Field(default=None, description="Upper Bollinger Band")
-    bb_middle: float | None = Field(default=None, description="Middle Bollinger Band")
-    bb_lower: float | None = Field(default=None, description="Lower Bollinger Band")
-    bb_position: str | None = Field(default=None, description="Price vs Bollinger Bands: 'above', 'upper', 'lower', or 'below'")

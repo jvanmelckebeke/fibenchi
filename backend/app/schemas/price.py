@@ -45,9 +45,8 @@ class EtfHoldingsResponse(BaseModel):
     total_percent: float = Field(description="Sum of top holding weights (may be < 100%)")
 
 
-class HoldingIndicatorResponse(BaseModel):
-    symbol: str = Field(description="Holding ticker symbol")
-    currency: str = Field(default="USD", description="ISO 4217 currency code")
+class IndicatorSnapshotBase(BaseModel):
+    """Shared indicator fields for holding and constituent snapshot responses."""
     close: float | None = Field(default=None, description="Latest closing price")
     change_pct: float | None = Field(default=None, description="1-day percentage change")
     rsi: float | None = Field(default=None, description="RSI (14-period)")
@@ -61,3 +60,8 @@ class HoldingIndicatorResponse(BaseModel):
     bb_middle: float | None = Field(default=None, description="Middle Bollinger Band")
     bb_lower: float | None = Field(default=None, description="Lower Bollinger Band")
     bb_position: str | None = Field(default=None, description="Price position vs Bollinger Bands: 'above', 'upper', 'lower', or 'below'")
+
+
+class HoldingIndicatorResponse(IndicatorSnapshotBase):
+    symbol: str = Field(description="Holding ticker symbol")
+    currency: str = Field(default="USD", description="ISO 4217 currency code")
