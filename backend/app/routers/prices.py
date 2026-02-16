@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Asset, PriceHistory
+from app.routers.deps import find_asset, get_asset
 from app.schemas.price import IndicatorResponse, PriceResponse
 from app.services.indicators import compute_indicators
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
@@ -28,19 +29,6 @@ def _display_start(period: str) -> date:
     """Return the earliest date to include in the response for a given period."""
     days = _PERIOD_DAYS.get(period, 90)
     return date.today() - timedelta(days=days)
-
-
-async def _find_asset(symbol: str, db: AsyncSession) -> Asset | None:
-    """Look up asset in DB, returning None if not found."""
-    result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
-    return result.scalar_one_or_none()
-
-
-async def _get_asset(symbol: str, db: AsyncSession) -> Asset:
-    asset = await _find_asset(symbol, db)
-    if not asset:
-        raise HTTPException(404, f"Asset {symbol} not found")
-    return asset
 
 
 def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd.DataFrame:
@@ -108,7 +96,7 @@ async def get_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depend
 
     Supported periods: `1mo`, `3mo` (default), `6mo`, `1y`, `2y`, `5y`.
     """
-    asset = await _find_asset(symbol, db)
+    asset = await find_asset(symbol, db)
 
     if asset:
         prices = await _ensure_prices(db, asset, period)
@@ -143,7 +131,7 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
 
     Supported periods: `1mo`, `3mo` (default), `6mo`, `1y`, `2y`, `5y`.
     """
-    asset = await _find_asset(symbol, db)
+    asset = await find_asset(symbol, db)
     start = _display_start(period)
 
     if asset:
@@ -203,6 +191,6 @@ async def refresh_prices(symbol: str, period: str = "3mo", db: AsyncSession = De
 
     Returns the number of price points upserted.
     """
-    asset = await _get_asset(symbol, db)
+    asset = await get_asset(symbol, db)
     count = await sync_asset_prices(db, asset, period=period)
     return {"symbol": asset.symbol, "synced": count}

@@ -1,5 +1,7 @@
 """Technical indicator computations on price data."""
 
+from __future__ import annotations
+
 import pandas as pd
 
 
@@ -39,6 +41,60 @@ def macd(closes: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> 
     signal_line = ema(macd_line, signal)
     histogram = macd_line - signal_line
     return {"macd": macd_line, "signal": signal_line, "histogram": histogram}
+
+
+def bb_position(close: float, upper: float, middle: float, lower: float) -> str:
+    """Classify where price sits relative to Bollinger Bands."""
+    if close > upper:
+        return "above"
+    elif close > middle:
+        return "upper"
+    elif close > lower:
+        return "lower"
+    else:
+        return "below"
+
+
+def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
+    """Build a dict of latest indicator values from a computed indicators DataFrame.
+
+    Returns fields common to both HoldingIndicatorResponse and
+    ConstituentIndicatorResponse: close, change_pct, rsi, sma_20, sma_50,
+    macd/signal/hist/dir, bb_upper/middle/lower/position.
+    """
+    if indicators.empty or len(indicators) < 2:
+        return {}
+
+    latest = indicators.iloc[-1]
+    prev_close = indicators.iloc[-2]["close"]
+
+    change_pct = None
+    if prev_close and prev_close != 0:
+        change_pct = round((latest["close"] - prev_close) / prev_close * 100, 2)
+
+    macd_dir = None
+    if pd.notna(latest["macd"]) and pd.notna(latest["macd_signal"]):
+        macd_dir = "bullish" if latest["macd"] > latest["macd_signal"] else "bearish"
+
+    bb_pos = None
+    if pd.notna(latest["bb_upper"]) and pd.notna(latest["bb_middle"]) and pd.notna(latest["bb_lower"]):
+        bb_pos = bb_position(latest["close"], latest["bb_upper"], latest["bb_middle"], latest["bb_lower"])
+
+    return {
+        "close": round(latest["close"], 2),
+        "change_pct": change_pct,
+        "rsi": round(latest["rsi"], 2) if pd.notna(latest["rsi"]) else None,
+        "sma_20": round(latest["sma_20"], 2) if pd.notna(latest["sma_20"]) else None,
+        "sma_50": round(latest["sma_50"], 2) if pd.notna(latest["sma_50"]) else None,
+        "macd": round(latest["macd"], 4) if pd.notna(latest["macd"]) else None,
+        "macd_signal": round(latest["macd_signal"], 4) if pd.notna(latest["macd_signal"]) else None,
+        "macd_hist": round(latest["macd_hist"], 4) if pd.notna(latest["macd_hist"]) else None,
+        "macd_signal_dir": macd_dir,
+        "bb_upper": round(latest["bb_upper"], 2) if pd.notna(latest["bb_upper"]) else None,
+        "bb_middle": round(latest["bb_middle"], 2) if pd.notna(latest["bb_middle"]) else None,
+        "bb_lower": round(latest["bb_lower"], 2) if pd.notna(latest["bb_lower"]) else None,
+        "bb_position": bb_pos,
+    }
 
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
