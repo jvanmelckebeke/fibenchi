@@ -1,14 +1,7 @@
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
-import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, MoreVertical, Plus, Table, Trash2, TrendingUp } from "lucide-react"
+import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, MoreVertical, Table, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +9,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAssets, useCreateAsset, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators, usePrefetchAssetDetail, useSymbolSearch } from "@/lib/queries"
+import { AddSymbolDialog } from "@/components/add-symbol-dialog"
+import { useAssets, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators, usePrefetchAssetDetail } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
@@ -48,12 +41,7 @@ const SORT_LABELS: Record<WatchlistSortBy, string> = Object.fromEntries(SORT_OPT
 export function WatchlistPage() {
   const { data: allAssets, isLoading } = useAssets()
   const { data: allTags } = useTags()
-  const createAsset = useCreateAsset()
   const deleteAsset = useDeleteAsset()
-  const [symbol, setSymbol] = useState("")
-  const [debouncedQuery, setDebouncedQuery] = useState("")
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
@@ -62,14 +50,6 @@ export function WatchlistPage() {
   const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
   const { data: batchIndicators } = useWatchlistIndicators()
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
-  const { data: searchResults } = useSymbolSearch(debouncedQuery)
-  const suggestionsRef = useRef<HTMLDivElement>(null)
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(symbol.trim()), 300)
-    return () => clearTimeout(timer)
-  }, [symbol])
 
   const typeFilter = settings.watchlist_type_filter
   const sortBy = settings.watchlist_sort_by
@@ -103,20 +83,6 @@ export function WatchlistPage() {
     setSelectedTags((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
     )
-
-  const handleAdd = () => {
-    const s = symbol.trim().toUpperCase()
-    if (!s) return
-    createAsset.mutate(
-      { symbol: s },
-      {
-        onSuccess: () => {
-          setSymbol("")
-          setDialogOpen(false)
-        },
-      },
-    )
-  }
 
   return (
     <div className="p-6 space-y-6">
@@ -176,59 +142,7 @@ export function WatchlistPage() {
             onChange={setViewMode}
           />
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); setShowSuggestions(false); createAsset.reset() } }}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              Add Symbol
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add Symbol</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="relative">
-                <Input
-                  placeholder="Search by name or symbol (e.g. AAPL, Porsche)"
-                  value={symbol}
-                  onChange={(e) => { setSymbol(e.target.value); setShowSuggestions(true) }}
-                  onKeyDown={(e) => { if (e.key === "Enter") { setShowSuggestions(false); handleAdd() } }}
-                  onFocus={() => setShowSuggestions(true)}
-                  autoFocus
-                />
-                {showSuggestions && searchResults && searchResults.length > 0 && symbol.trim() && (
-                  <div
-                    ref={suggestionsRef}
-                    className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-60 overflow-auto"
-                  >
-                    {searchResults.map((r) => (
-                      <button
-                        key={r.symbol}
-                        type="button"
-                        className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { setSymbol(r.symbol); setShowSuggestions(false) }}
-                      >
-                        <span className="font-mono font-medium text-primary shrink-0">{r.symbol}</span>
-                        <span className="text-muted-foreground truncate">{r.name}</span>
-                        <Badge variant="secondary" className="ml-auto text-xs shrink-0">{r.exchange}</Badge>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {createAsset.isError && (
-                <p className="text-sm text-destructive">{createAsset.error.message}</p>
-              )}
-              <div className="flex justify-end">
-                <Button onClick={() => { setShowSuggestions(false); handleAdd() }} disabled={createAsset.isPending || !symbol.trim()}>
-                  {createAsset.isPending ? "Adding…" : "Add"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AddSymbolDialog />
       </div>
 
       {allTags && allTags.length > 0 && (
