@@ -30,7 +30,14 @@ async def batch_sparklines(
     period: str = "3mo",
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, list[dict]]:
-    """Return {symbol: [{date, close}, ...]} for all watchlisted assets."""
+    """Return close-price sparkline data for every watchlisted asset in a single query.
+
+    Response shape: `{symbol: [{date, close}, ...]}`.
+
+    Supported periods: `1mo`, `3mo` (default), `6mo`, `1y`, `2y`, `5y`.
+
+    This endpoint replaces per-card price fetches on the watchlist page.
+    """
     days = _PERIOD_DAYS.get(period, 90)
     start = date.today() - timedelta(days=days)
 
@@ -67,10 +74,14 @@ async def batch_sparklines(
 async def batch_indicators(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, dict]:
-    """Return {symbol: {rsi, macd, macd_signal, macd_hist}} for all watchlisted assets.
+    """Return the latest RSI and MACD indicator values for every watchlisted asset.
 
-    Only computes and returns the latest non-null values needed for the
-    watchlist card badges (RsiGauge, MacdIndicator).
+    Response shape: `{symbol: {rsi, macd, macd_signal, macd_hist}}`.
+
+    Values are computed from ~3 months of price history with an 80-day warmup
+    window for SMA50/Bollinger Band convergence. Only the most recent non-null
+    values are returned — this is optimised for the watchlist card badges, not
+    for charting full indicator time series.
     """
     assets_result = await db.execute(
         select(Asset.id, Asset.symbol).where(Asset.watchlisted == True)  # noqa: E712

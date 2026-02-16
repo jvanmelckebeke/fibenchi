@@ -102,8 +102,12 @@ app = FastAPI(
         "- Ephemeral price views allow fetching prices for non-watchlisted symbols (e.g. ETF "
         "holdings) without persisting data.\n"
         "- Groups are user-defined collections of assets for organization.\n"
+        "- Batch watchlist endpoints provide sparklines and indicator snapshots for all "
+        "watchlisted assets in a single request, avoiding per-card N+1 queries.\n"
+        "- Real-time quotes are delivered via SSE with delta compression — only symbols whose "
+        "data changed since the last push are included.\n"
     ),
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
     openapi_tags=[
         {
@@ -123,6 +127,10 @@ app = FastAPI(
             "description": "Portfolio-wide analytics: composite equal-weight index of all watchlisted assets, and top/bottom performer rankings by period return.",
         },
         {
+            "name": "watchlist",
+            "description": "Batch endpoints for the watchlist page. Return aggregated sparklines and indicator snapshots for all watchlisted assets in a single request, eliminating N+1 per-card fetches.",
+        },
+        {
             "name": "groups",
             "description": "User-defined groups for organizing assets into named collections (e.g. 'Tech', 'Dividend').",
         },
@@ -140,7 +148,12 @@ app = FastAPI(
         },
         {
             "name": "quotes",
-            "description": "Real-time market quotes for one or more symbols. Lightweight endpoint for live price polling.",
+            "description": (
+                "Real-time market quotes via REST and SSE. The REST endpoint returns quotes for "
+                "arbitrary symbols. The SSE stream pushes watchlisted quotes with delta compression "
+                "(only changed symbols are sent) and adaptive intervals: 15 s during regular market "
+                "hours, 60 s pre/post-market, 300 s when markets are closed."
+            ),
         },
         {
             "name": "pseudo-etfs",
@@ -149,6 +162,10 @@ app = FastAPI(
         {
             "name": "settings",
             "description": "User preference storage for indicator visibility, chart preferences, and display options.",
+        },
+        {
+            "name": "system",
+            "description": "Health checks and operational endpoints.",
         },
     ],
 )
@@ -170,6 +187,7 @@ app.include_router(watchlist.router)
 
 @app.get("/api/health", summary="Health check", tags=["system"])
 async def health():
+    """Return `{\"status\": \"ok\"}` when the service is running."""
     return {"status": "ok"}
 
 

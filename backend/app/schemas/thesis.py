@@ -1,14 +1,14 @@
-from datetime import datetime
+import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ThesisUpdate(BaseModel):
-    content: str
+    content: str = Field(description="Investment thesis text (Markdown supported)")
 
 
 class ThesisResponse(BaseModel):
-    content: str
-    updated_at: datetime
+    content: str = Field(description="Investment thesis text (Markdown)")
+    updated_at: datetime.datetime = Field(description="Last modification timestamp")
 
     model_config = {"from_attributes": True}

@@ -1,63 +1,63 @@
-from datetime import date
+import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PriceResponse(BaseModel):
-    date: date
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
+    date: datetime.date = Field(description="Trading date")
+    open: float = Field(description="Opening price")
+    high: float = Field(description="Highest price of the day")
+    low: float = Field(description="Lowest price of the day")
+    close: float = Field(description="Closing price")
+    volume: int = Field(description="Trading volume")
 
     model_config = {"from_attributes": True}
 
 
 class IndicatorResponse(BaseModel):
-    date: date
-    close: float
-    rsi: float | None = None
-    sma_20: float | None = None
-    sma_50: float | None = None
-    bb_upper: float | None = None
-    bb_middle: float | None = None
-    bb_lower: float | None = None
-    macd: float | None = None
-    macd_signal: float | None = None
-    macd_hist: float | None = None
+    date: datetime.date = Field(description="Trading date")
+    close: float = Field(description="Closing price")
+    rsi: float | None = Field(default=None, description="Relative Strength Index (14-period)")
+    sma_20: float | None = Field(default=None, description="20-day Simple Moving Average")
+    sma_50: float | None = Field(default=None, description="50-day Simple Moving Average")
+    bb_upper: float | None = Field(default=None, description="Upper Bollinger Band (20-day, 2 std dev)")
+    bb_middle: float | None = Field(default=None, description="Middle Bollinger Band (20-day SMA)")
+    bb_lower: float | None = Field(default=None, description="Lower Bollinger Band (20-day, 2 std dev)")
+    macd: float | None = Field(default=None, description="MACD line (12-period EMA minus 26-period EMA)")
+    macd_signal: float | None = Field(default=None, description="MACD signal line (9-period EMA of MACD)")
+    macd_hist: float | None = Field(default=None, description="MACD histogram (MACD minus signal)")
 
 
 class HoldingResponse(BaseModel):
-    symbol: str
-    name: str
-    percent: float
+    symbol: str = Field(description="Holding ticker symbol")
+    name: str = Field(description="Holding company name")
+    percent: float = Field(description="Holding weight as a percentage of the ETF")
 
 
 class SectorWeighting(BaseModel):
-    sector: str
-    percent: float
+    sector: str = Field(description="Sector name")
+    percent: float = Field(description="Sector weight as a percentage")
 
 
 class EtfHoldingsResponse(BaseModel):
-    top_holdings: list[HoldingResponse]
-    sector_weightings: list[SectorWeighting]
-    total_percent: float
+    top_holdings: list[HoldingResponse] = Field(description="Top holdings by weight")
+    sector_weightings: list[SectorWeighting] = Field(description="Sector allocation breakdown")
+    total_percent: float = Field(description="Sum of top holding weights (may be < 100%)")
 
 
 class HoldingIndicatorResponse(BaseModel):
-    symbol: str
-    currency: str = "USD"
-    close: float | None = None
-    change_pct: float | None = None
-    rsi: float | None = None
-    sma_20: float | None = None
-    sma_50: float | None = None
-    macd: float | None = None
-    macd_signal: float | None = None
-    macd_hist: float | None = None
-    macd_signal_dir: str | None = None  # "bullish" | "bearish"
-    bb_upper: float | None = None
-    bb_middle: float | None = None
-    bb_lower: float | None = None
-    bb_position: str | None = None  # "above" | "upper" | "middle" | "lower" | "below"
+    symbol: str = Field(description="Holding ticker symbol")
+    currency: str = Field(default="USD", description="ISO 4217 currency code")
+    close: float | None = Field(default=None, description="Latest closing price")
+    change_pct: float | None = Field(default=None, description="1-day percentage change")
+    rsi: float | None = Field(default=None, description="RSI (14-period)")
+    sma_20: float | None = Field(default=None, description="20-day SMA")
+    sma_50: float | None = Field(default=None, description="50-day SMA")
+    macd: float | None = Field(default=None, description="MACD line")
+    macd_signal: float | None = Field(default=None, description="MACD signal line")
+    macd_hist: float | None = Field(default=None, description="MACD histogram")
+    macd_signal_dir: str | None = Field(default=None, description="MACD signal direction: 'bullish' or 'bearish'")
+    bb_upper: float | None = Field(default=None, description="Upper Bollinger Band")
+    bb_middle: float | None = Field(default=None, description="Middle Bollinger Band")
+    bb_lower: float | None = Field(default=None, description="Lower Bollinger Band")
+    bb_position: str | None = Field(default=None, description="Price position vs Bollinger Bands: 'above', 'upper', 'lower', or 'below'")
