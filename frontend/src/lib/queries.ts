@@ -67,6 +67,7 @@ export function usePrices(symbol: string, period?: string) {
     queryKey: keys.prices(symbol, period),
     queryFn: () => api.prices.list(symbol, period),
     enabled: !!symbol,
+    staleTime: 5 * 60 * 1000, // 5 min — daily OHLCV data, SSE handles live quotes
   })
 }
 
@@ -75,6 +76,7 @@ export function useIndicators(symbol: string, period?: string) {
     queryKey: keys.indicators(symbol, period),
     queryFn: () => api.prices.indicators(symbol, period),
     enabled: !!symbol,
+    staleTime: 5 * 60 * 1000, // 5 min — computed from daily prices
   })
 }
 
