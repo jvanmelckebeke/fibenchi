@@ -2,15 +2,13 @@ import { useEffect, useRef, useState } from "react"
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
 import { Link } from "react-router-dom"
 import { Loader2, TrendingUp, TrendingDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ChartSkeleton } from "@/components/chart-skeleton"
+import { PeriodSelector } from "@/components/period-selector"
 import { usePortfolioIndex, usePortfolioPerformers, usePrefetchAssetDetail } from "@/lib/queries"
 import { getChartTheme, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
 import type { AssetPerformance } from "@/lib/api"
-
-const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
 export function PortfolioPage() {
   const [period, setPeriod] = useState<string>("1y")
@@ -19,18 +17,8 @@ export function PortfolioPage() {
 
   return (
     <div className="p-6 space-y-8">
-      <div className="flex justify-center gap-1">
-        {PERIODS.map((p) => (
-          <Button
-            key={p}
-            variant={period === p ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setPeriod(p)}
-            className="text-xs"
-          >
-            {p}
-          </Button>
-        ))}
+      <div className="flex justify-center">
+        <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
       {isLoading ? (
