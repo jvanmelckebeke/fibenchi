@@ -2,7 +2,20 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClie
 import { useCallback } from "react"
 import { api, type Asset, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
 
-// Pseudo-ETF thesis/annotation keys are defined inline below
+function useInvalidatingMutation<TData, TVariables>(
+  mutationFn: (vars: TVariables) => Promise<TData>,
+  invalidateKeys: readonly (readonly unknown[])[],
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      for (const key of invalidateKeys) {
+        qc.invalidateQueries({ queryKey: key })
+      }
+    },
+  })
+}
 
 // Keys
 export const keys = {
@@ -71,11 +84,10 @@ export function useAssets() {
 }
 
 export function useCreateAsset() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: AssetCreate) => api.assets.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.assets }),
-  })
+  return useInvalidatingMutation(
+    (data: AssetCreate) => api.assets.create(data),
+    [keys.assets],
+  )
 }
 
 export function useDeleteAsset() {
@@ -148,14 +160,10 @@ export function useHoldingsIndicators(symbol: string, enabled: boolean) {
 }
 
 export function useRefreshPrices(symbol: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (period?: string) => api.prices.refresh(symbol, period),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.prices(symbol) })
-      qc.invalidateQueries({ queryKey: keys.indicators(symbol) })
-    },
-  })
+  return useInvalidatingMutation(
+    (period?: string) => api.prices.refresh(symbol, period),
+    [keys.prices(symbol), keys.indicators(symbol)],
+  )
 }
 
 // Prefetch — fire on hover to warm cache before navigation
@@ -175,11 +183,10 @@ export function useTags() {
 }
 
 export function useCreateTag() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: TagCreate) => api.tags.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.tags }),
-  })
+  return useInvalidatingMutation(
+    (data: TagCreate) => api.tags.create(data),
+    [keys.tags],
+  )
 }
 
 export function useAttachTag() {
@@ -246,45 +253,40 @@ export function useGroups() {
 }
 
 export function useCreateGroup() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: GroupCreate) => api.groups.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.groups }),
-  })
+  return useInvalidatingMutation(
+    (data: GroupCreate) => api.groups.create(data),
+    [keys.groups],
+  )
 }
 
 export function useUpdateGroup() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: GroupUpdate }) => api.groups.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.groups }),
-  })
+  return useInvalidatingMutation(
+    ({ id, data }: { id: number; data: GroupUpdate }) => api.groups.update(id, data),
+    [keys.groups],
+  )
 }
 
 export function useDeleteGroup() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => api.groups.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.groups }),
-  })
+  return useInvalidatingMutation(
+    (id: number) => api.groups.delete(id),
+    [keys.groups],
+  )
 }
 
 export function useAddAssetsToGroup() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ groupId, assetIds }: { groupId: number; assetIds: number[] }) =>
+  return useInvalidatingMutation(
+    ({ groupId, assetIds }: { groupId: number; assetIds: number[] }) =>
       api.groups.addAssets(groupId, assetIds),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.groups }),
-  })
+    [keys.groups],
+  )
 }
 
 export function useRemoveAssetFromGroup() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ groupId, assetId }: { groupId: number; assetId: number }) =>
+  return useInvalidatingMutation(
+    ({ groupId, assetId }: { groupId: number; assetId: number }) =>
       api.groups.removeAsset(groupId, assetId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.groups }),
-  })
+    [keys.groups],
+  )
 }
 
 // Thesis
@@ -298,11 +300,10 @@ export function useThesis(symbol: string) {
 }
 
 export function useUpdateThesis(symbol: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (content: string) => api.thesis.update(symbol, content),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.thesis(symbol) }),
-  })
+  return useInvalidatingMutation(
+    (content: string) => api.thesis.update(symbol, content),
+    [keys.thesis(symbol)],
+  )
 }
 
 // Annotations
@@ -316,19 +317,17 @@ export function useAnnotations(symbol: string) {
 }
 
 export function useCreateAnnotation(symbol: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: AnnotationCreate) => api.annotations.create(symbol, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.annotations(symbol) }),
-  })
+  return useInvalidatingMutation(
+    (data: AnnotationCreate) => api.annotations.create(symbol, data),
+    [keys.annotations(symbol)],
+  )
 }
 
 export function useDeleteAnnotation(symbol: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => api.annotations.delete(symbol, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.annotations(symbol) }),
-  })
+  return useInvalidatingMutation(
+    (id: number) => api.annotations.delete(symbol, id),
+    [keys.annotations(symbol)],
+  )
 }
 
 // Pseudo-ETFs
@@ -345,27 +344,24 @@ export function usePseudoEtf(id: number) {
 }
 
 export function useCreatePseudoEtf() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: PseudoETFCreate) => api.pseudoEtfs.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfs }),
-  })
+  return useInvalidatingMutation(
+    (data: PseudoETFCreate) => api.pseudoEtfs.create(data),
+    [keys.pseudoEtfs],
+  )
 }
 
 export function useUpdatePseudoEtf() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: PseudoETFUpdate }) => api.pseudoEtfs.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfs }),
-  })
+  return useInvalidatingMutation(
+    ({ id, data }: { id: number; data: PseudoETFUpdate }) => api.pseudoEtfs.update(id, data),
+    [keys.pseudoEtfs],
+  )
 }
 
 export function useDeletePseudoEtf() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => api.pseudoEtfs.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfs }),
-  })
+  return useInvalidatingMutation(
+    (id: number) => api.pseudoEtfs.delete(id),
+    [keys.pseudoEtfs],
+  )
 }
 
 export function useAddPseudoEtfConstituents() {
@@ -421,11 +417,10 @@ export function usePseudoEtfThesis(id: number) {
 }
 
 export function useUpdatePseudoEtfThesis(id: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (content: string) => api.pseudoEtfs.thesis.update(id, content),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfThesis(id) }),
-  })
+  return useInvalidatingMutation(
+    (content: string) => api.pseudoEtfs.thesis.update(id, content),
+    [keys.pseudoEtfThesis(id)],
+  )
 }
 
 // Pseudo-ETF Annotations
@@ -438,18 +433,16 @@ export function usePseudoEtfAnnotations(id: number) {
 }
 
 export function useCreatePseudoEtfAnnotation(id: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: AnnotationCreate) => api.pseudoEtfs.annotations.create(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfAnnotations(id) }),
-  })
+  return useInvalidatingMutation(
+    (data: AnnotationCreate) => api.pseudoEtfs.annotations.create(id, data),
+    [keys.pseudoEtfAnnotations(id)],
+  )
 }
 
 export function useDeletePseudoEtfAnnotation(id: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (annotationId: number) => api.pseudoEtfs.annotations.delete(id, annotationId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.pseudoEtfAnnotations(id) }),
-  })
+  return useInvalidatingMutation(
+    (annotationId: number) => api.pseudoEtfs.annotations.delete(id, annotationId),
+    [keys.pseudoEtfAnnotations(id)],
+  )
 }
 
