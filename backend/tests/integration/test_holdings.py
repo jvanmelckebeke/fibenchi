@@ -1,11 +1,10 @@
 """Tests for the holdings router (ETF holdings + holding indicators)."""
 
-import numpy as np
-import pandas as pd
 import pytest
 from unittest.mock import patch
 
 from app.services.indicators import bb_position
+from tests.helpers import make_price_df
 
 
 # ── Pure unit tests for bb_position ───────────────────────────────────
@@ -26,24 +25,6 @@ def test_bb_position_below():
     assert bb_position(close=90, upper=105, middle=100, lower=95) == "below"
 
 
-# ── Helpers ───────────────────────────────────────────────────────────
-
-def _make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:
-    """Generate synthetic price data for testing."""
-    np.random.seed(42)
-    dates = pd.date_range("2024-01-01", periods=n, freq="B")
-    returns = np.random.normal(0.001, 0.02, n)
-    prices = start_price * np.cumprod(1 + returns)
-
-    return pd.DataFrame({
-        "open": prices * (1 - np.random.uniform(0, 0.01, n)),
-        "high": prices * (1 + np.random.uniform(0, 0.02, n)),
-        "low": prices * (1 - np.random.uniform(0, 0.02, n)),
-        "close": prices,
-        "volume": np.random.randint(1_000_000, 10_000_000, n),
-    }, index=dates)
-
-
 _MOCK_HOLDINGS = {
     "top_holdings": [
         {"symbol": "AAPL", "name": "Apple Inc.", "percent": 7.0},
@@ -62,8 +43,8 @@ async def test_holdings_indicators_success(client):
     await client.post("/api/assets", json={"symbol": "SPY", "name": "SPDR S&P 500", "type": "etf"})
 
     histories = {
-        "AAPL": _make_price_df(100, 180.0),
-        "MSFT": _make_price_df(100, 400.0),
+        "AAPL": make_price_df(100, 180.0),
+        "MSFT": make_price_df(100, 400.0),
     }
 
     with (

@@ -1,12 +1,9 @@
 import pytest
 
+from tests.helpers import create_asset_via_api
+
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-async def _create_asset(client, symbol, name):
-    resp = await client.post("/api/assets", json={"symbol": symbol, "name": name})
-    return resp.json()
 
 
 async def test_create_tag(client):
@@ -51,7 +48,7 @@ async def test_duplicate_tag_name(client):
 
 
 async def test_attach_tag_to_asset(client):
-    asset = await _create_asset(client, "AAPL", "Apple")
+    asset = await create_asset_via_api(client, "AAPL", "Apple")
     tag_resp = await client.post("/api/tags", json={"name": "tech"})
     tid = tag_resp.json()["id"]
 
@@ -63,7 +60,7 @@ async def test_attach_tag_to_asset(client):
 
 
 async def test_detach_tag_from_asset(client):
-    asset = await _create_asset(client, "AAPL", "Apple")
+    asset = await create_asset_via_api(client, "AAPL", "Apple")
     t1 = (await client.post("/api/tags", json={"name": "tech"})).json()
     t2 = (await client.post("/api/tags", json={"name": "growth"})).json()
 
@@ -78,7 +75,7 @@ async def test_detach_tag_from_asset(client):
 
 
 async def test_tags_appear_in_asset_response(client):
-    asset = await _create_asset(client, "AAPL", "Apple")
+    asset = await create_asset_via_api(client, "AAPL", "Apple")
     tag_resp = await client.post("/api/tags", json={"name": "tech"})
     tid = tag_resp.json()["id"]
 
@@ -108,7 +105,7 @@ async def test_attach_tag_nonexistent_asset(client):
 
 
 async def test_attach_nonexistent_tag_to_asset(client):
-    await _create_asset(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     resp = await client.post("/api/assets/AAPL/tags/999")
     assert resp.status_code == 404
 
@@ -119,7 +116,7 @@ async def test_detach_tag_nonexistent_asset(client):
 
 
 async def test_attach_tag_idempotent(client):
-    await _create_asset(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     tag = (await client.post("/api/tags", json={"name": "tech"})).json()
 
     await client.post(f"/api/assets/AAPL/tags/{tag['id']}")
@@ -135,7 +132,7 @@ async def test_create_tag_default_color(client):
 
 
 async def test_delete_tag_cleans_asset_association(client):
-    await _create_asset(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     tag = (await client.post("/api/tags", json={"name": "tech"})).json()
     await client.post(f"/api/assets/AAPL/tags/{tag['id']}")
 
@@ -149,7 +146,7 @@ async def test_delete_tag_cleans_asset_association(client):
 async def test_list_tags_with_assets(client):
     """Regression: listing tags that have assets must serialize the nested
     Asset→tags relationship without MissingGreenlet errors."""
-    await _create_asset(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     t1 = (await client.post("/api/tags", json={"name": "tech"})).json()
     t2 = (await client.post("/api/tags", json={"name": "growth"})).json()
     await client.post(f"/api/assets/AAPL/tags/{t1['id']}")
@@ -166,7 +163,7 @@ async def test_list_tags_with_assets(client):
 
 
 async def test_attach_tag_case_insensitive_symbol(client):
-    await _create_asset(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     tag = (await client.post("/api/tags", json={"name": "tech"})).json()
 
     resp = await client.post(f"/api/assets/aapl/tags/{tag['id']}")
