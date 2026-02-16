@@ -1,5 +1,4 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { useIndicators } from "@/lib/queries"
 
 function getMarkerColor(rsi: number): string {
   if (rsi <= 20) return "rgb(239, 68, 68)"       // red-500
@@ -25,19 +24,12 @@ function getZoneLabel(rsi: number): string {
   return ""
 }
 
-export function RsiGauge({ symbol, batchRsi }: { symbol: string; batchRsi?: number | null }) {
-  // Use batch data when available, fall back to individual fetch (asset detail page)
-  const { data: indicators, isLoading } = useIndicators(symbol, undefined, { enabled: batchRsi === undefined })
-
-  const latestRsi = batchRsi !== undefined
-    ? batchRsi
-    : indicators?.slice().reverse().find((i) => i.rsi !== null)?.rsi
-
-  if (batchRsi === undefined && isLoading) {
+export function RsiGauge({ batchRsi }: { symbol: string; batchRsi?: number | null }) {
+  if (batchRsi === undefined) {
     return <Skeleton className="h-5 w-full rounded-full" />
   }
 
-  if (latestRsi == null) {
+  if (batchRsi == null) {
     return (
       <div className="flex items-center justify-center h-5 rounded-full bg-muted text-[10px] text-muted-foreground">
         No RSI
@@ -45,7 +37,7 @@ export function RsiGauge({ symbol, batchRsi }: { symbol: string; batchRsi?: numb
     )
   }
 
-  const pct = Math.max(0, Math.min(100, latestRsi))
+  const pct = Math.max(0, Math.min(100, batchRsi))
   const markerColor = getMarkerColor(pct)
   const textClass = getTextClass(pct)
   const label = getZoneLabel(pct)
