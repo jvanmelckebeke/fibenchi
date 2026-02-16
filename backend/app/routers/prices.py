@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.database import get_db
 from app.models import Asset, PriceHistory
 from app.routers.deps import find_asset, get_asset
@@ -16,18 +17,10 @@ import pandas as pd
 
 router = APIRouter(prefix="/api/assets/{symbol}", tags=["prices"])
 
-# Calendar days for each period string
-_PERIOD_DAYS = {
-    "1mo": 30, "3mo": 90, "6mo": 180,
-    "1y": 365, "2y": 730, "5y": 1825,
-}
-# Extra calendar days to fetch for indicator warmup (~50 trading days for SMA50)
-_WARMUP_DAYS = 80
-
 
 def _display_start(period: str) -> date:
     """Return the earliest date to include in the response for a given period."""
-    days = _PERIOD_DAYS.get(period, 90)
+    days = PERIOD_DAYS.get(period, 90)
     return date.today() - timedelta(days=days)
 
 
@@ -36,9 +29,9 @@ def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd.DataF
 
     Used for non-watchlisted symbols viewed via ETF holdings links.
     """
-    days = _PERIOD_DAYS.get(period, 90)
+    days = PERIOD_DAYS.get(period, 90)
     if warmup:
-        days += _WARMUP_DAYS
+        days += WARMUP_DAYS
     start_date = date.today() - timedelta(days=days)
     try:
         df = fetch_history(symbol.upper(), start=start_date, end=date.today())
@@ -136,7 +129,7 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
 
     if asset:
         prices = await _ensure_prices(db, asset, period)
-        warmup_start = start - timedelta(days=_WARMUP_DAYS)
+        warmup_start = start - timedelta(days=WARMUP_DAYS)
 
         # If DB doesn't have enough warmup data, fetch extra from Yahoo
         if prices and prices[0].date > warmup_start:

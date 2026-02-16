@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import PERIOD_DAYS
 from app.database import get_db
 from app.models import Asset, PriceHistory
 from app.services.pseudo_etf import calculate_performance
@@ -14,11 +15,6 @@ from app.services.pseudo_etf import calculate_performance
 _MIN_ENTRY_PRICE = 10.0
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
-
-_PERIOD_DAYS = {
-    "1mo": 30, "3mo": 90, "6mo": 180,
-    "1y": 365, "2y": 730, "5y": 1825,
-}
 
 
 class PortfolioIndexResponse(BaseModel):
@@ -46,7 +42,7 @@ async def _get_watchlisted_ids(db: AsyncSession) -> list[int]:
 @router.get("/index", response_model=PortfolioIndexResponse, summary="Get composite portfolio index")
 async def get_portfolio_index(period: str = "1y", db: AsyncSession = Depends(get_db)):
     """Compute equal-weight composite index of all watchlisted assets."""
-    days = _PERIOD_DAYS.get(period, 365)
+    days = PERIOD_DAYS.get(period, 365)
     start_date = date.today() - timedelta(days=days)
 
     asset_ids = await _get_watchlisted_ids(db)
@@ -85,7 +81,7 @@ async def get_portfolio_index(period: str = "1y", db: AsyncSession = Depends(get
 @router.get("/performers", response_model=list[AssetPerformance], summary="Get top and bottom performers by return")
 async def get_performers(period: str = "1y", db: AsyncSession = Depends(get_db)):
     """Return watchlisted assets ranked by period return (best first)."""
-    days = _PERIOD_DAYS.get(period, 365)
+    days = PERIOD_DAYS.get(period, 365)
     start_date = date.today() - timedelta(days=days)
 
     result = await db.execute(

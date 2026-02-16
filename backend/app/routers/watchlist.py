@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import pandas as pd
 
+from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.database import get_db
 from app.models import Asset, PriceHistory
 from app.services.indicators import compute_indicators
@@ -23,12 +24,6 @@ router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 # Key: (frozenset of symbols, latest_price_date) — auto-invalidates when prices change.
 _indicator_cache: dict[tuple, tuple[dict, float]] = {}
 _INDICATOR_CACHE_TTL = 600  # 10 minutes
-
-_PERIOD_DAYS = {
-    "1mo": 30, "3mo": 90, "6mo": 180,
-    "1y": 365, "2y": 730, "5y": 1825,
-}
-_WARMUP_DAYS = 80
 
 
 @router.get("/sparklines", summary="Batch close prices for sparkline charts")
@@ -44,7 +39,7 @@ async def batch_sparklines(
 
     This endpoint replaces per-card price fetches on the watchlist page.
     """
-    days = _PERIOD_DAYS.get(period, 90)
+    days = PERIOD_DAYS.get(period, 90)
     start = date.today() - timedelta(days=days)
 
     assets_result = await db.execute(
@@ -123,7 +118,7 @@ async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
         return cached[0]
 
     # Fetch enough history for indicator warmup (SMA50 needs ~50 trading days)
-    warmup_start = date.today() - timedelta(days=_PERIOD_DAYS["3mo"] + _WARMUP_DAYS)
+    warmup_start = date.today() - timedelta(days=PERIOD_DAYS["3mo"] + WARMUP_DAYS)
 
     prices_result = await db.execute(
         select(PriceHistory)
