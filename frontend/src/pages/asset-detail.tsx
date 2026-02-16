@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Loader2, RefreshCw, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PriceChart } from "@/components/price-chart"
+import { ChartSkeleton } from "@/components/chart-skeleton"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
@@ -193,12 +194,7 @@ function ChartSection({
   const { data: annotations } = useAnnotations(symbol)
 
   if (pricesLoading || indicatorsLoading) {
-    return (
-      <div className="h-[520px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
-        <span className="text-sm">Loading chart...</span>
-      </div>
-    )
+    return <ChartSkeleton height={520} />
   }
 
   if (!prices?.length) {

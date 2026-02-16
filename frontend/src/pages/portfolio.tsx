@@ -5,6 +5,7 @@ import { Loader2, TrendingUp, TrendingDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { ChartSkeleton } from "@/components/chart-skeleton"
 import { usePortfolioIndex, usePortfolioPerformers, usePrefetchAssetDetail } from "@/lib/queries"
 import { getChartTheme, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
 import type { AssetPerformance } from "@/lib/api"
@@ -33,10 +34,7 @@ export function PortfolioPage() {
       </div>
 
       {isLoading ? (
-        <div className="h-[480px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span className="text-sm">Loading portfolio...</span>
-        </div>
+        <ChartSkeleton height={480} />
       ) : !data || !data.dates.length ? (
         <div className="h-[480px] flex items-center justify-center text-muted-foreground">
           No data yet. Add assets to your watchlist and refresh prices.

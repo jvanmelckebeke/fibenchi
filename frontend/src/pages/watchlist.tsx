@@ -3,6 +3,13 @@ import { Link } from "react-router-dom"
 import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, MoreVertical, Plus, Table, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -43,6 +50,7 @@ export function WatchlistPage() {
   const createAsset = useCreateAsset()
   const deleteAsset = useDeleteAsset()
   const [symbol, setSymbol] = useState("")
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
@@ -88,7 +96,15 @@ export function WatchlistPage() {
   const handleAdd = () => {
     const s = symbol.trim().toUpperCase()
     if (!s) return
-    createAsset.mutate({ symbol: s }, { onSuccess: () => setSymbol("") })
+    createAsset.mutate(
+      { symbol: s },
+      {
+        onSuccess: () => {
+          setSymbol("")
+          setDialogOpen(false)
+        },
+      },
+    )
   }
 
   return (
@@ -177,18 +193,36 @@ export function WatchlistPage() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Add symbol (e.g. AAPL)"
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            className="w-48"
-          />
-          <Button onClick={handleAdd} disabled={createAsset.isPending} size="icon">
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); createAsset.reset() } }}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Add Symbol
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Symbol</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input
+                placeholder="Enter symbol (e.g. AAPL)"
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                autoFocus
+              />
+              {createAsset.isError && (
+                <p className="text-sm text-destructive">{createAsset.error.message}</p>
+              )}
+              <div className="flex justify-end">
+                <Button onClick={handleAdd} disabled={createAsset.isPending || !symbol.trim()}>
+                  {createAsset.isPending ? "Adding…" : "Add"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {allTags && allTags.length > 0 && (
@@ -211,10 +245,6 @@ export function WatchlistPage() {
             </button>
           )}
         </div>
-      )}
-
-      {createAsset.isError && (
-        <p className="text-sm text-destructive">{createAsset.error.message}</p>
       )}
 
       {isLoading && <p className="text-muted-foreground">Loading...</p>}
