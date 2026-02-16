@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { ArrowDownAZ, ArrowUpAZ, MoreVertical, Plus, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } fro
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings, type AssetTypeFilter, type WatchlistSortBy, type SortDir } from "@/lib/settings"
+import { useFilteredSortedAssets } from "@/lib/use-watchlist-filter"
 
 const SORT_OPTIONS: [WatchlistSortBy, string][] = [
   ["name", "Name"],
@@ -52,70 +53,14 @@ export function WatchlistPage() {
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
   const quotes = useQuotes()
 
-  const assets = useMemo(() => {
-    if (!watchlisted) return undefined
-
-    // Filter by type
-    let filtered = watchlisted
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((a) => a.type === typeFilter)
-    }
-    // Filter by tags
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter((a) =>
-        a.tags.some((t) => selectedTags.includes(t.id))
-      )
-    }
-
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let cmp = 0
-      switch (sortBy) {
-        case "name":
-          cmp = a.symbol.localeCompare(b.symbol)
-          break
-        case "price": {
-          const pa = quotes[a.symbol]?.price ?? null
-          const pb = quotes[b.symbol]?.price ?? null
-          if (pa == null && pb == null) cmp = 0
-          else if (pa == null) cmp = 1
-          else if (pb == null) cmp = -1
-          else cmp = pa - pb
-          break
-        }
-        case "change_pct": {
-          const ca = quotes[a.symbol]?.change_percent ?? null
-          const cb = quotes[b.symbol]?.change_percent ?? null
-          if (ca == null && cb == null) cmp = 0
-          else if (ca == null) cmp = 1
-          else if (cb == null) cmp = -1
-          else cmp = ca - cb
-          break
-        }
-        case "rsi": {
-          const ra = batchIndicators?.[a.symbol]?.rsi ?? null
-          const rb = batchIndicators?.[b.symbol]?.rsi ?? null
-          if (ra == null && rb == null) cmp = 0
-          else if (ra == null) cmp = 1
-          else if (rb == null) cmp = -1
-          else cmp = ra - rb
-          break
-        }
-        case "macd_hist": {
-          const ma = batchIndicators?.[a.symbol]?.macd_hist ?? null
-          const mb = batchIndicators?.[b.symbol]?.macd_hist ?? null
-          if (ma == null && mb == null) cmp = 0
-          else if (ma == null) cmp = 1
-          else if (mb == null) cmp = -1
-          else cmp = ma - mb
-          break
-        }
-      }
-      return sortDir === "asc" ? cmp : -cmp
-    })
-
-    return sorted
-  }, [watchlisted, typeFilter, selectedTags, sortBy, sortDir, quotes, batchIndicators])
+  const assets = useFilteredSortedAssets(watchlisted, {
+    typeFilter,
+    selectedTags,
+    sortBy,
+    sortDir,
+    quotes,
+    indicators: batchIndicators,
+  })
 
   const setTypeFilter = (v: AssetTypeFilter) =>
     updateSettings({ watchlist_type_filter: v })
