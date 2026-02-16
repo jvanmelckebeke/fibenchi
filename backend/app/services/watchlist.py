@@ -1,6 +1,5 @@
 """Batch indicator computation for the watchlist page."""
 
-import time
 from datetime import date, timedelta
 
 from sqlalchemy import select, func
@@ -11,11 +10,11 @@ import pandas as pd
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import Asset, PriceHistory
 from app.services.indicators import compute_indicators
+from app.utils import TTLCache
 
 # In-memory cache for batch indicator snapshots.
 # Key: (frozenset of symbols, latest_price_date) — auto-invalidates when prices change.
-_indicator_cache: dict[tuple, tuple[dict, float]] = {}
-_INDICATOR_CACHE_TTL = 600  # 10 minutes
+_indicator_cache: TTLCache = TTLCache(default_ttl=600)
 
 
 async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
@@ -40,9 +39,9 @@ async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
     latest_date = latest_date_result.scalar()
     cache_key = (frozenset(id_to_symbol.values()), latest_date)
 
-    cached = _indicator_cache.get(cache_key)
-    if cached and time.monotonic() - cached[1] < _INDICATOR_CACHE_TTL:
-        return cached[0]
+    cached = _indicator_cache.get_value(cache_key)
+    if cached is not None:
+        return cached
 
     # Fetch enough history for indicator warmup (SMA50 needs ~50 trading days)
     warmup_start = date.today() - timedelta(days=PERIOD_DAYS["3mo"] + WARMUP_DAYS)
@@ -101,6 +100,6 @@ async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
 
     # Store in cache (single-entry — only latest key matters)
     _indicator_cache.clear()
-    _indicator_cache[cache_key] = (out, time.monotonic())
+    _indicator_cache.set_value(cache_key, out)
 
     return out
