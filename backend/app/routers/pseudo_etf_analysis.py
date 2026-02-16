@@ -5,8 +5,7 @@ from app.database import get_db
 from app.routers.deps import get_pseudo_etf
 from app.schemas.pseudo_etf import PerformanceBreakdownPoint, ConstituentIndicatorResponse
 from app.services.pseudo_etf import calculate_performance
-from app.services.indicators import compute_indicators, build_indicator_snapshot
-from app.services.yahoo import batch_fetch_currencies, batch_fetch_history
+from app.services.indicators import compute_batch_indicator_snapshots
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
 
@@ -48,29 +47,12 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
     symbols = [a.symbol for a in etf.constituents]
     symbol_to_name = {a.symbol: a.name for a in etf.constituents}
 
-    histories = batch_fetch_history(symbols, period="3mo")
-    currencies = batch_fetch_currencies(symbols)
-
-    results = []
-    for sym in symbols:
-        currency = currencies.get(sym, "USD")
-        df = histories.get(sym)
-        if df is None or df.empty or len(df) < 2:
-            results.append(ConstituentIndicatorResponse(
-                symbol=sym,
-                name=symbol_to_name.get(sym),
-                currency=currency,
-                weight_pct=weight_map.get(sym),
-            ))
-            continue
-
-        snapshot = build_indicator_snapshot(compute_indicators(df))
-        results.append(ConstituentIndicatorResponse(
-            symbol=sym,
-            name=symbol_to_name.get(sym),
-            currency=currency,
-            weight_pct=weight_map.get(sym),
-            **snapshot,
-        ))
-
-    return results
+    snapshots = compute_batch_indicator_snapshots(symbols)
+    return [
+        ConstituentIndicatorResponse(
+            **s,
+            name=symbol_to_name.get(s["symbol"]),
+            weight_pct=weight_map.get(s["symbol"]),
+        )
+        for s in snapshots
+    ]

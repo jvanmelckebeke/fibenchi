@@ -68,7 +68,8 @@ async def test_holdings_indicators_success(client):
 
     with (
         patch("app.routers.holdings.fetch_etf_holdings", return_value=_MOCK_HOLDINGS),
-        patch("app.routers.holdings.batch_fetch_history", return_value=histories),
+        patch("app.services.indicators.batch_fetch_history", return_value=histories),
+        patch("app.services.indicators.batch_fetch_currencies", return_value={"AAPL": "USD", "MSFT": "USD"}),
     ):
         resp = await client.get("/api/assets/SPY/holdings/indicators")
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from app.services.yahoo import batch_fetch_currencies, batch_fetch_history
+
 
 def safe_round(value, decimals: int = 2) -> float | None:
     """Round a value if it is not NaN/None, otherwise return None."""
@@ -126,3 +128,34 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     result["macd_hist"] = macd_data["histogram"]
 
     return result
+
+
+def compute_batch_indicator_snapshots(
+    symbols: list[str],
+) -> list[dict]:
+    """Compute indicator snapshots for multiple symbols in batch.
+
+    Fetches ~3 months of history and currencies via Yahoo Finance, then
+    computes indicators and builds snapshots for each symbol.
+
+    Returns a list of dicts (one per symbol) with keys:
+    symbol, currency, and all build_indicator_snapshot fields.
+    """
+    if not symbols:
+        return []
+
+    histories = batch_fetch_history(symbols, period="3mo")
+    currencies = batch_fetch_currencies(symbols)
+
+    results = []
+    for sym in symbols:
+        currency = currencies.get(sym, "USD")
+        df = histories.get(sym)
+        if df is None or df.empty or len(df) < 2:
+            results.append({"symbol": sym, "currency": currency})
+            continue
+
+        snapshot = build_indicator_snapshot(compute_indicators(df))
+        results.append({"symbol": sym, "currency": currency, **snapshot})
+
+    return results
