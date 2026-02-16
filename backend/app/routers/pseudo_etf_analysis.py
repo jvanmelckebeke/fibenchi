@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.pseudo_etf import PseudoETF
+from app.routers.deps import get_pseudo_etf
 from app.schemas.pseudo_etf import PerformanceBreakdownPoint, ConstituentIndicatorResponse
 from app.services.pseudo_etf import calculate_performance
 from app.services.indicators import compute_indicators, build_indicator_snapshot
@@ -13,9 +13,7 @@ router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
 
 @router.get("/{etf_id}/performance", response_model=list[PerformanceBreakdownPoint], summary="Get indexed performance with per-constituent breakdown")
 async def get_performance(etf_id: int, db: AsyncSession = Depends(get_db)):
-    etf = await db.get(PseudoETF, etf_id)
-    if not etf:
-        raise HTTPException(404, "Pseudo-ETF not found")
+    etf = await get_pseudo_etf(etf_id, db)
 
     asset_ids = [a.id for a in etf.constituents]
     if not asset_ids:
@@ -29,9 +27,7 @@ async def get_performance(etf_id: int, db: AsyncSession = Depends(get_db)):
 @router.get("/{etf_id}/constituents/indicators", response_model=list[ConstituentIndicatorResponse], summary="Get technical indicators for each constituent")
 async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get_db)):
     """Return latest indicator snapshot for each constituent of a pseudo-ETF."""
-    etf = await db.get(PseudoETF, etf_id)
-    if not etf:
-        raise HTTPException(404, "Pseudo-ETF not found")
+    etf = await get_pseudo_etf(etf_id, db)
 
     if not etf.constituents:
         return []

@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import Asset, Tag
+from app.routers.deps import get_asset
 from app.schemas.asset import TagBrief
 from app.schemas.tag import TagCreate, TagResponse, TagUpdate
 
@@ -64,10 +65,7 @@ async def delete_tag(tag_id: int, db: AsyncSession = Depends(get_db)):
 
 @asset_tag_router.post("/{symbol}/tags/{tag_id}", response_model=list[TagBrief], summary="Attach a tag to an asset")
 async def attach_tag(symbol: str, tag_id: int, db: AsyncSession = Depends(get_db)):
-    asset_result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
-    asset = asset_result.scalar_one_or_none()
-    if not asset:
-        raise HTTPException(404, "Asset not found")
+    asset = await get_asset(symbol, db)
 
     tag_result = await db.execute(select(Tag).where(Tag.id == tag_id))
     tag = tag_result.scalar_one_or_none()
@@ -84,10 +82,7 @@ async def attach_tag(symbol: str, tag_id: int, db: AsyncSession = Depends(get_db
 
 @asset_tag_router.delete("/{symbol}/tags/{tag_id}", response_model=list[TagBrief], summary="Detach a tag from an asset")
 async def detach_tag(symbol: str, tag_id: int, db: AsyncSession = Depends(get_db)):
-    asset_result = await db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
-    asset = asset_result.scalar_one_or_none()
-    if not asset:
-        raise HTTPException(404, "Asset not found")
+    asset = await get_asset(symbol, db)
 
     asset.tags = [t for t in asset.tags if t.id != tag_id]
     await db.commit()
