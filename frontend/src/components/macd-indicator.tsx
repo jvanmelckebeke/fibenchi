@@ -2,9 +2,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { IndicatorSummary } from "@/lib/api"
 import { useSettings } from "@/lib/settings"
 
-type MacdProps = { macd: number; sig: number; hist: number }
+type MacdProps = { macd: number; sig: number; hist: number; lg: boolean }
 
-function ClassicMacd({ macd, sig, hist }: MacdProps) {
+function ClassicMacd({ macd, sig, hist, lg }: MacdProps) {
   const histPositive = hist >= 0
   const bullish = macd > sig
   const barPct = 25
@@ -12,9 +12,10 @@ function ClassicMacd({ macd, sig, hist }: MacdProps) {
   const histColor = histPositive ? "bg-emerald-500/30" : "bg-red-500/30"
   const macdTextColor = bullish ? "text-emerald-400" : "text-red-400"
   const histTextColor = histPositive ? "text-emerald-400" : "text-red-400"
+  const textSize = lg ? "text-sm" : "text-[10px]"
 
   return (
-    <div className="relative h-5 w-full rounded-full bg-muted overflow-hidden flex items-center px-2">
+    <div className={`relative ${lg ? "h-10" : "h-5"} w-full rounded-full bg-muted overflow-hidden flex items-center ${lg ? "px-3" : "px-2"}`}>
       <div className="absolute left-1/2 top-0 h-full w-px bg-border" />
       <div
         className={`absolute top-0 h-full ${histColor}`}
@@ -23,20 +24,20 @@ function ClassicMacd({ macd, sig, hist }: MacdProps) {
           width: `${barPct}%`,
         }}
       />
-      <span className={`relative z-10 text-[10px] font-medium tabular-nums ${macdTextColor}`}>
+      <span className={`relative z-10 ${textSize} font-medium tabular-nums ${macdTextColor}`}>
         M {macd.toFixed(2)}
       </span>
-      <span className="relative z-10 text-[10px] tabular-nums text-muted-foreground ml-1.5">
+      <span className={`relative z-10 ${textSize} tabular-nums text-muted-foreground ml-1.5`}>
         S {sig.toFixed(2)}
       </span>
-      <span className={`relative z-10 text-[10px] font-medium tabular-nums ml-auto ${histTextColor}`}>
+      <span className={`relative z-10 ${textSize} font-medium tabular-nums ml-auto ${histTextColor}`}>
         H {histPositive ? "+" : ""}{hist.toFixed(2)}
       </span>
     </div>
   )
 }
 
-function DivergenceMacd({ macd, sig, hist }: MacdProps) {
+function DivergenceMacd({ macd, sig, hist, lg }: MacdProps) {
   const histPositive = hist >= 0
   const bullish = macd > sig
   const barPct = 25
@@ -45,12 +46,14 @@ function DivergenceMacd({ macd, sig, hist }: MacdProps) {
   const trendColor = bullish ? "text-emerald-400" : "text-red-400"
   const dotFill = bullish ? "bg-emerald-400" : "bg-red-400"
   const histTextColor = histPositive ? "text-emerald-400" : "text-red-400"
+  const textSize = lg ? "text-sm" : "text-[10px]"
 
   const strength = Math.abs(hist)
   const dots = strength > 0.5 ? 3 : strength > 0.15 ? 2 : 1
+  const dotSize = lg ? "h-1.5 w-1.5" : "h-1 w-1"
 
   return (
-    <div className="relative h-5 w-full rounded-full bg-muted overflow-hidden flex items-center px-2">
+    <div className={`relative ${lg ? "h-10" : "h-5"} w-full rounded-full bg-muted overflow-hidden flex items-center ${lg ? "px-3" : "px-2"}`}>
       <div className="absolute left-1/2 top-0 h-full w-px bg-border" />
       <div
         className={`absolute top-0 h-full ${barColor}`}
@@ -59,18 +62,18 @@ function DivergenceMacd({ macd, sig, hist }: MacdProps) {
           width: `${barPct}%`,
         }}
       />
-      <span className={`relative z-10 text-[10px] font-medium tabular-nums ${trendColor}`}>
+      <span className={`relative z-10 ${textSize} font-medium tabular-nums ${trendColor}`}>
         {bullish ? "\u25B2" : "\u25BC"} {macd.toFixed(2)}
       </span>
-      <span className="relative z-10 flex items-center gap-0.5 ml-1.5">
+      <span className={`relative z-10 flex items-center ${lg ? "gap-1" : "gap-0.5"} ml-1.5`}>
         {Array.from({ length: dots }).map((_, i) => (
-          <span key={i} className={`inline-block h-1 w-1 rounded-full ${dotFill}`} />
+          <span key={i} className={`inline-block ${dotSize} rounded-full ${dotFill}`} />
         ))}
         {Array.from({ length: 3 - dots }).map((_, i) => (
-          <span key={i} className="inline-block h-1 w-1 rounded-full bg-muted-foreground/20" />
+          <span key={i} className={`inline-block ${dotSize} rounded-full bg-muted-foreground/20`} />
         ))}
       </span>
-      <span className={`relative z-10 text-[10px] font-medium tabular-nums ml-auto ${histTextColor}`}>
+      <span className={`relative z-10 ${textSize} font-medium tabular-nums ml-auto ${histTextColor}`}>
         {histPositive ? "+" : ""}{hist.toFixed(2)}
       </span>
     </div>
@@ -79,19 +82,22 @@ function DivergenceMacd({ macd, sig, hist }: MacdProps) {
 
 export function MacdIndicator({
   batchMacd,
+  size = "sm",
 }: {
   symbol: string
   batchMacd?: Pick<IndicatorSummary, "macd" | "macd_signal" | "macd_hist"> | null
+  size?: "sm" | "lg"
 }) {
   const { settings } = useSettings()
+  const lg = size === "lg"
 
   if (batchMacd === undefined) {
-    return <Skeleton className="h-5 w-full rounded-full" />
+    return <Skeleton className={`${lg ? "h-10" : "h-5"} w-full rounded-full`} />
   }
 
   if (batchMacd?.macd == null || batchMacd?.macd_signal == null || batchMacd?.macd_hist == null) {
     return (
-      <div className="flex items-center justify-center h-5 rounded-full bg-muted text-[10px] text-muted-foreground">
+      <div className={`flex items-center justify-center ${lg ? "h-10 text-sm" : "h-5 text-[10px]"} rounded-full bg-muted text-muted-foreground`}>
         No MACD
       </div>
     )
@@ -101,6 +107,7 @@ export function MacdIndicator({
     macd: batchMacd.macd,
     sig: batchMacd.macd_signal,
     hist: batchMacd.macd_hist,
+    lg,
   }
 
   return settings.watchlist_macd_style === "classic"
