@@ -28,6 +28,11 @@ class IndicatorResponse(BaseModel):
     macd_hist: float | None = Field(default=None, description="MACD histogram (MACD minus signal)")
 
 
+class AssetDetailResponse(BaseModel):
+    prices: list[PriceResponse] = Field(description="OHLCV price history for the requested period")
+    indicators: list[IndicatorResponse] = Field(description="Technical indicators for the requested period")
+
+
 class HoldingResponse(BaseModel):
     symbol: str = Field(description="Holding ticker symbol")
     name: str = Field(description="Holding company name")

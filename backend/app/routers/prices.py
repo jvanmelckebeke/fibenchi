@@ -1,4 +1,3 @@
-import asyncio
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,7 +10,7 @@ from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.database import get_db
 from app.models import Asset, PriceHistory
 from app.routers.deps import find_asset, get_asset
-from app.schemas.price import IndicatorResponse, PriceResponse
+from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
 from app.services.indicators import compute_indicators, safe_round
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
 from app.services.yahoo import fetch_history  # async via @async_threadable
@@ -21,15 +20,6 @@ router = APIRouter(prefix="/api/assets/{symbol}", tags=["prices"])
 
 # In-memory indicator cache: keyed by "SYMBOL:period:last_price_date"
 _indicator_cache: TTLCache = TTLCache(default_ttl=300, max_size=200)
-
-# Per-symbol locks to prevent duplicate Yahoo fetches from concurrent requests
-_sync_locks: dict[str, asyncio.Lock] = {}
-
-
-def _get_sync_lock(symbol: str) -> asyncio.Lock:
-    if symbol not in _sync_locks:
-        _sync_locks[symbol] = asyncio.Lock()
-    return _sync_locks[symbol]
 
 
 def _display_start(period: str) -> date:
@@ -63,12 +53,24 @@ async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd
 
 
 async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[PriceHistory]:
-    """Load all prices from DB, fetching from Yahoo if the requested period isn't covered.
+    """Load all prices from DB, fetching from Yahoo if the requested period isn't covered."""
+    result = await db.execute(
+        select(PriceHistory)
+        .where(PriceHistory.asset_id == asset.id)
+        .order_by(PriceHistory.date)
+    )
+    prices = result.scalars().all()
 
-    Uses a per-symbol lock to prevent duplicate Yahoo fetches when the frontend
-    fires /prices and /indicators in parallel.
-    """
-    async with _get_sync_lock(asset.symbol):
+    needed_start = _display_start(period)
+
+    if not prices:
+        count = await sync_asset_prices(db, asset, period=period)
+        if count == 0:
+            raise HTTPException(404, f"No price data available for {asset.symbol}")
+    elif prices[0].date > needed_start:
+        await sync_asset_prices_range(db, asset, needed_start, date.today())
+
+    if not prices or prices[0].date > needed_start:
         result = await db.execute(
             select(PriceHistory)
             .where(PriceHistory.asset_id == asset.id)
@@ -76,25 +78,7 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
         )
         prices = result.scalars().all()
 
-        needed_start = _display_start(period)
-
-        if not prices:
-            count = await sync_asset_prices(db, asset, period=period)
-            if count == 0:
-                raise HTTPException(404, f"No price data available for {asset.symbol}")
-        elif prices[0].date > needed_start:
-            # DB has data but doesn't go back far enough for the requested period
-            await sync_asset_prices_range(db, asset, needed_start, date.today())
-
-        if not prices or prices[0].date > needed_start:
-            result = await db.execute(
-                select(PriceHistory)
-                .where(PriceHistory.asset_id == asset.id)
-                .order_by(PriceHistory.date)
-            )
-            prices = result.scalars().all()
-
-        return prices
+    return prices
 
 
 @router.get("/prices", response_model=list[PriceResponse], summary="Get OHLCV price history")
@@ -207,6 +191,77 @@ async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = De
         _indicator_cache.set_value(cache_key, rows)
 
     return rows
+
+
+@router.get("/detail", response_model=AssetDetailResponse, summary="Get prices and indicators in one call")
+async def get_detail(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
+    """Return both OHLCV prices and technical indicators for a symbol in a single request.
+
+    Avoids the need for parallel `/prices` + `/indicators` calls from the frontend,
+    sharing the data-loading step.
+
+    Supported periods: `1mo`, `3mo` (default), `6mo`, `1y`, `2y`, `5y`.
+    """
+    asset = await find_asset(symbol, db)
+    start = _display_start(period)
+
+    if asset:
+        prices = await _ensure_prices(db, asset, period)
+        price_rows = [p for p in prices if p.date >= start]
+
+        last_date = prices[-1].date if prices else None
+        cache_key = f"{symbol}:{period}:{last_date}"
+        cached = _indicator_cache.get_value(cache_key)
+        if cached is not None:
+            return AssetDetailResponse(prices=price_rows, indicators=cached)
+
+        warmup_start = start - timedelta(days=WARMUP_DAYS)
+        if prices and prices[0].date > warmup_start:
+            await sync_asset_prices_range(db, asset, warmup_start, date.today())
+            result = await db.execute(
+                select(PriceHistory)
+                .where(PriceHistory.asset_id == asset.id)
+                .order_by(PriceHistory.date)
+            )
+            prices = result.scalars().all()
+
+        df = pd.DataFrame([{
+            "date": p.date, "open": float(p.open), "high": float(p.high),
+            "low": float(p.low), "close": float(p.close), "volume": p.volume,
+        } for p in prices]).set_index("date")
+    else:
+        cache_key = None
+        df = await _fetch_ephemeral(symbol, period, warmup=True)
+        price_rows = []
+        for dt, row in df.iterrows():
+            if dt < start:
+                continue
+            price_rows.append(PriceResponse(
+                date=dt,
+                open=round(float(row["open"]), 4), high=round(float(row["high"]), 4),
+                low=round(float(row["low"]), 4), close=round(float(row["close"]), 4),
+                volume=int(row["volume"]),
+            ))
+
+    indicators = compute_indicators(df)
+    indicator_rows = []
+    for dt, row in indicators.iterrows():
+        if dt < start:
+            continue
+        indicator_rows.append(IndicatorResponse(
+            date=dt, close=round(row["close"], 4),
+            rsi=safe_round(row["rsi"], 2),
+            sma_20=safe_round(row["sma_20"], 4), sma_50=safe_round(row["sma_50"], 4),
+            bb_upper=safe_round(row["bb_upper"], 4), bb_middle=safe_round(row["bb_middle"], 4),
+            bb_lower=safe_round(row["bb_lower"], 4),
+            macd=safe_round(row["macd"], 4), macd_signal=safe_round(row["macd_signal"], 4),
+            macd_hist=safe_round(row["macd_hist"], 4),
+        ))
+
+    if cache_key:
+        _indicator_cache.set_value(cache_key, indicator_rows)
+
+    return AssetDetailResponse(prices=price_rows, indicators=indicator_rows)
 
 
 @router.post("/refresh", status_code=200, summary="Force-refresh prices from Yahoo Finance")

@@ -13,7 +13,7 @@ import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { WatchlistSortBy, SortDir } from "@/lib/settings"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
-import { usePrices, useIndicators, useAnnotations } from "@/lib/queries"
+import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
 interface WatchlistTableProps {
@@ -119,11 +119,12 @@ function getRsiColor(rsi: number): string {
 function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: IndicatorSummary }) {
   const { settings } = useSettings()
   const period = settings.chart_default_period
-  const { data: prices, isLoading: pricesLoading } = usePrices(symbol, period)
-  const { data: chartIndicators, isLoading: indicatorsLoading } = useIndicators(symbol, period)
+  const { data: detail, isLoading: detailLoading } = useAssetDetail(symbol, period)
+  const prices = detail?.prices
+  const chartIndicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
 
-  const loading = pricesLoading || indicatorsLoading
+  const loading = detailLoading
 
   return (
     <div className="flex gap-4">

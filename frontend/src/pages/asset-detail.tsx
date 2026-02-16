@@ -17,8 +17,7 @@ import type { EtfHoldings } from "@/lib/api"
 import {
   useAssets,
   useCreateAsset,
-  usePrices,
-  useIndicators,
+  useAssetDetail,
   useRefreshPrices,
   useEtfHoldings,
   useHoldingsIndicators,
@@ -184,11 +183,12 @@ function ChartSection({
   showMacdChart: boolean
   chartType: "candle" | "line"
 }) {
-  const { data: prices, isLoading: pricesLoading, isFetching: pricesFetching } = usePrices(symbol, period)
-  const { data: indicators, isLoading: indicatorsLoading, isFetching: indicatorsFetching } = useIndicators(symbol, period)
+  const { data: detail, isLoading: detailLoading, isFetching: detailFetching } = useAssetDetail(symbol, period)
+  const prices = detail?.prices
+  const indicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
 
-  if (pricesLoading || indicatorsLoading) {
+  if (detailLoading) {
     return <ChartSkeleton height={520} />
   }
 
@@ -202,7 +202,7 @@ function ChartSection({
 
   return (
     <div className="relative">
-      {(pricesFetching || indicatorsFetching) && (
+      {detailFetching && (
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10 rounded-t-md">
           <div className="h-full w-1/3 bg-primary animate-[slide_1s_ease-in-out_infinite]" />
         </div>

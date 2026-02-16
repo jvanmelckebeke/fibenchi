@@ -23,6 +23,7 @@ export const keys = {
   portfolioPerformers: (period?: string) => ["portfolio-performers", period] as const,
   assets: ["assets"] as const,
   asset: (symbol: string) => ["assets", symbol] as const,
+  assetDetail: (symbol: string, period?: string) => ["asset-detail", symbol, period] as const,
   prices: (symbol: string, period?: string) => ["prices", symbol, period] as const,
   indicators: (symbol: string, period?: string) => ["indicators", symbol, period] as const,
   etfHoldings: (symbol: string) => ["etf-holdings", symbol] as const,
@@ -121,12 +122,22 @@ export function useSymbolSearch(query: string) {
 }
 
 // Prices & Indicators
+export function useAssetDetail(symbol: string, period?: string, opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: keys.assetDetail(symbol, period),
+    queryFn: () => api.prices.detail(symbol, period),
+    enabled: (opts?.enabled ?? true) && !!symbol,
+    staleTime: 5 * 60 * 1000, // 5 min — daily OHLCV data, SSE handles live quotes
+    placeholderData: keepPreviousData,
+  })
+}
+
 export function usePrices(symbol: string, period?: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: keys.prices(symbol, period),
     queryFn: () => api.prices.list(symbol, period),
     enabled: (opts?.enabled ?? true) && !!symbol,
-    staleTime: 5 * 60 * 1000, // 5 min — daily OHLCV data, SSE handles live quotes
+    staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   })
 }
@@ -136,7 +147,7 @@ export function useIndicators(symbol: string, period?: string, opts?: { enabled?
     queryKey: keys.indicators(symbol, period),
     queryFn: () => api.prices.indicators(symbol, period),
     enabled: (opts?.enabled ?? true) && !!symbol,
-    staleTime: 5 * 60 * 1000, // 5 min — computed from daily prices
+    staleTime: 5 * 60 * 1000,
     placeholderData: keepPreviousData,
   })
 }

@@ -3,6 +3,7 @@ import type {
   AnnotationCreate,
   Asset,
   AssetCreate,
+  AssetDetail,
   AssetPerformance,
   ConstituentIndicator,
   EtfHoldings,
@@ -75,6 +76,8 @@ export const api = {
       request<Price[]>(`/assets/${symbol}/prices${qs({ period })}`),
     indicators: (symbol: string, period?: string) =>
       request<Indicator[]>(`/assets/${symbol}/indicators${qs({ period })}`),
+    detail: (symbol: string, period?: string) =>
+      request<AssetDetail>(`/assets/${symbol}/detail${qs({ period })}`),
     refresh: (symbol: string, period?: string) =>
       request<SyncResult>(`/assets/${symbol}/refresh${qs({ period })}`, { method: "POST" }),
     holdings: (symbol: string) =>

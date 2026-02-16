@@ -92,6 +92,11 @@ export interface Indicator {
   macd_hist: number | null
 }
 
+export interface AssetDetail {
+  prices: Price[]
+  indicators: Indicator[]
+}
+
 export interface Annotation {
   id: number
   date: string
