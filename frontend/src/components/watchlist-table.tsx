@@ -5,9 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { TagBadge } from "@/components/tag-badge"
+import { PriceChart } from "@/components/price-chart"
+import { RsiGauge } from "@/components/rsi-gauge"
+import { MacdIndicator } from "@/components/macd-indicator"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
+import { usePrices, useIndicators, useAnnotations } from "@/lib/queries"
+import { useSettings } from "@/lib/settings"
 
 interface WatchlistTableProps {
   assets: Asset[]
@@ -69,6 +74,57 @@ function getRsiColor(rsi: number): string {
   if (rsi <= 30) return "text-amber-400"
   if (rsi >= 70) return "text-orange-400"
   return ""
+}
+
+function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: IndicatorSummary }) {
+  const { settings } = useSettings()
+  const period = settings.chart_default_period
+  const { data: prices, isLoading: pricesLoading } = usePrices(symbol, period)
+  const { data: chartIndicators, isLoading: indicatorsLoading } = useIndicators(symbol, period)
+  const { data: annotations } = useAnnotations(symbol)
+
+  const loading = pricesLoading || indicatorsLoading
+
+  return (
+    <div className="flex gap-4">
+      {/* Price chart — 80% */}
+      <div className="flex-[4] min-w-0">
+        {loading || !prices?.length ? (
+          <div className="h-[300px] flex items-center justify-center">
+            <Skeleton className="h-full w-full rounded-md" />
+          </div>
+        ) : (
+          <PriceChart
+            prices={prices}
+            indicators={chartIndicators ?? []}
+            annotations={annotations ?? []}
+            showSma20={settings.detail_show_sma20}
+            showSma50={settings.detail_show_sma50}
+            showBollinger={settings.detail_show_bollinger}
+            showRsiChart={false}
+            showMacdChart={false}
+            chartType={settings.chart_type}
+            mainChartHeight={300}
+          />
+        )}
+      </div>
+      {/* Indicators — 20% */}
+      <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
+        <div>
+          <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
+          <RsiGauge symbol={symbol} batchRsi={indicator?.rsi} size="lg" />
+        </div>
+        <div>
+          <span className="text-xs text-muted-foreground mb-1 block">MACD</span>
+          <MacdIndicator
+            symbol={symbol}
+            batchMacd={indicator ? { macd: indicator.macd, macd_signal: indicator.macd_signal, macd_hist: indicator.macd_hist } : undefined}
+            size="lg"
+          />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function TableRow({
@@ -202,9 +258,7 @@ function TableRow({
       {expanded && (
         <tr>
           <td colSpan={10} className="bg-muted/20 p-4 border-b border-border">
-            <div className="text-sm text-muted-foreground italic">
-              Chart and indicators will appear here when expanded.
-            </div>
+            <ExpandedContent symbol={asset.symbol} indicator={indicator} />
           </td>
         </tr>
       )}

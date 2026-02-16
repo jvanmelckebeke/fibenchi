@@ -23,6 +23,7 @@ interface PriceChartProps {
   showRsiChart?: boolean
   showMacdChart?: boolean
   chartType?: "candle" | "line"
+  mainChartHeight?: number
 }
 
 export function PriceChart({
@@ -35,6 +36,7 @@ export function PriceChart({
   showRsiChart = true,
   showMacdChart = true,
   chartType = "candle",
+  mainChartHeight = 400,
 }: PriceChartProps) {
   const mainRef = useRef<HTMLDivElement>(null)
   const rsiRef = useRef<HTMLDivElement>(null)
@@ -74,7 +76,7 @@ export function PriceChart({
 
     buildLookupMaps(prices, indicators)
 
-    const opts = baseChartOptions(mainRef.current, 400)
+    const opts = baseChartOptions(mainRef.current, mainChartHeight)
 
     // Main chart — hide time axis only when sub-charts exist below
     const hideMainTimeAxis = showRsiChart || showMacdChart
@@ -311,7 +313,7 @@ export function PriceChart({
       rsiChartRef.current = null
       macdChartRef.current = null
     }
-  }, [prices, indicators, annotations, buildLookupMaps, syncCharts, setupSingleChartCrosshair, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart, chartType])
+  }, [prices, indicators, annotations, buildLookupMaps, syncCharts, setupSingleChartCrosshair, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart, chartType, mainChartHeight])
 
   // Apply theme changes without recreating charts
   useEffect(() => {

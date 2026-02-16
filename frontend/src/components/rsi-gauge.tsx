@@ -24,14 +24,16 @@ function getZoneLabel(rsi: number): string {
   return ""
 }
 
-export function RsiGauge({ batchRsi }: { symbol: string; batchRsi?: number | null }) {
+export function RsiGauge({ batchRsi, size = "sm" }: { symbol: string; batchRsi?: number | null; size?: "sm" | "lg" }) {
+  const lg = size === "lg"
+
   if (batchRsi === undefined) {
-    return <Skeleton className="h-5 w-full rounded-full" />
+    return <Skeleton className={`${lg ? "h-10" : "h-5"} w-full rounded-full`} />
   }
 
   if (batchRsi == null) {
     return (
-      <div className="flex items-center justify-center h-5 rounded-full bg-muted text-[10px] text-muted-foreground">
+      <div className={`flex items-center justify-center ${lg ? "h-10 text-sm" : "h-5 text-[10px]"} rounded-full bg-muted text-muted-foreground`}>
         No RSI
       </div>
     )
@@ -43,7 +45,7 @@ export function RsiGauge({ batchRsi }: { symbol: string; batchRsi?: number | nul
   const label = getZoneLabel(pct)
 
   return (
-    <div className="relative h-5 w-full rounded-full bg-muted overflow-hidden flex items-center px-2">
+    <div className={`relative ${lg ? "h-10" : "h-5"} w-full rounded-full bg-muted overflow-hidden flex items-center ${lg ? "px-3" : "px-2"}`}>
       {/* Zone backgrounds */}
       <div className="absolute inset-0 flex">
         <div className="w-[30%] bg-amber-500/10" />
@@ -52,15 +54,15 @@ export function RsiGauge({ batchRsi }: { symbol: string; batchRsi?: number | nul
       </div>
       {/* Marker */}
       <div
-        className="absolute top-0 h-full w-0.5 rounded-full"
+        className={`absolute top-0 h-full ${lg ? "w-1" : "w-0.5"} rounded-full`}
         style={{ left: `${pct}%`, backgroundColor: markerColor }}
       />
       {/* Text inside bar */}
-      <span className={`relative z-10 text-[10px] font-medium tabular-nums ${textClass}`}>
+      <span className={`relative z-10 ${lg ? "text-sm" : "text-[10px]"} font-medium tabular-nums ${textClass}`}>
         RSI {pct.toFixed(0)}
       </span>
       {label && (
-        <span className={`relative z-10 text-[10px] ml-auto ${textClass}`}>{label}</span>
+        <span className={`relative z-10 ${lg ? "text-sm" : "text-[10px]"} ml-auto ${textClass}`}>{label}</span>
       )}
     </div>
   )
