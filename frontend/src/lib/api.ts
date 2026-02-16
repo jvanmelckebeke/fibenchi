@@ -35,6 +35,13 @@ export type * from "./types"
 
 const BASE = "/api"
 
+function qs(params: Record<string, string | undefined>): string {
+  const entries = Object.entries(params).filter(
+    (entry): entry is [string, string] => entry[1] !== undefined,
+  )
+  return entries.length ? `?${new URLSearchParams(entries)}` : ""
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -52,9 +59,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   portfolio: {
     index: (period?: string) =>
-      request<PortfolioIndex>(`/portfolio/index${period ? `?period=${period}` : ""}`),
+      request<PortfolioIndex>(`/portfolio/index${qs({ period })}`),
     performers: (period?: string) =>
-      request<AssetPerformance[]>(`/portfolio/performers${period ? `?period=${period}` : ""}`),
+      request<AssetPerformance[]>(`/portfolio/performers${qs({ period })}`),
   },
   assets: {
     list: () => request<Asset[]>("/assets"),
@@ -65,11 +72,11 @@ export const api = {
   },
   prices: {
     list: (symbol: string, period?: string) =>
-      request<Price[]>(`/assets/${symbol}/prices${period ? `?period=${period}` : ""}`),
+      request<Price[]>(`/assets/${symbol}/prices${qs({ period })}`),
     indicators: (symbol: string, period?: string) =>
-      request<Indicator[]>(`/assets/${symbol}/indicators${period ? `?period=${period}` : ""}`),
+      request<Indicator[]>(`/assets/${symbol}/indicators${qs({ period })}`),
     refresh: (symbol: string, period?: string) =>
-      request<SyncResult>(`/assets/${symbol}/refresh${period ? `?period=${period}` : ""}`, { method: "POST" }),
+      request<SyncResult>(`/assets/${symbol}/refresh${qs({ period })}`, { method: "POST" }),
     holdings: (symbol: string) =>
       request<EtfHoldings>(`/assets/${symbol}/holdings`),
     holdingsIndicators: (symbol: string) =>
@@ -124,7 +131,7 @@ export const api = {
   },
   watchlist: {
     sparklines: (period?: string) =>
-      request<Record<string, SparklinePoint[]>>(`/watchlist/sparklines${period ? `?period=${period}` : ""}`),
+      request<Record<string, SparklinePoint[]>>(`/watchlist/sparklines${qs({ period })}`),
     indicators: () =>
       request<Record<string, IndicatorSummary>>("/watchlist/indicators"),
   },
