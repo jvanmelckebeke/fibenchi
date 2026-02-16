@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAssets, useCreateAsset, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators } from "@/lib/queries"
+import { useAssets, useCreateAsset, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators, usePrefetchAssetDetail } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
@@ -30,6 +30,8 @@ const SORT_OPTIONS: [WatchlistSortBy, string][] = [
   ["price", "Price"],
   ["change_pct", "Change %"],
   ["rsi", "RSI"],
+  ["macd", "MACD"],
+  ["macd_signal", "Signal"],
   ["macd_hist", "MACD Hist"],
 ]
 
@@ -48,6 +50,7 @@ export function WatchlistPage() {
   const setViewMode = (v: "card" | "table") => updateSettings({ watchlist_view_mode: v })
   const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
   const { data: batchIndicators } = useWatchlistIndicators()
+  const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
 
   const typeFilter = settings.watchlist_type_filter
   const sortBy = settings.watchlist_sort_by
@@ -234,6 +237,10 @@ export function WatchlistPage() {
           indicators={batchIndicators}
           onDelete={(s) => deleteAsset.mutate(s)}
           compactMode={settings.compact_mode}
+          onHover={prefetch}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
         />
       ) : (
         <div className={`grid gap-4 ${
@@ -254,6 +261,7 @@ export function WatchlistPage() {
               sparklineData={batchSparklines?.[asset.symbol]}
               indicatorData={batchIndicators?.[asset.symbol]}
               onDelete={() => deleteAsset.mutate(asset.symbol)}
+              onHover={() => prefetch(asset.symbol)}
               showSparkline={settings.watchlist_show_sparkline}
               showRsi={settings.watchlist_show_rsi}
               showMacd={settings.watchlist_show_macd}
@@ -276,6 +284,7 @@ function AssetCard({
   sparklineData,
   indicatorData,
   onDelete,
+  onHover,
   showSparkline,
   showRsi,
   showMacd,
@@ -290,6 +299,7 @@ function AssetCard({
   sparklineData?: SparklinePoint[]
   indicatorData?: IndicatorSummary
   onDelete: () => void
+  onHover: () => void
   showSparkline: boolean
   showRsi: boolean
   showMacd: boolean
@@ -302,7 +312,7 @@ function AssetCard({
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
 
   return (
-    <Card className="group relative hover:border-primary/50 transition-colors">
+    <Card className="group relative hover:border-primary/50 transition-colors" onMouseEnter={onHover}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClient } from "@tanstack/react-query"
+import { useCallback } from "react"
 import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
 
 // Pseudo-ETF thesis/annotation keys are defined inline below
@@ -32,6 +33,8 @@ export function usePortfolioIndex(period?: string) {
   return useQuery({
     queryKey: keys.portfolioIndex(period),
     queryFn: () => api.portfolio.index(period),
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -39,6 +42,8 @@ export function usePortfolioPerformers(period?: string) {
   return useQuery({
     queryKey: keys.portfolioPerformers(period),
     queryFn: () => api.portfolio.performers(period),
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -61,7 +66,7 @@ export function useWatchlistIndicators() {
 
 // Assets
 export function useAssets() {
-  return useQuery({ queryKey: keys.assets, queryFn: api.assets.list })
+  return useQuery({ queryKey: keys.assets, queryFn: api.assets.list, staleTime: 5 * 60 * 1000 })
 }
 
 export function useCreateAsset() {
@@ -87,6 +92,7 @@ export function usePrices(symbol: string, period?: string, opts?: { enabled?: bo
     queryFn: () => api.prices.list(symbol, period),
     enabled: (opts?.enabled ?? true) && !!symbol,
     staleTime: 5 * 60 * 1000, // 5 min — daily OHLCV data, SSE handles live quotes
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -96,6 +102,7 @@ export function useIndicators(symbol: string, period?: string, opts?: { enabled?
     queryFn: () => api.prices.indicators(symbol, period),
     enabled: (opts?.enabled ?? true) && !!symbol,
     staleTime: 5 * 60 * 1000, // 5 min — computed from daily prices
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -128,9 +135,20 @@ export function useRefreshPrices(symbol: string) {
   })
 }
 
+// Prefetch — fire on hover to warm cache before navigation
+function prefetchAssetDetail(qc: QueryClient, symbol: string, period: string) {
+  qc.prefetchQuery({ queryKey: keys.prices(symbol, period), queryFn: () => api.prices.list(symbol, period), staleTime: 5 * 60 * 1000 })
+  qc.prefetchQuery({ queryKey: keys.indicators(symbol, period), queryFn: () => api.prices.indicators(symbol, period), staleTime: 5 * 60 * 1000 })
+}
+
+export function usePrefetchAssetDetail(period: string) {
+  const qc = useQueryClient()
+  return useCallback((symbol: string) => prefetchAssetDetail(qc, symbol, period), [qc, period])
+}
+
 // Tags
 export function useTags() {
-  return useQuery({ queryKey: keys.tags, queryFn: api.tags.list })
+  return useQuery({ queryKey: keys.tags, queryFn: api.tags.list, staleTime: 5 * 60 * 1000 })
 }
 
 export function useCreateTag() {
@@ -167,7 +185,7 @@ export function useDetachTag() {
 
 // Groups
 export function useGroups() {
-  return useQuery({ queryKey: keys.groups, queryFn: api.groups.list })
+  return useQuery({ queryKey: keys.groups, queryFn: api.groups.list, staleTime: 5 * 60 * 1000 })
 }
 
 export function useCreateGroup() {
@@ -218,6 +236,7 @@ export function useThesis(symbol: string) {
     queryKey: keys.thesis(symbol),
     queryFn: () => api.thesis.get(symbol),
     enabled: !!symbol,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -235,6 +254,7 @@ export function useAnnotations(symbol: string) {
     queryKey: keys.annotations(symbol),
     queryFn: () => api.annotations.list(symbol),
     enabled: !!symbol,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -256,7 +276,7 @@ export function useDeleteAnnotation(symbol: string) {
 
 // Pseudo-ETFs
 export function usePseudoEtfs() {
-  return useQuery({ queryKey: keys.pseudoEtfs, queryFn: api.pseudoEtfs.list })
+  return useQuery({ queryKey: keys.pseudoEtfs, queryFn: api.pseudoEtfs.list, staleTime: 5 * 60 * 1000 })
 }
 
 export function usePseudoEtf(id: number) {

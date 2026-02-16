@@ -140,3 +140,8 @@
 }
 .flash-green { animation: flash-green 1.8s ease-out; }
 .flash-red   { animation: flash-red 1.8s ease-out; }
+
+@keyframes slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}

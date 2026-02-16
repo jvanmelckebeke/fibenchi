@@ -5,7 +5,7 @@ import { Loader2, TrendingUp, TrendingDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { usePortfolioIndex, usePortfolioPerformers } from "@/lib/queries"
+import { usePortfolioIndex, usePortfolioPerformers, usePrefetchAssetDetail } from "@/lib/queries"
 import { getChartTheme, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
 import type { AssetPerformance } from "@/lib/api"
 
@@ -13,7 +13,7 @@ const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
 export function PortfolioPage() {
   const [period, setPeriod] = useState<string>("1y")
-  const { data, isLoading } = usePortfolioIndex(period)
+  const { data, isLoading, isFetching } = usePortfolioIndex(period)
   const { data: performers, isLoading: performersLoading } = usePortfolioPerformers(period)
 
   return (
@@ -42,10 +42,15 @@ export function PortfolioPage() {
           No data yet. Add assets to your watchlist and refresh prices.
         </div>
       ) : (
-        <>
+        <div className="relative">
+          {isFetching && (
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10 rounded-t-md">
+              <div className="h-full w-1/3 bg-primary animate-[slide_1s_ease-in-out_infinite]" />
+            </div>
+          )}
           <PortfolioChart dates={data.dates} values={data.values} up={data.change >= 0} />
           <ValueDisplay current={data.current} change={data.change} changePct={data.change_pct} />
-        </>
+        </div>
       )}
 
       <PerformersSection performers={performers} isLoading={performersLoading} period={period} />
@@ -200,6 +205,8 @@ function PerformersList({
   assets: AssetPerformance[]
   period: string
 }) {
+  const prefetch = usePrefetchAssetDetail(period)
+
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
@@ -216,6 +223,7 @@ function PerformersList({
               key={a.symbol}
               to={`/asset/${a.symbol}`}
               className="flex items-center justify-between py-2 hover:bg-muted/50 rounded px-2 -mx-2 transition-colors"
+              onMouseEnter={() => prefetch(a.symbol)}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="font-mono text-sm text-primary">{a.symbol}</span>

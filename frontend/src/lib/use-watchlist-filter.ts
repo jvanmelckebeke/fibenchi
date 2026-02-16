@@ -59,6 +59,18 @@ export function useFilteredSortedAssets(
             indicators?.[b.symbol]?.rsi ?? null,
           )
           break
+        case "macd":
+          cmp = compareNullable(
+            indicators?.[a.symbol]?.macd ?? null,
+            indicators?.[b.symbol]?.macd ?? null,
+          )
+          break
+        case "macd_signal":
+          cmp = compareNullable(
+            indicators?.[a.symbol]?.macd_signal ?? null,
+            indicators?.[b.symbol]?.macd_signal ?? null,
+          )
+          break
         case "macd_hist":
           cmp = compareNullable(
             indicators?.[a.symbol]?.macd_hist ?? null,

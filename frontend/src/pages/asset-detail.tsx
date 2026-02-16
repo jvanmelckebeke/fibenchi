@@ -43,7 +43,7 @@ export function AssetDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <Header symbol={symbol} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isWatchlisted={isWatchlisted} />
+      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isWatchlisted={isWatchlisted} />
       <ChartSection
         symbol={symbol}
         period={period}
@@ -68,12 +68,14 @@ export function AssetDetailPage() {
 
 function Header({
   symbol,
+  name,
   currency,
   period,
   setPeriod,
   isWatchlisted,
 }: {
   symbol: string
+  name?: string
   currency: string
   period: string
   setPeriod: (p: string) => void
@@ -95,7 +97,10 @@ function Header({
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold">{symbol}</h1>
+        <div>
+          <h1 className="text-2xl font-bold">{symbol}</h1>
+          {name && <p className="text-sm text-muted-foreground">{name}</p>}
+        </div>
         {price != null && (
           <span ref={priceRef} className="text-xl font-semibold tabular-nums rounded px-1">
             {formatPrice(price, currency)}
@@ -183,8 +188,8 @@ function ChartSection({
   showMacdChart: boolean
   chartType: "candle" | "line"
 }) {
-  const { data: prices, isLoading: pricesLoading } = usePrices(symbol, period)
-  const { data: indicators, isLoading: indicatorsLoading } = useIndicators(symbol, period)
+  const { data: prices, isLoading: pricesLoading, isFetching: pricesFetching } = usePrices(symbol, period)
+  const { data: indicators, isLoading: indicatorsLoading, isFetching: indicatorsFetching } = useIndicators(symbol, period)
   const { data: annotations } = useAnnotations(symbol)
 
   if (pricesLoading || indicatorsLoading) {
@@ -205,17 +210,24 @@ function ChartSection({
   }
 
   return (
-    <PriceChart
-      prices={prices}
-      indicators={indicators ?? []}
-      annotations={annotations ?? []}
-      showSma20={showSma20}
-      showSma50={showSma50}
-      showBollinger={showBollinger}
-      showRsiChart={showRsiChart}
-      showMacdChart={showMacdChart}
-      chartType={chartType}
-    />
+    <div className="relative">
+      {(pricesFetching || indicatorsFetching) && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10 rounded-t-md">
+          <div className="h-full w-1/3 bg-primary animate-[slide_1s_ease-in-out_infinite]" />
+        </div>
+      )}
+      <PriceChart
+        prices={prices}
+        indicators={indicators ?? []}
+        annotations={annotations ?? []}
+        showSma20={showSma20}
+        showSma50={showSma50}
+        showBollinger={showBollinger}
+        showRsiChart={showRsiChart}
+        showMacdChart={showMacdChart}
+        chartType={chartType}
+      />
+    </div>
   )
 }
 

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react"
 
 export type AssetTypeFilter = "all" | "stock" | "etf"
-export type WatchlistSortBy = "name" | "price" | "change_pct" | "rsi" | "macd_hist"
+export type WatchlistSortBy = "name" | "price" | "change_pct" | "rsi" | "macd" | "macd_signal" | "macd_hist"
 export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"
 export type WatchlistViewMode = "card" | "table"
