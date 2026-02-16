@@ -9,7 +9,7 @@ import pandas as pd
 
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import Asset, PriceHistory
-from app.services.indicators import compute_indicators
+from app.services.indicators import build_indicator_snapshot, compute_indicators
 from app.utils import TTLCache
 
 # In-memory cache for batch indicator snapshots.
@@ -73,29 +73,13 @@ async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
             "close": float(p.close),
         } for p in prices]).set_index("date")
 
-        indicators = compute_indicators(df)
-
-        # Get last row with non-null RSI
-        rsi_val = None
-        for _, row in indicators.iloc[::-1].iterrows():
-            if pd.notna(row["rsi"]):
-                rsi_val = round(row["rsi"], 2)
-                break
-
-        # Get last row with non-null MACD triplet
-        macd_val = macd_sig = macd_hist = None
-        for _, row in indicators.iloc[::-1].iterrows():
-            if pd.notna(row["macd"]) and pd.notna(row["macd_signal"]) and pd.notna(row["macd_hist"]):
-                macd_val = round(row["macd"], 4)
-                macd_sig = round(row["macd_signal"], 4)
-                macd_hist = round(row["macd_hist"], 4)
-                break
+        snapshot = build_indicator_snapshot(compute_indicators(df))
 
         out[symbol] = {
-            "rsi": rsi_val,
-            "macd": macd_val,
-            "macd_signal": macd_sig,
-            "macd_hist": macd_hist,
+            "rsi": snapshot.get("rsi"),
+            "macd": snapshot.get("macd"),
+            "macd_signal": snapshot.get("macd_signal"),
+            "macd_hist": snapshot.get("macd_hist"),
         }
 
     # Store in cache (single-entry — only latest key matters)
