@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
-import { api, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
+import { api, type Asset, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
 
 // Pseudo-ETF thesis/annotation keys are defined inline below
 
@@ -81,7 +81,18 @@ export function useDeleteAsset() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (symbol: string) => api.assets.delete(symbol),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.assets }),
+    onMutate: async (symbol) => {
+      await qc.cancelQueries({ queryKey: keys.assets })
+      const previous = qc.getQueryData<Asset[]>(keys.assets)
+      qc.setQueryData<Asset[]>(keys.assets, (old) =>
+        old?.map((a) => (a.symbol === symbol ? { ...a, watchlisted: false } : a)),
+      )
+      return { previous }
+    },
+    onError: (_err, _symbol, context) => {
+      if (context?.previous) qc.setQueryData(keys.assets, context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.assets }),
   })
 }
 
@@ -164,7 +175,26 @@ export function useAttachTag() {
   return useMutation({
     mutationFn: ({ symbol, tagId }: { symbol: string; tagId: number }) =>
       api.tags.attach(symbol, tagId),
-    onSuccess: () => {
+    onMutate: async ({ symbol, tagId }) => {
+      await qc.cancelQueries({ queryKey: keys.assets })
+      const previous = qc.getQueryData<Asset[]>(keys.assets)
+      const tags = qc.getQueryData<{ id: number; name: string; color: string }[]>(keys.tags)
+      const tag = tags?.find((t) => t.id === tagId)
+      if (tag) {
+        qc.setQueryData<Asset[]>(keys.assets, (old) =>
+          old?.map((a) =>
+            a.symbol === symbol && !a.tags.some((t) => t.id === tagId)
+              ? { ...a, tags: [...a.tags, { id: tag.id, name: tag.name, color: tag.color }] }
+              : a,
+          ),
+        )
+      }
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(keys.assets, context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: keys.assets })
       qc.invalidateQueries({ queryKey: keys.tags })
     },
@@ -176,7 +206,22 @@ export function useDetachTag() {
   return useMutation({
     mutationFn: ({ symbol, tagId }: { symbol: string; tagId: number }) =>
       api.tags.detach(symbol, tagId),
-    onSuccess: () => {
+    onMutate: async ({ symbol, tagId }) => {
+      await qc.cancelQueries({ queryKey: keys.assets })
+      const previous = qc.getQueryData<Asset[]>(keys.assets)
+      qc.setQueryData<Asset[]>(keys.assets, (old) =>
+        old?.map((a) =>
+          a.symbol === symbol
+            ? { ...a, tags: a.tags.filter((t) => t.id !== tagId) }
+            : a,
+        ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(keys.assets, context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: keys.assets })
       qc.invalidateQueries({ queryKey: keys.tags })
     },
