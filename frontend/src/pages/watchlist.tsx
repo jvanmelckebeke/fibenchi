@@ -43,8 +43,9 @@ export function WatchlistPage() {
   const [symbol, setSymbol] = useState("")
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
-  const [viewMode, setViewMode] = useState<"card" | "table">("card")
   const { settings, updateSettings } = useSettings()
+  const viewMode = settings.watchlist_view_mode
+  const setViewMode = (v: "card" | "table") => updateSettings({ watchlist_view_mode: v })
   const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
   const { data: batchIndicators } = useWatchlistIndicators()
 

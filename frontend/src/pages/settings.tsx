@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useSettings, type AppSettings, type MacdStyle } from "@/lib/settings"
+import { useSettings, type AppSettings, type MacdStyle, type WatchlistViewMode } from "@/lib/settings"
 
 function SettingSwitch({
   id,
@@ -61,9 +61,24 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Watchlist Card Indicators</CardTitle>
+          <CardTitle>Watchlist</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label>Default View</Label>
+            <Select
+              value={draft.watchlist_view_mode}
+              onValueChange={(v) => change({ watchlist_view_mode: v as WatchlistViewMode })}
+            >
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="card">Card</SelectItem>
+                <SelectItem value="table">Table</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <SettingSwitch id="wl-sparkline" label="Sparkline Chart" settingKey="watchlist_show_sparkline" draft={draft} onChange={change} />
           <SettingSwitch id="wl-rsi" label="RSI Gauge" settingKey="watchlist_show_rsi" draft={draft} onChange={change} />
           <SettingSwitch id="wl-macd" label="MACD Indicator" settingKey="watchlist_show_macd" draft={draft} onChange={change} />
