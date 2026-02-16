@@ -8,6 +8,7 @@ import { ChartSkeleton } from "@/components/chart-skeleton"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
+import { PeriodSelector } from "@/components/period-selector"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { buildYahooFinanceUrl, formatPrice } from "@/lib/format"
 import { useQuotes } from "@/lib/quote-stream"
@@ -29,7 +30,6 @@ import {
 } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
-const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
 export function AssetDetailPage() {
   const { symbol } = useParams<{ symbol: string }>()
@@ -141,19 +141,7 @@ function Header({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex gap-1">
-          {PERIODS.map((p) => (
-            <Button
-              key={p}
-              variant={period === p ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setPeriod(p)}
-              className="text-xs"
-            >
-              {p}
-            </Button>
-          ))}
-        </div>
+        <PeriodSelector value={period} onChange={setPeriod} />
         {isWatchlisted && (
           <Button
             variant="outline"
