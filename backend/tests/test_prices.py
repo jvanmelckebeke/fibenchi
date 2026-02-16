@@ -80,7 +80,7 @@ async def test_get_prices_respects_period_boundary(client, db):
 async def test_get_prices_ephemeral_symbol(client):
     """Non-watchlisted symbol fetches from Yahoo without persisting."""
     mock_df = _make_yahoo_df()
-    with patch("app.routers.prices.fetch_history", return_value=mock_df):
+    with patch("app.services.price_service.fetch_history", return_value=mock_df):
         resp = await client.get("/api/assets/UNKNOWN/prices?period=3mo")
     assert resp.status_code == 200
     assert len(resp.json()) > 0
@@ -88,7 +88,7 @@ async def test_get_prices_ephemeral_symbol(client):
 
 async def test_get_prices_unknown_404(client):
     """Symbol that fails Yahoo fetch returns 404."""
-    with patch("app.routers.prices.fetch_history", side_effect=ValueError("No data")):
+    with patch("app.services.price_service.fetch_history", side_effect=ValueError("No data")):
         resp = await client.get("/api/assets/XXXX/prices")
     assert resp.status_code == 404
 
@@ -111,7 +111,7 @@ async def test_get_indicators_fields(client, db):
 async def test_get_indicators_ephemeral(client):
     """Indicators for non-DB symbol uses ephemeral fetch with warmup."""
     mock_df = _make_yahoo_df(n_days=120)
-    with patch("app.routers.prices.fetch_history", return_value=mock_df):
+    with patch("app.services.price_service.fetch_history", return_value=mock_df):
         resp = await client.get("/api/assets/UNKNOWN/indicators?period=3mo")
     assert resp.status_code == 200
     assert len(resp.json()) > 0
@@ -122,7 +122,7 @@ async def test_get_indicators_ephemeral(client):
 async def test_refresh_prices(client, db):
     """Refresh triggers sync and returns count."""
     asset = await _seed_asset_with_prices(db, n_days=30)
-    with patch("app.routers.prices.sync_asset_prices", new_callable=AsyncMock, return_value=42):
+    with patch("app.services.price_service.sync_asset_prices", new_callable=AsyncMock, return_value=42):
         resp = await client.post(f"/api/assets/{asset.symbol}/refresh?period=3mo")
     assert resp.status_code == 200
     assert resp.json() == {"symbol": asset.symbol, "synced": 42}

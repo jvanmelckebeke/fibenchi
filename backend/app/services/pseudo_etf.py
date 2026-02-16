@@ -20,11 +20,10 @@ Dynamic entry mode (for portfolio overview):
 from datetime import date
 
 import pandas as pd
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Asset
-from app.models.price import PriceHistory
+from app.repositories.asset_repo import AssetRepository
+from app.repositories.price_repo import PriceRepository
 
 
 QUARTER_MONTHS = {1, 4, 7, 10}
@@ -51,20 +50,12 @@ async def calculate_performance(
     # Build asset_id -> symbol map if breakdown requested
     symbol_map: dict[int, str] = {}
     if include_breakdown:
-        asset_stmt = select(Asset).where(Asset.id.in_(asset_ids))
-        asset_result = await db.execute(asset_stmt)
-        for a in asset_result.scalars().all():
+        assets = await AssetRepository(db).get_by_ids(asset_ids)
+        for a in assets:
             symbol_map[a.id] = a.symbol
 
     # Fetch all price history from base_date for the constituents
-    stmt = (
-        select(PriceHistory)
-        .where(PriceHistory.asset_id.in_(asset_ids))
-        .where(PriceHistory.date >= base_date)
-        .order_by(PriceHistory.date)
-    )
-    result = await db.execute(stmt)
-    rows = result.scalars().all()
+    rows = await PriceRepository(db).list_by_assets_since(asset_ids, base_date)
 
     if not rows:
         return []

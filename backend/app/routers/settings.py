@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.user_settings import UserSettings
 from app.schemas.settings import SettingsResponse, SettingsUpdate
+from app.services import settings_service
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -15,11 +14,7 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
 
     Returns `{\"data\": {}}` if no settings have been saved yet.
     """
-    result = await db.execute(select(UserSettings).where(UserSettings.id == 1))
-    row = result.scalar_one_or_none()
-    if not row:
-        return SettingsResponse(data={})
-    return row
+    return await settings_service.get_settings(db)
 
 
 @router.put("", response_model=SettingsResponse, summary="Update user settings")
@@ -27,13 +22,4 @@ async def update_settings(body: SettingsUpdate, db: AsyncSession = Depends(get_d
     """Replace the user settings object. The `data` field is a free-form JSON
     object storing preferences like `watchlist_show_rsi`, `compact_mode`, etc.
     """
-    result = await db.execute(select(UserSettings).where(UserSettings.id == 1))
-    row = result.scalar_one_or_none()
-    if row:
-        row.data = body.data
-    else:
-        row = UserSettings(id=1, data=body.data)
-        db.add(row)
-    await db.commit()
-    await db.refresh(row)
-    return row
+    return await settings_service.update_settings(db, body.data)

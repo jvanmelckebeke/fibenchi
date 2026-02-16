@@ -27,7 +27,7 @@ async def test_create_asset_with_name(client):
 
 async def test_create_asset_auto_resolve(client):
     mock_info = {"symbol": "NVDA", "name": "NVIDIA Corporation", "type": "EQUITY"}
-    with patch("app.routers.assets.validate_symbol", return_value=mock_info):
+    with patch("app.services.asset_service.validate_symbol", return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "nvda"})
     assert resp.status_code == 201
     assert resp.json()["symbol"] == "NVDA"
@@ -37,7 +37,7 @@ async def test_create_asset_auto_resolve(client):
 
 async def test_create_asset_with_currency(client):
     mock_info = {"symbol": "VWCE.DE", "name": "Vanguard FTSE All-World", "type": "ETF", "currency": "EUR"}
-    with patch("app.routers.assets.validate_symbol", return_value=mock_info):
+    with patch("app.services.asset_service.validate_symbol", return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "vwce.de"})
     assert resp.status_code == 201
     data = resp.json()
@@ -47,7 +47,7 @@ async def test_create_asset_with_currency(client):
 
 
 async def test_create_asset_invalid_symbol(client):
-    with patch("app.routers.assets.validate_symbol", return_value=None):
+    with patch("app.services.asset_service.validate_symbol", return_value=None):
         resp = await client.post("/api/assets", json={"symbol": "XXXX"})
     assert resp.status_code == 404
 

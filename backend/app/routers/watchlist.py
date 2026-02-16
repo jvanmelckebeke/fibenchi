@@ -4,16 +4,11 @@ These return aggregated data for all watchlisted assets in a single request,
 eliminating the N+1 pattern of fetching prices/indicators per asset card.
 """
 
-from datetime import date, timedelta
-
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import PERIOD_DAYS
 from app.database import get_db
-from app.models import Asset, PriceHistory
-from app.services.watchlist import compute_and_cache_indicators
+from app.services.watchlist import compute_and_cache_indicators, get_batch_sparklines
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
@@ -31,36 +26,7 @@ async def batch_sparklines(
 
     This endpoint replaces per-card price fetches on the watchlist page.
     """
-    days = PERIOD_DAYS.get(period, 90)
-    start = date.today() - timedelta(days=days)
-
-    assets_result = await db.execute(
-        select(Asset.id, Asset.symbol).where(Asset.watchlisted == True)  # noqa: E712
-    )
-    asset_rows = assets_result.all()
-    if not asset_rows:
-        return {}
-
-    asset_ids = [r.id for r in asset_rows]
-    id_to_symbol = {r.id: r.symbol for r in asset_rows}
-
-    prices_result = await db.execute(
-        select(PriceHistory)
-        .where(
-            PriceHistory.asset_id.in_(asset_ids),
-            PriceHistory.date >= start,
-        )
-        .order_by(PriceHistory.asset_id, PriceHistory.date)
-    )
-    prices = prices_result.scalars().all()
-
-    out: dict[str, list[dict]] = {sym: [] for sym in id_to_symbol.values()}
-    for p in prices:
-        sym = id_to_symbol.get(p.asset_id)
-        if sym:
-            out[sym].append({"date": p.date.isoformat(), "close": round(float(p.close), 4)})
-
-    return out
+    return await get_batch_sparklines(db, period)
 
 
 @router.get("/indicators", summary="Batch latest indicator values for watchlist cards")

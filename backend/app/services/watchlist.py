@@ -1,14 +1,15 @@
-"""Batch indicator computation for the watchlist page."""
+"""Batch indicator computation and sparkline data for the watchlist page."""
 
 from datetime import date, timedelta
 
-from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import pandas as pd
 
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
-from app.models import Asset, PriceHistory
+from app.models import PriceHistory
+from app.repositories.asset_repo import AssetRepository
+from app.repositories.price_repo import PriceRepository
 from app.services.indicators import build_indicator_snapshot, compute_indicators
 from app.utils import TTLCache
 
@@ -17,26 +18,45 @@ from app.utils import TTLCache
 _indicator_cache: TTLCache = TTLCache(default_ttl=600)
 
 
-async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
-    """Compute indicator snapshots for all watchlisted assets, with caching.
+async def get_batch_sparklines(db: AsyncSession, period: str = "3mo") -> dict[str, list[dict]]:
+    """Return close-price sparkline data for every watchlisted asset."""
+    days = PERIOD_DAYS.get(period, 90)
+    start = date.today() - timedelta(days=days)
 
-    Called by the API endpoint and also by the nightly cron to warm the cache.
-    """
-    assets_result = await db.execute(
-        select(Asset.id, Asset.symbol).where(Asset.watchlisted == True)  # noqa: E712
-    )
-    asset_rows = assets_result.all()
+    asset_rows = await AssetRepository(db).list_watchlisted_id_symbol_pairs()
     if not asset_rows:
         return {}
 
     asset_ids = [r.id for r in asset_rows]
     id_to_symbol = {r.id: r.symbol for r in asset_rows}
 
+    prices = await PriceRepository(db).list_by_assets_since(asset_ids, start)
+
+    out: dict[str, list[dict]] = {sym: [] for sym in id_to_symbol.values()}
+    for p in prices:
+        sym = id_to_symbol.get(p.asset_id)
+        if sym:
+            out[sym].append({"date": p.date.isoformat(), "close": round(float(p.close), 4)})
+
+    return out
+
+
+async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
+    """Compute indicator snapshots for all watchlisted assets, with caching.
+
+    Called by the API endpoint and also by the nightly cron to warm the cache.
+    """
+    asset_rows = await AssetRepository(db).list_watchlisted_id_symbol_pairs()
+    if not asset_rows:
+        return {}
+
+    asset_ids = [r.id for r in asset_rows]
+    id_to_symbol = {r.id: r.symbol for r in asset_rows}
+
+    price_repo = PriceRepository(db)
+
     # Build cache key: symbols + latest price date
-    latest_date_result = await db.execute(
-        select(func.max(PriceHistory.date)).where(PriceHistory.asset_id.in_(asset_ids))
-    )
-    latest_date = latest_date_result.scalar()
+    latest_date = await price_repo.get_latest_date(asset_ids)
     cache_key = (frozenset(id_to_symbol.values()), latest_date)
 
     cached = _indicator_cache.get_value(cache_key)
@@ -46,15 +66,7 @@ async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
     # Fetch enough history for indicator warmup (SMA50 needs ~50 trading days)
     warmup_start = date.today() - timedelta(days=PERIOD_DAYS["3mo"] + WARMUP_DAYS)
 
-    prices_result = await db.execute(
-        select(PriceHistory)
-        .where(
-            PriceHistory.asset_id.in_(asset_ids),
-            PriceHistory.date >= warmup_start,
-        )
-        .order_by(PriceHistory.asset_id, PriceHistory.date)
-    )
-    all_prices = prices_result.scalars().all()
+    all_prices = await price_repo.list_by_assets_since(asset_ids, warmup_start)
 
     # Group prices by asset
     grouped: dict[int, list[PriceHistory]] = {}
