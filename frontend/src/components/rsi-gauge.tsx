@@ -25,15 +25,15 @@ function getZoneLabel(rsi: number): string {
   return ""
 }
 
-export function RsiGauge({ symbol }: { symbol: string }) {
-  const { data: indicators, isLoading } = useIndicators(symbol)
+export function RsiGauge({ symbol, batchRsi }: { symbol: string; batchRsi?: number | null }) {
+  // Use batch data when available, fall back to individual fetch (asset detail page)
+  const { data: indicators, isLoading } = useIndicators(symbol, undefined, { enabled: batchRsi === undefined })
 
-  const latestRsi = indicators
-    ?.slice()
-    .reverse()
-    .find((i) => i.rsi !== null)?.rsi
+  const latestRsi = batchRsi !== undefined
+    ? batchRsi
+    : indicators?.slice().reverse().find((i) => i.rsi !== null)?.rsi
 
-  if (isLoading) {
+  if (batchRsi === undefined && isLoading) {
     return <Skeleton className="h-5 w-full rounded-full" />
   }
 

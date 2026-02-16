@@ -12,13 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAssets, useCreateAsset, useDeleteAsset, useTags } from "@/lib/queries"
+import { useAssets, useCreateAsset, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
-import type { Quote, TagBrief } from "@/lib/api"
+import type { Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -32,6 +32,8 @@ export function WatchlistPage() {
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings } = useSettings()
+  const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
+  const { data: batchIndicators } = useWatchlistIndicators()
 
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
   const quotes = useQuotes()
@@ -136,6 +138,8 @@ export function WatchlistPage() {
             tags={asset.tags}
             quote={quotes[asset.symbol]}
             sparklinePeriod={sparklinePeriod}
+            sparklineData={batchSparklines?.[asset.symbol]}
+            indicatorData={batchIndicators?.[asset.symbol]}
             onDelete={() => deleteAsset.mutate(asset.symbol)}
             showSparkline={settings.watchlist_show_sparkline}
             showRsi={settings.watchlist_show_rsi}
@@ -155,6 +159,8 @@ function AssetCard({
   tags,
   quote,
   sparklinePeriod,
+  sparklineData,
+  indicatorData,
   onDelete,
   showSparkline,
   showRsi,
@@ -167,6 +173,8 @@ function AssetCard({
   tags: TagBrief[]
   quote?: Quote
   sparklinePeriod: string
+  sparklineData?: SparklinePoint[]
+  indicatorData?: IndicatorSummary
   onDelete: () => void
   showSparkline: boolean
   showRsi: boolean
@@ -240,11 +248,11 @@ function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} />}
+          {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
           {(showRsi || showMacd) && (
             <div className="flex gap-1.5 mt-1">
-              {showRsi && <RsiGauge symbol={symbol} />}
-              {showMacd && <MacdIndicator symbol={symbol} />}
+              {showRsi && <RsiGauge symbol={symbol} batchRsi={indicatorData?.rsi} />}
+              {showMacd && <MacdIndicator symbol={symbol} batchMacd={indicatorData ? { macd: indicatorData.macd, macd_signal: indicatorData.macd_signal, macd_hist: indicatorData.macd_hist } : undefined} />}
             </div>
           )}
         </CardContent>

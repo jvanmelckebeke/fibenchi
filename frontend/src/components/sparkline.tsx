@@ -2,14 +2,25 @@ import { useEffect, useRef } from "react"
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
 import { Skeleton } from "@/components/ui/skeleton"
 import { usePrices } from "@/lib/queries"
+import type { SparklinePoint } from "@/lib/api"
 
-export function SparklineChart({ symbol, period = "3mo" }: { symbol: string; period?: string }) {
-  const { data: prices, isLoading } = usePrices(symbol, period)
+export function SparklineChart({
+  symbol,
+  period = "3mo",
+  batchData,
+}: {
+  symbol: string
+  period?: string
+  batchData?: SparklinePoint[]
+}) {
+  // Use batch data when available, fall back to individual fetch (asset detail page)
+  const { data: fetchedPrices, isLoading } = usePrices(symbol, period, { enabled: !batchData })
+  const points = batchData ?? fetchedPrices
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current || !prices?.length) return
+    if (!containerRef.current || !points?.length) return
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
@@ -30,8 +41,8 @@ export function SparklineChart({ symbol, period = "3mo" }: { symbol: string; per
       },
     })
 
-    const last = prices[prices.length - 1]
-    const first = prices[0]
+    const last = points[points.length - 1]
+    const first = points[0]
     const up = last.close >= first.close
 
     const series = chart.addSeries(AreaSeries, {
@@ -44,7 +55,7 @@ export function SparklineChart({ symbol, period = "3mo" }: { symbol: string; per
     })
 
     series.setData(
-      prices.map((p) => ({ time: p.date, value: p.close }))
+      points.map((p) => ({ time: p.date, value: p.close }))
     )
 
     chart.timeScale().fitContent()
@@ -63,13 +74,13 @@ export function SparklineChart({ symbol, period = "3mo" }: { symbol: string; per
       chart.remove()
       chartRef.current = null
     }
-  }, [prices])
+  }, [points])
 
-  if (isLoading) {
+  if (!batchData && isLoading) {
     return <Skeleton className="h-[60px] w-full rounded" />
   }
 
-  if (!prices?.length) {
+  if (!points?.length) {
     return <div className="h-[60px] flex items-center justify-center text-xs text-muted-foreground">No data</div>
   }
 

@@ -23,6 +23,8 @@ export const keys = {
   pseudoEtfConstituentsIndicators: (id: number) => ["pseudo-etfs", id, "constituents-indicators"] as const,
   pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
+  watchlistSparklines: (period?: string) => ["watchlist-sparklines", period] as const,
+  watchlistIndicators: ["watchlist-indicators"] as const,
 }
 
 // Portfolio
@@ -37,6 +39,23 @@ export function usePortfolioPerformers(period?: string) {
   return useQuery({
     queryKey: keys.portfolioPerformers(period),
     queryFn: () => api.portfolio.performers(period),
+  })
+}
+
+// Watchlist batch
+export function useWatchlistSparklines(period?: string) {
+  return useQuery({
+    queryKey: keys.watchlistSparklines(period),
+    queryFn: () => api.watchlist.sparklines(period),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useWatchlistIndicators() {
+  return useQuery({
+    queryKey: keys.watchlistIndicators,
+    queryFn: () => api.watchlist.indicators(),
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -62,20 +81,20 @@ export function useDeleteAsset() {
 }
 
 // Prices & Indicators
-export function usePrices(symbol: string, period?: string) {
+export function usePrices(symbol: string, period?: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: keys.prices(symbol, period),
     queryFn: () => api.prices.list(symbol, period),
-    enabled: !!symbol,
+    enabled: (opts?.enabled ?? true) && !!symbol,
     staleTime: 5 * 60 * 1000, // 5 min — daily OHLCV data, SSE handles live quotes
   })
 }
 
-export function useIndicators(symbol: string, period?: string) {
+export function useIndicators(symbol: string, period?: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: keys.indicators(symbol, period),
     queryFn: () => api.prices.indicators(symbol, period),
-    enabled: !!symbol,
+    enabled: (opts?.enabled ?? true) && !!symbol,
     staleTime: 5 * 60 * 1000, // 5 min — computed from daily prices
   })
 }

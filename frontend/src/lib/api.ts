@@ -215,6 +215,18 @@ export interface ConstituentIndicator {
   bb_position: string | null
 }
 
+export interface SparklinePoint {
+  date: string
+  close: number
+}
+
+export interface IndicatorSummary {
+  rsi: number | null
+  macd: number | null
+  macd_signal: number | null
+  macd_hist: number | null
+}
+
 export interface Quote {
   symbol: string
   price: number | null
@@ -315,6 +327,12 @@ export const api = {
       }),
     delete: (symbol: string, id: number) =>
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
+  },
+  watchlist: {
+    sparklines: (period?: string) =>
+      request<Record<string, SparklinePoint[]>>(`/watchlist/sparklines${period ? `?period=${period}` : ""}`),
+    indicators: () =>
+      request<Record<string, IndicatorSummary>>("/watchlist/indicators"),
   },
   settings: {
     get: () => request<{ data: Record<string, unknown> }>("/settings"),

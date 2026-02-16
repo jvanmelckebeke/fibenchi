@@ -1,15 +1,22 @@
 import { Skeleton } from "@/components/ui/skeleton"
 import { useIndicators } from "@/lib/queries"
+import type { IndicatorSummary } from "@/lib/api"
 
-export function MacdIndicator({ symbol }: { symbol: string }) {
-  const { data: indicators, isLoading } = useIndicators(symbol)
+export function MacdIndicator({
+  symbol,
+  batchMacd,
+}: {
+  symbol: string
+  batchMacd?: Pick<IndicatorSummary, "macd" | "macd_signal" | "macd_hist"> | null
+}) {
+  // Use batch data when available, fall back to individual fetch (asset detail page)
+  const { data: indicators, isLoading } = useIndicators(symbol, undefined, { enabled: batchMacd === undefined })
 
-  const latest = indicators
-    ?.slice()
-    .reverse()
-    .find((i) => i.macd !== null && i.macd_signal !== null && i.macd_hist !== null)
+  const latest = batchMacd !== undefined
+    ? batchMacd
+    : indicators?.slice().reverse().find((i) => i.macd !== null && i.macd_signal !== null && i.macd_hist !== null)
 
-  if (isLoading) {
+  if (batchMacd === undefined && isLoading) {
     return <Skeleton className="h-5 w-full rounded-full" />
   }
 
@@ -25,12 +32,18 @@ export function MacdIndicator({ symbol }: { symbol: string }) {
   const histPositive = hist >= 0
   const bullish = macd > sig
 
-  // Normalize histogram bar against recent range
-  const recentHists = (indicators ?? [])
-    .map((i) => i.macd_hist)
-    .filter((v): v is number => v !== null)
-  const maxAbsHist = Math.max(...recentHists.map(Math.abs), 0.01)
-  const barPct = Math.min((Math.abs(hist) / maxAbsHist) * 50, 50)
+  // Normalize histogram bar against recent range (when full series available)
+  let barPct: number
+  if (indicators && indicators.length > 0) {
+    const recentHists = indicators
+      .map((i) => i.macd_hist)
+      .filter((v): v is number => v !== null)
+    const maxAbsHist = Math.max(...recentHists.map(Math.abs), 0.01)
+    barPct = Math.min((Math.abs(hist) / maxAbsHist) * 50, 50)
+  } else {
+    // Batch mode: no full series, use a fixed proportion
+    barPct = 25
+  }
 
   const histColor = histPositive ? "bg-emerald-500/30" : "bg-red-500/30"
   const macdTextColor = bullish ? "text-emerald-400" : "text-red-400"
