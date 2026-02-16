@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Link } from "react-router-dom"
-import { MoreVertical, Plus, Trash2, TrendingUp } from "lucide-react"
+import { ArrowDownAZ, ArrowUpAZ, MoreVertical, Plus, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -18,10 +18,20 @@ import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
-import type { Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
+import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
-import { useSettings } from "@/lib/settings"
+import { useSettings, type AssetTypeFilter, type WatchlistSortBy, type SortDir } from "@/lib/settings"
+
+const SORT_OPTIONS: [WatchlistSortBy, string][] = [
+  ["name", "Name"],
+  ["price", "Price"],
+  ["change_pct", "Change %"],
+  ["rsi", "RSI"],
+  ["macd_hist", "MACD Hist"],
+]
+
+const SORT_LABELS: Record<WatchlistSortBy, string> = Object.fromEntries(SORT_OPTIONS) as Record<WatchlistSortBy, string>
 
 export function WatchlistPage() {
   const { data: allAssets, isLoading } = useAssets()
@@ -31,16 +41,93 @@ export function WatchlistPage() {
   const [symbol, setSymbol] = useState("")
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
-  const { settings } = useSettings()
+  const { settings, updateSettings } = useSettings()
   const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
   const { data: batchIndicators } = useWatchlistIndicators()
 
+  const typeFilter = settings.watchlist_type_filter
+  const sortBy = settings.watchlist_sort_by
+  const sortDir = settings.watchlist_sort_dir
+
   const watchlisted = allAssets?.filter((a) => a.watchlisted)
   const quotes = useQuotes()
-  const assets = watchlisted?.filter((a) => {
-    if (selectedTags.length === 0) return true
-    return a.tags.some((t) => selectedTags.includes(t.id))
-  })
+
+  const assets = useMemo(() => {
+    if (!watchlisted) return undefined
+
+    // Filter by type
+    let filtered = watchlisted
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((a) => a.type === typeFilter)
+    }
+    // Filter by tags
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter((a) =>
+        a.tags.some((t) => selectedTags.includes(t.id))
+      )
+    }
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0
+      switch (sortBy) {
+        case "name":
+          cmp = a.symbol.localeCompare(b.symbol)
+          break
+        case "price": {
+          const pa = quotes[a.symbol]?.price ?? null
+          const pb = quotes[b.symbol]?.price ?? null
+          if (pa == null && pb == null) cmp = 0
+          else if (pa == null) cmp = 1
+          else if (pb == null) cmp = -1
+          else cmp = pa - pb
+          break
+        }
+        case "change_pct": {
+          const ca = quotes[a.symbol]?.change_percent ?? null
+          const cb = quotes[b.symbol]?.change_percent ?? null
+          if (ca == null && cb == null) cmp = 0
+          else if (ca == null) cmp = 1
+          else if (cb == null) cmp = -1
+          else cmp = ca - cb
+          break
+        }
+        case "rsi": {
+          const ra = batchIndicators?.[a.symbol]?.rsi ?? null
+          const rb = batchIndicators?.[b.symbol]?.rsi ?? null
+          if (ra == null && rb == null) cmp = 0
+          else if (ra == null) cmp = 1
+          else if (rb == null) cmp = -1
+          else cmp = ra - rb
+          break
+        }
+        case "macd_hist": {
+          const ma = batchIndicators?.[a.symbol]?.macd_hist ?? null
+          const mb = batchIndicators?.[b.symbol]?.macd_hist ?? null
+          if (ma == null && mb == null) cmp = 0
+          else if (ma == null) cmp = 1
+          else if (mb == null) cmp = -1
+          else cmp = ma - mb
+          break
+        }
+      }
+      return sortDir === "asc" ? cmp : -cmp
+    })
+
+    return sorted
+  }, [watchlisted, typeFilter, selectedTags, sortBy, sortDir, quotes, batchIndicators])
+
+  const setTypeFilter = (v: AssetTypeFilter) =>
+    updateSettings({ watchlist_type_filter: v })
+
+  const handleSort = (key: WatchlistSortBy) => {
+    if (sortBy === key) {
+      updateSettings({ watchlist_sort_dir: sortDir === "asc" ? "desc" : "asc" })
+    } else {
+      const defaultDir: SortDir = key === "name" ? "asc" : "desc"
+      updateSettings({ watchlist_sort_by: key, watchlist_sort_dir: defaultDir })
+    }
+  }
 
   const toggleTag = (id: number) =>
     setSelectedTags((prev) =>
@@ -55,9 +142,26 @@ export function WatchlistPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">Watchlist</h1>
+          {/* Type filter */}
+          <div className="flex rounded-md border border-border overflow-hidden">
+            {([["all", "All"], ["stock", "Stocks"], ["etf", "ETFs"]] as const).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => setTypeFilter(v)}
+                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                  typeFilter === v
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Sparkline period */}
           <div className="flex rounded-md border border-border overflow-hidden">
             {(["3mo", "6mo", "1y"] as const).map((p) => (
               <button
@@ -72,6 +176,29 @@ export function WatchlistPage() {
                 {p === "3mo" ? "3M" : p === "6mo" ? "6M" : "1Y"}
               </button>
             ))}
+          </div>
+          {/* Sort */}
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                  {sortDir === "asc" ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />}
+                  {SORT_LABELS[sortBy]}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {SORT_OPTIONS.map(([key, label]) => (
+                  <DropdownMenuItem key={key} onClick={() => handleSort(key)}>
+                    {label}
+                    {sortBy === key && (
+                      <span className="ml-auto text-muted-foreground text-xs">
+                        {sortDir === "asc" ? "\u2191" : "\u2193"}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         <div className="flex gap-2">
@@ -119,7 +246,11 @@ export function WatchlistPage() {
       {assets && assets.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <TrendingUp className="h-12 w-12 mb-4" />
-          <p>No assets yet. Add a symbol above to get started.</p>
+          <p>
+            {watchlisted && watchlisted.length > 0
+              ? "No assets match the current filters."
+              : "No assets yet. Add a symbol above to get started."}
+          </p>
         </div>
       )}
 
@@ -168,7 +299,7 @@ function AssetCard({
 }: {
   symbol: string
   name: string
-  type: string
+  type: AssetType
   currency: string
   tags: TagBrief[]
   quote?: Quote
