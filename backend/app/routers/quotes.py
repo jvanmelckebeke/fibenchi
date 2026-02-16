@@ -25,7 +25,14 @@ async def get_quotes(symbols: str = Query(..., description="Comma-separated list
 
 
 async def _quote_event_generator():
-    """Yield SSE events with watchlisted quotes, adapting interval to market state."""
+    """Yield SSE events with watchlisted quotes, adapting interval to market state.
+
+    After the initial full payload, only symbols whose data changed since the
+    last push are included (delta mode).  This dramatically reduces bandwidth
+    when most markets are closed or prices are stable.
+    """
+    last_payload: dict[str, dict] = {}
+
     while True:
         try:
             async with async_session() as db:
@@ -36,20 +43,35 @@ async def _quote_event_generator():
 
             if not symbols:
                 yield "event: quotes\ndata: {}\n\n"
+                last_payload = {}
                 await asyncio.sleep(60)
                 continue
 
             quotes = await asyncio.to_thread(batch_fetch_quotes, symbols)
 
             # Build keyed payload
-            payload = {}
-            market_states = set()
+            full_payload: dict[str, dict] = {}
+            market_states: set[str] = set()
             for q in quotes:
-                payload[q["symbol"]] = q
+                full_payload[q["symbol"]] = q
                 if q.get("market_state"):
                     market_states.add(q["market_state"])
 
-            yield f"event: quotes\ndata: {json.dumps(payload)}\n\n"
+            # Compute delta: only symbols that changed since last push
+            if last_payload:
+                delta = {
+                    sym: data
+                    for sym, data in full_payload.items()
+                    if last_payload.get(sym) != data
+                }
+            else:
+                # First event — send everything
+                delta = full_payload
+
+            if delta:
+                yield f"event: quotes\ndata: {json.dumps(delta)}\n\n"
+
+            last_payload = full_payload
 
             # Adapt interval based on market state
             if "REGULAR" in market_states:
