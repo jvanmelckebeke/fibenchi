@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from "react-router-dom"
 import { LayoutDashboard, FolderOpen, LineChart, List, Settings } from "lucide-react"
+import { useQuoteStatus } from "@/lib/quote-stream"
 
 const navItems = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -8,8 +9,15 @@ const navItems = [
   { to: "/pseudo-etfs", label: "Pseudo-ETFs", icon: LineChart },
 ]
 
+const STATUS_CONFIG = {
+  connecting: { color: "bg-yellow-500", label: "Connecting…" },
+  connected: { color: "bg-green-500", label: "Live" },
+  reconnecting: { color: "bg-yellow-500 animate-pulse", label: "Reconnecting…" },
+} as const
+
 export function Layout() {
   const location = useLocation()
+  const quoteStatus = useQuoteStatus()
 
   return (
     <div className="flex h-screen bg-background">
@@ -38,7 +46,7 @@ export function Layout() {
             )
           })}
         </nav>
-        <div className="border-t p-2">
+        <div className="border-t p-2 space-y-1">
           <Link
             to="/settings"
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
@@ -50,6 +58,10 @@ export function Layout() {
             <Settings className="h-4 w-4" />
             Settings
           </Link>
+          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground">
+            <span className={`h-2 w-2 rounded-full ${STATUS_CONFIG[quoteStatus].color}`} />
+            {STATUS_CONFIG[quoteStatus].label}
+          </div>
         </div>
       </aside>
       <main className="flex-1 overflow-auto">
