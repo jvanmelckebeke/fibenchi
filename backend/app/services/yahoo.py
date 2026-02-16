@@ -1,9 +1,15 @@
 """Yahoo Finance data fetching via yahooquery."""
 
+import time
 from datetime import date
 
 import pandas as pd
 from yahooquery import Ticker
+
+# In-memory TTL cache for ETF holdings (holdings change quarterly at most)
+_holdings_cache: dict[str, tuple[dict | None, float]] = {}
+_HOLDINGS_TTL = 86400  # 24 hours
+_HOLDINGS_MAX = 100
 
 PERIOD_MAP = {
     "1d": "1d", "5d": "5d", "1w": "5d",
@@ -67,8 +73,27 @@ def validate_symbol(symbol: str) -> dict | None:
 def fetch_etf_holdings(symbol: str) -> dict | None:
     """Fetch ETF top holdings and sector weightings from Yahoo Finance.
 
+    Results are cached in-memory for 24h since holdings change quarterly at most.
     Returns None if the symbol is not an ETF or data is unavailable.
     """
+    key = symbol.upper()
+    cached = _holdings_cache.get(key)
+    if cached and time.monotonic() - cached[1] < _HOLDINGS_TTL:
+        return cached[0]
+
+    result = _fetch_etf_holdings_uncached(symbol)
+
+    # Evict oldest if at capacity
+    if len(_holdings_cache) >= _HOLDINGS_MAX:
+        oldest = min(_holdings_cache, key=lambda k: _holdings_cache[k][1])
+        del _holdings_cache[oldest]
+    _holdings_cache[key] = (result, time.monotonic())
+
+    return result
+
+
+def _fetch_etf_holdings_uncached(symbol: str) -> dict | None:
+    """Actual Yahoo Finance fetch for ETF holdings (no cache)."""
     ticker = Ticker(symbol)
     info = ticker.fund_holding_info.get(symbol)
 
