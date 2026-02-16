@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { ChartSkeleton } from "@/components/chart-skeleton"
 import { PeriodSelector } from "@/components/period-selector"
 import { usePortfolioIndex, usePortfolioPerformers, usePrefetchAssetDetail } from "@/lib/queries"
-import { getChartTheme, useChartTheme, chartThemeOptions } from "@/lib/chart-utils"
+import { getChartTheme } from "@/lib/chart-utils"
+import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import type { AssetPerformance } from "@/lib/api"
 
 export function PortfolioPage() {
@@ -47,7 +48,7 @@ export function PortfolioPage() {
 function PortfolioChart({ dates, values, up }: { dates: string[]; values: number[]; up: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const theme = useChartTheme()
+  const { startLifecycle } = useChartLifecycle(containerRef, [chartRef])
 
   useEffect(() => {
     if (!containerRef.current || !dates.length) return
@@ -99,24 +100,8 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
     chart.timeScale().fitContent()
     chartRef.current = chart
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width })
-      }
-    })
-    resizeObserver.observe(containerRef.current)
-
-    return () => {
-      resizeObserver.disconnect()
-      chart.remove()
-      chartRef.current = null
-    }
-  }, [dates, values, up])
-
-  // Apply theme changes without recreating chart
-  useEffect(() => {
-    chartRef.current?.applyOptions(chartThemeOptions(theme))
-  }, [theme])
+    return startLifecycle([chart])
+  }, [dates, values, up, startLifecycle])
 
   return <div ref={containerRef} className="w-full rounded-md overflow-hidden" />
 }
