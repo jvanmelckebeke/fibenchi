@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router-dom"
 import { LayoutDashboard, FolderOpen, LineChart, List, Settings } from "lucide-react"
 import { useQuoteStatus } from "@/lib/quote-stream"
+import { CommandSearch } from "@/components/command-search"
 
 const navItems = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -65,6 +66,9 @@ export function Layout() {
         </div>
       </aside>
       <main className="flex-1 overflow-auto">
+        <div className="flex h-14 items-center border-b px-6">
+          <CommandSearch />
+        </div>
         <Outlet />
       </main>
     </div>
