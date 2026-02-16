@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
-import { api, type Asset, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate } from "./api"
+import { api, type Asset, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
 
 // Pseudo-ETF thesis/annotation keys are defined inline below
 
@@ -26,6 +26,7 @@ export const keys = {
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
   watchlistSparklines: (period?: string) => ["watchlist-sparklines", period] as const,
   watchlistIndicators: ["watchlist-indicators"] as const,
+  symbolSearch: (q: string) => ["symbol-search", q] as const,
 }
 
 // Portfolio
@@ -93,6 +94,17 @@ export function useDeleteAsset() {
       if (context?.previous) qc.setQueryData(keys.assets, context.previous)
     },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.assets }),
+  })
+}
+
+// Search
+export function useSymbolSearch(query: string) {
+  return useQuery<SymbolSearchResult[]>({
+    queryKey: keys.symbolSearch(query),
+    queryFn: () => api.search(query),
+    enabled: query.length >= 1,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 
