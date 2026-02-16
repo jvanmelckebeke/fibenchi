@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { ArrowDownAZ, ArrowUpAZ, MoreVertical, Plus, Trash2, TrendingUp } from "lucide-react"
+import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, MoreVertical, Plus, Table, Trash2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings, type AssetTypeFilter, type WatchlistSortBy, type SortDir } from "@/lib/settings"
 import { useFilteredSortedAssets } from "@/lib/use-watchlist-filter"
+import { WatchlistTable } from "@/components/watchlist-table"
 
 const SORT_OPTIONS: [WatchlistSortBy, string][] = [
   ["name", "Name"],
@@ -42,6 +43,7 @@ export function WatchlistPage() {
   const [symbol, setSymbol] = useState("")
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
+  const [viewMode, setViewMode] = useState<"card" | "table">("card")
   const { settings, updateSettings } = useSettings()
   const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
   const { data: batchIndicators } = useWatchlistIndicators()
@@ -145,6 +147,31 @@ export function WatchlistPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {/* View mode toggle */}
+          <div className="flex rounded-md border border-border overflow-hidden">
+            <button
+              onClick={() => setViewMode("card")}
+              className={`px-2 py-1 transition-colors ${
+                viewMode === "card"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title="Card view"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("table")}
+              className={`px-2 py-1 transition-colors ${
+                viewMode === "table"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title="Table view"
+            >
+              <Table className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
         <div className="flex gap-2">
           <Input
@@ -199,30 +226,40 @@ export function WatchlistPage() {
         </div>
       )}
 
-      <div className={`grid gap-4 ${
-        settings.compact_mode
-          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"
-          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      }`}>
-        {assets?.map((asset) => (
-          <AssetCard
-            key={asset.id}
-            symbol={asset.symbol}
-            name={asset.name}
-            type={asset.type}
-            currency={asset.currency}
-            tags={asset.tags}
-            quote={quotes[asset.symbol]}
-            sparklinePeriod={sparklinePeriod}
-            sparklineData={batchSparklines?.[asset.symbol]}
-            indicatorData={batchIndicators?.[asset.symbol]}
-            onDelete={() => deleteAsset.mutate(asset.symbol)}
-            showSparkline={settings.watchlist_show_sparkline}
-            showRsi={settings.watchlist_show_rsi}
-            showMacd={settings.watchlist_show_macd}
-          />
-        ))}
-      </div>
+      {viewMode === "table" && assets && assets.length > 0 ? (
+        <WatchlistTable
+          assets={assets}
+          quotes={quotes}
+          indicators={batchIndicators}
+          onDelete={(s) => deleteAsset.mutate(s)}
+          compactMode={settings.compact_mode}
+        />
+      ) : (
+        <div className={`grid gap-4 ${
+          settings.compact_mode
+            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"
+            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        }`}>
+          {assets?.map((asset) => (
+            <AssetCard
+              key={asset.id}
+              symbol={asset.symbol}
+              name={asset.name}
+              type={asset.type}
+              currency={asset.currency}
+              tags={asset.tags}
+              quote={quotes[asset.symbol]}
+              sparklinePeriod={sparklinePeriod}
+              sparklineData={batchSparklines?.[asset.symbol]}
+              indicatorData={batchIndicators?.[asset.symbol]}
+              onDelete={() => deleteAsset.mutate(asset.symbol)}
+              showSparkline={settings.watchlist_show_sparkline}
+              showRsi={settings.watchlist_show_rsi}
+              showMacd={settings.watchlist_show_macd}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
