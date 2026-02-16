@@ -1,29 +1,29 @@
-from datetime import datetime
+import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.asset import AssetResponse
 
 
 class GroupCreate(BaseModel):
-    name: str
-    description: str | None = None
+    name: str = Field(description="Unique group name")
+    description: str | None = Field(default=None, description="Optional group description")
 
 
 class GroupUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, description="New group name")
+    description: str | None = Field(default=None, description="New description")
 
 
 class GroupAddAssets(BaseModel):
-    asset_ids: list[int]
+    asset_ids: list[int] = Field(description="List of asset IDs to add to the group")
 
 
 class GroupResponse(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    created_at: datetime
-    assets: list[AssetResponse] = []
+    id: int = Field(description="Group ID")
+    name: str = Field(description="Group name")
+    description: str | None = Field(description="Group description")
+    created_at: datetime.datetime = Field(description="Creation timestamp")
+    assets: list[AssetResponse] = Field(default=[], description="Assets in this group")
 
     model_config = {"from_attributes": True}

@@ -35,6 +35,10 @@ def _bb_position(close: float, upper: float, middle: float, lower: float) -> str
 
 @router.get("", response_model=EtfHoldingsResponse, summary="Get ETF top holdings")
 async def get_holdings(symbol: str, db: AsyncSession = Depends(get_db)):
+    """Return the top holdings and sector weightings for an ETF.
+
+    Only available for assets with `type=etf`. Data is fetched live from Yahoo Finance.
+    """
     asset = await _get_asset(symbol, db)
     if asset.type.value != "etf":
         raise HTTPException(400, f"{symbol} is not an ETF")
