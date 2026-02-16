@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +46,7 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
     currency = "USD"
 
     if not name:
-        info = validate_symbol(symbol)
+        info = await asyncio.to_thread(validate_symbol, symbol)
         if not info:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
         name = info["name"]

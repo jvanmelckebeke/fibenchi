@@ -26,7 +26,7 @@ async def get_quotes(symbols: str = Query(..., description="Comma-separated list
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
-    return batch_fetch_quotes(symbol_list)
+    return await asyncio.to_thread(batch_fetch_quotes, symbol_list)
 
 
 async def _quote_event_generator():
