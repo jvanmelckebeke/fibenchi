@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.routers.deps import get_asset
 from app.schemas.price import EtfHoldingsResponse, HoldingIndicatorResponse
-from app.services.indicators import compute_indicators, build_indicator_snapshot
-from app.services.yahoo import batch_fetch_currencies, batch_fetch_history, fetch_etf_holdings
+from app.services.indicators import compute_batch_indicator_snapshots
+from app.services.yahoo import fetch_etf_holdings
 
 router = APIRouter(prefix="/api/assets/{symbol}/holdings", tags=["holdings"])
 
@@ -40,19 +40,5 @@ async def get_holdings_indicators(symbol: str, db: AsyncSession = Depends(get_db
     if not holding_symbols:
         return []
 
-    # Batch fetch ~3 months of history (enough for SMA50 warmup)
-    histories = batch_fetch_history(holding_symbols, period="3mo")
-    currencies = batch_fetch_currencies(holding_symbols)
-
-    results = []
-    for sym in holding_symbols:
-        currency = currencies.get(sym, "USD")
-        df = histories.get(sym)
-        if df is None or df.empty or len(df) < 2:
-            results.append(HoldingIndicatorResponse(symbol=sym, currency=currency))
-            continue
-
-        snapshot = build_indicator_snapshot(compute_indicators(df))
-        results.append(HoldingIndicatorResponse(symbol=sym, currency=currency, **snapshot))
-
-    return results
+    snapshots = compute_batch_indicator_snapshots(holding_symbols)
+    return [HoldingIndicatorResponse(**s) for s in snapshots]
