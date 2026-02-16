@@ -1,14 +1,22 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronRight, ChevronDown, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronDown, MoreVertical, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { TagBadge } from "@/components/tag-badge"
 import { PriceChart } from "@/components/price-chart"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
+import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
+import type { WatchlistSortBy, SortDir } from "@/lib/settings"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { usePrices, useIndicators, useAnnotations } from "@/lib/queries"
@@ -20,9 +28,13 @@ interface WatchlistTableProps {
   indicators?: Record<string, IndicatorSummary>
   onDelete: (symbol: string) => void
   compactMode: boolean
+  onHover?: (symbol: string) => void
+  sortBy?: WatchlistSortBy
+  sortDir?: SortDir
+  onSort?: (key: WatchlistSortBy) => void
 }
 
-export function WatchlistTable({ assets, quotes, indicators, onDelete, compactMode }: WatchlistTableProps) {
+export function WatchlistTable({ assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: WatchlistTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
 
   const toggleExpand = (symbol: string) => {
@@ -40,14 +52,14 @@ export function WatchlistTable({ assets, quotes, indicators, onDelete, compactMo
         <thead>
           <tr className="border-b border-border bg-muted/50">
             <th className="w-8" />
-            <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Symbol</th>
+            <SortableHeader label="Symbol" sortKey="name" align="left" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
             <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
-            <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Price</th>
-            <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Change</th>
-            <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">RSI</th>
-            <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">MACD</th>
-            <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Signal</th>
-            <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Hist</th>
+            <SortableHeader label="Price" sortKey="price" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            <SortableHeader label="Change" sortKey="change_pct" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            <SortableHeader label="RSI" sortKey="rsi" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            <SortableHeader label="MACD" sortKey="macd" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            <SortableHeader label="Signal" sortKey="macd_signal" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            <SortableHeader label="Hist" sortKey="macd_hist" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
             <th className="w-8" />
           </tr>
         </thead>
@@ -61,12 +73,46 @@ export function WatchlistTable({ assets, quotes, indicators, onDelete, compactMo
               expanded={expandedSymbols.has(asset.symbol)}
               onToggle={() => toggleExpand(asset.symbol)}
               onDelete={() => onDelete(asset.symbol)}
+              onHover={() => onHover?.(asset.symbol)}
               compactMode={compactMode}
             />
           ))}
         </tbody>
       </table>
     </div>
+  )
+}
+
+function SortableHeader({
+  label,
+  sortKey,
+  align,
+  sortBy,
+  sortDir,
+  onSort,
+}: {
+  label: string
+  sortKey: WatchlistSortBy
+  align: "left" | "right"
+  sortBy?: WatchlistSortBy
+  sortDir?: SortDir
+  onSort?: (key: WatchlistSortBy) => void
+}) {
+  const active = sortBy === sortKey
+  const Icon = active && sortDir === "asc" ? ArrowUp : ArrowDown
+
+  return (
+    <th
+      className={`text-${align} text-xs font-medium px-3 py-2 ${
+        onSort ? "cursor-pointer select-none hover:text-foreground" : ""
+      } ${active ? "text-foreground" : "text-muted-foreground"}`}
+      onClick={() => onSort?.(sortKey)}
+    >
+      <span className={`inline-flex items-center gap-0.5 ${align === "right" ? "justify-end" : ""}`}>
+        {label}
+        {active && <Icon className="h-3 w-3" />}
+      </span>
+    </th>
   )
 }
 
@@ -134,6 +180,7 @@ function TableRow({
   expanded,
   onToggle,
   onDelete,
+  onHover,
   compactMode,
 }: {
   asset: Asset
@@ -142,6 +189,7 @@ function TableRow({
   expanded: boolean
   onToggle: () => void
   onDelete: () => void
+  onHover: () => void
   compactMode: boolean
 }) {
   const lastPrice = quote?.price ?? null
@@ -157,6 +205,7 @@ function TableRow({
       <tr
         className="border-b border-border hover:bg-muted/30 cursor-pointer group transition-colors"
         onClick={onToggle}
+        onMouseEnter={onHover}
       >
         <td className={`${py} pl-2`}>
           {expanded ? (
@@ -242,17 +291,30 @@ function TableRow({
           )}
         </td>
         <td className={`${py} pr-2`}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete()
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </td>
       </tr>
       {expanded && (
