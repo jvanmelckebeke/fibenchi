@@ -93,6 +93,14 @@ async def batch_indicators(
     and the latest price date. The cache auto-invalidates when new prices are
     synced (the latest date changes).
     """
+    return await compute_and_cache_indicators(db)
+
+
+async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
+    """Compute indicator snapshots for all watchlisted assets, with caching.
+
+    Called by the API endpoint and also by the nightly cron to warm the cache.
+    """
     assets_result = await db.execute(
         select(Asset.id, Asset.symbol).where(Asset.watchlisted == True)  # noqa: E712
     )

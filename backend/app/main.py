@@ -14,6 +14,7 @@ from sqlalchemy import select, text
 from app.database import async_session, engine, Base
 from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
 from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis, watchlist
+from app.routers.watchlist import compute_and_cache_indicators
 from app.services.price_sync import sync_all_prices
 from app.services.yahoo import batch_fetch_currencies
 
@@ -22,7 +23,7 @@ scheduler = AsyncIOScheduler()
 
 
 async def scheduled_refresh():
-    """Background job: refresh all asset prices."""
+    """Background job: refresh all asset prices, then warm indicator cache."""
     logger.info("Running scheduled price refresh...")
     async with async_session() as db:
         try:
@@ -31,6 +32,15 @@ async def scheduled_refresh():
             logger.info(f"Refreshed {len(counts)} assets, {total} price points")
         except Exception:
             logger.exception("Scheduled refresh failed")
+            return
+
+    # Pre-compute indicator snapshots so the first watchlist request is instant
+    async with async_session() as db:
+        try:
+            indicators = await compute_and_cache_indicators(db)
+            logger.info(f"Pre-computed indicators for {len(indicators)} assets")
+        except Exception:
+            logger.exception("Indicator pre-computation failed (non-fatal)")
 
 
 @asynccontextmanager
