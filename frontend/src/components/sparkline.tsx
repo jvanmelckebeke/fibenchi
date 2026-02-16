@@ -1,11 +1,9 @@
 import { useEffect, useRef } from "react"
 import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
 import { Skeleton } from "@/components/ui/skeleton"
-import { usePrices } from "@/lib/queries"
 import type { SparklinePoint } from "@/lib/api"
 
 export function SparklineChart({
-  symbol,
   period = "3mo",
   batchData,
 }: {
@@ -13,14 +11,12 @@ export function SparklineChart({
   period?: string
   batchData?: SparklinePoint[]
 }) {
-  // Use batch data when available, fall back to individual fetch (asset detail page)
-  const { data: fetchedPrices, isLoading } = usePrices(symbol, period, { enabled: !batchData })
-  const points = batchData ?? fetchedPrices
+  void period
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current || !points?.length) return
+    if (!containerRef.current || !batchData?.length) return
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
@@ -41,8 +37,8 @@ export function SparklineChart({
       },
     })
 
-    const last = points[points.length - 1]
-    const first = points[0]
+    const last = batchData[batchData.length - 1]
+    const first = batchData[0]
     const up = last.close >= first.close
 
     const series = chart.addSeries(AreaSeries, {
@@ -55,7 +51,7 @@ export function SparklineChart({
     })
 
     series.setData(
-      points.map((p) => ({ time: p.date, value: p.close }))
+      batchData.map((p) => ({ time: p.date, value: p.close }))
     )
 
     chart.timeScale().fitContent()
@@ -74,13 +70,13 @@ export function SparklineChart({
       chart.remove()
       chartRef.current = null
     }
-  }, [points])
+  }, [batchData])
 
-  if (!batchData && isLoading) {
+  if (!batchData) {
     return <Skeleton className="h-[60px] w-full rounded" />
   }
 
-  if (!points?.length) {
+  if (!batchData.length) {
     return <div className="h-[60px] flex items-center justify-center text-xs text-muted-foreground">No data</div>
   }
 
