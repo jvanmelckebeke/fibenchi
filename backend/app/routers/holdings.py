@@ -1,5 +1,3 @@
-import asyncio
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +19,7 @@ async def get_holdings(symbol: str, db: AsyncSession = Depends(get_db)):
     asset = await get_asset(symbol, db)
     if asset.type.value != "etf":
         raise HTTPException(400, f"{symbol} is not an ETF")
-    data = await asyncio.to_thread(fetch_etf_holdings, symbol)
+    data = await fetch_etf_holdings(symbol)
     if not data:
         raise HTTPException(404, f"No holdings data for {symbol}")
     return data
@@ -34,7 +32,7 @@ async def get_holdings_indicators(symbol: str, db: AsyncSession = Depends(get_db
     if asset.type.value != "etf":
         raise HTTPException(400, f"{symbol} is not an ETF")
 
-    data = await asyncio.to_thread(fetch_etf_holdings, symbol)
+    data = await fetch_etf_holdings(symbol)
     if not data:
         raise HTTPException(404, f"No holdings data for {symbol}")
 
@@ -42,5 +40,5 @@ async def get_holdings_indicators(symbol: str, db: AsyncSession = Depends(get_db
     if not holding_symbols:
         return []
 
-    snapshots = await asyncio.to_thread(compute_batch_indicator_snapshots, holding_symbols)
+    snapshots = await compute_batch_indicator_snapshots(holding_symbols)
     return [HoldingIndicatorResponse(**s) for s in snapshots]

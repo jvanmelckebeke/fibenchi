@@ -4,8 +4,9 @@ from datetime import date
 
 import pandas as pd
 from yahooquery import Ticker
+from yahooquery import search as _yq_search
 
-from app.utils import TTLCache
+from app.utils import TTLCache, async_threadable
 
 # In-memory TTL cache for ETF holdings (holdings change quarterly at most)
 _holdings_cache: TTLCache = TTLCache(default_ttl=86400, max_size=100)
@@ -18,6 +19,7 @@ PERIOD_MAP = {
 }
 
 
+@async_threadable
 def fetch_history(
     symbol: str,
     period: str = "3mo",
@@ -47,6 +49,7 @@ def fetch_history(
     return df
 
 
+@async_threadable
 def validate_symbol(symbol: str) -> dict | None:
     """Validate a ticker and return basic info, or None if invalid."""
     ticker = Ticker(symbol)
@@ -69,6 +72,7 @@ def validate_symbol(symbol: str) -> dict | None:
     }
 
 
+@async_threadable
 def fetch_etf_holdings(symbol: str) -> dict | None:
     """Fetch ETF top holdings and sector weightings from Yahoo Finance.
 
@@ -157,6 +161,7 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     return result
 
 
+@async_threadable
 def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
     """Fetch current market quotes for multiple symbols in one batch call.
 
@@ -219,3 +224,9 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
             continue
 
     return result
+
+
+@async_threadable
+def search(query: str, **kwargs) -> dict:
+    """Search Yahoo Finance for ticker symbols."""
+    return _yq_search(query, **kwargs)

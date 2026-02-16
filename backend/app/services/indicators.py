@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from app.services.yahoo import batch_fetch_currencies, batch_fetch_history
+from app.utils import async_threadable
 
 
 def safe_round(value, decimals: int = 2) -> float | None:
@@ -130,6 +131,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+@async_threadable
 def compute_batch_indicator_snapshots(
     symbols: list[str],
 ) -> list[dict]:

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.database import async_session
 from app.models.asset import Asset
 from app.schemas.quote import QuoteResponse
-from app.services.yahoo import batch_fetch_quotes
+from app.services.yahoo import batch_fetch_quotes  # async via @async_threadable
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ async def get_quotes(symbols: str = Query(..., description="Comma-separated list
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
-    return await asyncio.to_thread(batch_fetch_quotes, symbol_list)
+    return await batch_fetch_quotes(symbol_list)
 
 
 async def _quote_event_generator():
@@ -52,7 +52,7 @@ async def _quote_event_generator():
                 await asyncio.sleep(60)
                 continue
 
-            quotes = await asyncio.to_thread(batch_fetch_quotes, symbols)
+            quotes = await batch_fetch_quotes(symbols)
 
             # Build keyed payload
             full_payload: dict[str, dict] = {}

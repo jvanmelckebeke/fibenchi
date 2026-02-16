@@ -2,8 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
+from functools import wraps
 from typing import Hashable, TypeVar
+
+
+def async_threadable(fn):
+    """Decorator that wraps a sync function to run in a thread via asyncio.to_thread.
+
+    The decorated function becomes async. Callers simply ``await func(...)``
+    instead of ``await asyncio.to_thread(func, ...)``.
+    """
+
+    @wraps(fn)
+    async def wrapper(*args, **kwargs):
+        return await asyncio.to_thread(fn, *args, **kwargs)
+
+    return wrapper
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")

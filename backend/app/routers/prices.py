@@ -14,7 +14,7 @@ from app.routers.deps import find_asset, get_asset
 from app.schemas.price import IndicatorResponse, PriceResponse
 from app.services.indicators import compute_indicators, safe_round
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
-from app.services.yahoo import fetch_history
+from app.services.yahoo import fetch_history  # async via @async_threadable
 from app.utils import TTLCache
 
 router = APIRouter(prefix="/api/assets/{symbol}", tags=["prices"])
@@ -48,7 +48,7 @@ async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd
         days += WARMUP_DAYS
     start_date = date.today() - timedelta(days=days)
     try:
-        df = await asyncio.to_thread(fetch_history, symbol.upper(), start=start_date, end=date.today())
+        df = await fetch_history(symbol.upper(), start=start_date, end=date.today())
     except (ValueError, Exception):
         raise HTTPException(404, f"No price data available for {symbol}")
 

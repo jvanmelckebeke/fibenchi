@@ -1,5 +1,3 @@
-import asyncio
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,7 +47,7 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
     symbols = [a.symbol for a in etf.constituents]
     symbol_to_name = {a.symbol: a.name for a in etf.constituents}
 
-    snapshots = await asyncio.to_thread(compute_batch_indicator_snapshots, symbols)
+    snapshots = await compute_batch_indicator_snapshots(symbols)
     return [
         ConstituentIndicatorResponse(
             **s,
