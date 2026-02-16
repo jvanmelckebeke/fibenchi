@@ -1,27 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import pandas as pd
-
 from app.database import get_db
 from app.models.pseudo_etf import PseudoETF
 from app.schemas.pseudo_etf import PerformanceBreakdownPoint, ConstituentIndicatorResponse
 from app.services.pseudo_etf import calculate_performance
-from app.services.indicators import compute_indicators
+from app.services.indicators import compute_indicators, build_indicator_snapshot
 from app.services.yahoo import batch_fetch_currencies, batch_fetch_history
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
-
-
-def _bb_position(close: float, upper: float, middle: float, lower: float) -> str:
-    if close > upper:
-        return "above"
-    elif close > middle:
-        return "upper"
-    elif close > lower:
-        return "lower"
-    else:
-        return "below"
 
 
 @router.get("/{etf_id}/performance", response_model=list[PerformanceBreakdownPoint], summary="Get indexed performance with per-constituent breakdown")
@@ -81,40 +68,13 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
             ))
             continue
 
-        indicators = compute_indicators(df)
-        latest = indicators.iloc[-1]
-        prev_close = indicators.iloc[-2]["close"] if len(indicators) >= 2 else None
-
-        change_pct = None
-        if prev_close and prev_close != 0:
-            change_pct = round((latest["close"] - prev_close) / prev_close * 100, 2)
-
-        macd_dir = None
-        if pd.notna(latest["macd"]) and pd.notna(latest["macd_signal"]):
-            macd_dir = "bullish" if latest["macd"] > latest["macd_signal"] else "bearish"
-
-        bb_pos = None
-        if pd.notna(latest["bb_upper"]) and pd.notna(latest["bb_middle"]) and pd.notna(latest["bb_lower"]):
-            bb_pos = _bb_position(latest["close"], latest["bb_upper"], latest["bb_middle"], latest["bb_lower"])
-
+        snapshot = build_indicator_snapshot(compute_indicators(df))
         results.append(ConstituentIndicatorResponse(
             symbol=sym,
             name=symbol_to_name.get(sym),
             currency=currency,
             weight_pct=weight_map.get(sym),
-            close=round(latest["close"], 2),
-            change_pct=change_pct,
-            rsi=round(latest["rsi"], 2) if pd.notna(latest["rsi"]) else None,
-            sma_20=round(latest["sma_20"], 2) if pd.notna(latest["sma_20"]) else None,
-            sma_50=round(latest["sma_50"], 2) if pd.notna(latest["sma_50"]) else None,
-            macd=round(latest["macd"], 4) if pd.notna(latest["macd"]) else None,
-            macd_signal=round(latest["macd_signal"], 4) if pd.notna(latest["macd_signal"]) else None,
-            macd_hist=round(latest["macd_hist"], 4) if pd.notna(latest["macd_hist"]) else None,
-            macd_signal_dir=macd_dir,
-            bb_upper=round(latest["bb_upper"], 2) if pd.notna(latest["bb_upper"]) else None,
-            bb_middle=round(latest["bb_middle"], 2) if pd.notna(latest["bb_middle"]) else None,
-            bb_lower=round(latest["bb_lower"], 2) if pd.notna(latest["bb_lower"]) else None,
-            bb_position=bb_pos,
+            **snapshot,
         ))
 
     return results

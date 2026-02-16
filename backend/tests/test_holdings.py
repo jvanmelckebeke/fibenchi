@@ -5,25 +5,25 @@ import pandas as pd
 import pytest
 from unittest.mock import patch
 
-from app.routers.holdings import _bb_position
+from app.services.indicators import bb_position
 
 
-# ── Pure unit tests for _bb_position ──────────────────────────────────
+# ── Pure unit tests for bb_position ───────────────────────────────────
 
 def test_bb_position_above():
-    assert _bb_position(close=110, upper=105, middle=100, lower=95) == "above"
+    assert bb_position(close=110, upper=105, middle=100, lower=95) == "above"
 
 
 def test_bb_position_upper():
-    assert _bb_position(close=103, upper=105, middle=100, lower=95) == "upper"
+    assert bb_position(close=103, upper=105, middle=100, lower=95) == "upper"
 
 
 def test_bb_position_lower():
-    assert _bb_position(close=97, upper=105, middle=100, lower=95) == "lower"
+    assert bb_position(close=97, upper=105, middle=100, lower=95) == "lower"
 
 
 def test_bb_position_below():
-    assert _bb_position(close=90, upper=105, middle=100, lower=95) == "below"
+    assert bb_position(close=90, upper=105, middle=100, lower=95) == "below"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
