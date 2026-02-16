@@ -131,7 +131,7 @@ export function useChartSync() {
     }
   }, [getValuesForTime])
 
-  const setupSingleChartCrosshair = useCallback((chart: IChartApi) => {
+  const setupSingleChartCrosshair = useCallback((chart: IChartApi, series: ReturnType<IChartApi["addSeries"]>) => {
     chart.subscribeCrosshairMove((param) => {
       if (param.time) {
         const key = String(param.time)
@@ -146,6 +146,15 @@ export function useChartSync() {
           bbUpper: bbUpperByTime.current.get(key),
           bbLower: bbLowerByTime.current.get(key),
         })
+        // Snap crosshair to close price
+        if (!syncingRef.current) {
+          syncingRef.current = true
+          const closeVal = closeByTime.current.get(key)
+          if (closeVal !== undefined) {
+            chart.setCrosshairPosition(closeVal, param.time, series)
+          }
+          syncingRef.current = false
+        }
       } else {
         setHoverValues(null)
       }
