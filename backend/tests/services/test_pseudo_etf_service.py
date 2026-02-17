@@ -52,9 +52,13 @@ async def test_create_duplicate_name_raises_400(MockRepo):
     assert exc_info.value.status_code == 400
 
 
+@patch("app.services.pseudo_etf_service.sync_asset_prices", new_callable=AsyncMock)
+@patch("app.services.pseudo_etf_service.PriceRepository")
 @patch("app.services.pseudo_etf_service.AssetRepository")
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")
-async def test_add_constituents_skips_duplicates(MockPetfRepo, MockAssetRepo):
+async def test_add_constituents_skips_duplicates(
+    MockPetfRepo, MockAssetRepo, MockPriceRepo, mock_sync
+):
     db = AsyncMock()
     etf = _make_etf()
     existing_asset = _make_asset(1, "AAPL")
@@ -65,12 +69,41 @@ async def test_add_constituents_skips_duplicates(MockPetfRepo, MockAssetRepo):
     mock_petf_repo.save = AsyncMock(return_value=etf)
     mock_asset_repo = MockAssetRepo.return_value
     mock_asset_repo.get_by_ids = AsyncMock(return_value=[existing_asset, new_asset])
+    # MSFT already has price data
+    MockPriceRepo.return_value.get_last_dates = AsyncMock(return_value={2: "2025-06-01"})
 
     with patch(_PATCH_GET_ETF, new_callable=AsyncMock, return_value=etf):
         await add_constituents(db, etf_id=1, asset_ids=[1, 2])
 
     assert new_asset in etf.constituents
     mock_petf_repo.save.assert_awaited_once()
+    mock_sync.assert_not_awaited()
+
+
+@patch("app.services.pseudo_etf_service.sync_asset_prices", new_callable=AsyncMock)
+@patch("app.services.pseudo_etf_service.PriceRepository")
+@patch("app.services.pseudo_etf_service.AssetRepository")
+@patch("app.services.pseudo_etf_service.PseudoEtfRepository")
+async def test_add_constituents_syncs_prices_for_asset_without_data(
+    MockPetfRepo, MockAssetRepo, MockPriceRepo, mock_sync
+):
+    db = AsyncMock()
+    etf = _make_etf()
+    new_asset = _make_asset(5, "AVAV")
+    etf.constituents = []
+
+    mock_petf_repo = MockPetfRepo.return_value
+    mock_petf_repo.save = AsyncMock(return_value=etf)
+    MockAssetRepo.return_value.get_by_ids = AsyncMock(return_value=[new_asset])
+    # AVAV has no price data — missing from get_last_dates result
+    MockPriceRepo.return_value.get_last_dates = AsyncMock(return_value={})
+    mock_sync.return_value = 500
+
+    with patch(_PATCH_GET_ETF, new_callable=AsyncMock, return_value=etf):
+        await add_constituents(db, etf_id=1, asset_ids=[5])
+
+    assert new_asset in etf.constituents
+    mock_sync.assert_awaited_once_with(db, new_asset, period="5y")
 
 
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")
