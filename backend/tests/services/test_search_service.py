@@ -1,12 +1,10 @@
 """Unit tests for search_service — DB-backed symbol directory with Yahoo fallback."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
 from app.models.symbol_directory import SymbolDirectory
 from app.services.search_service import search_symbols, _parse_yahoo_results
 
-pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 def _yahoo_response(*items):

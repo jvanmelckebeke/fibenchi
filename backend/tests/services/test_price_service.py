@@ -16,7 +16,7 @@ from app.services.price_service import (
     refresh_prices,
 )
 
-pytestmark = pytest.mark.asyncio(loop_scope="function")
+
 
 
 def _make_asset(**overrides) -> Asset:
