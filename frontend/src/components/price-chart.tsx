@@ -5,11 +5,18 @@ import { useChartSync, type ChartEntry } from "@/lib/use-chart-sync"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import {
   createMainChart,
-  addBollingerBands,
-  addSmaOverlays,
-  addAnnotationMarkers,
+  createOverlaySeries,
   createRsiSubChart,
   createMacdSubChart,
+  setMainSeriesData,
+  setOverlayData,
+  setRsiData,
+  setMacdData,
+  addAnnotationMarkers,
+  type OverlaySeries,
+  type RsiChartState,
+  type MacdChartState,
+  type MarkersHandle,
 } from "./chart/chart-builders"
 import { Legend, RsiLegend, MacdLegend, type LegendValues } from "./chart/chart-legends"
 
@@ -24,6 +31,14 @@ interface PriceChartProps {
   showMacdChart?: boolean
   chartType?: "candle" | "line"
   mainChartHeight?: number
+}
+
+interface ChartState {
+  mainChart: IChartApi
+  mainSeries: ReturnType<IChartApi["addSeries"]>
+  overlays: OverlaySeries
+  rsi: RsiChartState | null
+  macd: MacdChartState | null
 }
 
 export function PriceChart({
@@ -48,6 +63,9 @@ export function PriceChart({
 
   const { hoverValues, buildLookupMaps, syncCharts, setupSingleChartCrosshair } = useChartSync()
 
+  const chartStateRef = useRef<ChartState | null>(null)
+  const markersRef = useRef<MarkersHandle | null>(null)
+
   // Compute latest values for default legend display
   const latestValues = useMemo<LegendValues>(() => {
     if (!prices.length) return {}
@@ -69,35 +87,26 @@ export function PriceChart({
     }
   }, [prices, indicators, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart])
 
+  // Effect 1: Create chart structure (runs only on structural changes)
   useEffect(() => {
-    if (!mainRef.current || !prices.length) return
+    if (!mainRef.current) return
     if (showRsiChart && !rsiRef.current) return
     if (showMacdChart && !macdRef.current) return
 
-    buildLookupMaps(prices, indicators)
-
-    // Main chart
     const hideTimeAxis = showRsiChart || showMacdChart
     const { chart: mainChart, series: mainSeries } = createMainChart(
-      mainRef.current, prices, chartType, mainChartHeight, hideTimeAxis,
+      mainRef.current, chartType, mainChartHeight, hideTimeAxis,
     )
+    const overlays = createOverlaySeries(mainChart)
 
-    // Overlays
-    if (indicators.length) {
-      if (showBollinger) addBollingerBands(mainChart, indicators)
-      addSmaOverlays(mainChart, indicators, { sma20: showSma20, sma50: showSma50 })
-    }
-    addAnnotationMarkers(mainSeries, annotations)
-
-    mainChart.timeScale().fitContent()
     mainChartRef.current = mainChart
 
     const chartEntries: ChartEntry[] = [{ chart: mainChart, series: mainSeries }]
     const createdCharts: IChartApi[] = [mainChart]
 
-    // RSI sub-chart
+    let rsi: RsiChartState | null = null
     if (showRsiChart && rsiRef.current) {
-      const rsi = createRsiSubChart(rsiRef.current, indicators)
+      rsi = createRsiSubChart(rsiRef.current)
       rsiChartRef.current = rsi.chart
       chartEntries.push({ chart: rsi.chart, series: rsi.series })
       createdCharts.push(rsi.chart)
@@ -105,11 +114,11 @@ export function PriceChart({
       rsiChartRef.current = null
     }
 
-    // MACD sub-chart
+    let macd: MacdChartState | null = null
     if (showMacdChart && macdRef.current) {
-      const macd = createMacdSubChart(macdRef.current, indicators)
+      macd = createMacdSubChart(macdRef.current)
       macdChartRef.current = macd.chart
-      chartEntries.push({ chart: macd.chart, series: macd.series })
+      chartEntries.push({ chart: macd.chart, series: macd.line })
       createdCharts.push(macd.chart)
     } else {
       macdChartRef.current = null
@@ -122,8 +131,48 @@ export function PriceChart({
       setupSingleChartCrosshair(mainChart, mainSeries)
     }
 
-    return startLifecycle(createdCharts)
-  }, [prices, indicators, annotations, buildLookupMaps, syncCharts, setupSingleChartCrosshair, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart, chartType, mainChartHeight, startLifecycle])
+    chartStateRef.current = { mainChart, mainSeries, overlays, rsi, macd }
+
+    const cleanupLifecycle = startLifecycle(createdCharts)
+    return () => {
+      markersRef.current = null
+      chartStateRef.current = null
+      cleanupLifecycle()
+    }
+  }, [chartType, showRsiChart, showMacdChart, mainChartHeight, syncCharts, setupSingleChartCrosshair, startLifecycle])
+
+  // Effect 2: Update data in-place (runs on data and overlay toggle changes)
+  useEffect(() => {
+    const state = chartStateRef.current
+    if (!state || !prices.length) return
+
+    buildLookupMaps(prices, indicators)
+
+    // Main series data
+    setMainSeriesData(state.mainSeries, prices, chartType)
+
+    // Overlay data (hidden overlays get empty data)
+    setOverlayData(state.overlays, indicators, {
+      sma20: showSma20,
+      sma50: showSma50,
+      bollinger: showBollinger,
+    })
+
+    // Annotation markers — detach old, create new
+    try { markersRef.current?.detach() } catch { /* chart may have been recreated */ }
+    markersRef.current = addAnnotationMarkers(state.mainSeries, annotations)
+
+    // RSI data
+    if (state.rsi) setRsiData(state.rsi, indicators)
+
+    // MACD data
+    if (state.macd) setMacdData(state.macd, indicators)
+
+    // Fit content on all charts
+    state.mainChart.timeScale().fitContent()
+    state.rsi?.chart.timeScale().fitContent()
+    state.macd?.chart.timeScale().fitContent()
+  }, [prices, indicators, annotations, showSma20, showSma50, showBollinger, chartType, showRsiChart, showMacdChart, mainChartHeight, buildLookupMaps])
 
   const resetView = useCallback(() => {
     mainChartRef.current?.timeScale().fitContent()

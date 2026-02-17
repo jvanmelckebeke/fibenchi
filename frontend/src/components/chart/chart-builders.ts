@@ -2,6 +2,8 @@ import {
   createChart,
   createSeriesMarkers,
   type IChartApi,
+  type Time,
+  type ISeriesMarkersPluginApi,
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
@@ -12,10 +14,38 @@ import { BandFillPrimitive } from "./bollinger-band-fill"
 
 type Series = ReturnType<IChartApi["addSeries"]>
 
-/** Create the main price series (candle or line) and return both chart and series. */
+// ---- Series handle interfaces ----
+
+export interface OverlaySeries {
+  sma20: Series
+  sma50: Series
+  bbUpper: Series
+  bbLower: Series
+  bbFill: BandFillPrimitive
+}
+
+export interface RsiChartState {
+  chart: IChartApi
+  series: Series
+  overbought: Series
+  oversold: Series
+}
+
+export interface MacdChartState {
+  chart: IChartApi
+  hist: Series
+  line: Series
+  signal: Series
+  zero: Series
+}
+
+export type MarkersHandle = ISeriesMarkersPluginApi<Time>
+
+// ---- Chart creation (structure only, no data) ----
+
+/** Create the main price chart with an empty candle or line series. */
 export function createMainChart(
   container: HTMLElement,
-  prices: Price[],
   chartType: "candle" | "line",
   height: number,
   hideTimeAxis: boolean,
@@ -26,113 +56,61 @@ export function createMainChart(
     timeScale: { ...opts.timeScale, visible: !hideTimeAxis },
   })
 
-  let series: Series
-  if (chartType === "line") {
-    series = chart.addSeries(LineSeries, {
-      color: "#3b82f6",
-      lineWidth: 2,
-      priceLineVisible: false,
-    })
-    series.setData(prices.map((p) => ({ time: p.date, value: p.close })))
-  } else {
-    series = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderUpColor: "#22c55e",
-      borderDownColor: "#ef4444",
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
-    })
-    series.setData(
-      prices.map((p) => ({
-        time: p.date,
-        open: p.open,
-        high: p.high,
-        low: p.low,
-        close: p.close,
-      })),
-    )
-  }
+  const series =
+    chartType === "line"
+      ? chart.addSeries(LineSeries, {
+          color: "#3b82f6",
+          lineWidth: 2,
+          priceLineVisible: false,
+        })
+      : chart.addSeries(CandlestickSeries, {
+          upColor: "#22c55e",
+          downColor: "#ef4444",
+          borderUpColor: "#22c55e",
+          borderDownColor: "#ef4444",
+          wickUpColor: "#22c55e",
+          wickDownColor: "#ef4444",
+        })
 
   return { chart, series }
 }
 
-/** Add Bollinger Bands (upper/lower lines + shaded fill) to the chart. */
-export function addBollingerBands(chart: IChartApi, indicators: Indicator[]): void {
-  const bbData = indicators.filter((i) => i.bb_upper !== null && i.bb_lower !== null)
-  if (!bbData.length) return
-
-  const lineOpts = {
+/** Create overlay series (SMA20, SMA50, Bollinger Bands) without data. */
+export function createOverlaySeries(chart: IChartApi): OverlaySeries {
+  const bbLineOpts = {
     color: "rgba(96, 165, 250, 0.4)",
     lineWidth: 1 as const,
     priceLineVisible: false,
     crosshairMarkerVisible: false,
   }
 
-  const bbUpperLine = chart.addSeries(LineSeries, lineOpts)
-  bbUpperLine.setData(bbData.map((i) => ({ time: i.date, value: i.bb_upper! })))
-
-  const bbLowerLine = chart.addSeries(LineSeries, lineOpts)
-  bbLowerLine.setData(bbData.map((i) => ({ time: i.date, value: i.bb_lower! })))
-
-  const bandFill = new BandFillPrimitive(
-    bbData.map((i) => ({ time: i.date, upper: i.bb_upper!, lower: i.bb_lower! })),
-  )
+  const bbUpper = chart.addSeries(LineSeries, bbLineOpts)
+  const bbLower = chart.addSeries(LineSeries, bbLineOpts)
+  const bbFill = new BandFillPrimitive([])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- lightweight-charts plugin API type mismatch
-  bbUpperLine.attachPrimitive(bandFill as any)
+  bbUpper.attachPrimitive(bbFill as any)
+
+  const sma20 = chart.addSeries(LineSeries, {
+    color: "#14b8a6",
+    lineWidth: 1,
+    priceLineVisible: false,
+    crosshairMarkerVisible: false,
+  })
+
+  const sma50 = chart.addSeries(LineSeries, {
+    color: "#8b5cf6",
+    lineWidth: 1,
+    priceLineVisible: false,
+    crosshairMarkerVisible: false,
+  })
+
+  return { sma20, sma50, bbUpper, bbLower, bbFill }
 }
 
-/** Add SMA overlay lines to the chart. */
-export function addSmaOverlays(
-  chart: IChartApi,
-  indicators: Indicator[],
-  opts: { sma20: boolean; sma50: boolean },
-): void {
-  if (opts.sma20) {
-    const sma20 = chart.addSeries(LineSeries, {
-      color: "#14b8a6",
-      lineWidth: 1,
-      priceLineVisible: false,
-      crosshairMarkerVisible: false,
-    })
-    sma20.setData(
-      indicators.filter((i) => i.sma_20 !== null).map((i) => ({ time: i.date, value: i.sma_20! })),
-    )
-  }
-
-  if (opts.sma50) {
-    const sma50 = chart.addSeries(LineSeries, {
-      color: "#8b5cf6",
-      lineWidth: 1,
-      priceLineVisible: false,
-      crosshairMarkerVisible: false,
-    })
-    sma50.setData(
-      indicators.filter((i) => i.sma_50 !== null).map((i) => ({ time: i.date, value: i.sma_50! })),
-    )
-  }
-}
-
-/** Add annotation markers to the main series. */
-export function addAnnotationMarkers(series: Series, annotations: Annotation[]): void {
-  if (!annotations.length) return
-  const markers = annotations
-    .map((a) => ({
-      time: a.date,
-      position: "aboveBar" as const,
-      color: a.color,
-      shape: "circle" as const,
-      text: a.title.slice(0, 2),
-    }))
-    .sort((a, b) => (a.time < b.time ? -1 : 1))
-  createSeriesMarkers(series, markers)
-}
-
-/** Create the RSI sub-chart and return chart + primary series. */
+/** Create the RSI sub-chart with empty series. */
 export function createRsiSubChart(
   container: HTMLElement,
-  indicators: Indicator[],
-): { chart: IChartApi; series: Series } {
+): RsiChartState {
   const rsiOpts = baseChartOptions(container, 120)
   const chart = createChart(container, {
     ...rsiOpts,
@@ -149,11 +127,7 @@ export function createRsiSubChart(
     priceLineVisible: false,
     autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
   })
-  series.setData(
-    indicators.filter((i) => i.rsi !== null).map((i) => ({ time: i.date, value: i.rsi! })),
-  )
 
-  // Threshold lines (overbought 70, oversold 30)
   const thresholdOpts = {
     lineWidth: 1 as const,
     lineStyle: 2 as const,
@@ -164,27 +138,110 @@ export function createRsiSubChart(
   const overbought = chart.addSeries(LineSeries, { ...thresholdOpts, color: "rgba(239, 68, 68, 0.5)" })
   const oversold = chart.addSeries(LineSeries, { ...thresholdOpts, color: "rgba(34, 197, 94, 0.5)" })
 
-  const rsiDates = indicators.filter((i) => i.rsi !== null).map((i) => i.date)
-  if (rsiDates.length) {
-    overbought.setData(rsiDates.map((d) => ({ time: d, value: 70 })))
-    oversold.setData(rsiDates.map((d) => ({ time: d, value: 30 })))
-  }
-
-  chart.timeScale().fitContent()
-  return { chart, series }
+  return { chart, series, overbought, oversold }
 }
 
-/** Create the MACD sub-chart and return chart + primary series. */
+/** Create the MACD sub-chart with empty series. */
 export function createMacdSubChart(
   container: HTMLElement,
-  indicators: Indicator[],
-): { chart: IChartApi; series: Series } {
+): MacdChartState {
   const chart = createChart(container, baseChartOptions(container, 120))
 
+  const hist = chart.addSeries(HistogramSeries, { priceLineVisible: false, base: 0 })
+
+  const line = chart.addSeries(LineSeries, {
+    color: "#38bdf8",
+    lineWidth: 2,
+    priceLineVisible: false,
+    crosshairMarkerVisible: false,
+  })
+
+  const signal = chart.addSeries(LineSeries, {
+    color: "#fb923c",
+    lineWidth: 2,
+    priceLineVisible: false,
+    crosshairMarkerVisible: false,
+  })
+
+  const zero = chart.addSeries(LineSeries, {
+    color: "rgba(161, 161, 170, 0.3)",
+    lineWidth: 1,
+    lineStyle: 2,
+    priceLineVisible: false,
+    crosshairMarkerVisible: false,
+  })
+
+  return { chart, hist, line, signal, zero }
+}
+
+// ---- Data setting functions ----
+
+/** Set price data on the main series. */
+export function setMainSeriesData(
+  series: Series,
+  prices: Price[],
+  chartType: "candle" | "line",
+): void {
+  if (chartType === "line") {
+    series.setData(prices.map((p) => ({ time: p.date, value: p.close })))
+  } else {
+    series.setData(
+      prices.map((p) => ({
+        time: p.date,
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+      })),
+    )
+  }
+}
+
+/** Set indicator data on overlay series. Hidden overlays get empty data. */
+export function setOverlayData(
+  overlays: OverlaySeries,
+  indicators: Indicator[],
+  opts: { sma20: boolean; sma50: boolean; bollinger: boolean },
+): void {
+  overlays.sma20.setData(
+    opts.sma20
+      ? indicators.filter((i) => i.sma_20 !== null).map((i) => ({ time: i.date, value: i.sma_20! }))
+      : [],
+  )
+
+  overlays.sma50.setData(
+    opts.sma50
+      ? indicators.filter((i) => i.sma_50 !== null).map((i) => ({ time: i.date, value: i.sma_50! }))
+      : [],
+  )
+
+  if (opts.bollinger) {
+    const bbData = indicators.filter((i) => i.bb_upper !== null && i.bb_lower !== null)
+    overlays.bbFill.data = bbData.map((i) => ({ time: i.date, upper: i.bb_upper!, lower: i.bb_lower! }))
+    overlays.bbUpper.setData(bbData.map((i) => ({ time: i.date, value: i.bb_upper! })))
+    overlays.bbLower.setData(bbData.map((i) => ({ time: i.date, value: i.bb_lower! })))
+  } else {
+    overlays.bbFill.data = []
+    overlays.bbUpper.setData([])
+    overlays.bbLower.setData([])
+  }
+}
+
+/** Set RSI data on the RSI sub-chart series. */
+export function setRsiData(rsi: RsiChartState, indicators: Indicator[]): void {
+  const rsiData = indicators.filter((i) => i.rsi !== null)
+  rsi.series.setData(rsiData.map((i) => ({ time: i.date, value: i.rsi! })))
+
+  const dates = rsiData.map((i) => i.date)
+  rsi.overbought.setData(dates.length ? dates.map((d) => ({ time: d, value: 70 })) : [])
+  rsi.oversold.setData(dates.length ? dates.map((d) => ({ time: d, value: 30 })) : [])
+}
+
+/** Set MACD data on the MACD sub-chart series. */
+export function setMacdData(macd: MacdChartState, indicators: Indicator[]): void {
   const macdData = indicators.filter((i) => i.macd !== null)
 
-  const histSeries = chart.addSeries(HistogramSeries, { priceLineVisible: false, base: 0 })
-  histSeries.setData(
+  macd.hist.setData(
     macdData.map((i) => ({
       time: i.date,
       value: i.macd_hist!,
@@ -192,35 +249,28 @@ export function createMacdSubChart(
     })),
   )
 
-  const lineSeries = chart.addSeries(LineSeries, {
-    color: "#38bdf8",
-    lineWidth: 2,
-    priceLineVisible: false,
-    crosshairMarkerVisible: false,
-  })
-  lineSeries.setData(macdData.map((i) => ({ time: i.date, value: i.macd! })))
+  macd.line.setData(macdData.map((i) => ({ time: i.date, value: i.macd! })))
 
-  const signalSeries = chart.addSeries(LineSeries, {
-    color: "#fb923c",
-    lineWidth: 2,
-    priceLineVisible: false,
-    crosshairMarkerVisible: false,
-  })
-  signalSeries.setData(
+  macd.signal.setData(
     indicators.filter((i) => i.macd_signal !== null).map((i) => ({ time: i.date, value: i.macd_signal! })),
   )
 
-  if (macdData.length) {
-    const zeroLine = chart.addSeries(LineSeries, {
-      color: "rgba(161, 161, 170, 0.3)",
-      lineWidth: 1,
-      lineStyle: 2,
-      priceLineVisible: false,
-      crosshairMarkerVisible: false,
-    })
-    zeroLine.setData(macdData.map((i) => ({ time: i.date, value: 0 })))
-  }
+  macd.zero.setData(
+    macdData.length ? macdData.map((i) => ({ time: i.date, value: 0 })) : [],
+  )
+}
 
-  chart.timeScale().fitContent()
-  return { chart, series: lineSeries }
+/** Create annotation markers on the series. Returns handle for lifecycle management. */
+export function addAnnotationMarkers(series: Series, annotations: Annotation[]): MarkersHandle | null {
+  if (!annotations.length) return null
+  const markers = annotations
+    .map((a) => ({
+      time: a.date,
+      position: "aboveBar" as const,
+      color: a.color,
+      shape: "circle" as const,
+      text: a.title.slice(0, 2),
+    }))
+    .sort((a, b) => (a.time < b.time ? -1 : 1))
+  return createSeriesMarkers(series, markers)
 }
