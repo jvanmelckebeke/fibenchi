@@ -81,7 +81,13 @@ export function useChartSync() {
         const timeRange = source.timeScale().getVisibleRange()
         if (timeRange) {
           for (const target of charts) {
-            if (target !== source) target.timeScale().setVisibleRange(timeRange)
+            if (target !== source) {
+              try {
+                target.timeScale().setVisibleRange(timeRange)
+              } catch {
+                // Target chart may not have data yet — skip until next sync
+              }
+            }
           }
         }
         syncingRef.current = false
