@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
-from app.services.lookups import get_group
+from app.services.entity_lookups import get_group
 
 
 async def list_groups(db: AsyncSession):

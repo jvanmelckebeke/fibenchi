@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.pseudo_etf_repo import PseudoEtfRepository
 from app.schemas.thesis import ThesisResponse
-from app.services.lookups import get_pseudo_etf
+from app.services.entity_lookups import get_pseudo_etf
 
 
 async def list_pseudo_etfs(db: AsyncSession):

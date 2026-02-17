@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.services.watchlist import compute_and_cache_indicators, get_batch_sparklines
+from app.services.compute.watchlist import compute_and_cache_indicators, get_batch_sparklines
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 

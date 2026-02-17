@@ -10,7 +10,7 @@ from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import PriceHistory
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
-from app.services.indicators import build_indicator_snapshot, compute_indicators
+from app.services.compute.indicators import build_indicator_snapshot, compute_indicators
 from app.utils import TTLCache
 
 # In-memory cache for batch indicator snapshots.

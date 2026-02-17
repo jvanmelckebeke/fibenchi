@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.tag_repo import TagRepository
-from app.services.lookups import get_asset
+from app.services.entity_lookups import get_asset
 
 
 async def list_tags(db: AsyncSession):

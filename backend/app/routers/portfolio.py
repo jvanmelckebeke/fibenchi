@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.services.portfolio import compute_performers, compute_portfolio_index
+from app.services.compute.portfolio import compute_performers, compute_portfolio_index
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 

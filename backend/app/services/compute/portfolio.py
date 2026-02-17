@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import PERIOD_DAYS
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
-from app.services.pseudo_etf import calculate_performance
+from app.services.compute.pseudo_etf import calculate_performance
 
 # Minimum stock price before an asset is included in the composite index.
 # Prevents low-IPO-price stocks from distorting equal-weight returns.

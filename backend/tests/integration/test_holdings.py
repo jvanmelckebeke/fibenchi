@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch
 
-from app.services.indicators import bb_position
+from app.services.compute.indicators import bb_position
 from tests.helpers import make_price_df
 
 
@@ -49,8 +49,8 @@ async def test_holdings_indicators_success(client):
 
     with (
         patch("app.services.holdings_service.fetch_etf_holdings", return_value=_MOCK_HOLDINGS),
-        patch("app.services.indicators.batch_fetch_history", return_value=histories),
-        patch("app.services.indicators.batch_fetch_currencies", return_value={"AAPL": "USD", "MSFT": "USD"}),
+        patch("app.services.compute.indicators.batch_fetch_history", return_value=histories),
+        patch("app.services.compute.indicators.batch_fetch_currencies", return_value={"AAPL": "USD", "MSFT": "USD"}),
     ):
         resp = await client.get("/api/assets/SPY/holdings/indicators")
 

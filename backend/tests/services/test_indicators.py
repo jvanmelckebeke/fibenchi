@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.services.indicators import compute_indicators, rsi, sma, macd
+from app.services.compute.indicators import compute_indicators, rsi, sma, macd
 
 
 def _make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:

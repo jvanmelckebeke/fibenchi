@@ -3,8 +3,8 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.indicators import compute_batch_indicator_snapshots
-from app.services.lookups import get_asset
+from app.services.compute.indicators import compute_batch_indicator_snapshots
+from app.services.entity_lookups import get_asset
 from app.services.yahoo import fetch_etf_holdings
 
 

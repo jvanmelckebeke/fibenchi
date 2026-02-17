@@ -11,7 +11,7 @@ from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import Asset, PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
-from app.services.indicators import compute_indicators, safe_round
+from app.services.compute.indicators import compute_indicators, safe_round
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
 from app.services.yahoo import fetch_history
 from app.utils import TTLCache

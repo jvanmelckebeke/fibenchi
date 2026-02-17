@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AssetType
 from app.repositories.asset_repo import AssetRepository
-from app.services.lookups import get_asset
+from app.services.entity_lookups import get_asset
 from app.services.yahoo import validate_symbol
 
 

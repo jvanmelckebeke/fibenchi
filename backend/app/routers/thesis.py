@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.services.lookups import get_asset
+from app.services.entity_lookups import get_asset
 from app.schemas.thesis import ThesisResponse, ThesisUpdate
 from app.services import thesis_service
 
