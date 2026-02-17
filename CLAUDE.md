@@ -83,6 +83,11 @@ Tests seed ~500 days of price data to avoid triggering Yahoo Finance sync (the b
 
 ## Database
 
-PostgreSQL with async SQLAlchemy. Schema is managed via `Base.metadata.create_all()` on startup plus `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in the lifespan function for incremental migrations.
+PostgreSQL with async SQLAlchemy. Schema is managed via **Alembic** migrations (`backend/alembic/`). `alembic upgrade head` runs automatically on container startup (before uvicorn). The initial migration (`0001`) is idempotent — it detects existing tables and skips creation, so it works for both fresh and pre-existing databases.
+
+To create a new migration after model changes:
+```bash
+docker compose exec backend alembic revision --autogenerate -m "description"
+```
 
 DB credentials: `fibenchi/fibenchi@db:5432/fibenchi` (dev only).

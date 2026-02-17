@@ -9,14 +9,11 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from app.config import settings as app_settings
-from sqlalchemy import select, text
 
-from app.database import async_session, engine, Base
-from app.models import Asset  # noqa: F401 - ensure models are imported for create_all
+from app.database import async_session, engine
 from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis, watchlist
 from app.services.price_sync import sync_all_prices
 from app.services.compute.watchlist import compute_and_cache_indicators
-from app.services.yahoo import batch_fetch_currencies
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -45,37 +42,6 @@ async def scheduled_refresh():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        # Migration: add watchlisted column to existing assets table
-        await conn.execute(text(
-            "ALTER TABLE assets ADD COLUMN IF NOT EXISTS watchlisted BOOLEAN DEFAULT TRUE NOT NULL"
-        ))
-        # Migration: add currency column to existing assets table
-        await conn.execute(text(
-            "ALTER TABLE assets ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD' NOT NULL"
-        ))
-
-    # Backfill currencies for existing assets that still have the default "USD"
-    async with async_session() as db:
-        result = await db.execute(select(Asset).where(Asset.currency == "USD"))
-        usd_assets = result.scalars().all()
-        if usd_assets:
-            symbols = [a.symbol for a in usd_assets]
-            try:
-                currencies = batch_fetch_currencies(symbols)
-                updated = 0
-                for asset in usd_assets:
-                    fetched = currencies.get(asset.symbol)
-                    if fetched and fetched != "USD":
-                        asset.currency = fetched
-                        updated += 1
-                if updated:
-                    await db.commit()
-                    logger.info(f"Backfilled currency for {updated} assets")
-            except Exception:
-                logger.exception("Currency backfill failed (non-fatal)")
-
     # Parse cron expression (minute hour day month dow)
     parts = app_settings.refresh_cron.split()
     if len(parts) == 5:
