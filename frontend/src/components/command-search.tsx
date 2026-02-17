@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search } from "lucide-react"
+import { Check, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { useSymbolSearch } from "@/lib/queries"
+import { useAssets, useSymbolSearch } from "@/lib/queries"
 
 export function CommandSearch() {
   const [open, setOpen] = useState(false)
@@ -14,6 +14,11 @@ export function CommandSearch() {
   const inputRef = useRef<HTMLInputElement>(null)
   const prevResultsRef = useRef<string>("")
   const { data: results } = useSymbolSearch(debouncedQuery)
+  const { data: assets } = useAssets()
+  const watchlistedSymbols = useMemo(
+    () => new Set(assets?.filter((a) => a.watchlisted).map((a) => a.symbol)),
+    [assets],
+  )
 
   // Debounce search input
   useEffect(() => {
@@ -111,27 +116,37 @@ export function CommandSearch() {
 
           {results && results.length > 0 && query.trim() && (
             <div className="max-h-72 overflow-auto py-1">
-              {results.map((r, i) => (
-                <button
-                  key={r.symbol}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
-                    i === selectedIndex
-                      ? "bg-primary/10 text-foreground"
-                      : "text-foreground hover:bg-muted"
-                  }`}
-                  onMouseEnter={() => setSelectedIndex(i)}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => goToSymbol(r.symbol)}
-                >
-                  <span className="font-mono font-medium text-primary shrink-0 w-16">
-                    {r.symbol}
-                  </span>
-                  <span className="text-muted-foreground truncate">{r.name}</span>
-                  <Badge variant="secondary" className="ml-auto text-xs shrink-0">
-                    {r.exchange}
-                  </Badge>
-                </button>
-              ))}
+              {results.map((r, i) => {
+                const isWatchlisted = watchlistedSymbols.has(r.symbol)
+                return (
+                  <button
+                    key={r.symbol}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
+                      i === selectedIndex
+                        ? "bg-primary/10 text-foreground"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                    onMouseEnter={() => setSelectedIndex(i)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => goToSymbol(r.symbol)}
+                  >
+                    <span className="font-mono font-medium text-primary shrink-0 w-16">
+                      {r.symbol}
+                    </span>
+                    <span className="text-muted-foreground truncate">{r.name}</span>
+                    {isWatchlisted ? (
+                      <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
+                        <Check className="h-3 w-3" />
+                        Watchlisted
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                        {r.exchange}
+                      </Badge>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           )}
 

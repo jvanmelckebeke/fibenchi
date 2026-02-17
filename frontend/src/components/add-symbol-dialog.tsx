@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react"
-import { Plus } from "lucide-react"
+import { useState, useEffect, useRef, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
+import { Check, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,10 +11,16 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useCreateAsset, useSymbolSearch } from "@/lib/queries"
+import { useAssets, useCreateAsset, useSymbolSearch } from "@/lib/queries"
 
 export function AddSymbolDialog() {
+  const navigate = useNavigate()
   const createAsset = useCreateAsset()
+  const { data: assets } = useAssets()
+  const watchlistedSymbols = useMemo(
+    () => new Set(assets?.filter((a) => a.watchlisted).map((a) => a.symbol)),
+    [assets],
+  )
   const [symbol, setSymbol] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -68,19 +75,37 @@ export function AddSymbolDialog() {
                 ref={suggestionsRef}
                 className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-60 overflow-auto"
               >
-                {searchResults.map((r) => (
-                  <button
-                    key={r.symbol}
-                    type="button"
-                    className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { setSymbol(r.symbol); setShowSuggestions(false) }}
-                  >
-                    <span className="font-mono font-medium text-primary shrink-0">{r.symbol}</span>
-                    <span className="text-muted-foreground truncate">{r.name}</span>
-                    <Badge variant="secondary" className="ml-auto text-xs shrink-0">{r.exchange}</Badge>
-                  </button>
-                ))}
+                {searchResults.map((r) => {
+                  const isWatchlisted = watchlistedSymbols.has(r.symbol)
+                  return (
+                    <button
+                      key={r.symbol}
+                      type="button"
+                      className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (isWatchlisted) {
+                          setDialogOpen(false)
+                          navigate(`/asset/${r.symbol}`)
+                        } else {
+                          setSymbol(r.symbol)
+                          setShowSuggestions(false)
+                        }
+                      }}
+                    >
+                      <span className="font-mono font-medium text-primary shrink-0">{r.symbol}</span>
+                      <span className="text-muted-foreground truncate">{r.name}</span>
+                      {isWatchlisted ? (
+                        <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
+                          <Check className="h-3 w-3" />
+                          Watchlisted
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="ml-auto text-xs shrink-0">{r.exchange}</Badge>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
