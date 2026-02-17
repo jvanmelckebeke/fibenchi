@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useParams, Link } from "react-router-dom"
-import { ArrowLeft, ExternalLink, Loader2, RefreshCw, Plus } from "lucide-react"
+import { ArrowLeft, ExternalLink, RefreshCw, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { PriceChart } from "@/components/price-chart"
 import { ChartSkeleton } from "@/components/chart-skeleton"
 import { ThesisEditor } from "@/components/thesis-editor"
@@ -222,9 +223,33 @@ function HoldingsSection({ symbol }: { symbol: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-muted-foreground py-4">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Loading holdings...</span>
+      <div className="space-y-6">
+        <Card className="p-4">
+          <Skeleton className="h-4 w-48 mb-3" />
+          <div className="space-y-2">
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-4 w-14" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-10" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-12" />
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card className="p-4">
+          <Skeleton className="h-4 w-36 mb-3" />
+          <div className="space-y-2">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 rounded" style={{ width: `${80 - i * 10}%` }} />
+                <Skeleton className="h-4 w-12" />
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     )
   }
