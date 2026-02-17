@@ -11,6 +11,7 @@ import { AnnotationsList } from "@/components/annotations-list"
 import { TagInput } from "@/components/tag-input"
 import { PeriodSelector } from "@/components/period-selector"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
+import { MarketStatusDot } from "@/components/market-status-dot"
 import { buildYahooFinanceUrl, formatPrice } from "@/lib/format"
 import { useQuotes } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
@@ -99,7 +100,10 @@ function Header({
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">{symbol}</h1>
+          <div className="flex items-center gap-2">
+            <MarketStatusDot marketState={quote?.market_state} className="h-2.5 w-2.5" />
+            <h1 className="text-2xl font-bold">{symbol}</h1>
+          </div>
           {name && <p className="text-sm text-muted-foreground">{name}</p>}
         </div>
         {price != null && (
