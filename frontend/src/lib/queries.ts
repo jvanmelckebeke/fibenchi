@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData, type QueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { api, type Asset, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
 
@@ -24,8 +24,6 @@ export const keys = {
   assets: ["assets"] as const,
   asset: (symbol: string) => ["assets", symbol] as const,
   assetDetail: (symbol: string, period?: string) => ["asset-detail", symbol, period] as const,
-  prices: (symbol: string, period?: string) => ["prices", symbol, period] as const,
-  indicators: (symbol: string, period?: string) => ["indicators", symbol, period] as const,
   etfHoldings: (symbol: string) => ["etf-holdings", symbol] as const,
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
   tags: ["tags"] as const,
@@ -132,26 +130,6 @@ export function useAssetDetail(symbol: string, period?: string, opts?: { enabled
   })
 }
 
-export function usePrices(symbol: string, period?: string, opts?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: keys.prices(symbol, period),
-    queryFn: () => api.prices.list(symbol, period),
-    enabled: (opts?.enabled ?? true) && !!symbol,
-    staleTime: 5 * 60 * 1000,
-    placeholderData: keepPreviousData,
-  })
-}
-
-export function useIndicators(symbol: string, period?: string, opts?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: keys.indicators(symbol, period),
-    queryFn: () => api.prices.indicators(symbol, period),
-    enabled: (opts?.enabled ?? true) && !!symbol,
-    staleTime: 5 * 60 * 1000,
-    placeholderData: keepPreviousData,
-  })
-}
-
 export function useEtfHoldings(symbol: string, enabled: boolean) {
   return useQuery({
     queryKey: keys.etfHoldings(symbol),
@@ -173,19 +151,23 @@ export function useHoldingsIndicators(symbol: string, enabled: boolean) {
 export function useRefreshPrices(symbol: string) {
   return useInvalidatingMutation(
     (period?: string) => api.prices.refresh(symbol, period),
-    [keys.prices(symbol), keys.indicators(symbol)],
+    [keys.assetDetail(symbol)],
   )
 }
 
-// Prefetch — fire on hover to warm cache before navigation
-function prefetchAssetDetail(qc: QueryClient, symbol: string, period: string) {
-  qc.prefetchQuery({ queryKey: keys.prices(symbol, period), queryFn: () => api.prices.list(symbol, period), staleTime: 5 * 60 * 1000 })
-  qc.prefetchQuery({ queryKey: keys.indicators(symbol, period), queryFn: () => api.prices.indicators(symbol, period), staleTime: 5 * 60 * 1000 })
-}
 
+// Prefetch — fire on hover to warm cache before navigation
 export function usePrefetchAssetDetail(period: string) {
   const qc = useQueryClient()
-  return useCallback((symbol: string) => prefetchAssetDetail(qc, symbol, period), [qc, period])
+  return useCallback(
+    (symbol: string) =>
+      qc.prefetchQuery({
+        queryKey: keys.assetDetail(symbol, period),
+        queryFn: () => api.prices.detail(symbol, period),
+        staleTime: 5 * 60 * 1000,
+      }),
+    [qc, period],
+  )
 }
 
 // Tags

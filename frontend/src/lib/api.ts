@@ -11,11 +11,9 @@ import type {
   GroupCreate,
   GroupUpdate,
   HoldingIndicator,
-  Indicator,
   IndicatorSummary,
   PerformanceBreakdownPoint,
   PortfolioIndex,
-  Price,
   PseudoETF,
   PseudoETFCreate,
   PseudoETFUpdate,
@@ -72,10 +70,6 @@ export const api = {
       request<void>(`/assets/${symbol}`, { method: "DELETE" }),
   },
   prices: {
-    list: (symbol: string, period?: string) =>
-      request<Price[]>(`/assets/${symbol}/prices${qs({ period })}`),
-    indicators: (symbol: string, period?: string) =>
-      request<Indicator[]>(`/assets/${symbol}/indicators${qs({ period })}`),
     detail: (symbol: string, period?: string) =>
       request<AssetDetail>(`/assets/${symbol}/detail${qs({ period })}`),
     refresh: (symbol: string, period?: string) =>
