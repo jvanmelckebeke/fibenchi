@@ -13,8 +13,10 @@ export function TagBadge({
   onClick?: () => void
   onRemove?: () => void
 }) {
+  const Wrapper = onClick ? "button" : "span"
   return (
-    <span
+    <Wrapper
+      type={onClick ? "button" : undefined}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all",
         onClick && "cursor-pointer",
@@ -41,6 +43,6 @@ export function TagBadge({
           &times;
         </button>
       )}
-    </span>
+    </Wrapper>
   )
 }
