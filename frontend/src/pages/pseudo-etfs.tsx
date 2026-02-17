@@ -77,8 +77,9 @@ function CreateForm({ onClose }: { onClose: () => void }) {
           className="min-h-[60px]"
         />
         <div className="flex items-center gap-2">
-          <label className="text-sm text-muted-foreground">Base date:</label>
+          <label htmlFor="pseudo-etf-base-date" className="text-sm text-muted-foreground">Base date:</label>
           <Input
+            id="pseudo-etf-base-date"
             type="date"
             value={baseDate}
             onChange={(e) => setBaseDate(e.target.value)}
