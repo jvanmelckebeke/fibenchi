@@ -1,12 +1,18 @@
 """Pseudo-ETF CRUD business logic."""
 
+import logging
+
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.asset_repo import AssetRepository
+from app.repositories.price_repo import PriceRepository
 from app.repositories.pseudo_etf_repo import PseudoEtfRepository
 from app.schemas.thesis import ThesisResponse
 from app.services.entity_lookups import get_pseudo_etf
+from app.services.price_sync import sync_asset_prices
+
+logger = logging.getLogger(__name__)
 
 
 async def list_pseudo_etfs(db: AsyncSession):
@@ -40,10 +46,21 @@ async def add_constituents(db: AsyncSession, etf_id: int, asset_ids: list[int]):
     etf = await get_pseudo_etf(etf_id, db)
     assets = await AssetRepository(db).get_by_ids(asset_ids)
     existing_ids = {a.id for a in etf.constituents}
-    for asset in assets:
-        if asset.id not in existing_ids:
-            etf.constituents.append(asset)
-    return await PseudoEtfRepository(db).save(etf)
+    new_assets = [a for a in assets if a.id not in existing_ids]
+    for asset in new_assets:
+        etf.constituents.append(asset)
+    result = await PseudoEtfRepository(db).save(etf)
+
+    # Sync price history for any new constituent that lacks data
+    if new_assets:
+        new_ids = [a.id for a in new_assets]
+        last_dates = await PriceRepository(db).get_last_dates(new_ids)
+        for asset in new_assets:
+            if asset.id not in last_dates:
+                logger.info("Syncing prices for new constituent %s", asset.symbol)
+                await sync_asset_prices(db, asset, period="5y")
+
+    return result
 
 
 async def remove_constituent(db: AsyncSession, etf_id: int, asset_id: int):
