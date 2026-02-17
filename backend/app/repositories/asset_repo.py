@@ -16,19 +16,19 @@ class AssetRepository:
 
     async def list_watchlisted(self) -> list[Asset]:
         result = await self.db.execute(
-            select(Asset).where(Asset.watchlisted == True).order_by(Asset.symbol)  # noqa: E712
+            select(Asset).where(Asset.watchlisted.is_(True)).order_by(Asset.symbol)
         )
         return list(result.scalars().all())
 
     async def list_watchlisted_ids(self) -> list[int]:
         result = await self.db.execute(
-            select(Asset.id).where(Asset.watchlisted == True)  # noqa: E712
+            select(Asset.id).where(Asset.watchlisted.is_(True))
         )
         return list(result.scalars().all())
 
     async def list_watchlisted_id_symbol_pairs(self) -> list[tuple[int, str]]:
         result = await self.db.execute(
-            select(Asset.id, Asset.symbol).where(Asset.watchlisted == True)  # noqa: E712
+            select(Asset.id, Asset.symbol).where(Asset.watchlisted.is_(True))
         )
         return list(result.all())
 

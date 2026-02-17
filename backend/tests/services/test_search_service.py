@@ -1,12 +1,10 @@
-"""Unit tests for search_service — symbol search with TTL cache."""
+"""Unit tests for search_service — DB-backed symbol directory with Yahoo fallback."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-import app.services.search_service as search_mod
-from app.services.search_service import search_symbols
+from app.models.symbol_directory import SymbolDirectory
+from app.services.search_service import search_symbols, _parse_yahoo_results
 
-pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 def _yahoo_response(*items):
@@ -26,24 +24,13 @@ def _mutual_fund(symbol: str, name: str = ""):
     return {"symbol": symbol, "shortname": name, "quoteType": "MUTUALFUND", "exchDisp": "NAS"}
 
 
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    """Clear the module-level search cache before each test."""
-    search_mod._cache.clear()
-    yield
-    search_mod._cache.clear()
-
-
-@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
-async def test_search_returns_filtered_results(mock_yahoo):
-    mock_yahoo.return_value = _yahoo_response(
+def test_parse_yahoo_results_filters_non_equity_etf():
+    quotes = [
         _equity("AAPL", "Apple Inc."),
         _mutual_fund("VFINX", "Vanguard 500"),
         _etf("SPY", "SPDR S&P 500"),
-    )
-
-    result = await search_symbols("apple")
-
+    ]
+    result = _parse_yahoo_results(quotes)
     assert len(result) == 2
     symbols = [r["symbol"] for r in result]
     assert "AAPL" in symbols
@@ -51,59 +38,82 @@ async def test_search_returns_filtered_results(mock_yahoo):
     assert "VFINX" not in symbols
 
 
+def test_parse_yahoo_results_caps_at_8():
+    quotes = [_equity(f"SYM{i}", f"Company {i}") for i in range(12)]
+    result = _parse_yahoo_results(quotes)
+    assert len(result) == 8
+
+
+def test_parse_yahoo_results_empty():
+    result = _parse_yahoo_results([])
+    assert result == []
+
+
+@patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
 @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
-async def test_search_strips_and_lowercases_query(mock_yahoo):
+async def test_search_queries_yahoo_when_db_empty(mock_yahoo, mock_upsert, db):
+    mock_yahoo.return_value = _yahoo_response(
+        _equity("AAPL", "Apple Inc."),
+        _etf("SPY", "SPDR S&P 500"),
+    )
+
+    result = await search_symbols("apple", db)
+
+    assert len(result) == 2
+    mock_yahoo.assert_awaited_once_with("apple", first_quote=False)
+    mock_upsert.assert_awaited_once()
+
+
+@patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
+@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+async def test_search_strips_and_lowercases_query(mock_yahoo, mock_upsert, db):
     mock_yahoo.return_value = _yahoo_response(_equity("AAPL", "Apple"))
 
-    await search_symbols("  AAPL  ")
+    await search_symbols("  AAPL  ", db)
 
     mock_yahoo.assert_awaited_once_with("aapl", first_quote=False)
 
 
+@patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
 @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
-async def test_search_caps_results_at_8(mock_yahoo):
-    quotes = [_equity(f"SYM{i}", f"Company {i}") for i in range(12)]
-    mock_yahoo.return_value = _yahoo_response(*quotes)
+async def test_search_returns_local_when_enough_results(mock_yahoo, mock_upsert, db):
+    # Seed 8+ symbols into the DB
+    for i in range(10):
+        db.add(SymbolDirectory(symbol=f"AAPL{i}", name=f"Apple {i}", exchange="NYSE", type="stock"))
+    await db.commit()
 
-    result = await search_symbols("sym")
+    result = await search_symbols("aapl", db)
 
-    assert len(result) == 8
+    assert len(result) >= 8
+    mock_yahoo.assert_not_awaited()  # Should not call Yahoo when local has enough
 
 
+@patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
 @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
-async def test_search_returns_cached_result_on_second_call(mock_yahoo):
-    mock_yahoo.return_value = _yahoo_response(_equity("AAPL", "Apple"))
+async def test_search_falls_back_to_yahoo_when_few_local(mock_yahoo, mock_upsert, db):
+    # Seed only 2 symbols
+    db.add(SymbolDirectory(symbol="AAPL", name="Apple Inc.", exchange="NYSE", type="stock"))
+    db.add(SymbolDirectory(symbol="AAPLX", name="Apple Extra", exchange="NYSE", type="stock"))
+    await db.commit()
 
-    first = await search_symbols("apple")
-    second = await search_symbols("apple")
+    mock_yahoo.return_value = _yahoo_response(
+        _equity("AAPL", "Apple Inc."),
+        _equity("AAPL2", "Apple 2"),
+    )
 
-    mock_yahoo.assert_awaited_once()  # Only one call — second hit cache
-    assert first == second
+    result = await search_symbols("aapl", db)
+
+    mock_yahoo.assert_awaited_once()
+    assert len(result) == 2  # Yahoo results take priority
 
 
+@patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
 @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
-async def test_search_returns_empty_list_when_no_matches(mock_yahoo):
+async def test_search_returns_empty_when_no_matches(mock_yahoo, mock_upsert, db):
     mock_yahoo.return_value = _yahoo_response(
         _mutual_fund("VFINX", "Vanguard 500"),
     )
 
-    result = await search_symbols("vanguard")
+    result = await search_symbols("vanguard", db)
 
     assert result == []
-
-
-@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
-async def test_cache_eviction_when_max_reached(mock_yahoo):
-    original_max = search_mod._CACHE_MAX
-    search_mod._CACHE_MAX = 3
-    try:
-        for i in range(4):
-            mock_yahoo.return_value = _yahoo_response(_equity(f"S{i}", f"Co {i}"))
-            await search_symbols(f"query{i}")
-
-        # Cache should have evicted the oldest entry
-        assert len(search_mod._cache) == 3
-        assert "query0" not in search_mod._cache
-        assert "query3" in search_mod._cache
-    finally:
-        search_mod._CACHE_MAX = original_max

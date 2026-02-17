@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { TagBadge } from "@/components/tag-badge"
 import { AssetActionMenu } from "@/components/asset-action-menu"
+import { MarketStatusDot } from "@/components/market-status-dot"
 import { PriceChart } from "@/components/price-chart"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
@@ -211,6 +212,7 @@ function TableRow({
         </td>
         <td className={`${py} px-3`}>
           <div className="flex items-center gap-2">
+            <MarketStatusDot marketState={quote?.market_state} />
             <Link
               to={`/asset/${asset.symbol}`}
               className="font-semibold hover:underline"

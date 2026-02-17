@@ -14,6 +14,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/add-symbol-dialog"
 import { AssetActionMenu } from "@/components/asset-action-menu"
+import { MarketStatusDot } from "@/components/market-status-dot"
 import { useAssets, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators, usePrefetchAssetDetail } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
@@ -271,6 +272,7 @@ function AssetCard({
       <Link to={`/asset/${symbol}`}>
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
+            <MarketStatusDot marketState={quote?.market_state} />
             <CardTitle className="text-base">{symbol}</CardTitle>
             <Badge variant="secondary" className="text-xs">
               {type}
