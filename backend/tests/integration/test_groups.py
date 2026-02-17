@@ -1,12 +1,9 @@
 import pytest
 
+from tests.helpers import create_asset_via_api
+
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-async def _create_asset(client, symbol, name):
-    resp = await client.post("/api/assets", json={"symbol": symbol, "name": name})
-    return resp.json()
 
 
 async def test_create_group(client):
@@ -43,8 +40,8 @@ async def test_delete_group(client):
 
 
 async def test_add_assets_to_group(client):
-    a1 = await _create_asset(client, "AAPL", "Apple")
-    a2 = await _create_asset(client, "MSFT", "Microsoft")
+    a1 = await create_asset_via_api(client, "AAPL", "Apple")
+    a2 = await create_asset_via_api(client, "MSFT", "Microsoft")
 
     resp = await client.post("/api/groups", json={"name": "Tech"})
     gid = resp.json()["id"]
@@ -55,8 +52,8 @@ async def test_add_assets_to_group(client):
 
 
 async def test_remove_asset_from_group(client):
-    a1 = await _create_asset(client, "AAPL", "Apple")
-    a2 = await _create_asset(client, "MSFT", "Microsoft")
+    a1 = await create_asset_via_api(client, "AAPL", "Apple")
+    a2 = await create_asset_via_api(client, "MSFT", "Microsoft")
 
     resp = await client.post("/api/groups", json={"name": "Tech"})
     gid = resp.json()["id"]

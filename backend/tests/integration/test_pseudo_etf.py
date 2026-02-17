@@ -1,12 +1,9 @@
 import pytest
 
+from tests.helpers import create_asset_via_api
+
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-async def _create_asset(client, symbol, name):
-    resp = await client.post("/api/assets", json={"symbol": symbol, "name": name})
-    return resp.json()
 
 
 async def test_create_pseudo_etf(client):
@@ -58,8 +55,8 @@ async def test_delete_pseudo_etf(client):
 
 
 async def test_add_constituents(client):
-    a1 = await _create_asset(client, "QBTS", "D-Wave")
-    a2 = await _create_asset(client, "IONQ", "IonQ")
+    a1 = await create_asset_via_api(client, "QBTS", "D-Wave")
+    a2 = await create_asset_via_api(client, "IONQ", "IonQ")
 
     resp = await client.post("/api/pseudo-etfs", json={"name": "Quantum", "base_date": "2025-01-01"})
     etf_id = resp.json()["id"]
@@ -72,8 +69,8 @@ async def test_add_constituents(client):
 
 
 async def test_remove_constituent(client):
-    a1 = await _create_asset(client, "QBTS", "D-Wave")
-    a2 = await _create_asset(client, "IONQ", "IonQ")
+    a1 = await create_asset_via_api(client, "QBTS", "D-Wave")
+    a2 = await create_asset_via_api(client, "IONQ", "IonQ")
 
     resp = await client.post("/api/pseudo-etfs", json={"name": "Quantum", "base_date": "2025-01-01"})
     etf_id = resp.json()["id"]

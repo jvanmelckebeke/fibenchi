@@ -4,11 +4,11 @@ import asyncio
 from datetime import date
 
 import pandas as pd
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Asset, PriceHistory
+from app.models import Asset
+from app.repositories.asset_repo import AssetRepository
+from app.repositories.price_repo import PriceRepository
 from app.services.yahoo import fetch_history, batch_fetch_history
 
 
@@ -28,8 +28,7 @@ async def sync_asset_prices_range(
 
 async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int]:
     """Fetch and upsert prices for all watchlist assets. Returns {symbol: count}."""
-    result = await db.execute(select(Asset))
-    assets = result.scalars().all()
+    assets = await AssetRepository(db).list_all()
 
     if not assets:
         return {}
@@ -49,36 +48,4 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
 
 async def _upsert_prices(db: AsyncSession, asset_id: int, df: pd.DataFrame) -> int:
     """Upsert price rows from a DataFrame. Returns row count."""
-    if df.empty:
-        return 0
-
-    rows = []
-    for idx, row in df.iterrows():
-        dt = idx.date() if hasattr(idx, "date") else idx
-        if not isinstance(dt, date):
-            dt = pd.Timestamp(dt).date()
-
-        rows.append({
-            "asset_id": asset_id,
-            "date": dt,
-            "open": round(float(row["open"]), 4),
-            "high": round(float(row["high"]), 4),
-            "low": round(float(row["low"]), 4),
-            "close": round(float(row["close"]), 4),
-            "volume": int(row["volume"]) if pd.notna(row["volume"]) else 0,
-        })
-
-    stmt = pg_insert(PriceHistory).values(rows)
-    stmt = stmt.on_conflict_do_update(
-        constraint="uq_asset_date",
-        set_={
-            "open": stmt.excluded.open,
-            "high": stmt.excluded.high,
-            "low": stmt.excluded.low,
-            "close": stmt.excluded.close,
-            "volume": stmt.excluded.volume,
-        },
-    )
-    await db.execute(stmt)
-    await db.commit()
-    return len(rows)
+    return await PriceRepository(db).upsert_prices(asset_id, df)

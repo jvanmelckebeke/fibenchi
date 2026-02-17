@@ -1,17 +1,8 @@
-import asyncio
-import json
-import logging
-
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
 
-from app.database import async_session
-from app.models.asset import Asset
 from app.schemas.quote import QuoteResponse
-from app.services.yahoo import batch_fetch_quotes  # async via @async_threadable
-
-logger = logging.getLogger(__name__)
+from app.services import quote_service
 
 router = APIRouter(prefix="/api", tags=["quotes"])
 
@@ -23,76 +14,7 @@ async def get_quotes(symbols: str = Query(..., description="Comma-separated list
     Pass a comma-separated list of ticker symbols (e.g. `AAPL,MSFT,GOOGL`).
     Returns price, previous close, change, change percent, currency, and market state.
     """
-    symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
-    if not symbol_list:
-        return []
-    return await batch_fetch_quotes(symbol_list)
-
-
-async def _quote_event_generator():
-    """Yield SSE events with watchlisted quotes, adapting interval to market state.
-
-    After the initial full payload, only symbols whose data changed since the
-    last push are included (delta mode).  This dramatically reduces bandwidth
-    when most markets are closed or prices are stable.
-    """
-    last_payload: dict[str, dict] = {}
-
-    while True:
-        try:
-            async with async_session() as db:
-                result = await db.execute(
-                    select(Asset.symbol).where(Asset.watchlisted.is_(True))
-                )
-                symbols = [row[0] for row in result.all()]
-
-            if not symbols:
-                yield "event: quotes\ndata: {}\n\n"
-                last_payload = {}
-                await asyncio.sleep(60)
-                continue
-
-            quotes = await batch_fetch_quotes(symbols)
-
-            # Build keyed payload
-            full_payload: dict[str, dict] = {}
-            market_states: set[str] = set()
-            for q in quotes:
-                full_payload[q["symbol"]] = q
-                if q.get("market_state"):
-                    market_states.add(q["market_state"])
-
-            # Compute delta: only symbols that changed since last push
-            if last_payload:
-                delta = {
-                    sym: data
-                    for sym, data in full_payload.items()
-                    if last_payload.get(sym) != data
-                }
-            else:
-                # First event — send everything
-                delta = full_payload
-
-            if delta:
-                yield f"event: quotes\ndata: {json.dumps(delta)}\n\n"
-
-            last_payload = full_payload
-
-            # Adapt interval based on market state
-            if "REGULAR" in market_states:
-                interval = 15
-            elif market_states & {"PRE", "POST", "PREPRE", "POSTPOST"}:
-                interval = 60
-            else:
-                interval = 300
-
-            await asyncio.sleep(interval)
-
-        except asyncio.CancelledError:
-            break
-        except Exception:
-            logger.exception("Quote stream error")
-            await asyncio.sleep(30)
+    return await quote_service.get_quotes(symbols)
 
 
 @router.get(
@@ -117,7 +39,7 @@ async def stream_quotes():
     Each SSE event uses `event: quotes` with a JSON object keyed by symbol.
     """
     return StreamingResponse(
-        _quote_event_generator(),
+        quote_service.quote_event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

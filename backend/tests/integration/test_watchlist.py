@@ -4,6 +4,7 @@ import pytest
 from datetime import date, timedelta
 
 from app.models import Asset, AssetType, PriceHistory
+from tests.helpers import seed_asset_with_prices
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -13,28 +14,10 @@ async def _seed_assets(db, count=3, n_days=200):
     symbols = ["AAPL", "GOOGL", "MSFT"][:count]
     assets = []
     for i, sym in enumerate(symbols):
-        asset = Asset(
-            symbol=sym, name=f"{sym} Inc.",
-            type=AssetType.STOCK, currency="USD", watchlisted=True,
+        asset = await seed_asset_with_prices(
+            db, symbol=sym, base_price=100.0 + i * 50, n_days=n_days,
         )
-        db.add(asset)
-        await db.flush()
-
-        today = date.today()
-        base_price = 100.0 + i * 50
-        for j in range(n_days):
-            d = today - timedelta(days=n_days - 1 - j)
-            if d.weekday() >= 5:
-                continue
-            price = base_price + j * 0.1
-            db.add(PriceHistory(
-                asset_id=asset.id, date=d,
-                open=round(price - 0.5, 4), high=round(price + 1.0, 4),
-                low=round(price - 1.0, 4), close=round(price, 4),
-                volume=1_000_000 + j * 1000,
-            ))
         assets.append(asset)
-    await db.commit()
     return assets
 
 

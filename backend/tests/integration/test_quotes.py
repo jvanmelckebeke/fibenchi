@@ -44,7 +44,7 @@ def _parse_sse_events(body: str) -> list[dict]:
 
 async def test_get_quotes_returns_data(client):
     """GET /api/quotes returns quote data for requested symbols."""
-    with patch("app.routers.quotes.batch_fetch_quotes", return_value=_MOCK_QUOTES):
+    with patch("app.services.quote_service.batch_fetch_quotes", return_value=_MOCK_QUOTES):
         resp = await client.get("/api/quotes", params={"symbols": "AAPL,MSFT"})
 
     assert resp.status_code == 200
@@ -57,7 +57,7 @@ async def test_get_quotes_returns_data(client):
 
 async def test_get_quotes_empty_symbols(client):
     """GET /api/quotes with empty symbols returns empty list."""
-    with patch("app.routers.quotes.batch_fetch_quotes", return_value=[]):
+    with patch("app.services.quote_service.batch_fetch_quotes", return_value=[]):
         resp = await client.get("/api/quotes", params={"symbols": ""})
 
     assert resp.status_code == 200
@@ -66,7 +66,7 @@ async def test_get_quotes_empty_symbols(client):
 
 async def test_get_quotes_single_symbol(client):
     """GET /api/quotes works with a single symbol."""
-    with patch("app.routers.quotes.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]):
+    with patch("app.services.quote_service.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]):
         resp = await client.get("/api/quotes", params={"symbols": "AAPL"})
 
     assert resp.status_code == 200
@@ -79,7 +79,7 @@ async def test_get_quotes_single_symbol(client):
 
 async def test_get_quotes_uppercase_normalization(client):
     """Symbols are normalized to uppercase before fetching."""
-    with patch("app.routers.quotes.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]) as mock:
+    with patch("app.services.quote_service.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]) as mock:
         await client.get("/api/quotes", params={"symbols": "aapl"})
 
     mock.assert_called_once_with(["AAPL"])
@@ -93,8 +93,8 @@ async def test_get_quotes_uppercase_normalization(client):
 async def test_stream_quotes_no_watchlisted(client):
     """SSE stream emits empty payload when no assets are watchlisted."""
     with (
-        patch("app.routers.quotes.async_session", TestSession),
-        patch("app.routers.quotes.asyncio.sleep", side_effect=asyncio.CancelledError()),
+        patch("app.services.quote_service.async_session", TestSession),
+        patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
     ):
         resp = await client.get("/api/quotes/stream")
 
@@ -110,9 +110,9 @@ async def test_stream_quotes_emits_event(client):
     await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
 
     with (
-        patch("app.routers.quotes.async_session", TestSession),
-        patch("app.routers.quotes.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]),
-        patch("app.routers.quotes.asyncio.sleep", side_effect=asyncio.CancelledError()),
+        patch("app.services.quote_service.async_session", TestSession),
+        patch("app.services.quote_service.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]),
+        patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
     ):
         resp = await client.get("/api/quotes/stream")
 
@@ -127,8 +127,8 @@ async def test_stream_quotes_emits_event(client):
 async def test_stream_quotes_cache_headers(client):
     """SSE stream sets correct cache-control and buffering headers."""
     with (
-        patch("app.routers.quotes.async_session", TestSession),
-        patch("app.routers.quotes.asyncio.sleep", side_effect=asyncio.CancelledError()),
+        patch("app.services.quote_service.async_session", TestSession),
+        patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
     ):
         resp = await client.get("/api/quotes/stream")
 
@@ -142,9 +142,9 @@ async def test_stream_quotes_multiple_symbols(client):
     await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft", "type": "stock"})
 
     with (
-        patch("app.routers.quotes.async_session", TestSession),
-        patch("app.routers.quotes.batch_fetch_quotes", return_value=_MOCK_QUOTES),
-        patch("app.routers.quotes.asyncio.sleep", side_effect=asyncio.CancelledError()),
+        patch("app.services.quote_service.async_session", TestSession),
+        patch("app.services.quote_service.batch_fetch_quotes", return_value=_MOCK_QUOTES),
+        patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
     ):
         resp = await client.get("/api/quotes/stream")
 

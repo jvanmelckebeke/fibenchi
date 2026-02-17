@@ -2,23 +2,16 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import PERIOD_DAYS
-from app.models import Asset, PriceHistory
-from app.services.pseudo_etf import calculate_performance
+from app.repositories.asset_repo import AssetRepository
+from app.repositories.price_repo import PriceRepository
+from app.services.compute.pseudo_etf import calculate_performance
 
 # Minimum stock price before an asset is included in the composite index.
 # Prevents low-IPO-price stocks from distorting equal-weight returns.
 _MIN_ENTRY_PRICE = 10.0
-
-
-async def _get_watchlisted_ids(db: AsyncSession) -> list[int]:
-    result = await db.execute(
-        select(Asset.id).where(Asset.watchlisted == True)  # noqa: E712
-    )
-    return list(result.scalars().all())
 
 
 async def compute_portfolio_index(
@@ -31,7 +24,7 @@ async def compute_portfolio_index(
     days = PERIOD_DAYS.get(period, 365)
     start_date = date.today() - timedelta(days=days)
 
-    asset_ids = await _get_watchlisted_ids(db)
+    asset_ids = await AssetRepository(db).list_watchlisted_ids()
 
     empty = {"dates": [], "values": [], "current": 0, "change": 0, "change_pct": 0}
 
@@ -72,10 +65,10 @@ async def compute_performers(
     days = PERIOD_DAYS.get(period, 365)
     start_date = date.today() - timedelta(days=days)
 
-    result = await db.execute(
-        select(Asset).where(Asset.watchlisted == True)  # noqa: E712
-    )
-    assets = result.scalars().all()
+    asset_repo = AssetRepository(db)
+    price_repo = PriceRepository(db)
+
+    assets = await asset_repo.list_watchlisted()
 
     if not assets:
         return []
@@ -83,55 +76,21 @@ async def compute_performers(
     asset_map = {a.id: a for a in assets}
     asset_ids = list(asset_map.keys())
 
-    # Get earliest price on or after start_date per asset
-    first_prices_q = await db.execute(
-        select(
-            PriceHistory.asset_id,
-            func.min(PriceHistory.date).label("first_date"),
-        )
-        .where(PriceHistory.asset_id.in_(asset_ids))
-        .where(PriceHistory.date >= start_date)
-        .group_by(PriceHistory.asset_id)
-    )
-    first_dates = {row.asset_id: row.first_date for row in first_prices_q}
+    first_dates = await price_repo.get_first_dates(asset_ids, start_date)
+    last_dates = await price_repo.get_last_dates(asset_ids)
 
-    # Get latest price per asset
-    last_prices_q = await db.execute(
-        select(
-            PriceHistory.asset_id,
-            func.max(PriceHistory.date).label("last_date"),
-        )
-        .where(PriceHistory.asset_id.in_(asset_ids))
-        .group_by(PriceHistory.asset_id)
-    )
-    last_dates = {row.asset_id: row.last_date for row in last_prices_q}
-
-    # Fetch the actual close prices for those dates
-    date_pairs = []
+    # Collect all dates we need prices for
+    all_dates: set[date] = set()
     for aid in asset_ids:
         if aid in first_dates:
-            date_pairs.append((aid, first_dates[aid]))
+            all_dates.add(first_dates[aid])
         if aid in last_dates:
-            date_pairs.append((aid, last_dates[aid]))
+            all_dates.add(last_dates[aid])
 
-    if not date_pairs:
+    if not all_dates:
         return []
 
-    prices_q = await db.execute(
-        select(PriceHistory)
-        .where(PriceHistory.asset_id.in_(asset_ids))
-        .where(
-            PriceHistory.date.in_(
-                list({d for _, d in date_pairs})
-            )
-        )
-    )
-    price_rows = prices_q.scalars().all()
-
-    # Build lookup: (asset_id, date) -> close
-    price_map: dict[tuple[int, date], float] = {}
-    for p in price_rows:
-        price_map[(p.asset_id, p.date)] = float(p.close)
+    price_map = await price_repo.get_prices_at_dates(asset_ids, all_dates)
 
     performers = []
     for aid, asset in asset_map.items():
