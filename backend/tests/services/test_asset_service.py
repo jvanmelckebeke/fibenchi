@@ -131,8 +131,7 @@ async def test_delete_asset_soft_deletes(MockRepo):
     asset = _make_asset(watchlisted=True)
     mock_repo.save = AsyncMock(return_value=asset)
 
-    with patch("app.routers.deps.AssetRepository") as MockDepsRepo:
-        MockDepsRepo.return_value.find_by_symbol = AsyncMock(return_value=asset)
+    with patch("app.services.asset_service.get_asset", new_callable=AsyncMock, return_value=asset):
         await delete_asset(db, "AAPL")
 
     assert asset.watchlisted is False

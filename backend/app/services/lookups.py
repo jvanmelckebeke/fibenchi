@@ -1,4 +1,9 @@
-"""Shared router dependencies and helpers."""
+"""Entity lookup helpers for the service layer.
+
+These raise HTTPException(404) when an entity is not found — keeping the
+"find or fail" pattern available to services without importing from the
+router layer.
+"""
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession

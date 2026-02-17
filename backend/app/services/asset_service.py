@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AssetType
 from app.repositories.asset_repo import AssetRepository
+from app.services.lookups import get_asset
 from app.services.yahoo import validate_symbol
 
 
@@ -37,7 +38,6 @@ async def create_asset(db: AsyncSession, symbol: str, name: str | None, asset_ty
 
 
 async def delete_asset(db: AsyncSession, symbol: str):
-    from app.routers.deps import get_asset
     asset = await get_asset(symbol, db)
     asset.watchlisted = False
     await AssetRepository(db).save(asset)

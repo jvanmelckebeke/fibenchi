@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.tag_repo import TagRepository
+from app.services.lookups import get_asset
 
 
 async def list_tags(db: AsyncSession):
@@ -37,7 +38,6 @@ async def delete_tag(db: AsyncSession, tag_id: int):
 
 
 async def attach_tag(db: AsyncSession, symbol: str, tag_id: int):
-    from app.routers.deps import get_asset
     asset = await get_asset(symbol, db)
     tag = await TagRepository(db).get_by_id(tag_id)
     if not tag:
@@ -49,7 +49,6 @@ async def attach_tag(db: AsyncSession, symbol: str, tag_id: int):
 
 
 async def detach_tag(db: AsyncSession, symbol: str, tag_id: int):
-    from app.routers.deps import get_asset
     asset = await get_asset(symbol, db)
     asset.tags = [t for t in asset.tags if t.id != tag_id]
     await AssetRepository(db).save(asset)

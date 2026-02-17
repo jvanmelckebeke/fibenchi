@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.routers.deps import find_asset, get_asset
+from app.services.lookups import find_asset, get_asset
 from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
 from app.services import price_service
 

@@ -14,8 +14,8 @@ from app.services.tag_service import (
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
-# tag_service does: from app.routers.deps import get_asset
-_PATCH_GET_ASSET = "app.routers.deps.get_asset"
+# Patch where the name is bound (top-level import in tag_service)
+_PATCH_GET_ASSET = "app.services.tag_service.get_asset"
 
 
 def _make_tag(id: int = 1, name: str = "tech", color: str = "#3b82f6") -> Tag:

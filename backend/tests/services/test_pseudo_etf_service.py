@@ -17,9 +17,8 @@ from app.services.pseudo_etf_service import (
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
-# All services that call get_pseudo_etf do: from app.routers.deps import get_pseudo_etf
-# So we patch at the source: app.routers.deps.get_pseudo_etf
-_PATCH_GET_ETF = "app.routers.deps.get_pseudo_etf"
+# Patch where the name is bound (top-level import in pseudo_etf_service)
+_PATCH_GET_ETF = "app.services.pseudo_etf_service.get_pseudo_etf"
 
 
 def _make_etf(**overrides) -> PseudoETF:
