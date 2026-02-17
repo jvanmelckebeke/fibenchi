@@ -75,6 +75,22 @@ async def test_create_asset_duplicate_raises_400(MockRepo):
     assert exc_info.value.status_code == 400
 
 
+@patch("app.services.asset_service.AssetRepository")
+async def test_create_asset_existing_unwatchlisted_returns_existing(MockRepo):
+    """When asset already exists and caller passes watchlisted=False (e.g. pseudo-ETF
+    constituent picker), return the existing record without error."""
+    db = AsyncMock()
+    mock_repo = MockRepo.return_value
+    existing = _make_asset(watchlisted=True)
+    mock_repo.find_by_symbol = AsyncMock(return_value=existing)
+
+    result = await create_asset(db, symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, watchlisted=False)
+
+    assert result is existing
+    mock_repo.save.assert_not_called()
+    mock_repo.create.assert_not_called()
+
+
 @patch("app.services.asset_service.validate_symbol", new_callable=AsyncMock)
 @patch("app.services.asset_service.AssetRepository")
 async def test_create_asset_auto_resolves_from_yahoo(MockRepo, mock_validate):

@@ -20,6 +20,9 @@ async def create_asset(db: AsyncSession, symbol: str, name: str | None, asset_ty
         if not existing.watchlisted and watchlisted:
             existing.watchlisted = True
             return await repo.save(existing)
+        if not watchlisted:
+            # Caller just needs the asset record (e.g. pseudo-ETF constituent picker)
+            return existing
         raise HTTPException(400, f"Asset with symbol {symbol} already exists")
 
     currency = "USD"
