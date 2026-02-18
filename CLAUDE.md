@@ -36,7 +36,20 @@ pnpm run lint                     # ESLint
 pnpm run build                    # TypeScript check + Vite build
 ```
 
-**CI** (`.github/workflows/ci.yaml`): runs `pytest` (backend), `pnpm lint` + `pnpm build` (frontend), then builds/pushes a Docker image to GHCR on merge to main.
+**CI** (`.github/workflows/ci.yaml`): runs `pytest` (backend), `pnpm lint` + `pnpm build` (frontend), then builds/pushes a Docker image to GHCR. Push to `main` tags `latest`, push to `dev` tags `dev`.
+
+## Branching Strategy
+
+Two long-lived branches: `main` (production, `fibenchi:latest`) and `dev` (staging, `fibenchi:dev`).
+
+**For larger or risky changes** (schema migrations, multi-file refactors, new features that touch core logic): **always ask the user whether to PR into `dev` instead of `main`**. These changes can break the running production instance, so they should be validated on `dev` first. The flow is: feature branch → PR to `dev` → test on dev environment → PR `dev` into `main`.
+
+**For small, safe changes** (docs, CI tweaks, single-file fixes with passing tests): PR directly to `main` is fine, but `dev` must be kept in sync afterward.
+
+**Sync rules:**
+- **Before starting work on `dev`**: always sync dev with main first (`git checkout dev && git merge origin/main`). Dev should never be behind main.
+- `dev` updates → `main` only gets updated via PR (never force-push or direct merge)
+- After merging a small fix directly to `main`, sync `dev` before any further dev-branch work.
 
 ## Architecture
 
