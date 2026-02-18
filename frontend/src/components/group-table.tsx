@@ -311,6 +311,32 @@ function TableRow({
           )}
         </td>
         {SORTABLE_FIELDS.map((field) => {
+          if (field === "macd") {
+            const macdVals = extractMacdValues(indicator?.values)
+            const m = macdVals?.macd
+            const s = macdVals?.macd_signal
+            const h = macdVals?.macd_hist
+            const hasValues = m != null || s != null || h != null
+            const histColor = h != null ? (h >= 0 ? "text-emerald-400" : "text-red-400") : ""
+            const fmt = (v: number | null | undefined) =>
+              v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
+            return (
+              <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+                {hasValues ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-muted-foreground">M</span>
+                    <span>{fmt(m)}</span>
+                    <span className="text-muted-foreground">S</span>
+                    <span>{fmt(s)}</span>
+                    <span className="text-muted-foreground">H</span>
+                    <span className={histColor}>{fmt(h)}</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">&mdash;</span>
+                )}
+              </td>
+            )
+          }
           const val = getNumericValue(indicator?.values, field)
           const series = getSeriesByField(field)
           const colorClass = resolveThresholdColor(series?.thresholdColors, val)

@@ -153,7 +153,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     shortLabel: "MACD",
     placement: "subchart",
     fields: ["macd", "macd_signal", "macd_hist"],
-    sortableFields: ["macd", "macd_signal", "macd_hist"],
+    sortableFields: ["macd"],
     series: [
       {
         field: "macd_hist",
