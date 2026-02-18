@@ -3,7 +3,6 @@ import { Link } from "react-router-dom"
 import {
   createChart,
   type IChartApi,
-  AreaSeries,
   LineSeries,
   HistogramSeries,
 } from "lightweight-charts"
@@ -17,7 +16,11 @@ interface SharedChartProps {
   symbolColorMap: Map<string, string>
 }
 
-export function StackedAreaChart({
+/**
+ * Rebases each symbol's contribution to start at baseValue, then renders
+ * individual line series so relative performance is easy to compare.
+ */
+export function PerformanceOverlayChart({
   data,
   baseValue,
   sortedSymbols,
@@ -25,83 +28,99 @@ export function StackedAreaChart({
 }: SharedChartProps & { baseValue: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const topSeriesRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
+  const totalSeriesRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
   const baseLineRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
-  const [hoverData, setHoverData] = useState<{ total: number; breakdown: Record<string, number> } | null>(null)
+  const [hoverData, setHoverData] = useState<{
+    total: number
+    rebased: Record<string, number>
+  } | null>(null)
   const { theme, startLifecycle } = useChartLifecycle(ref, [chartRef])
 
+  // Lookup maps for crosshair
   const totalByTime = useRef(new Map<string, number>())
-  const breakdownByTime = useRef(new Map<string, Record<string, number>>())
+  const rebasedByTime = useRef(new Map<string, Record<string, number>>())
 
   useEffect(() => {
     if (!ref.current || !data.length || !sortedSymbols.length) return
 
+    const firstBreakdown = data[0].breakdown
+
+    // Pre-compute rebased values: contribution[sym][date] / contribution[sym][first_date] * baseValue
+    // Symbols with a zero first-date contribution get a flat baseValue line.
     totalByTime.current.clear()
-    breakdownByTime.current.clear()
+    rebasedByTime.current.clear()
+
+    const rebasedSeries = new Map<string, { time: string; value: number }[]>()
+    for (const sym of sortedSymbols) {
+      rebasedSeries.set(sym, [])
+    }
+
     for (const point of data) {
       totalByTime.current.set(point.date, point.value)
-      breakdownByTime.current.set(point.date, point.breakdown)
+      const rebasedRow: Record<string, number> = {}
+      for (const sym of sortedSymbols) {
+        const firstVal = firstBreakdown[sym] ?? 0
+        const curVal = point.breakdown[sym] ?? 0
+        const rebased = firstVal !== 0 ? (curVal / firstVal) * baseValue : baseValue
+        rebasedRow[sym] = rebased
+        rebasedSeries.get(sym)!.push({ time: point.date, value: rebased })
+      }
+      rebasedByTime.current.set(point.date, rebasedRow)
     }
 
     const chart = createChart(ref.current, baseChartOptions(ref.current, 440))
 
-    // Build cumulative series: for position i, value = sum of symbols 0..i
-    const cumulativeData: { symbol: string; points: { time: string; value: number }[] }[] = []
+    // Total index line (prominent, white/dark foreground)
+    const totalColor = theme.dark ? "rgba(250, 250, 250, 0.85)" : "rgba(24, 24, 27, 0.85)"
+    const totalSeries = chart.addSeries(LineSeries, {
+      color: totalColor,
+      lineWidth: 2,
+      priceLineVisible: false,
+      crosshairMarkerVisible: true,
+      lastValueVisible: false,
+    })
+    totalSeries.setData(data.map((p) => ({ time: p.date, value: p.value })))
+    totalSeriesRef.current = totalSeries
 
-    for (let i = sortedSymbols.length - 1; i >= 0; i--) {
-      const points = data.map((point) => {
-        let cumValue = 0
-        for (let j = 0; j <= i; j++) {
-          cumValue += point.breakdown[sortedSymbols[j]] ?? 0
-        }
-        return { time: point.date, value: cumValue }
-      })
-      cumulativeData.push({ symbol: sortedSymbols[i], points })
-    }
-
-    let topSeries: ReturnType<IChartApi["addSeries"]> | null = null
-    for (let idx = 0; idx < cumulativeData.length; idx++) {
-      const { symbol, points } = cumulativeData[idx]
-      const color = symbolColorMap.get(symbol) ?? STACK_COLORS[0]
-      const isTop = idx === 0
-      const series = chart.addSeries(AreaSeries, {
-        lineColor: color,
-        topColor: color,
-        bottomColor: color,
+    // Per-symbol rebased lines
+    for (const sym of sortedSymbols) {
+      const color = symbolColorMap.get(sym) ?? STACK_COLORS[0]
+      const series = chart.addSeries(LineSeries, {
+        color,
         lineWidth: 1,
         priceLineVisible: false,
-        crosshairMarkerVisible: isTop,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
       })
-      series.setData(points)
-      if (isTop) topSeries = series
+      series.setData(rebasedSeries.get(sym)!)
     }
-    topSeriesRef.current = topSeries
 
-    // Base value reference line
-    const theme = getChartTheme()
+    // Dashed base value reference line
+    const chartTheme = getChartTheme()
     const baseLine = chart.addSeries(LineSeries, {
-      color: theme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
+      color: chartTheme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
       crosshairMarkerVisible: false,
+      lastValueVisible: false,
     })
     baseLine.setData(data.map((p) => ({ time: p.date, value: baseValue })))
     baseLineRef.current = baseLine
 
-    // Crosshair snap + legend update
+    // Crosshair: snap to total line, update legend with per-symbol rebased values
     let snapping = false
     chart.subscribeCrosshairMove((param) => {
       if (param.time) {
         const key = String(param.time)
         const total = totalByTime.current.get(key)
-        const breakdown = breakdownByTime.current.get(key)
-        if (total !== undefined && breakdown) {
-          setHoverData({ total, breakdown })
+        const rebased = rebasedByTime.current.get(key)
+        if (total !== undefined && rebased) {
+          setHoverData({ total, rebased })
         }
-        if (!snapping && total !== undefined && topSeries) {
+        if (!snapping && total !== undefined) {
           snapping = true
-          chart.setCrosshairPosition(total, param.time, topSeries)
+          chart.setCrosshairPosition(total, param.time, totalSeries)
           snapping = false
         }
       } else {
@@ -115,20 +134,36 @@ export function StackedAreaChart({
     const cleanup = startLifecycle([chart])
     return () => {
       cleanup()
-      topSeriesRef.current = null
+      totalSeriesRef.current = null
       baseLineRef.current = null
     }
-  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle])
+  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle, theme.dark])
 
-  // Apply baseLine theme color (chartThemeOptions handled by useChartLifecycle)
+  // Apply baseLine + totalLine theme colors on theme change
   useEffect(() => {
     baseLineRef.current?.applyOptions({
       color: theme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
     })
+    totalSeriesRef.current?.applyOptions({
+      color: theme.dark ? "rgba(250, 250, 250, 0.85)" : "rgba(24, 24, 27, 0.85)",
+    })
   }, [theme])
 
-  const lastPoint = data[data.length - 1]
-  const displayData = hoverData ?? (lastPoint ? { total: lastPoint.value, breakdown: lastPoint.breakdown } : null)
+  // Default display: last point's data
+  const lastRebased = useMemo(() => {
+    if (!data.length || !sortedSymbols.length) return null
+    const firstBreakdown = data[0].breakdown
+    const last = data[data.length - 1]
+    const rebased: Record<string, number> = {}
+    for (const sym of sortedSymbols) {
+      const firstVal = firstBreakdown[sym] ?? 0
+      const curVal = last.breakdown[sym] ?? 0
+      rebased[sym] = firstVal !== 0 ? (curVal / firstVal) * baseValue : baseValue
+    }
+    return { total: last.value, rebased }
+  }, [data, sortedSymbols, baseValue])
+
+  const displayData = hoverData ?? lastRebased
 
   return (
     <div className="space-y-2">
@@ -136,8 +171,8 @@ export function StackedAreaChart({
       <SymbolLegend
         sortedSymbols={sortedSymbols}
         symbolColorMap={symbolColorMap}
-        values={displayData ? sortedSymbols.map((sym) => displayData.breakdown[sym]?.toFixed(2)) : undefined}
-        suffix={displayData ? <span className="text-xs font-medium ml-auto">Total: {displayData.total.toFixed(2)}</span> : undefined}
+        values={displayData ? sortedSymbols.map((sym) => displayData.rebased[sym]?.toFixed(2)) : undefined}
+        suffix={displayData ? <span className="text-xs font-medium ml-auto">Index: {displayData.total.toFixed(2)}</span> : undefined}
       />
     </div>
   )
