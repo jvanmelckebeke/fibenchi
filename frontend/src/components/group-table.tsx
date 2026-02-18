@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { TagBadge } from "@/components/tag-badge"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { PriceChart } from "@/components/price-chart"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
+import { ChartSyncProvider, useChartHoverValues } from "@/components/chart/chart-sync-provider"
+import { CandlestickChart } from "@/components/chart/candlestick-chart"
 import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
@@ -130,6 +131,42 @@ function SortableHeader({
   )
 }
 
+/** Gauges that react to crosshair hover values from the ChartSyncProvider. */
+function HoverReactiveGauges({ fallbackIndicator }: { fallbackIndicator?: IndicatorSummary }) {
+  const { hoverValues, latestValues } = useChartHoverValues()
+
+  // Use hover values when available, fall back to latest chart data, then batch indicator
+  const vals = hoverValues ?? latestValues
+  const rsiVal = vals.indicators.rsi ?? getNumericValue(fallbackIndicator?.values, "rsi")
+  const macdVals = {
+    macd: vals.indicators.macd ?? getNumericValue(fallbackIndicator?.values, "macd"),
+    macd_signal: vals.indicators.macd_signal ?? getNumericValue(fallbackIndicator?.values, "macd_signal"),
+    macd_hist: vals.indicators.macd_hist ?? getNumericValue(fallbackIndicator?.values, "macd_hist"),
+  }
+
+  const hoverActive = hoverValues !== null
+
+  return (
+    <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
+      <div>
+        <span className="text-xs text-muted-foreground mb-1 block">
+          RSI{hoverActive ? <span className="ml-1 text-muted-foreground/50">(hover)</span> : ""}
+        </span>
+        <RsiGauge batchRsi={rsiVal} size="lg" />
+      </div>
+      <div>
+        <span className="text-xs text-muted-foreground mb-1 block">
+          MACD{hoverActive ? <span className="ml-1 text-muted-foreground/50">(hover)</span> : ""}
+        </span>
+        <MacdIndicator
+          batchMacd={macdVals}
+          size="lg"
+        />
+      </div>
+    </div>
+  )
+}
+
 function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: IndicatorSummary }) {
   const { settings } = useSettings()
   const period = settings.chart_default_period
@@ -140,21 +177,34 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
 
   const loading = detailLoading
 
-  const rsiVal = getNumericValue(indicator?.values, "rsi")
-  const macdVals = extractMacdValues(indicator?.values)
-
-  return (
-    <div className="flex gap-4">
-      {/* Price chart — 80% */}
-      <div className="flex-[4] min-w-0">
-        {loading || !prices?.length ? (
+  if (loading || !prices?.length) {
+    return (
+      <div className="flex gap-4">
+        <div className="flex-[4] min-w-0">
           <div className="h-[300px] flex items-center justify-center">
             <Skeleton className="h-full w-full rounded-md" />
           </div>
-        ) : (
-          <PriceChart
-            prices={prices}
-            indicators={chartIndicators ?? []}
+        </div>
+        <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
+          <div>
+            <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
+            <RsiGauge batchRsi={getNumericValue(indicator?.values, "rsi")} size="lg" />
+          </div>
+          <div>
+            <span className="text-xs text-muted-foreground mb-1 block">MACD</span>
+            <MacdIndicator batchMacd={extractMacdValues(indicator?.values)} size="lg" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <ChartSyncProvider prices={prices} indicators={chartIndicators ?? []}>
+      <div className="flex gap-4">
+        {/* Price chart — 80% */}
+        <div className="flex-[4] min-w-0 mb-4">
+          <CandlestickChart
             annotations={annotations ?? []}
             indicatorVisibility={{
               ...settings.detail_indicator_visibility,
@@ -162,25 +212,14 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
               macd: false,
             }}
             chartType={settings.chart_type}
-            mainChartHeight={300}
-          />
-        )}
-      </div>
-      {/* Indicators — 20% */}
-      <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
-        <div>
-          <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
-          <RsiGauge batchRsi={rsiVal} size="lg" />
-        </div>
-        <div>
-          <span className="text-xs text-muted-foreground mb-1 block">MACD</span>
-          <MacdIndicator
-            batchMacd={macdVals}
-            size="lg"
+            height={300}
+            roundedClass="rounded-md"
           />
         </div>
+        {/* Hover-reactive indicators — 20% */}
+        <HoverReactiveGauges fallbackIndicator={indicator} />
       </div>
-    </div>
+    </ChartSyncProvider>
   )
 }
 
