@@ -105,20 +105,28 @@ def _currency_from_suffix(symbol: str) -> str | None:
     return EXCHANGE_CURRENCY_MAP.get(suffix.upper()) or EXCHANGE_CURRENCY_MAP.get(suffix)
 
 
-def _extract_currency(ticker: Ticker, symbol: str) -> tuple[str, int]:
+def _extract_currency(
+    ticker: Ticker,
+    symbol: str,
+    price_info: dict | None = None,
+) -> tuple[str, int]:
     """Extract and normalize currency for a symbol from Yahoo Finance data.
 
     Tries multiple data sources in order:
-    1. ticker.price (primary source)
+    1. price_info dict (pre-fetched, avoids redundant API call)
     2. ticker.summary_detail (fallback)
     3. Exchange suffix mapping (last resort)
 
+    Pass ``price_info`` when the caller already accessed ``ticker.price``
+    to avoid a redundant Yahoo API round-trip.
+
     Returns (normalized_currency_code, divisor).
     """
-    # Try ticker.price first
-    price_data = ticker.price.get(symbol, {})
-    if isinstance(price_data, dict):
-        raw = price_data.get("currency")
+    # Try pre-fetched price info first (or fetch if not provided)
+    if price_info is None:
+        price_info = ticker.price.get(symbol, {})
+    if isinstance(price_info, dict):
+        raw = price_info.get("currency")
         if raw:
             return normalize_currency(raw)
 
@@ -287,10 +295,12 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
         return {}
 
     ticker = Ticker(symbols)
+    price_data = ticker.price
 
     result = {}
     for sym in symbols:
-        currency, _ = _extract_currency(ticker, sym)
+        info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
+        currency, _ = _extract_currency(ticker, sym, price_info=info)
         result[sym] = currency
 
     return result
@@ -322,7 +332,7 @@ def _parse_price_data(
             results.append({"symbol": sym})
             continue
 
-        currency, divisor = _extract_currency(ticker, sym)
+        currency, divisor = _extract_currency(ticker, sym, price_info=info)
 
         price = _sanitize(info.get("regularMarketPrice"))
         prev_close = _sanitize(info.get("regularMarketPreviousClose"))
@@ -413,6 +423,8 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
     if isinstance(hist, dict) or hist.empty:
         return {}
 
+    price_data = ticker.price
+
     result = {}
     for sym in symbols:
         try:
@@ -422,7 +434,8 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
                 df = hist.copy()
             if not df.empty and len(df) >= 2:
                 # Convert subunit prices (e.g. pence → pounds)
-                _, divisor = _extract_currency(ticker, sym)
+                info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
+                _, divisor = _extract_currency(ticker, sym, price_info=info)
                 df = _normalize_ohlcv_df(df, divisor)
                 result[sym] = df
         except KeyError:
