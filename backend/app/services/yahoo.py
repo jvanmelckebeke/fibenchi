@@ -296,19 +296,21 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     return result
 
 
-@async_threadable
-def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
-    """Fetch current market quotes for multiple symbols in one batch call.
+def _sanitize(val: float | None) -> float | None:
+    """Convert NaN/Infinity to None so json.dumps produces valid JSON."""
+    if val is None:
+        return None
+    if math.isnan(val) or math.isinf(val):
+        return None
+    return val
 
-    Returns a list of dicts with keys: symbol, price, previous_close, change,
-    change_percent, currency, market_state.
-    """
-    if not symbols:
-        return []
 
-    ticker = Ticker(symbols)
-    price_data = ticker.price
-
+def _parse_price_data(
+    ticker: Ticker,
+    symbols: list[str],
+    price_data: dict,
+) -> list[dict]:
+    """Build quote dicts from Yahoo price data, with NaN sanitization and logging."""
     results = []
     null_symbols: list[str] = []
     nan_fields: list[str] = []
@@ -322,23 +324,10 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
 
         currency, divisor = _extract_currency(ticker, sym)
 
-        price = info.get("regularMarketPrice")
-        prev_close = info.get("regularMarketPreviousClose")
-        change = info.get("regularMarketChange")
-        change_pct = info.get("regularMarketChangePercent")
-
-        # Sanitize NaN/Infinity → None
-        def _sanitize(val: float | None) -> float | None:
-            if val is None:
-                return None
-            if math.isnan(val) or math.isinf(val):
-                return None
-            return val
-
-        price = _sanitize(price)
-        prev_close = _sanitize(prev_close)
-        change = _sanitize(change)
-        change_pct = _sanitize(change_pct)
+        price = _sanitize(info.get("regularMarketPrice"))
+        prev_close = _sanitize(info.get("regularMarketPreviousClose"))
+        change = _sanitize(info.get("regularMarketChange"))
+        change_pct = _sanitize(info.get("regularMarketChangePercent"))
 
         if price is None and info.get("regularMarketPrice") is not None:
             nan_fields.append(f"{sym}.price")
@@ -368,6 +357,44 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
         )
 
     return results
+
+
+def _has_invalid_crumb(price_data: dict) -> bool:
+    """Check if Yahoo rejected the crumb for all symbols."""
+    return all(
+        isinstance(v, str) and "Invalid Crumb" in v
+        for v in price_data.values()
+    ) if price_data else False
+
+
+@async_threadable
+def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
+    """Fetch current market quotes for multiple symbols in one batch call.
+
+    Returns a list of dicts with keys: symbol, price, previous_close, change,
+    change_percent, currency, market_state.
+    """
+    if not symbols:
+        return []
+
+    ticker = Ticker(symbols)
+    price_data = ticker.price
+
+    # Retry once with a fresh session if Yahoo rejected the crumb
+    if _has_invalid_crumb(price_data):
+        logger.warning(
+            "Yahoo rejected crumb for all %d symbols — retrying with fresh session",
+            len(symbols),
+        )
+        ticker = Ticker(symbols)
+        price_data = ticker.price
+        if _has_invalid_crumb(price_data):
+            logger.error(
+                "Yahoo crumb rejected twice — likely IP-level blocking. "
+                "Consider restarting the container or using a proxy."
+            )
+
+    return _parse_price_data(ticker, symbols, price_data)
 
 
 def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
