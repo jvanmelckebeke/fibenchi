@@ -23,10 +23,15 @@ export interface ThresholdColor {
 export interface SeriesDescriptor {
   field: string
   label: string
+  /** Color used for the chart line/series. */
   color: string
+  /** Opaque color for legend text (falls back to `color`). */
+  legendColor?: string
   lineWidth?: number
   type?: "line" | "histogram"
   thresholdColors?: ThresholdColor[]
+  /** Histogram bar colors keyed by sign (positive/negative). */
+  histogramColors?: { positive: string; negative: string }
 }
 
 /** Reference line on a sub-chart (e.g. RSI overbought at 70). */
@@ -52,6 +57,8 @@ export interface IndicatorDescriptor {
     lines?: ThresholdLine[]
     range?: { min: number; max: number }
   }
+  /** Band-fill between two series fields (e.g. Bollinger Bands). */
+  bandFill?: { upperField: string; lowerField: string }
 }
 
 // ---------------------------------------------------------------------------
@@ -119,10 +126,11 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     fields: ["bb_upper", "bb_middle", "bb_lower"],
     sortableFields: [],
     series: [
-      { field: "bb_upper", label: "BB Upper", color: "rgba(96, 165, 250, 0.4)", lineWidth: 1 },
-      { field: "bb_lower", label: "BB Lower", color: "rgba(96, 165, 250, 0.4)", lineWidth: 1 },
+      { field: "bb_upper", label: "BB Upper", color: "rgba(96, 165, 250, 0.4)", legendColor: "#60a5fa", lineWidth: 1 },
+      { field: "bb_lower", label: "BB Lower", color: "rgba(96, 165, 250, 0.4)", legendColor: "#60a5fa", lineWidth: 1 },
     ],
     decimals: 2,
+    bandFill: { upperField: "bb_upper", lowerField: "bb_lower" },
   },
   {
     id: "macd",
@@ -141,6 +149,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
           { condition: "gte", value: 0, className: "text-emerald-400" },
           { condition: "lt", value: 0, className: "text-red-400" },
         ],
+        histogramColors: { positive: "rgba(34, 197, 94, 0.6)", negative: "rgba(239, 68, 68, 0.6)" },
       },
       { field: "macd", label: "MACD", color: "#38bdf8", lineWidth: 2 },
       { field: "macd_signal", label: "Signal", color: "#fb923c", lineWidth: 2 },
