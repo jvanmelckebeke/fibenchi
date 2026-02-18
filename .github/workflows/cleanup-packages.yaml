@@ -5,29 +5,33 @@ on:
     # Every Sunday at 03:00 UTC
     - cron: "0 3 * * 0"
   workflow_dispatch:
-    inputs:
-      dry-run:
-        description: "Simulate cleanup without deleting anything"
-        type: boolean
-        default: false
 
 permissions:
   packages: write
 
-env:
-  RETENTION_DAYS: 7
-
 jobs:
-  cleanup:
+  cleanup-untagged:
+    name: Delete untagged container versions
     runs-on: ubuntu-latest
     steps:
-      - name: Prune old container versions
-        uses: dataaxiom/ghcr-cleanup-action@v1.0.16
+      - name: Delete all untagged versions
+        uses: actions/delete-package-versions@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          package: fibenchi
-          delete-untagged: true
-          delete-tags: sha-*
-          exclude-tags: latest,dev
-          older-than: ${{ env.RETENTION_DAYS }} days
-          dry-run: ${{ inputs.dry-run || false }}
+          package-name: fibenchi
+          package-type: container
+          owner: jvanmelckebeke
+          delete-only-untagged-versions: "true"
+          min-versions-to-keep: 0
+
+  cleanup-old-tagged:
+    name: Delete old tagged container versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old versions (keep latest and dev)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: fibenchi
+          package-type: container
+          owner: jvanmelckebeke
+          min-versions-to-keep: 10
+          ignore-versions: "^(latest|dev)$"
