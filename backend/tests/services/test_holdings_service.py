@@ -84,7 +84,10 @@ async def test_get_holdings_indicators_returns_snapshots(
     db = AsyncMock()
     mock_get_asset.return_value = _make_etf_asset("SPY")
     mock_fetch.return_value = _sample_holdings()
-    snapshots = [{"symbol": "AAPL", "rsi": 55.0}, {"symbol": "MSFT", "rsi": 60.0}]
+    snapshots = [
+        {"symbol": "AAPL", "currency": "USD", "close": 180.0, "change_pct": 1.0, "values": {"rsi": 55.0}},
+        {"symbol": "MSFT", "currency": "USD", "close": 400.0, "change_pct": 0.5, "values": {"rsi": 60.0}},
+    ]
     mock_compute.return_value = snapshots
 
     result = await get_holdings_indicators(db, "SPY")

@@ -95,7 +95,12 @@ async def test_indicators_has_expected_fields(client, db):
     resp = await client.get(f"/api/groups/{gid}/indicators")
     data = resp.json()
     ind = data["AAPL"]
-    assert set(ind.keys()) == {"rsi", "macd", "macd_signal", "macd_hist"}
+    # Full snapshot has close, change_pct, and nested values
+    assert "values" in ind
+    assert "close" in ind
+    from app.services.compute.indicators import get_all_output_fields
+    expected_fields = set(get_all_output_fields())
+    assert expected_fields.issubset(set(ind["values"].keys()))
 
 
 async def test_indicators_values_not_null_with_enough_data(client, db):
@@ -104,10 +109,11 @@ async def test_indicators_values_not_null_with_enough_data(client, db):
     resp = await client.get(f"/api/groups/{gid}/indicators")
     data = resp.json()
     ind = data["AAPL"]
-    assert ind["rsi"] is not None
-    assert ind["macd"] is not None
-    assert ind["macd_signal"] is not None
-    assert ind["macd_hist"] is not None
+    values = ind["values"]
+    assert values["rsi"] is not None
+    assert values["macd"] is not None
+    assert values["macd_signal"] is not None
+    assert values["macd_hist"] is not None
 
 
 async def test_indicators_null_with_insufficient_data(client, db):
@@ -135,8 +141,8 @@ async def test_indicators_null_with_insufficient_data(client, db):
     resp = await client.get(f"/api/groups/{gid}/indicators")
     data = resp.json()
     ind = data["TINY"]
-    assert ind["rsi"] is None
-    assert ind["macd"] is None
+    # With insufficient data, values dict should be empty
+    assert ind["values"] == {}
 
 
 async def test_indicators_empty_group(client, db):

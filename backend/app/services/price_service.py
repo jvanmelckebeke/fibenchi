@@ -11,7 +11,7 @@ from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import Asset, PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
-from app.services.compute.indicators import compute_indicators, safe_round
+from app.services.compute.indicators import INDICATOR_REGISTRY, compute_indicators, safe_round
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
 from app.services.yahoo import fetch_history
 from app.utils import TTLCache
@@ -98,18 +98,14 @@ def _df_to_indicator_rows(indicators: pd.DataFrame, start: date) -> list[Indicat
     for dt, row in indicators.iterrows():
         if dt < start:
             continue
+        values: dict[str, float | None] = {}
+        for defn in INDICATOR_REGISTRY.values():
+            for col in defn.output_fields:
+                values[col] = safe_round(row[col], defn.decimals)
         rows.append(IndicatorResponse(
             date=dt,
             close=round(row["close"], 4),
-            rsi=safe_round(row["rsi"], 2),
-            sma_20=safe_round(row["sma_20"], 4),
-            sma_50=safe_round(row["sma_50"], 4),
-            bb_upper=safe_round(row["bb_upper"], 4),
-            bb_middle=safe_round(row["bb_middle"], 4),
-            bb_lower=safe_round(row["bb_lower"], 4),
-            macd=safe_round(row["macd"], 4),
-            macd_signal=safe_round(row["macd_signal"], 4),
-            macd_hist=safe_round(row["macd_hist"], 4),
+            values=values,
         ))
     return rows
 

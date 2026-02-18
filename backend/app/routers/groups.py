@@ -59,5 +59,5 @@ async def group_indicators(
     group_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, dict]:
-    """Return the latest RSI and MACD indicator values for every asset in the group."""
+    """Return the latest indicator snapshot for every asset in the group."""
     return await compute_and_cache_indicators(db, group_id=group_id)

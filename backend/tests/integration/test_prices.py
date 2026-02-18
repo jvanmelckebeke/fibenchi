@@ -62,10 +62,12 @@ async def test_get_indicators_fields(client, db):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) > 0
-    expected = {"date", "close", "rsi", "sma_20", "sma_50",
-                "bb_upper", "bb_middle", "bb_lower",
-                "macd", "macd_signal", "macd_hist"}
-    assert set(data[0].keys()) == expected
+    # Top-level keys: date, close, values
+    assert set(data[0].keys()) == {"date", "close", "values"}
+    # All registry output fields should be under 'values'
+    from app.services.compute.indicators import get_all_output_fields
+    expected_fields = set(get_all_output_fields())
+    assert set(data[0]["values"].keys()) == expected_fields
 
 
 async def test_get_indicators_ephemeral(client):
