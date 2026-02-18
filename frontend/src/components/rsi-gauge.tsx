@@ -24,7 +24,7 @@ function getZoneLabel(rsi: number): string {
   return ""
 }
 
-export function RsiGauge({ batchRsi, size = "sm" }: { symbol: string; batchRsi?: number | null; size?: "sm" | "lg" }) {
+export function RsiGauge({ batchRsi, size = "sm" }: { batchRsi?: number | null; size?: "sm" | "lg" }) {
   const lg = size === "lg"
 
   if (batchRsi === undefined) {
