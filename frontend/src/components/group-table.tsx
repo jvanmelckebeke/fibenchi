@@ -15,6 +15,7 @@ import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { formatPrice } from "@/lib/format"
 import {
   getNumericValue,
+  extractMacdValues,
   getAllSortableFields,
   getSeriesByField,
   resolveThresholdColor,
@@ -140,13 +141,7 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
   const loading = detailLoading
 
   const rsiVal = getNumericValue(indicator?.values, "rsi")
-  const macdVals = indicator?.values
-    ? {
-        macd: getNumericValue(indicator.values, "macd"),
-        macd_signal: getNumericValue(indicator.values, "macd_signal"),
-        macd_hist: getNumericValue(indicator.values, "macd_hist"),
-      }
-    : undefined
+  const macdVals = extractMacdValues(indicator?.values)
 
   return (
     <div className="flex gap-4">

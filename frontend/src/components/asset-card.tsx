@@ -10,7 +10,7 @@ import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
-import { getNumericValue } from "@/lib/indicator-registry"
+import { getNumericValue, extractMacdValues } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 
 export interface AssetCardProps {
@@ -99,7 +99,7 @@ export function AssetCard({
           {(showRsi || showMacd) && (
             <div className="flex gap-1.5 mt-1">
               {showRsi && <RsiGauge batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
-              {showMacd && <MacdIndicator batchMacd={indicatorData?.values ? { macd: getNumericValue(indicatorData.values, "macd"), macd_signal: getNumericValue(indicatorData.values, "macd_signal"), macd_hist: getNumericValue(indicatorData.values, "macd_hist") } : undefined} />}
+              {showMacd && <MacdIndicator batchMacd={extractMacdValues(indicatorData?.values)} />}
             </div>
           )}
         </CardContent>
