@@ -5,6 +5,11 @@ from unittest.mock import patch
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
+def _mock_validate(symbol, currency="USD"):
+    """Return a validate_symbol mock result for common test symbols."""
+    return {"symbol": symbol.upper(), "name": symbol.upper(), "type": "EQUITY", "currency": currency}
+
+
 async def test_list_assets_empty(client):
     resp = await client.get("/api/assets")
     assert resp.status_code == 200
@@ -12,11 +17,13 @@ async def test_list_assets_empty(client):
 
 
 async def test_create_asset_with_name(client):
-    resp = await client.post("/api/assets", json={
-        "symbol": "AAPL",
-        "name": "Apple Inc.",
-        "type": "stock",
-    })
+    mock_info = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD"}
+    with patch("app.services.asset_service.validate_symbol", return_value=mock_info):
+        resp = await client.post("/api/assets", json={
+            "symbol": "AAPL",
+            "name": "Apple Inc.",
+            "type": "stock",
+        })
     assert resp.status_code == 201
     data = resp.json()
     assert data["symbol"] == "AAPL"
@@ -46,6 +53,18 @@ async def test_create_asset_with_currency(client):
     assert data["type"] == "etf"
 
 
+async def test_create_asset_krw_currency(client):
+    """Regression test for #213: KOSPI assets should have KRW currency."""
+    mock_info = {"symbol": "006260.KS", "name": "LS Corp", "type": "EQUITY", "currency": "KRW"}
+    with patch("app.services.asset_service.validate_symbol", return_value=mock_info):
+        resp = await client.post("/api/assets", json={"symbol": "006260.KS"})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["symbol"] == "006260.KS"
+    assert data["currency"] == "KRW"
+    assert data["name"] == "LS Corp"
+
+
 async def test_create_asset_invalid_symbol(client):
     with patch("app.services.asset_service.validate_symbol", return_value=None):
         resp = await client.post("/api/assets", json={"symbol": "XXXX"})
@@ -54,14 +73,18 @@ async def test_create_asset_invalid_symbol(client):
 
 async def test_create_duplicate_asset_returns_existing(client):
     """Creating an asset that already exists returns the existing record (idempotent)."""
-    resp1 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
-    resp2 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+    mock_info = {"symbol": "AAPL", "name": "Apple", "type": "EQUITY", "currency": "USD"}
+    with patch("app.services.asset_service.validate_symbol", return_value=mock_info):
+        resp1 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+        resp2 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
     assert resp2.status_code == 201
     assert resp2.json()["id"] == resp1.json()["id"]
 
 
 async def test_delete_asset(client):
-    await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+    mock_info = {"symbol": "AAPL", "name": "Apple", "type": "EQUITY", "currency": "USD"}
+    with patch("app.services.asset_service.validate_symbol", return_value=mock_info):
+        await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
     resp = await client.delete("/api/assets/AAPL")
     assert resp.status_code == 204
 
@@ -75,8 +98,11 @@ async def test_delete_nonexistent_asset(client):
 
 
 async def test_list_assets_returns_created(client):
-    await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
-    await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft"})
+    mock_aapl = {"symbol": "AAPL", "name": "Apple", "type": "EQUITY", "currency": "USD"}
+    mock_msft = {"symbol": "MSFT", "name": "Microsoft", "type": "EQUITY", "currency": "USD"}
+    with patch("app.services.asset_service.validate_symbol", side_effect=[mock_aapl, mock_msft]):
+        await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+        await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft"})
 
     resp = await client.get("/api/assets")
     assert resp.status_code == 200

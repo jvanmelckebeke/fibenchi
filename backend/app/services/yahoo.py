@@ -20,6 +20,63 @@ SUBUNIT_CURRENCIES: dict[str, tuple[str, int]] = {
     "ZAc": ("ZAR", 100),
 }
 
+# Fallback mapping from Yahoo Finance exchange suffixes to ISO 4217 currency codes.
+# Used when ticker.price doesn't return currency data for a symbol.
+EXCHANGE_CURRENCY_MAP: dict[str, str] = {
+    # Asia-Pacific
+    ".KS": "KRW",   # Korea (KOSPI)
+    ".KQ": "KRW",   # Korea (KOSDAQ)
+    ".T": "JPY",    # Tokyo
+    ".HK": "HKD",   # Hong Kong
+    ".SS": "CNY",   # Shanghai
+    ".SZ": "CNY",   # Shenzhen
+    ".TW": "TWD",   # Taiwan (TWSE)
+    ".TWO": "TWD",  # Taiwan (OTC)
+    ".SI": "SGD",   # Singapore
+    ".AX": "AUD",   # Australia (ASX)
+    ".NZ": "NZD",   # New Zealand
+    ".NS": "INR",   # India (NSE)
+    ".BO": "INR",   # India (BSE)
+    ".JK": "IDR",   # Jakarta
+    ".BK": "THB",   # Bangkok
+    # Europe
+    ".L": "GBP",    # London
+    ".IL": "GBP",   # London (IOB)
+    ".PA": "EUR",   # Paris
+    ".DE": "EUR",   # XETRA (Germany)
+    ".F": "EUR",    # Frankfurt
+    ".MI": "EUR",   # Milan
+    ".MC": "EUR",   # Madrid
+    ".AS": "EUR",   # Amsterdam
+    ".BR": "EUR",   # Brussels
+    ".LS": "EUR",   # Lisbon
+    ".HE": "EUR",   # Helsinki
+    ".AT": "EUR",   # Athens
+    ".VI": "EUR",   # Vienna
+    ".IR": "EUR",   # Dublin
+    ".OL": "NOK",   # Oslo
+    ".ST": "SEK",   # Stockholm
+    ".CO": "DKK",   # Copenhagen
+    ".IC": "ISK",   # Iceland
+    ".WA": "PLN",   # Warsaw
+    ".PR": "CZK",   # Prague
+    ".BD": "HUF",   # Budapest
+    ".SW": "CHF",   # Swiss Exchange
+    ".IS": "TRY",   # Istanbul
+    # Middle East & Africa
+    ".TA": "ILS",   # Tel Aviv
+    ".SR": "SAR",   # Saudi (Tadawul)
+    ".QA": "QAR",   # Qatar
+    ".JO": "ZAR",   # Johannesburg
+    # Americas
+    ".TO": "CAD",   # Toronto (TSX)
+    ".V": "CAD",    # TSX Venture
+    ".SA": "BRL",   # Sao Paulo
+    ".MX": "MXN",   # Mexico
+    ".SN": "CLP",   # Santiago
+    ".BA": "ARS",   # Buenos Aires
+}
+
 
 def normalize_currency(currency: str) -> tuple[str, int]:
     """Normalize a Yahoo Finance currency code.
@@ -30,6 +87,50 @@ def normalize_currency(currency: str) -> tuple[str, int]:
     if currency in SUBUNIT_CURRENCIES:
         return SUBUNIT_CURRENCIES[currency]
     return (currency, 1)
+
+
+def _currency_from_suffix(symbol: str) -> str | None:
+    """Derive currency from a Yahoo Finance exchange suffix (e.g. '.KS' → 'KRW').
+
+    Returns None if the symbol has no recognized suffix.
+    """
+    dot = symbol.rfind(".")
+    if dot == -1:
+        return None
+    suffix = symbol[dot:]
+    return EXCHANGE_CURRENCY_MAP.get(suffix.upper()) or EXCHANGE_CURRENCY_MAP.get(suffix)
+
+
+def _extract_currency(ticker: Ticker, symbol: str) -> tuple[str, int]:
+    """Extract and normalize currency for a symbol from Yahoo Finance data.
+
+    Tries multiple data sources in order:
+    1. ticker.price (primary source)
+    2. ticker.summary_detail (fallback)
+    3. Exchange suffix mapping (last resort)
+
+    Returns (normalized_currency_code, divisor).
+    """
+    # Try ticker.price first
+    price_data = ticker.price.get(symbol, {})
+    if isinstance(price_data, dict):
+        raw = price_data.get("currency")
+        if raw:
+            return normalize_currency(raw)
+
+    # Try ticker.summary_detail as fallback
+    detail = ticker.summary_detail.get(symbol, {})
+    if isinstance(detail, dict):
+        raw = detail.get("currency")
+        if raw:
+            return normalize_currency(raw)
+
+    # Last resort: derive from exchange suffix
+    suffix_currency = _currency_from_suffix(symbol)
+    if suffix_currency:
+        return (suffix_currency, 1)
+
+    return ("USD", 1)
 
 
 def _normalize_ohlcv_df(df: pd.DataFrame, divisor: int) -> pd.DataFrame:
@@ -78,11 +179,8 @@ def fetch_history(
         df = df.reset_index().set_index("date")
 
     # Convert subunit prices (e.g. pence → pounds)
-    price_data = ticker.price.get(symbol, {})
-    if isinstance(price_data, dict):
-        raw_currency = price_data.get("currency", "USD") or "USD"
-        _, divisor = normalize_currency(raw_currency)
-        df = _normalize_ohlcv_df(df, divisor)
+    _, divisor = _extract_currency(ticker, symbol)
+    df = _normalize_ohlcv_df(df, divisor)
 
     return df
 
@@ -96,12 +194,8 @@ def validate_symbol(symbol: str) -> dict | None:
     if not quote or isinstance(quote, str):
         return None
 
-    # Extract currency from price data and normalize subunits
-    price_data = ticker.price.get(symbol, {})
-    currency = "USD"
-    if isinstance(price_data, dict):
-        raw_currency = price_data.get("currency", "USD") or "USD"
-        currency, _ = normalize_currency(raw_currency)
+    # Extract currency from multiple Yahoo Finance data sources with suffix fallback
+    currency, _ = _extract_currency(ticker, symbol)
 
     return {
         "symbol": symbol.upper(),
@@ -189,15 +283,11 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
         return {}
 
     ticker = Ticker(symbols)
-    price_data = ticker.price
 
     result = {}
     for sym in symbols:
-        info = price_data.get(sym, {})
-        if isinstance(info, dict):
-            raw_currency = info.get("currency", "USD") or "USD"
-            currency, _ = normalize_currency(raw_currency)
-            result[sym] = currency
+        currency, _ = _extract_currency(ticker, sym)
+        result[sym] = currency
 
     return result
 
@@ -222,8 +312,7 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
             results.append({"symbol": sym})
             continue
 
-        raw_currency = info.get("currency", "USD") or "USD"
-        currency, divisor = normalize_currency(raw_currency)
+        currency, divisor = _extract_currency(ticker, sym)
 
         price = info.get("regularMarketPrice")
         prev_close = info.get("regularMarketPreviousClose")
@@ -268,11 +357,8 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
                 df = hist.copy()
             if not df.empty and len(df) >= 2:
                 # Convert subunit prices (e.g. pence → pounds)
-                info = price_data.get(sym, {})
-                if isinstance(info, dict):
-                    raw_currency = info.get("currency", "USD") or "USD"
-                    _, divisor = normalize_currency(raw_currency)
-                    df = _normalize_ohlcv_df(df, divisor)
+                _, divisor = _extract_currency(ticker, sym)
+                df = _normalize_ohlcv_df(df, divisor)
                 result[sym] = df
         except KeyError:
             continue

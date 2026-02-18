@@ -35,13 +35,18 @@ async def create_asset(
         # Caller just needs the asset record (e.g. pseudo-ETF constituent picker)
         return existing
 
-    currency = "USD"
-    if not name:
-        info = await validate_symbol(symbol)
-        if not info:
+    # Always call validate_symbol to detect currency (and name/type if not provided)
+    info = await validate_symbol(symbol)
+    if not info:
+        if not name:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
-        name = info["name"]
+        # Name was provided manually — proceed with exchange-suffix currency fallback
+        from app.services.yahoo import _currency_from_suffix
+        currency = _currency_from_suffix(symbol) or "USD"
+    else:
         currency = info.get("currency", "USD")
+        if not name:
+            name = info["name"]
         if info["type"] == "ETF":
             asset_type = AssetType.ETF
 
