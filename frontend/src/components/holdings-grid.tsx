@@ -29,22 +29,23 @@ interface HoldingsGridProps {
 
 const SUMMARY_DESCRIPTORS = getHoldingSummaryDescriptors()
 
-function buildGridCols(hasRemove: boolean): string {
+function buildGridTemplate(hasRemove: boolean): string {
   // base: symbol, name, %, price, chg%
   const base = "4rem 1fr 3.5rem 5rem 4rem"
   const indicatorCols = SUMMARY_DESCRIPTORS.map(() => "3.5rem").join(" ")
   const removePart = hasRemove ? " 2rem" : ""
-  return `grid-cols-[${base} ${indicatorCols}${removePart}]`
+  return `${base} ${indicatorCols}${removePart}`
 }
 
 export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, linkTarget }: HoldingsGridProps) {
   const hasRemove = !!onRemove
-  const gridCols = buildGridCols(hasRemove)
+  const gridTemplate = buildGridTemplate(hasRemove)
+  const gridStyle = { gridTemplateColumns: gridTemplate }
 
   return (
     <div className="overflow-x-auto">
       <div className={`${hasRemove ? "min-w-[750px]" : "min-w-[700px]"} space-y-0`}>
-        <div className={`grid ${gridCols} text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2`}>
+        <div className="grid text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2" style={gridStyle}>
           <span>Symbol</span>
           <span>Name</span>
           <span className="text-right">%</span>
@@ -62,7 +63,8 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
           return (
             <div
               key={row.key}
-              className={`grid ${gridCols} text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center${hasRemove ? " group/row" : ""}`}
+              className={`grid text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center${hasRemove ? " group/row" : ""}`}
+              style={gridStyle}
             >
               <Link
                 to={`/asset/${row.symbol}`}
@@ -74,7 +76,7 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
               <span className="text-muted-foreground truncate text-xs">{row.name}</span>
               <IndicatorCell value={row.percent != null ? `${row.percent.toFixed(1)}%` : null} />
               {indicatorsLoading ? (
-                <span className={`col-span-${2 + SUMMARY_DESCRIPTORS.length} text-right text-xs text-muted-foreground animate-pulse`}>Loading...</span>
+                <span className="text-right text-xs text-muted-foreground animate-pulse" style={{ gridColumn: `span ${2 + SUMMARY_DESCRIPTORS.length}` }}>Loading...</span>
               ) : (
                 <>
                   <IndicatorCell value={ind?.close != null ? formatPrice(ind.close, ind.currency, 0) : null} />
