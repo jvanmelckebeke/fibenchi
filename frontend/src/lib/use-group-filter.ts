@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import type { AssetTypeFilter, WatchlistSortBy, SortDir } from "@/lib/settings"
+import type { AssetTypeFilter, GroupSortBy, SortDir } from "@/lib/settings"
 
 function compareNullable(a: number | null, b: number | null): number {
   if (a == null && b == null) return 0
@@ -14,7 +14,7 @@ export function useFilteredSortedAssets(
   opts: {
     typeFilter: AssetTypeFilter
     selectedTags: number[]
-    sortBy: WatchlistSortBy
+    sortBy: GroupSortBy
     sortDir: SortDir
     quotes: Record<string, Quote>
     indicators?: Record<string, IndicatorSummary>

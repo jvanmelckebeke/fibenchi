@@ -17,7 +17,7 @@ _MIN_ENTRY_PRICE = 10.0
 async def compute_portfolio_index(
     db: AsyncSession, period: str = "1y",
 ) -> dict:
-    """Compute equal-weight composite index of all watchlisted assets.
+    """Compute equal-weight composite index of all grouped assets.
 
     Returns dict with keys: dates, values, current, change, change_pct.
     """
@@ -58,7 +58,7 @@ async def compute_portfolio_index(
 async def compute_performers(
     db: AsyncSession, period: str = "1y",
 ) -> list[dict]:
-    """Return watchlisted assets ranked by period return (best first).
+    """Return grouped assets ranked by period return (best first).
 
     Returns list of dicts with keys: symbol, name, type, change_pct.
     """

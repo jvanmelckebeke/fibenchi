@@ -17,14 +17,14 @@ async def create_asset(
     symbol: str,
     name: str | None,
     asset_type: AssetType,
-    add_to_watchlist: bool = True,
+    add_to_default_group: bool = True,
 ):
     repo = AssetRepository(db)
     symbol = symbol.upper()
 
     existing = await repo.find_by_symbol(symbol)
     if existing:
-        if add_to_watchlist:
+        if add_to_default_group:
             # Add to default group if not already in it
             group_repo = GroupRepository(db)
             default_group = await group_repo.get_default()
@@ -49,7 +49,7 @@ async def create_asset(
         symbol=symbol, name=name, type=asset_type, currency=currency,
     )
 
-    if add_to_watchlist:
+    if add_to_default_group:
         group_repo = GroupRepository(db)
         default_group = await group_repo.get_default()
         if default_group:
@@ -60,7 +60,7 @@ async def create_asset(
 
 
 async def delete_asset(db: AsyncSession, symbol: str):
-    """Remove an asset from the default Watchlist group (soft-delete).
+    """Remove an asset from the default group (soft-delete).
 
     The asset row is preserved so that pseudo-ETF constituent relationships
     remain intact.

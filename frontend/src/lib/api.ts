@@ -27,7 +27,6 @@ import type {
   Thesis,
 } from "./types"
 
-// Re-export all types for backwards compatibility
 export type * from "./types"
 
 // API client

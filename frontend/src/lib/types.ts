@@ -40,7 +40,7 @@ export interface AssetCreate {
   symbol: string
   name?: string
   type?: AssetType
-  add_to_watchlist?: boolean
+  add_to_default_group?: boolean
 }
 
 export interface SymbolSearchResult {

@@ -90,8 +90,8 @@ async def test_get_quotes_uppercase_normalization(client):
 # patch it to use the test database session.
 
 
-async def test_stream_quotes_no_watchlisted(client):
-    """SSE stream emits empty payload when no assets are watchlisted."""
+async def test_stream_quotes_no_tracked(client):
+    """SSE stream emits empty payload when no assets are tracked."""
     with (
         patch("app.services.quote_service.async_session", TestSession),
         patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
@@ -106,7 +106,7 @@ async def test_stream_quotes_no_watchlisted(client):
 
 
 async def test_stream_quotes_emits_event(client):
-    """SSE stream emits quote data for watchlisted assets."""
+    """SSE stream emits quote data for tracked assets."""
     await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
 
     with (
@@ -137,7 +137,7 @@ async def test_stream_quotes_cache_headers(client):
 
 
 async def test_stream_quotes_multiple_symbols(client):
-    """SSE stream includes all watchlisted symbols in first event."""
+    """SSE stream includes all tracked symbols in first event."""
     await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
     await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft", "type": "stock"})
 

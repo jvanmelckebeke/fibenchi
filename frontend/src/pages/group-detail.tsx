@@ -1,9 +1,9 @@
 import { useParams } from "react-router-dom"
-import { WatchlistPage } from "@/pages/watchlist"
+import { GroupPage } from "@/pages/group-page"
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>()
   const groupId = Number(id)
 
-  return <WatchlistPage groupId={groupId} />
+  return <GroupPage groupId={groupId} />
 }

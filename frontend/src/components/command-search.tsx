@@ -15,7 +15,7 @@ export function CommandSearch() {
   const prevResultsRef = useRef<string>("")
   const { data: results } = useSymbolSearch(debouncedQuery)
   const { data: assets } = useAssets()
-  const watchlistedSymbols = useMemo(
+  const trackedSymbols = useMemo(
     () => new Set(assets?.map((a) => a.symbol)),
     [assets],
   )
@@ -118,7 +118,7 @@ export function CommandSearch() {
           {results && results.length > 0 && query.trim() && (
             <div className="max-h-72 overflow-auto py-1">
               {results.map((r, i) => {
-                const isWatchlisted = watchlistedSymbols.has(r.symbol)
+                const isTracked = trackedSymbols.has(r.symbol)
                 return (
                   <button
                     key={r.symbol}
@@ -135,10 +135,10 @@ export function CommandSearch() {
                       {r.symbol}
                     </span>
                     <span className="text-muted-foreground truncate">{r.name}</span>
-                    {isWatchlisted ? (
+                    {isTracked ? (
                       <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
                         <Check className="h-3 w-3" />
-                        Watchlisted
+                        Tracked
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="ml-auto text-xs shrink-0">

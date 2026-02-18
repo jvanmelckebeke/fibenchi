@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.group import GroupAddAssets, GroupCreate, GroupResponse, GroupUpdate
 from app.services import group_service
-from app.services.compute.watchlist import compute_and_cache_indicators, get_batch_sparklines
+from app.services.compute.group import compute_and_cache_indicators, get_batch_sparklines
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 

@@ -101,7 +101,7 @@ function GroupsSection() {
         </div>
       )}
 
-      {/* Default Watchlist group — always first */}
+      {/* Default group — always first */}
       {defaultGroup && (
         <NavLink
           to={`/groups/${defaultGroup.id}`}

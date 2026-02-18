@@ -21,7 +21,7 @@ async def _create_asset(db, symbol: str, **kwargs) -> Asset:
 
 
 async def _add_to_default_group(db, asset: Asset) -> None:
-    """Add an asset to the default Watchlist group."""
+    """Add an asset to the default group."""
     default_group = await GroupRepository(db).get_default()
     default_group.assets.append(asset)
     await db.commit()
