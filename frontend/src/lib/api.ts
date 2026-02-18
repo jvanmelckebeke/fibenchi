@@ -131,12 +131,6 @@ export const api = {
     delete: (symbol: string, id: number) =>
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
   },
-  watchlist: {
-    sparklines: (period?: string) =>
-      request<Record<string, SparklinePoint[]>>(`/watchlist/sparklines${qs({ period })}`),
-    indicators: () =>
-      request<Record<string, IndicatorSummary>>("/watchlist/indicators"),
-  },
   search: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
   settings: {
     get: () => request<{ data: Record<string, unknown> }>("/settings"),
