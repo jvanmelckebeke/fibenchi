@@ -16,7 +16,7 @@ export function CommandSearch() {
   const { data: results } = useSymbolSearch(debouncedQuery)
   const { data: assets } = useAssets()
   const watchlistedSymbols = useMemo(
-    () => new Set(assets?.filter((a) => a.watchlisted).map((a) => a.symbol)),
+    () => new Set(assets?.map((a) => a.symbol)),
     [assets],
   )
 

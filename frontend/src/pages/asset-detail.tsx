@@ -136,7 +136,7 @@ function Header({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => createAsset.mutate({ symbol: symbol.toUpperCase(), watchlisted: true })}
+            onClick={() => createAsset.mutate({ symbol: symbol.toUpperCase() })}
             disabled={createAsset.isPending}
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" />
