@@ -263,6 +263,15 @@ export function buildSortOptions(): [string, string][] {
   return base
 }
 
+/** Extract the three MACD values from an indicator values dict. */
+export function extractMacdValues(values?: Record<string, number | string | null>) {
+  return values ? {
+    macd: getNumericValue(values, "macd"),
+    macd_signal: getNumericValue(values, "macd_signal"),
+    macd_hist: getNumericValue(values, "macd_hist"),
+  } : undefined
+}
+
 export function getSeriesByField(field: string): SeriesDescriptor | undefined {
   for (const desc of INDICATOR_REGISTRY) {
     const s = desc.series.find((ser) => ser.field === field)

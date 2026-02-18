@@ -32,6 +32,11 @@ export function formatChangePct(v: number | null): { text: string | null; classN
 /**
  * Build a Yahoo Finance advanced chart URL with pre-configured indicators.
  * Config includes: candlestick + volume, Bollinger Bands (20,2), RSI (14), MACD (12,26,9), 1Y daily.
+ *
+ * NOTE: Study key names contain invisible zero-width non-joiner characters (\u200c).
+ * Yahoo Finance's chart config format requires these characters as delimiters in
+ * study identifiers (e.g. "\u200cvol undr\u200c"). Removing them will break the
+ * pre-configured chart layout when the URL is opened.
  */
 export function buildYahooFinanceUrl(symbol: string): string {
   const config = {
