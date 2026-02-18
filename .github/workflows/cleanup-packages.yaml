@@ -1,0 +1,33 @@
+name: Cleanup GHCR packages
+
+on:
+  schedule:
+    # Every Sunday at 03:00 UTC
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Simulate cleanup without deleting anything"
+        type: boolean
+        default: false
+
+permissions:
+  packages: write
+
+env:
+  RETENTION_DAYS: 7
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prune old container versions
+        uses: dataaxiom/ghcr-cleanup-action@v1.0.16
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          package: fibenchi
+          delete-untagged: true
+          delete-tags: sha-*
+          exclude-tags: latest,dev
+          older-than: ${{ env.RETENTION_DAYS }} days
+          dry-run: ${{ inputs.dry-run || false }}
