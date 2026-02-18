@@ -39,8 +39,6 @@ export const keys = {
   pseudoEtfConstituentsIndicators: (id: number) => ["pseudo-etfs", id, "constituents-indicators"] as const,
   pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
-  watchlistSparklines: (period?: string) => ["watchlist-sparklines", period] as const,
-  watchlistIndicators: ["watchlist-indicators"] as const,
   symbolSearch: (q: string) => ["symbol-search", q] as const,
 }
 
@@ -63,23 +61,6 @@ export function usePortfolioPerformers(period?: string) {
   })
 }
 
-// Watchlist batch
-export function useWatchlistSparklines(period?: string) {
-  return useQuery({
-    queryKey: keys.watchlistSparklines(period),
-    queryFn: () => api.watchlist.sparklines(period),
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-export function useWatchlistIndicators() {
-  return useQuery({
-    queryKey: keys.watchlistIndicators,
-    queryFn: () => api.watchlist.indicators(),
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
 // Assets
 export function useAssets() {
   return useQuery({ queryKey: keys.assets, queryFn: api.assets.list, staleTime: 5 * 60 * 1000 })
@@ -90,28 +71,6 @@ export function useCreateAsset() {
     (data: AssetCreate) => api.assets.create(data),
     [keys.assets, keys.groups],
   )
-}
-
-export function useDeleteAsset() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (symbol: string) => api.assets.delete(symbol),
-    onMutate: async (symbol) => {
-      await qc.cancelQueries({ queryKey: keys.assets })
-      const previous = qc.getQueryData<Asset[]>(keys.assets)
-      qc.setQueryData<Asset[]>(keys.assets, (old) =>
-        old?.filter((a) => a.symbol !== symbol),
-      )
-      return { previous }
-    },
-    onError: (_err, _symbol, context) => {
-      if (context?.previous) qc.setQueryData(keys.assets, context.previous)
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: keys.assets })
-      qc.invalidateQueries({ queryKey: keys.groups })
-    },
-  })
 }
 
 // Search

@@ -19,7 +19,7 @@ async def get_quotes(symbols: str) -> list[dict]:
 
 
 async def quote_event_generator():
-    """Yield SSE events with watchlisted quotes, adapting interval to market state.
+    """Yield SSE events with quotes for all grouped assets, adapting interval to market state.
 
     After the initial full payload, only symbols whose data changed since the
     last push are included (delta mode).  This dramatically reduces bandwidth

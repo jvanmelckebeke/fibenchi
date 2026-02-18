@@ -19,12 +19,12 @@ async def get_quotes(symbols: str = Query(..., description="Comma-separated list
 
 @router.get(
     "/quotes/stream",
-    summary="SSE stream of watchlisted quotes (delta compressed)",
-    responses={200: {"content": {"text/event-stream": {}}, "description": "Server-Sent Events stream. Each event has `event: quotes` with JSON data containing only the symbols whose quote changed since the last push. The first event contains all watchlisted symbols."}},
+    summary="SSE stream of grouped asset quotes (delta compressed)",
+    responses={200: {"content": {"text/event-stream": {}}, "description": "Server-Sent Events stream. Each event has `event: quotes` with JSON data containing only the symbols whose quote changed since the last push. The first event contains all grouped symbols."}},
 )
 async def stream_quotes():
     """Open a Server-Sent Events stream that pushes real-time quotes for all
-    watchlisted assets.
+    assets that belong to at least one group.
 
     **Delta compression:** After the initial full payload, only symbols whose
     data has changed since the previous push are included — reducing bandwidth
