@@ -59,6 +59,13 @@ export interface IndicatorDescriptor {
   }
   /** Band-fill between two series fields (e.g. Bollinger Bands). */
   bandFill?: { upperField: string; lowerField: string }
+  /** How this indicator appears in the holdings grid summary column. */
+  holdingSummary?: {
+    label: string
+    field: string
+    format: "numeric" | "compare_close" | "string_map"
+    colorMap?: Record<string, string>
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +100,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       ],
       range: { min: 0, max: 100 },
     },
+    holdingSummary: { label: "RSI", field: "rsi", format: "numeric" },
   },
   {
     id: "sma_20",
@@ -105,6 +113,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       { field: "sma_20", label: "SMA 20", color: "#14b8a6", lineWidth: 1 },
     ],
     decimals: 2,
+    holdingSummary: { label: "SMA20", field: "sma_20", format: "compare_close" },
   },
   {
     id: "sma_50",
@@ -131,6 +140,12 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     ],
     decimals: 2,
     bandFill: { upperField: "bb_upper", lowerField: "bb_lower" },
+    holdingSummary: {
+      label: "BB",
+      field: "bb_position",
+      format: "string_map",
+      colorMap: { above: "text-red-500", below: "text-emerald-500" },
+    },
   },
   {
     id: "macd",
@@ -157,6 +172,12 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     decimals: 2,
     chartConfig: {
       lines: [{ value: 0, color: "rgba(161, 161, 170, 0.3)" }],
+    },
+    holdingSummary: {
+      label: "MACD",
+      field: "macd_signal_dir",
+      format: "string_map",
+      colorMap: { bullish: "text-emerald-500", bearish: "text-red-500" },
     },
   },
 ]
@@ -220,6 +241,26 @@ export function getAllSortableFields(): string[] {
 
 export function getDescriptorById(id: string): IndicatorDescriptor | undefined {
   return INDICATOR_REGISTRY.find((d) => d.id === id)
+}
+
+export function getHoldingSummaryDescriptors(): IndicatorDescriptor[] {
+  return INDICATOR_REGISTRY.filter((d) => d.holdingSummary != null)
+}
+
+/** Build sort options from registry: base fields + all sortable indicator fields. */
+export function buildSortOptions(): [string, string][] {
+  const base: [string, string][] = [
+    ["name", "Name"],
+    ["price", "Price"],
+    ["change_pct", "Change %"],
+  ]
+  for (const desc of INDICATOR_REGISTRY) {
+    for (const field of desc.sortableFields) {
+      const series = desc.series.find((s) => s.field === field)
+      base.push([field, series?.label ?? field])
+    }
+  }
+  return base
 }
 
 export function getSeriesByField(field: string): SeriesDescriptor | undefined {

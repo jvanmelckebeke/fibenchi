@@ -49,11 +49,7 @@ export function AssetDetailPage() {
       <ChartSection
         symbol={symbol}
         period={period}
-        showSma20={settings.detail_show_sma20}
-        showSma50={settings.detail_show_sma50}
-        showBollinger={settings.detail_show_bollinger}
-        showRsiChart={settings.detail_show_rsi_chart}
-        showMacdChart={settings.detail_show_macd_chart}
+        indicatorVisibility={settings.detail_indicator_visibility}
         chartType={settings.chart_type}
       />
       {isEtf && <HoldingsSection symbol={symbol} />}
@@ -165,20 +161,12 @@ function Header({
 function ChartSection({
   symbol,
   period,
-  showSma20,
-  showSma50,
-  showBollinger,
-  showRsiChart,
-  showMacdChart,
+  indicatorVisibility,
   chartType,
 }: {
   symbol: string
   period: string
-  showSma20: boolean
-  showSma50: boolean
-  showBollinger: boolean
-  showRsiChart: boolean
-  showMacdChart: boolean
+  indicatorVisibility: Record<string, boolean>
   chartType: "candle" | "line"
 }) {
   const { data: detail, isLoading: detailLoading, isFetching: detailFetching } = useAssetDetail(symbol, period)
@@ -209,11 +197,7 @@ function ChartSection({
         prices={prices}
         indicators={indicators ?? []}
         annotations={annotations ?? []}
-        showSma20={showSma20}
-        showSma50={showSma50}
-        showBollinger={showBollinger}
-        showRsiChart={showRsiChart}
-        showMacdChart={showMacdChart}
+        indicatorVisibility={indicatorVisibility}
         chartType={chartType}
       />
     </div>

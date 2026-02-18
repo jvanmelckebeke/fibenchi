@@ -11,28 +11,23 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useSettings, type AppSettings, type MacdStyle, type GroupViewMode } from "@/lib/settings"
+import { INDICATOR_REGISTRY } from "@/lib/indicator-registry"
 
-function SettingSwitch({
+function VisibilityToggle({
   id,
   label,
-  settingKey,
-  draft,
-  onChange,
+  checked,
+  onCheckedChange,
 }: {
   id: string
   label: string
-  settingKey: keyof AppSettings
-  draft: AppSettings
-  onChange: (patch: Partial<AppSettings>) => void
+  checked: boolean
+  onCheckedChange: (v: boolean) => void
 }) {
   return (
     <div className="flex items-center justify-between">
       <Label htmlFor={id}>{label}</Label>
-      <Switch
-        id={id}
-        checked={draft[settingKey] as boolean}
-        onCheckedChange={(v) => onChange({ [settingKey]: v })}
-      />
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   )
 }
@@ -80,10 +75,26 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <SettingSwitch id="wl-sparkline" label="Sparkline Chart" settingKey="group_show_sparkline" draft={draft} onChange={change} />
-          <SettingSwitch id="wl-rsi" label="RSI Gauge" settingKey="group_show_rsi" draft={draft} onChange={change} />
-          <SettingSwitch id="wl-macd" label="MACD Indicator" settingKey="group_show_macd" draft={draft} onChange={change} />
-          {draft.group_show_macd && (
+          <VisibilityToggle
+            id="wl-sparkline"
+            label="Sparkline Chart"
+            checked={draft.group_show_sparkline}
+            onCheckedChange={(v) => change({ group_show_sparkline: v })}
+          />
+          {INDICATOR_REGISTRY.map((desc) => (
+            <VisibilityToggle
+              key={`grp-${desc.id}`}
+              id={`grp-${desc.id}`}
+              label={desc.label}
+              checked={draft.group_indicator_visibility[desc.id] !== false}
+              onCheckedChange={(v) =>
+                change({
+                  group_indicator_visibility: { ...draft.group_indicator_visibility, [desc.id]: v },
+                })
+              }
+            />
+          ))}
+          {draft.group_indicator_visibility.macd !== false && (
             <div className="flex items-center justify-between pl-4">
               <Label className="text-muted-foreground">MACD Style</Label>
               <Select
@@ -108,11 +119,19 @@ export function SettingsPage() {
           <CardTitle>Detail Page Chart</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <SettingSwitch id="dt-sma20" label="SMA 20" settingKey="detail_show_sma20" draft={draft} onChange={change} />
-          <SettingSwitch id="dt-sma50" label="SMA 50" settingKey="detail_show_sma50" draft={draft} onChange={change} />
-          <SettingSwitch id="dt-bb" label="Bollinger Bands" settingKey="detail_show_bollinger" draft={draft} onChange={change} />
-          <SettingSwitch id="dt-rsi" label="RSI Chart" settingKey="detail_show_rsi_chart" draft={draft} onChange={change} />
-          <SettingSwitch id="dt-macd" label="MACD Chart" settingKey="detail_show_macd_chart" draft={draft} onChange={change} />
+          {INDICATOR_REGISTRY.map((desc) => (
+            <VisibilityToggle
+              key={`dtl-${desc.id}`}
+              id={`dtl-${desc.id}`}
+              label={desc.label}
+              checked={draft.detail_indicator_visibility[desc.id] !== false}
+              onCheckedChange={(v) =>
+                change({
+                  detail_indicator_visibility: { ...draft.detail_indicator_visibility, [desc.id]: v },
+                })
+              }
+            />
+          ))}
         </CardContent>
       </Card>
 
@@ -179,7 +198,12 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <SettingSwitch id="compact" label="Compact Mode" settingKey="compact_mode" draft={draft} onChange={change} />
+          <VisibilityToggle
+            id="compact"
+            label="Compact Mode"
+            checked={draft.compact_mode}
+            onCheckedChange={(v) => change({ compact_mode: v })}
+          />
           <div className="flex items-center justify-between">
             <Label>Decimal Places</Label>
             <Select

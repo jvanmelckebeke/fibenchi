@@ -16,7 +16,7 @@ import {
   type MarkersHandle,
 } from "./chart/chart-builders"
 import { Legend, SubChartLegend, type LegendValues } from "./chart/chart-legends"
-import { getSubChartDescriptors, getAllIndicatorFields, type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { getSubChartDescriptors, getOverlayDescriptors, getAllIndicatorFields, type IndicatorDescriptor } from "@/lib/indicator-registry"
 
 const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()
 
@@ -24,11 +24,8 @@ interface PriceChartProps {
   prices: Price[]
   indicators: Indicator[]
   annotations: Annotation[]
-  showSma20?: boolean
-  showSma50?: boolean
-  showBollinger?: boolean
-  showRsiChart?: boolean
-  showMacdChart?: boolean
+  /** Per-descriptor visibility (keys = descriptor IDs). Missing keys default to true. */
+  indicatorVisibility?: Record<string, boolean>
   chartType?: "candle" | "line"
   mainChartHeight?: number
 }
@@ -44,11 +41,7 @@ export function PriceChart({
   prices,
   indicators,
   annotations,
-  showSma20 = true,
-  showSma50 = true,
-  showBollinger = true,
-  showRsiChart = true,
-  showMacdChart = true,
+  indicatorVisibility,
   chartType = "candle",
   mainChartHeight = 400,
 }: PriceChartProps) {
@@ -73,22 +66,22 @@ export function PriceChart({
   const chartStateRef = useRef<ChartState | null>(null)
   const markersRef = useRef<MarkersHandle | null>(null)
 
-  // Map individual show* props to generic sets
+  const isVisible = useCallback(
+    (id: string) => indicatorVisibility?.[id] !== false,
+    [indicatorVisibility],
+  )
+
   const enabledOverlayIds = useMemo(() => {
     const ids = new Set<string>()
-    if (showSma20) ids.add("sma_20")
-    if (showSma50) ids.add("sma_50")
-    if (showBollinger) ids.add("bb")
+    for (const d of getOverlayDescriptors()) {
+      if (isVisible(d.id)) ids.add(d.id)
+    }
     return ids
-  }, [showSma20, showSma50, showBollinger])
+  }, [isVisible])
 
   const enabledSubCharts = useMemo<IndicatorDescriptor[]>(
-    () => SUB_CHART_DESCRIPTORS.filter((d) => {
-      if (d.id === "rsi") return showRsiChart
-      if (d.id === "macd") return showMacdChart
-      return false
-    }),
-    [showRsiChart, showMacdChart],
+    () => SUB_CHART_DESCRIPTORS.filter((d) => isVisible(d.id)),
+    [isVisible],
   )
 
   const hasSubCharts = enabledSubCharts.length > 0
@@ -172,7 +165,7 @@ export function PriceChart({
       cleanupLifecycle()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- enabledSubCharts identity changes trigger re-creation
-  }, [chartType, showRsiChart, showMacdChart, mainChartHeight, syncCharts, setupSingleChartCrosshair, startLifecycle])
+  }, [chartType, enabledSubCharts, mainChartHeight, syncCharts, setupSingleChartCrosshair, startLifecycle])
 
   // Effect 2: Update data in-place (runs on data and overlay toggle changes)
   useEffect(() => {
@@ -201,7 +194,7 @@ export function PriceChart({
     for (const sc of state.subCharts) {
       sc.chart.timeScale().fitContent()
     }
-  }, [prices, indicators, annotations, enabledOverlayIds, chartType, showRsiChart, showMacdChart, mainChartHeight, buildLookupMaps])
+  }, [prices, indicators, annotations, enabledOverlayIds, chartType, enabledSubCharts, mainChartHeight, buildLookupMaps])
 
   const resetView = useCallback(() => {
     mainChartRef.current?.timeScale().fitContent()
