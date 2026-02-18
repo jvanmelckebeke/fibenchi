@@ -6,6 +6,8 @@ import type { LegendValues } from "@/components/chart/chart-legends"
 export interface ChartEntry {
   chart: IChartApi
   series: ReturnType<IChartApi["addSeries"]>
+  /** Field name used to snap the crosshair y-position on this chart. */
+  snapField?: string
 }
 
 export function useChartSync() {
@@ -13,60 +15,39 @@ export function useChartSync() {
 
   const closeByTime = useRef(new Map<string, number>())
   const ohlcByTime = useRef(new Map<string, { o: number; h: number; l: number; c: number }>())
-  const sma20ByTime = useRef(new Map<string, number>())
-  const sma50ByTime = useRef(new Map<string, number>())
-  const bbUpperByTime = useRef(new Map<string, number>())
-  const bbLowerByTime = useRef(new Map<string, number>())
-  const rsiByTime = useRef(new Map<string, number>())
-  const macdByTime = useRef(new Map<string, number>())
-  const macdSignalByTime = useRef(new Map<string, number>())
-  const macdHistByTime = useRef(new Map<string, number>())
+  const indicatorsByTime = useRef(new Map<string, Record<string, number>>())
 
   const syncingRef = useRef(false)
 
   const buildLookupMaps = useCallback((prices: Price[], indicators: Indicator[]) => {
     closeByTime.current.clear()
     ohlcByTime.current.clear()
-    sma20ByTime.current.clear()
-    sma50ByTime.current.clear()
-    bbUpperByTime.current.clear()
-    bbLowerByTime.current.clear()
-    rsiByTime.current.clear()
-    macdByTime.current.clear()
-    macdSignalByTime.current.clear()
-    macdHistByTime.current.clear()
+    indicatorsByTime.current.clear()
 
     for (const p of prices) {
       closeByTime.current.set(p.date, p.close)
       ohlcByTime.current.set(p.date, { o: p.open, h: p.high, l: p.low, c: p.close })
     }
     for (const i of indicators) {
-      if (i.sma_20 !== null) sma20ByTime.current.set(i.date, i.sma_20)
-      if (i.sma_50 !== null) sma50ByTime.current.set(i.date, i.sma_50)
-      if (i.bb_upper !== null) bbUpperByTime.current.set(i.date, i.bb_upper)
-      if (i.bb_lower !== null) bbLowerByTime.current.set(i.date, i.bb_lower)
-      if (i.rsi !== null) rsiByTime.current.set(i.date, i.rsi)
-      if (i.macd !== null) macdByTime.current.set(i.date, i.macd)
-      if (i.macd_signal !== null) macdSignalByTime.current.set(i.date, i.macd_signal)
-      if (i.macd_hist !== null) macdHistByTime.current.set(i.date, i.macd_hist)
+      const vals: Record<string, number> = {}
+      for (const [field, value] of Object.entries(i.values)) {
+        if (value != null && typeof value === "number") {
+          vals[field] = value
+        }
+      }
+      indicatorsByTime.current.set(i.date, vals)
     }
   }, [])
 
   const getValuesForTime = useCallback((key: string): LegendValues => {
     const ohlc = ohlcByTime.current.get(key)
+    const indVals = indicatorsByTime.current.get(key) ?? {}
     return {
       o: ohlc?.o,
       h: ohlc?.h,
       l: ohlc?.l,
       c: ohlc?.c,
-      sma20: sma20ByTime.current.get(key),
-      sma50: sma50ByTime.current.get(key),
-      bbUpper: bbUpperByTime.current.get(key),
-      bbLower: bbLowerByTime.current.get(key),
-      rsi: rsiByTime.current.get(key),
-      macd: macdByTime.current.get(key),
-      macdSignal: macdSignalByTime.current.get(key),
-      macdHist: macdHistByTime.current.get(key),
+      indicators: indVals,
     }
   }, [])
 
@@ -96,17 +77,18 @@ export function useChartSync() {
 
     const snapCrosshair = (key: string, time: Parameters<IChartApi["setCrosshairPosition"]>[1]) => {
       for (const entry of chartEntries) {
-        const closeVal = closeByTime.current.get(key)
-        const rsiVal = rsiByTime.current.get(key)
-        const macdVal = macdByTime.current.get(key)
-
-        if (entry === chartEntries[0] && closeVal !== undefined) {
-          entry.chart.setCrosshairPosition(closeVal, time, entry.series)
-        } else if (chartEntries.length > 1 && entry === chartEntries[1]) {
-          const val = rsiVal !== undefined ? rsiVal : macdVal
-          if (val !== undefined) entry.chart.setCrosshairPosition(val, time, entry.series)
-        } else if (chartEntries.length > 2 && entry === chartEntries[2] && macdVal !== undefined) {
-          entry.chart.setCrosshairPosition(macdVal, time, entry.series)
+        if (entry === chartEntries[0]) {
+          // Main chart — snap to close price
+          const closeVal = closeByTime.current.get(key)
+          if (closeVal !== undefined) {
+            entry.chart.setCrosshairPosition(closeVal, time, entry.series)
+          }
+        } else if (entry.snapField) {
+          // Sub-chart — snap to its designated field
+          const val = indicatorsByTime.current.get(key)?.[entry.snapField]
+          if (val !== undefined) {
+            entry.chart.setCrosshairPosition(val, time, entry.series)
+          }
         }
       }
     }
@@ -141,17 +123,7 @@ export function useChartSync() {
     chart.subscribeCrosshairMove((param) => {
       if (param.time) {
         const key = String(param.time)
-        const ohlc = ohlcByTime.current.get(key)
-        setHoverValues({
-          o: ohlc?.o,
-          h: ohlc?.h,
-          l: ohlc?.l,
-          c: ohlc?.c,
-          sma20: sma20ByTime.current.get(key),
-          sma50: sma50ByTime.current.get(key),
-          bbUpper: bbUpperByTime.current.get(key),
-          bbLower: bbLowerByTime.current.get(key),
-        })
+        setHoverValues(getValuesForTime(key))
         // Snap crosshair to close price
         if (!syncingRef.current) {
           syncingRef.current = true
@@ -165,7 +137,7 @@ export function useChartSync() {
         setHoverValues(null)
       }
     })
-  }, [])
+  }, [getValuesForTime])
 
   return {
     hoverValues,

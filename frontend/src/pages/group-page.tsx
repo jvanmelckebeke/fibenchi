@@ -24,22 +24,15 @@ import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
+import { getNumericValue, buildSortOptions } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type SortDir } from "@/lib/settings"
 import { useFilteredSortedAssets } from "@/lib/use-group-filter"
 import { GroupTable } from "@/components/group-table"
 
-const SORT_OPTIONS: [GroupSortBy, string][] = [
-  ["name", "Name"],
-  ["price", "Price"],
-  ["change_pct", "Change %"],
-  ["rsi", "RSI"],
-  ["macd", "MACD"],
-  ["macd_signal", "Signal"],
-  ["macd_hist", "MACD Hist"],
-]
+const SORT_OPTIONS = buildSortOptions()
 
-const SORT_LABELS: Record<GroupSortBy, string> = Object.fromEntries(SORT_OPTIONS) as Record<GroupSortBy, string>
+const SORT_LABELS: Record<string, string> = Object.fromEntries(SORT_OPTIONS)
 
 export function GroupPage({ groupId }: { groupId: number }) {
   const { data: group, isLoading: groupLoading } = useGroup(groupId)
@@ -223,8 +216,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               onDelete={() => handleRemove(asset.symbol)}
               onHover={() => prefetch(asset.symbol)}
               showSparkline={settings.group_show_sparkline}
-              showRsi={settings.group_show_rsi}
-              showMacd={settings.group_show_macd}
+              indicatorVisibility={settings.group_indicator_visibility}
             />
           ))}
         </div>
@@ -312,8 +304,7 @@ function AssetCard({
   onDelete,
   onHover,
   showSparkline,
-  showRsi,
-  showMacd,
+  indicatorVisibility,
 }: {
   symbol: string
   name: string
@@ -327,9 +318,10 @@ function AssetCard({
   onDelete: () => void
   onHover: () => void
   showSparkline: boolean
-  showRsi: boolean
-  showMacd: boolean
+  indicatorVisibility: Record<string, boolean>
 }) {
+  const showRsi = indicatorVisibility.rsi !== false
+  const showMacd = indicatorVisibility.macd !== false
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
   const changeColor =
@@ -382,8 +374,8 @@ function AssetCard({
           {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
           {(showRsi || showMacd) && (
             <div className="flex gap-1.5 mt-1">
-              {showRsi && <RsiGauge symbol={symbol} batchRsi={indicatorData?.rsi} />}
-              {showMacd && <MacdIndicator symbol={symbol} batchMacd={indicatorData ? { macd: indicatorData.macd, macd_signal: indicatorData.macd_signal, macd_hist: indicatorData.macd_hist } : undefined} />}
+              {showRsi && <RsiGauge symbol={symbol} batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
+              {showMacd && <MacdIndicator symbol={symbol} batchMacd={indicatorData?.values ? { macd: getNumericValue(indicatorData.values, "macd"), macd_signal: getNumericValue(indicatorData.values, "macd_signal"), macd_hist: getNumericValue(indicatorData.values, "macd_hist") } : undefined} />}
             </div>
           )}
         </CardContent>

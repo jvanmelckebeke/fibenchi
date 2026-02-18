@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.services.compute.indicators import compute_indicators, rsi, sma, macd
+from app.services.compute.indicators import compute_indicators, get_all_output_fields, rsi, sma, macd
 
 
 def _make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:
@@ -54,7 +54,7 @@ def test_macd_keys():
 def test_compute_indicators_columns():
     df = _make_price_df()
     result = compute_indicators(df)
-    expected_cols = {"close", "rsi", "sma_20", "sma_50", "bb_upper", "bb_middle", "bb_lower", "macd", "macd_signal", "macd_hist"}
+    expected_cols = {"close"} | set(get_all_output_fields())
     assert set(result.columns) == expected_cols
 
 

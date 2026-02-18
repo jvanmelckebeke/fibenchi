@@ -1,5 +1,4 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import type { IndicatorSummary } from "@/lib/api"
 import { useSettings } from "@/lib/settings"
 
 type MacdProps = { macd: number; sig: number; hist: number; lg: boolean }
@@ -85,7 +84,7 @@ export function MacdIndicator({
   size = "sm",
 }: {
   symbol: string
-  batchMacd?: Pick<IndicatorSummary, "macd" | "macd_signal" | "macd_hist"> | null
+  batchMacd?: { macd: number | null; macd_signal: number | null; macd_hist: number | null } | null
   size?: "sm" | "lg"
 }) {
   const { settings } = useSettings()

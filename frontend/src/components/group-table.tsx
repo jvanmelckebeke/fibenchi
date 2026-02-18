@@ -13,6 +13,12 @@ import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { formatPrice } from "@/lib/format"
+import {
+  getNumericValue,
+  getAllSortableFields,
+  getSeriesByField,
+  resolveThresholdColor,
+} from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
@@ -51,10 +57,20 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
             <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
             <SortableHeader label="Price" sortKey="price" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
             <SortableHeader label="Change" sortKey="change_pct" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
-            <SortableHeader label="RSI" sortKey="rsi" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
-            <SortableHeader label="MACD" sortKey="macd" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
-            <SortableHeader label="Signal" sortKey="macd_signal" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
-            <SortableHeader label="Hist" sortKey="macd_hist" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            {getAllSortableFields().map((field) => {
+              const series = getSeriesByField(field)
+              return (
+                <SortableHeader
+                  key={field}
+                  label={series?.label ?? field}
+                  sortKey={field}
+                  align="right"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                />
+              )
+            })}
             <th className="w-8" />
           </tr>
         </thead>
@@ -111,12 +127,6 @@ function SortableHeader({
   )
 }
 
-function getRsiColor(rsi: number): string {
-  if (rsi <= 30) return "text-amber-400"
-  if (rsi >= 70) return "text-orange-400"
-  return ""
-}
-
 function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: IndicatorSummary }) {
   const { settings } = useSettings()
   const period = settings.chart_default_period
@@ -126,6 +136,15 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
   const { data: annotations } = useAnnotations(symbol)
 
   const loading = detailLoading
+
+  const rsiVal = getNumericValue(indicator?.values, "rsi")
+  const macdVals = indicator?.values
+    ? {
+        macd: getNumericValue(indicator.values, "macd"),
+        macd_signal: getNumericValue(indicator.values, "macd_signal"),
+        macd_hist: getNumericValue(indicator.values, "macd_hist"),
+      }
+    : undefined
 
   return (
     <div className="flex gap-4">
@@ -140,11 +159,11 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
             prices={prices}
             indicators={chartIndicators ?? []}
             annotations={annotations ?? []}
-            showSma20={settings.detail_show_sma20}
-            showSma50={settings.detail_show_sma50}
-            showBollinger={settings.detail_show_bollinger}
-            showRsiChart={false}
-            showMacdChart={false}
+            indicatorVisibility={{
+              ...settings.detail_indicator_visibility,
+              rsi: false,
+              macd: false,
+            }}
             chartType={settings.chart_type}
             mainChartHeight={300}
           />
@@ -154,13 +173,13 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
       <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
         <div>
           <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
-          <RsiGauge symbol={symbol} batchRsi={indicator?.rsi} size="lg" />
+          <RsiGauge symbol={symbol} batchRsi={rsiVal} size="lg" />
         </div>
         <div>
           <span className="text-xs text-muted-foreground mb-1 block">MACD</span>
           <MacdIndicator
             symbol={symbol}
-            batchMacd={indicator ? { macd: indicator.macd, macd_signal: indicator.macd_signal, macd_hist: indicator.macd_hist } : undefined}
+            batchMacd={macdVals}
             size="lg"
           />
         </div>
@@ -256,37 +275,21 @@ function TableRow({
             <Skeleton className="h-4 w-12 ml-auto rounded" />
           )}
         </td>
-        <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.rsi != null ? (
-            <span className={getRsiColor(indicator.rsi)}>{indicator.rsi.toFixed(0)}</span>
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
-        </td>
-        <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.macd != null ? (
-            indicator.macd.toFixed(2)
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
-        </td>
-        <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.macd_signal != null ? (
-            indicator.macd_signal.toFixed(2)
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
-        </td>
-        <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.macd_hist != null ? (
-            <span className={indicator.macd_hist >= 0 ? "text-emerald-400" : "text-red-400"}>
-              {indicator.macd_hist >= 0 ? "+" : ""}
-              {indicator.macd_hist.toFixed(2)}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
-        </td>
+        {getAllSortableFields().map((field) => {
+          const val = getNumericValue(indicator?.values, field)
+          const series = getSeriesByField(field)
+          const colorClass = resolveThresholdColor(series?.thresholdColors, val)
+          const decimals = val != null && Math.abs(val) >= 100 ? 0 : 2
+          return (
+            <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+              {val != null ? (
+                <span className={colorClass}>{val.toFixed(decimals)}</span>
+              ) : (
+                <span className="text-muted-foreground">&mdash;</span>
+              )}
+            </td>
+          )
+        })}
         <td className={`${py} pr-2`}>
           <AssetActionMenu
             onDelete={onDelete}
@@ -296,7 +299,7 @@ function TableRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={10} className="bg-muted/20 p-4 border-b border-border">
+          <td colSpan={6 + getAllSortableFields().length} className="bg-muted/20 p-4 border-b border-border">
             <ExpandedContent symbol={asset.symbol} indicator={indicator} />
           </td>
         </tr>

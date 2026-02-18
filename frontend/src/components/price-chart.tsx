@@ -1,34 +1,31 @@
-import { useEffect, useRef, useCallback, useMemo } from "react"
+import { useEffect, useRef, useCallback, useMemo, Fragment } from "react"
 import type { IChartApi } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
 import { useChartSync, type ChartEntry } from "@/lib/use-chart-sync"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import {
   createMainChart,
-  createOverlaySeries,
-  createRsiSubChart,
-  createMacdSubChart,
+  createOverlays,
+  createSubChart,
   setMainSeriesData,
-  setOverlayData,
-  setRsiData,
-  setMacdData,
+  setAllOverlayData,
+  setSubChartData,
   addAnnotationMarkers,
-  type OverlaySeries,
-  type RsiChartState,
-  type MacdChartState,
+  type OverlayState,
+  type SubChartState,
   type MarkersHandle,
 } from "./chart/chart-builders"
-import { Legend, RsiLegend, MacdLegend, type LegendValues } from "./chart/chart-legends"
+import { Legend, SubChartLegend, type LegendValues } from "./chart/chart-legends"
+import { getSubChartDescriptors, getOverlayDescriptors, getAllIndicatorFields, type IndicatorDescriptor } from "@/lib/indicator-registry"
+
+const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()
 
 interface PriceChartProps {
   prices: Price[]
   indicators: Indicator[]
   annotations: Annotation[]
-  showSma20?: boolean
-  showSma50?: boolean
-  showBollinger?: boolean
-  showRsiChart?: boolean
-  showMacdChart?: boolean
+  /** Per-descriptor visibility (keys = descriptor IDs). Missing keys default to true. */
+  indicatorVisibility?: Record<string, boolean>
   chartType?: "candle" | "line"
   mainChartHeight?: number
 }
@@ -36,92 +33,115 @@ interface PriceChartProps {
 interface ChartState {
   mainChart: IChartApi
   mainSeries: ReturnType<IChartApi["addSeries"]>
-  overlays: OverlaySeries
-  rsi: RsiChartState | null
-  macd: MacdChartState | null
+  overlays: OverlayState
+  subCharts: SubChartState[]
 }
 
 export function PriceChart({
   prices,
   indicators,
   annotations,
-  showSma20 = true,
-  showSma50 = true,
-  showBollinger = true,
-  showRsiChart = true,
-  showMacdChart = true,
+  indicatorVisibility,
   chartType = "candle",
   mainChartHeight = 400,
 }: PriceChartProps) {
   const mainRef = useRef<HTMLDivElement>(null)
-  const rsiRef = useRef<HTMLDivElement>(null)
-  const macdRef = useRef<HTMLDivElement>(null)
+
+  // Pre-create refs for main + all possible sub-charts (hooks must be unconditional)
   const mainChartRef = useRef<IChartApi | null>(null)
-  const rsiChartRef = useRef<IChartApi | null>(null)
-  const macdChartRef = useRef<IChartApi | null>(null)
-  const { startLifecycle } = useChartLifecycle(mainRef, [mainChartRef, rsiChartRef, macdChartRef])
+  const subChartApiRefs = useRef(
+    Object.fromEntries(
+      SUB_CHART_DESCRIPTORS.map((d) => [d.id, { current: null as IChartApi | null }]),
+    ) as Record<string, { current: IChartApi | null }>,
+  )
+  const allChartRefs = useMemo(
+    () => [mainChartRef, ...SUB_CHART_DESCRIPTORS.map((d) => subChartApiRefs.current[d.id])],
+    [],
+  )
+  const subContainersRef = useRef(new Map<string, HTMLDivElement>())
+  const { startLifecycle } = useChartLifecycle(mainRef, allChartRefs)
 
   const { hoverValues, buildLookupMaps, syncCharts, setupSingleChartCrosshair } = useChartSync()
 
   const chartStateRef = useRef<ChartState | null>(null)
   const markersRef = useRef<MarkersHandle | null>(null)
 
+  const isVisible = useCallback(
+    (id: string) => indicatorVisibility?.[id] !== false,
+    [indicatorVisibility],
+  )
+
+  const enabledOverlayIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const d of getOverlayDescriptors()) {
+      if (isVisible(d.id)) ids.add(d.id)
+    }
+    return ids
+  }, [isVisible])
+
+  const enabledSubCharts = useMemo<IndicatorDescriptor[]>(
+    () => SUB_CHART_DESCRIPTORS.filter((d) => isVisible(d.id)),
+    [isVisible],
+  )
+
+  const hasSubCharts = enabledSubCharts.length > 0
+
   // Compute latest values for default legend display
   const latestValues = useMemo<LegendValues>(() => {
-    if (!prices.length) return {}
+    if (!prices.length) return { indicators: {} }
     const lastPrice = prices[prices.length - 1]
     const lastIndicators = [...indicators].reverse()
+    const findVal = (field: string): number | undefined =>
+      (lastIndicators.find((i) => i.values[field] != null)?.values[field] ?? undefined) as number | undefined
+
+    const indicatorValues: Record<string, number | undefined> = {}
+    for (const field of getAllIndicatorFields()) {
+      indicatorValues[field] = findVal(field)
+    }
+
     return {
       o: lastPrice.open,
       h: lastPrice.high,
       l: lastPrice.low,
       c: lastPrice.close,
-      sma20: showSma20 ? (lastIndicators.find((i) => i.sma_20 !== null)?.sma_20 ?? undefined) : undefined,
-      sma50: showSma50 ? (lastIndicators.find((i) => i.sma_50 !== null)?.sma_50 ?? undefined) : undefined,
-      bbUpper: showBollinger ? (lastIndicators.find((i) => i.bb_upper !== null)?.bb_upper ?? undefined) : undefined,
-      bbLower: showBollinger ? (lastIndicators.find((i) => i.bb_lower !== null)?.bb_lower ?? undefined) : undefined,
-      rsi: showRsiChart ? (lastIndicators.find((i) => i.rsi !== null)?.rsi ?? undefined) : undefined,
-      macd: showMacdChart ? (lastIndicators.find((i) => i.macd !== null)?.macd ?? undefined) : undefined,
-      macdSignal: showMacdChart ? (lastIndicators.find((i) => i.macd_signal !== null)?.macd_signal ?? undefined) : undefined,
-      macdHist: showMacdChart ? (lastIndicators.find((i) => i.macd_hist !== null)?.macd_hist ?? undefined) : undefined,
+      indicators: indicatorValues,
     }
-  }, [prices, indicators, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart])
+  }, [prices, indicators])
 
   // Effect 1: Create chart structure (runs only on structural changes)
   useEffect(() => {
     if (!mainRef.current) return
-    if (showRsiChart && !rsiRef.current) return
-    if (showMacdChart && !macdRef.current) return
+    // Ensure all enabled sub-chart containers are mounted
+    for (const desc of enabledSubCharts) {
+      if (!subContainersRef.current.has(desc.id)) return
+    }
 
-    const hideTimeAxis = showRsiChart || showMacdChart
+    const hideTimeAxis = hasSubCharts
     const { chart: mainChart, series: mainSeries } = createMainChart(
       mainRef.current, chartType, mainChartHeight, hideTimeAxis,
     )
-    const overlays = createOverlaySeries(mainChart)
+    const overlays = createOverlays(mainChart)
 
     mainChartRef.current = mainChart
 
     const chartEntries: ChartEntry[] = [{ chart: mainChart, series: mainSeries }]
     const createdCharts: IChartApi[] = [mainChart]
+    const subCharts: SubChartState[] = []
 
-    let rsi: RsiChartState | null = null
-    if (showRsiChart && rsiRef.current) {
-      rsi = createRsiSubChart(rsiRef.current)
-      rsiChartRef.current = rsi.chart
-      chartEntries.push({ chart: rsi.chart, series: rsi.series })
-      createdCharts.push(rsi.chart)
-    } else {
-      rsiChartRef.current = null
-    }
+    for (const desc of enabledSubCharts) {
+      const container = subContainersRef.current.get(desc.id)
+      if (!container) continue
 
-    let macd: MacdChartState | null = null
-    if (showMacdChart && macdRef.current) {
-      macd = createMacdSubChart(macdRef.current)
-      macdChartRef.current = macd.chart
-      chartEntries.push({ chart: macd.chart, series: macd.line })
-      createdCharts.push(macd.chart)
-    } else {
-      macdChartRef.current = null
+      const state = createSubChart(container, desc)
+      subChartApiRefs.current[desc.id].current = state.chart
+
+      // First series handle for crosshair snap
+      const firstSeries = state.seriesMap.values().next().value
+      if (firstSeries) {
+        chartEntries.push({ chart: state.chart, series: firstSeries, snapField: state.snapField })
+      }
+      createdCharts.push(state.chart)
+      subCharts.push(state)
     }
 
     // Sync all created charts
@@ -131,15 +151,21 @@ export function PriceChart({
       setupSingleChartCrosshair(mainChart, mainSeries)
     }
 
-    chartStateRef.current = { mainChart, mainSeries, overlays, rsi, macd }
+    chartStateRef.current = { mainChart, mainSeries, overlays, subCharts }
 
     const cleanupLifecycle = startLifecycle(createdCharts)
+    const apiRefs = subChartApiRefs.current
     return () => {
       markersRef.current = null
       chartStateRef.current = null
+      // Clear sub-chart refs
+      for (const desc of SUB_CHART_DESCRIPTORS) {
+        apiRefs[desc.id].current = null
+      }
       cleanupLifecycle()
     }
-  }, [chartType, showRsiChart, showMacdChart, mainChartHeight, syncCharts, setupSingleChartCrosshair, startLifecycle])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- enabledSubCharts identity changes trigger re-creation
+  }, [chartType, enabledSubCharts, mainChartHeight, syncCharts, setupSingleChartCrosshair, startLifecycle])
 
   // Effect 2: Update data in-place (runs on data and overlay toggle changes)
   useEffect(() => {
@@ -151,36 +177,33 @@ export function PriceChart({
     // Main series data
     setMainSeriesData(state.mainSeries, prices, chartType)
 
-    // Overlay data (hidden overlays get empty data)
-    setOverlayData(state.overlays, indicators, {
-      sma20: showSma20,
-      sma50: showSma50,
-      bollinger: showBollinger,
-    })
+    // Overlay data (disabled overlays get empty data)
+    setAllOverlayData(state.overlays, indicators, enabledOverlayIds)
 
     // Annotation markers — detach old, create new
     try { markersRef.current?.detach() } catch { /* chart may have been recreated */ }
     markersRef.current = addAnnotationMarkers(state.mainSeries, annotations)
 
-    // RSI data
-    if (state.rsi) setRsiData(state.rsi, indicators)
-
-    // MACD data
-    if (state.macd) setMacdData(state.macd, indicators)
+    // Sub-chart data
+    for (const sc of state.subCharts) {
+      setSubChartData(sc, indicators)
+    }
 
     // Fit content on all charts
     state.mainChart.timeScale().fitContent()
-    state.rsi?.chart.timeScale().fitContent()
-    state.macd?.chart.timeScale().fitContent()
-  }, [prices, indicators, annotations, showSma20, showSma50, showBollinger, chartType, showRsiChart, showMacdChart, mainChartHeight, buildLookupMaps])
+    for (const sc of state.subCharts) {
+      sc.chart.timeScale().fitContent()
+    }
+  }, [prices, indicators, annotations, enabledOverlayIds, chartType, enabledSubCharts, mainChartHeight, buildLookupMaps])
 
   const resetView = useCallback(() => {
     mainChartRef.current?.timeScale().fitContent()
-    rsiChartRef.current?.timeScale().fitContent()
-    macdChartRef.current?.timeScale().fitContent()
+    for (const desc of SUB_CHART_DESCRIPTORS) {
+      subChartApiRefs.current[desc.id].current?.timeScale().fitContent()
+    }
   }, [])
 
-  const mainRoundClass = !showRsiChart && !showMacdChart ? "rounded-md" : "rounded-t-md"
+  const mainRoundClass = !hasSubCharts ? "rounded-md" : "rounded-t-md"
 
   return (
     <div className="mb-4">
@@ -195,22 +218,20 @@ export function PriceChart({
         </button>
       </div>
       <div ref={mainRef} className={`w-full ${mainRoundClass} overflow-hidden`} />
-      {showRsiChart && (
-        <>
+      {enabledSubCharts.map((desc, idx) => (
+        <Fragment key={desc.id}>
           <div className="px-1 py-1">
-            <RsiLegend values={hoverValues} latest={latestValues} />
+            <SubChartLegend descriptorId={desc.id} values={hoverValues} latest={latestValues} />
           </div>
-          <div ref={rsiRef} className="w-full overflow-hidden" />
-        </>
-      )}
-      {showMacdChart && (
-        <>
-          <div className="px-1 py-1">
-            <MacdLegend values={hoverValues} latest={latestValues} />
-          </div>
-          <div ref={macdRef} className={`w-full ${!showRsiChart && !showMacdChart ? "" : "rounded-b-md"} overflow-hidden`} />
-        </>
-      )}
+          <div
+            ref={(el) => {
+              if (el) subContainersRef.current.set(desc.id, el)
+              else subContainersRef.current.delete(desc.id)
+            }}
+            className={`w-full ${idx === enabledSubCharts.length - 1 ? "rounded-b-md" : ""} overflow-hidden`}
+          />
+        </Fragment>
+      ))}
     </div>
   )
 }

@@ -101,7 +101,7 @@ async def compute_and_cache_indicators(
     for asset_id, symbol in id_to_symbol.items():
         prices = grouped.get(asset_id, [])
         if len(prices) < 26:  # Need at least MACD slow period
-            out[symbol] = {"rsi": None, "macd": None, "macd_signal": None, "macd_hist": None}
+            out[symbol] = {"values": {}}
             continue
 
         df = pd.DataFrame([{
@@ -110,13 +110,7 @@ async def compute_and_cache_indicators(
         } for p in prices]).set_index("date")
 
         snapshot = build_indicator_snapshot(compute_indicators(df))
-
-        out[symbol] = {
-            "rsi": snapshot.get("rsi"),
-            "macd": snapshot.get("macd"),
-            "macd_signal": snapshot.get("macd_signal"),
-            "macd_hist": snapshot.get("macd_hist"),
-        }
+        out[symbol] = snapshot
 
     # Store in cache (single-entry — only latest key matters)
     _indicator_cache.clear()
