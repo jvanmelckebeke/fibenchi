@@ -8,6 +8,7 @@ import pandas as pd
 from yahooquery import Ticker
 from yahooquery import search as _yq_search
 
+from app.services.currency_service import lookup as currency_lookup
 from app.utils import TTLCache, async_threadable
 
 logger = logging.getLogger(__name__)
@@ -191,7 +192,12 @@ def fetch_history(
         df = df.reset_index().set_index("date")
 
     # Convert subunit prices (e.g. pence → pounds)
-    _, divisor = _extract_currency(ticker, symbol)
+    price_info = ticker.price.get(symbol, {})
+    raw = price_info.get("currency") if isinstance(price_info, dict) else None
+    if raw:
+        _, divisor = currency_lookup(raw)
+    else:
+        divisor = 1
     df = _normalize_ohlcv_df(df, divisor)
 
     return df
@@ -199,21 +205,37 @@ def fetch_history(
 
 @async_threadable
 def validate_symbol(symbol: str) -> dict | None:
-    """Validate a ticker and return basic info, or None if invalid."""
+    """Validate a ticker and return basic info, or None if invalid.
+
+    Returns both ``currency`` (display code for API responses) and
+    ``currency_code`` (raw Yahoo code for DB storage).
+    """
     ticker = Ticker(symbol)
     quote = ticker.quote_type.get(symbol, {})
 
     if not quote or isinstance(quote, str):
         return None
 
-    # Extract currency from multiple Yahoo Finance data sources with suffix fallback
-    currency, _ = _extract_currency(ticker, symbol)
+    # Extract raw currency from Yahoo data sources
+    price_info = ticker.price.get(symbol, {})
+    raw_code = None
+    if isinstance(price_info, dict):
+        raw_code = price_info.get("currency")
+    if not raw_code:
+        detail = ticker.summary_detail.get(symbol, {})
+        if isinstance(detail, dict):
+            raw_code = detail.get("currency")
+    if not raw_code:
+        raw_code = _currency_from_suffix(symbol) or "USD"
+
+    display_code, _ = currency_lookup(raw_code)
 
     return {
         "symbol": symbol.upper(),
         "name": quote.get("shortName") or quote.get("longName") or symbol.upper(),
         "type": quote.get("quoteType", "EQUITY"),
-        "currency": currency,
+        "currency": display_code,
+        "currency_code": raw_code,
     }
 
 
@@ -288,8 +310,8 @@ def _fetch_etf_holdings_uncached(symbol: str) -> dict | None:
 def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     """Fetch currencies for multiple symbols in one batch call.
 
-    Returns a dict mapping symbol -> normalized currency code (e.g. "USD", "GBP").
-    Subunit currencies (e.g. GBp) are normalized to their main currency.
+    Returns a dict mapping symbol -> display currency code (e.g. "USD", "GBP").
+    Subunit currencies (e.g. GBp) are normalized to their main currency via lookup.
     """
     if not symbols:
         return {}
@@ -300,8 +322,12 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     result = {}
     for sym in symbols:
         info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
-        currency, _ = _extract_currency(ticker, sym, price_info=info)
-        result[sym] = currency
+        raw = info.get("currency") if isinstance(info, dict) else None
+        if raw:
+            display, _ = currency_lookup(raw)
+        else:
+            display = _currency_from_suffix(sym) or "USD"
+        result[sym] = display
 
     return result
 
@@ -332,7 +358,12 @@ def _parse_price_data(
             results.append({"symbol": sym})
             continue
 
-        currency, divisor = _extract_currency(ticker, sym, price_info=info)
+        raw = info.get("currency") if isinstance(info, dict) else None
+        if raw:
+            currency, divisor = currency_lookup(raw)
+        else:
+            currency = _currency_from_suffix(sym) or "USD"
+            divisor = 1
 
         price = _sanitize(info.get("regularMarketPrice"))
         prev_close = _sanitize(info.get("regularMarketPreviousClose"))
@@ -435,7 +466,11 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
             if not df.empty and len(df) >= 2:
                 # Convert subunit prices (e.g. pence → pounds)
                 info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
-                _, divisor = _extract_currency(ticker, sym, price_info=info)
+                raw = info.get("currency") if isinstance(info, dict) else None
+                if raw:
+                    _, divisor = currency_lookup(raw)
+                else:
+                    divisor = 1
                 df = _normalize_ohlcv_df(df, divisor)
                 result[sym] = df
         except KeyError:
