@@ -1,23 +1,63 @@
+import { Fragment } from "react"
+import {
+  getOverlayDescriptors,
+  getDescriptorById,
+  resolveThresholdColor,
+  type IndicatorDescriptor,
+  type SeriesDescriptor,
+} from "@/lib/indicator-registry"
+
 export interface LegendValues {
   o?: number
   h?: number
   l?: number
   c?: number
-  sma20?: number
-  sma50?: number
-  bbUpper?: number
-  bbLower?: number
-  rsi?: number
-  macd?: number
-  macdSignal?: number
-  macdHist?: number
+  indicators: Record<string, number | undefined>
+}
+
+function seriesTextColor(s: SeriesDescriptor): string {
+  return s.legendColor || s.color
+}
+
+function OverlayEntry({ descriptor, v }: { descriptor: IndicatorDescriptor; v: LegendValues }) {
+  const hasData = descriptor.series.some((s) => v.indicators[s.field] !== undefined)
+  if (!hasData) return null
+
+  if (descriptor.series.length === 1) {
+    const s = descriptor.series[0]
+    const val = v.indicators[s.field]
+    const color = seriesTextColor(s)
+    return (
+      <span>
+        <span className="inline-block w-2 h-0.5 mr-1 align-middle" style={{ backgroundColor: color }} />
+        {s.label}{" "}
+        <span style={{ color }}>{val?.toFixed(descriptor.decimals)}</span>
+      </span>
+    )
+  }
+
+  // Multi-series (e.g. Bollinger Bands) — show short label + all values
+  const color = seriesTextColor(descriptor.series[0])
+  return (
+    <span style={{ color }}>
+      {descriptor.shortLabel}{" "}
+      {descriptor.series.map((s, i) => (
+        <Fragment key={s.field}>
+          {i > 0 && " / "}
+          <span>{v.indicators[s.field]?.toFixed(descriptor.decimals)}</span>
+        </Fragment>
+      ))}
+    </span>
+  )
 }
 
 export function Legend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
   const v = values ?? latest
   const changeColor = v.c !== undefined && v.o !== undefined
-    ? v.c >= v.o ? "text-green-500" : "text-red-500"
+    ? v.c >= v.o ? "text-emerald-500" : "text-red-500"
     : ""
+
+  const overlays = getOverlayDescriptors()
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
@@ -29,49 +69,50 @@ export function Legend({ values, latest }: { values: LegendValues | null; latest
           <span className="text-muted-foreground">C <span className={changeColor}>{v.c!.toFixed(2)}</span></span>
         </>
       )}
-      {v.sma20 !== undefined && (
-        <span><span className="inline-block w-2 h-0.5 bg-teal-500 mr-1 align-middle" />SMA 20 <span className="text-teal-500">{v.sma20.toFixed(2)}</span></span>
-      )}
-      {v.sma50 !== undefined && (
-        <span><span className="inline-block w-2 h-0.5 bg-violet-500 mr-1 align-middle" />SMA 50 <span className="text-violet-500">{v.sma50.toFixed(2)}</span></span>
-      )}
-      {v.bbUpper !== undefined && v.bbLower !== undefined && (
-        <span className="text-blue-400">BB <span>{v.bbUpper.toFixed(2)}</span> / <span>{v.bbLower.toFixed(2)}</span></span>
-      )}
+      {overlays.map((desc) => (
+        <OverlayEntry key={desc.id} descriptor={desc} v={v} />
+      ))}
     </div>
   )
 }
 
-export function RsiLegend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
-  const rsi = (values ?? latest).rsi
-  const color = rsi !== undefined
-    ? rsi >= 70 ? "text-red-500" : rsi <= 30 ? "text-green-500" : "text-violet-500"
-    : "text-muted-foreground"
+export function SubChartLegend({ descriptorId, values, latest }: {
+  descriptorId: string
+  values: LegendValues | null
+  latest: LegendValues
+}) {
+  const desc = getDescriptorById(descriptorId)
+  if (!desc) return null
 
-  return (
-    <div className="text-xs tabular-nums">
-      <span className="text-muted-foreground">RSI(14) </span>
-      {rsi !== undefined && <span className={color}>{rsi.toFixed(2)}</span>}
-    </div>
-  )
-}
-
-export function MacdLegend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
   const v = values ?? latest
-  const histColor = v.macdHist !== undefined
-    ? v.macdHist >= 0 ? "text-green-500" : "text-red-500"
-    : ""
 
   return (
     <div className="flex items-center gap-x-3 text-xs tabular-nums">
-      <span className="text-muted-foreground">MACD(12,26,9)</span>
-      {v.macd !== undefined && (
-        <>
-          <span><span className="inline-block w-2 h-0.5 bg-sky-400 mr-1 align-middle" />MACD <span className="text-sky-400">{v.macd.toFixed(2)}</span></span>
-          <span><span className="inline-block w-2 h-0.5 bg-orange-400 mr-1 align-middle" />Signal <span className="text-orange-400">{v.macdSignal!.toFixed(2)}</span></span>
-          <span className={histColor}>Hist {v.macdHist!.toFixed(2)}</span>
-        </>
-      )}
+      <span className="text-muted-foreground">{desc.label}</span>
+      {desc.series.map((s) => {
+        const val = v.indicators[s.field]
+        if (val === undefined) return null
+
+        // Use threshold color (Tailwind class) if available, otherwise inline style
+        const thresholdClass = resolveThresholdColor(s.thresholdColors, val)
+        const color = seriesTextColor(s)
+
+        if (thresholdClass) {
+          return (
+            <span key={s.field} className={thresholdClass}>
+              {s.label} {val.toFixed(desc.decimals)}
+            </span>
+          )
+        }
+
+        return (
+          <span key={s.field}>
+            <span className="inline-block w-2 h-0.5 mr-1 align-middle" style={{ backgroundColor: color }} />
+            {s.label}{" "}
+            <span style={{ color }}>{val.toFixed(desc.decimals)}</span>
+          </span>
+        )
+      })}
     </div>
   )
 }

@@ -17,15 +17,10 @@ class PriceResponse(BaseModel):
 class IndicatorResponse(BaseModel):
     date: datetime.date = Field(description="Trading date")
     close: float = Field(description="Closing price")
-    rsi: float | None = Field(default=None, description="Relative Strength Index (14-period)")
-    sma_20: float | None = Field(default=None, description="20-day Simple Moving Average")
-    sma_50: float | None = Field(default=None, description="50-day Simple Moving Average")
-    bb_upper: float | None = Field(default=None, description="Upper Bollinger Band (20-day, 2 std dev)")
-    bb_middle: float | None = Field(default=None, description="Middle Bollinger Band (20-day SMA)")
-    bb_lower: float | None = Field(default=None, description="Lower Bollinger Band (20-day, 2 std dev)")
-    macd: float | None = Field(default=None, description="MACD line (12-period EMA minus 26-period EMA)")
-    macd_signal: float | None = Field(default=None, description="MACD signal line (9-period EMA of MACD)")
-    macd_hist: float | None = Field(default=None, description="MACD histogram (MACD minus signal)")
+    values: dict[str, float | None] = Field(
+        default_factory=dict,
+        description="Indicator values keyed by field name (e.g. rsi, sma_20, macd)",
+    )
 
 
 class AssetDetailResponse(BaseModel):
@@ -54,17 +49,10 @@ class IndicatorSnapshotBase(BaseModel):
     """Shared indicator fields for holding and constituent snapshot responses."""
     close: float | None = Field(default=None, description="Latest closing price")
     change_pct: float | None = Field(default=None, description="1-day percentage change")
-    rsi: float | None = Field(default=None, description="RSI (14-period)")
-    sma_20: float | None = Field(default=None, description="20-day SMA")
-    sma_50: float | None = Field(default=None, description="50-day SMA")
-    macd: float | None = Field(default=None, description="MACD line")
-    macd_signal: float | None = Field(default=None, description="MACD signal line")
-    macd_hist: float | None = Field(default=None, description="MACD histogram")
-    macd_signal_dir: str | None = Field(default=None, description="MACD signal direction: 'bullish' or 'bearish'")
-    bb_upper: float | None = Field(default=None, description="Upper Bollinger Band")
-    bb_middle: float | None = Field(default=None, description="Middle Bollinger Band")
-    bb_lower: float | None = Field(default=None, description="Lower Bollinger Band")
-    bb_position: str | None = Field(default=None, description="Price position vs Bollinger Bands: 'above', 'upper', 'lower', or 'below'")
+    values: dict[str, float | str | None] = Field(
+        default_factory=dict,
+        description="Indicator values keyed by field name (includes derived fields like macd_signal_dir, bb_position)",
+    )
 
 
 class HoldingIndicatorResponse(IndicatorSnapshotBase):

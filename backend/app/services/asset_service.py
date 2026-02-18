@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import AssetType
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
+from app.services.currency_service import ensure_currency, lookup as currency_lookup
 from app.services.entity_lookups import get_asset
 from app.services.yahoo import validate_symbol
 
@@ -35,16 +36,24 @@ async def create_asset(
         # Caller just needs the asset record (e.g. pseudo-ETF constituent picker)
         return existing
 
-    currency = "USD"
-    if not name:
-        info = await validate_symbol(symbol)
-        if not info:
+    # Always call validate_symbol to detect currency (and name/type if not provided)
+    info = await validate_symbol(symbol)
+    if not info:
+        if not name:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
-        name = info["name"]
-        currency = info.get("currency", "USD")
+        # Name was provided manually — proceed with exchange-suffix currency fallback
+        from app.services.yahoo import _currency_from_suffix
+        currency = _currency_from_suffix(symbol) or "USD"
+    else:
+        # Store raw Yahoo currency code (e.g. "GBp") — the currencies table
+        # provides display_code and divisor via lookup.
+        currency = info.get("currency_code") or info.get("currency", "USD")
+        if not name:
+            name = info["name"]
         if info["type"] == "ETF":
             asset_type = AssetType.ETF
 
+    await ensure_currency(db, currency)
     asset = await repo.create(
         symbol=symbol, name=name, type=asset_type, currency=currency,
     )

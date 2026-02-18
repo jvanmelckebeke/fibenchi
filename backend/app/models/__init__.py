@@ -7,3 +7,4 @@ from app.models.tag import Tag, tag_assets  # noqa: F401
 from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfThesis, pseudo_etf_constituents  # noqa: F401
 from app.models.user_settings import UserSettings  # noqa: F401
 from app.models.symbol_directory import SymbolDirectory  # noqa: F401
+from app.models.currency import Currency  # noqa: F401

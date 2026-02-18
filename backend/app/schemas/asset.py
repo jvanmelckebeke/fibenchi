@@ -1,8 +1,9 @@
 import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.asset import AssetType
+from app.services.currency_service import lookup as currency_lookup
 
 
 class AssetCreate(BaseModel):
@@ -30,3 +31,10 @@ class AssetResponse(BaseModel):
     tags: list[TagBrief] = Field(default=[], description="Tags attached to this asset")
 
     model_config = {"from_attributes": True}
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def normalize_currency(cls, v: str) -> str:
+        """Convert raw Yahoo code (e.g. 'GBp') to display code ('GBP') for API responses."""
+        display, _ = currency_lookup(v)
+        return display

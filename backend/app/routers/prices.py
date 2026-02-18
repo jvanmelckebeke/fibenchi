@@ -24,11 +24,12 @@ async def get_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depend
     return await price_service.get_prices(db, asset, symbol, period)
 
 
-@router.get("/indicators", response_model=list[IndicatorResponse], summary="Get technical indicators (RSI, SMA, MACD, Bollinger)")
+@router.get("/indicators", response_model=list[IndicatorResponse], summary="Get technical indicators (RSI, SMA, MACD, Bollinger, ATR, ADX)")
 async def get_indicators(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
     """Return daily indicator time series for a symbol.
 
-    Includes RSI (14), SMA 20/50, Bollinger Bands (20, 2σ), and MACD (12/26/9).
+    Includes RSI (14), SMA 20/50, Bollinger Bands (20, 2σ), MACD (12/26/9),
+    ATR (14), and ADX (14) with +DI/-DI.
     An extra 80-day warmup window is fetched internally so that the first
     returned data point already has converged indicator values.
 

@@ -14,6 +14,7 @@ from app.database import async_session, engine
 from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
+from app.services.currency_service import load_cache as load_currency_cache
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -42,6 +43,10 @@ async def scheduled_refresh():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Load currency lookup cache from DB
+    async with async_session() as db:
+        await load_currency_cache(db)
+
     # Parse cron expression (minute hour day month dow)
     parts = app_settings.refresh_cron.split()
     if len(parts) == 5:

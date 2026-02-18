@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { AssetTypeFilter, GroupSortBy, SortDir } from "@/lib/settings"
+import { getNumericValue } from "@/lib/indicator-registry"
 
 function compareNullable(a: number | null, b: number | null): number {
   if (a == null && b == null) return 0
@@ -53,28 +54,11 @@ export function useFilteredSortedAssets(
             quotes[b.symbol]?.change_percent ?? null,
           )
           break
-        case "rsi":
+        default:
+          // Indicator-based sorting: sortBy is the field name (e.g. "rsi", "macd")
           cmp = compareNullable(
-            indicators?.[a.symbol]?.rsi ?? null,
-            indicators?.[b.symbol]?.rsi ?? null,
-          )
-          break
-        case "macd":
-          cmp = compareNullable(
-            indicators?.[a.symbol]?.macd ?? null,
-            indicators?.[b.symbol]?.macd ?? null,
-          )
-          break
-        case "macd_signal":
-          cmp = compareNullable(
-            indicators?.[a.symbol]?.macd_signal ?? null,
-            indicators?.[b.symbol]?.macd_signal ?? null,
-          )
-          break
-        case "macd_hist":
-          cmp = compareNullable(
-            indicators?.[a.symbol]?.macd_hist ?? null,
-            indicators?.[b.symbol]?.macd_hist ?? null,
+            getNumericValue(indicators?.[a.symbol]?.values, sortBy),
+            getNumericValue(indicators?.[b.symbol]?.values, sortBy),
           )
           break
       }

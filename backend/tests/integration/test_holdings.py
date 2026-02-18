@@ -61,24 +61,22 @@ async def test_holdings_indicators_success(client):
     assert data[0]["close"] is not None
     assert data[1]["symbol"] == "MSFT"
 
-    # Verify raw numeric indicator fields are present
+    # Verify indicator values are nested under 'values'
+    from app.services.compute.indicators import get_all_output_fields
+    expected_fields = set(get_all_output_fields())
     for item in data:
-        assert "macd" in item
-        assert "macd_signal" in item
-        assert "macd_hist" in item
-        assert "bb_upper" in item
-        assert "bb_middle" in item
-        assert "bb_lower" in item
+        assert "values" in item
+        values = item["values"]
+        # All registry output fields should be present
+        for field in expected_fields:
+            assert field in values
         # With 100 data points, all indicators should have values
-        assert isinstance(item["macd"], float)
-        assert isinstance(item["macd_signal"], float)
-        assert isinstance(item["macd_hist"], float)
-        assert isinstance(item["bb_upper"], float)
-        assert isinstance(item["bb_middle"], float)
-        assert isinstance(item["bb_lower"], float)
-        # Classified fields still present
-        assert "macd_signal_dir" in item
-        assert "bb_position" in item
+        assert isinstance(values["macd"], float)
+        assert isinstance(values["macd_signal"], float)
+        assert isinstance(values["bb_upper"], float)
+        # Derived fields still present
+        assert "macd_signal_dir" in values
+        assert "bb_position" in values
 
 
 async def test_holdings_indicators_not_etf(client):

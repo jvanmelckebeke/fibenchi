@@ -3,21 +3,13 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IndicatorCell } from "@/components/indicator-cell"
 import { formatPrice, formatChangePct } from "@/lib/format"
+import { getNumericValue, getStringValue, getHoldingSummaryDescriptors } from "@/lib/indicator-registry"
 
 export interface IndicatorData {
   currency: string
   close: number | null
   change_pct: number | null
-  rsi: number | null
-  sma_20: number | null
-  macd: number | null
-  macd_signal: number | null
-  macd_hist: number | null
-  macd_signal_dir: string | null
-  bb_upper: number | null
-  bb_middle: number | null
-  bb_lower: number | null
-  bb_position: string | null
+  values: Record<string, number | string | null>
 }
 
 export interface HoldingsGridRow {
@@ -35,41 +27,44 @@ interface HoldingsGridProps {
   linkTarget?: "_blank"
 }
 
-const GRID_COLS = "grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem]"
-const GRID_COLS_REMOVABLE = "grid-cols-[4rem_1fr_3.5rem_5rem_4rem_3.5rem_3.5rem_4rem_3.5rem_2rem]"
+const SUMMARY_DESCRIPTORS = getHoldingSummaryDescriptors()
+
+function buildGridTemplate(hasRemove: boolean): string {
+  // base: symbol, name, %, price, chg%
+  const base = "4rem 1fr 3.5rem 5rem 4rem"
+  const indicatorCols = SUMMARY_DESCRIPTORS.map(() => "3.5rem").join(" ")
+  const removePart = hasRemove ? " 2rem" : ""
+  return `${base} ${indicatorCols}${removePart}`
+}
 
 export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, linkTarget }: HoldingsGridProps) {
   const hasRemove = !!onRemove
-  const gridCols = hasRemove ? GRID_COLS_REMOVABLE : GRID_COLS
+  const gridTemplate = buildGridTemplate(hasRemove)
+  const gridStyle = { gridTemplateColumns: gridTemplate }
 
   return (
     <div className="overflow-x-auto">
       <div className={`${hasRemove ? "min-w-[750px]" : "min-w-[700px]"} space-y-0`}>
-        <div className={`grid ${gridCols} text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2`}>
+        <div className="grid text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2" style={gridStyle}>
           <span>Symbol</span>
           <span>Name</span>
           <span className="text-right">%</span>
           <span className="text-right">Price</span>
           <span className="text-right">Chg%</span>
-          <span className="text-right">RSI</span>
-          <span className="text-right">SMA20</span>
-          <span className="text-right">MACD</span>
-          <span className="text-right">BB</span>
+          {SUMMARY_DESCRIPTORS.map((desc) => (
+            <span key={desc.id} className="text-right">{desc.holdingSummary!.label}</span>
+          ))}
           {hasRemove && <span></span>}
         </div>
         {rows.map((row) => {
           const ind = indicatorMap.get(row.symbol)
           const chg = formatChangePct(ind?.change_pct ?? null)
-          const rsiVal = ind?.rsi
-          const rsiColor = rsiVal != null ? (rsiVal > 70 ? "text-red-500" : rsiVal < 30 ? "text-emerald-500" : "") : ""
-          const smaAbove = ind?.sma_20 != null && ind?.close != null ? ind.close > ind.sma_20 : null
-          const macdDir = ind?.macd_signal_dir
-          const bbPos = ind?.bb_position
 
           return (
             <div
               key={row.key}
-              className={`grid ${gridCols} text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center${hasRemove ? " group/row" : ""}`}
+              className={`grid text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center${hasRemove ? " group/row" : ""}`}
+              style={gridStyle}
             >
               <Link
                 to={`/asset/${row.symbol}`}
@@ -81,24 +76,24 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
               <span className="text-muted-foreground truncate text-xs">{row.name}</span>
               <IndicatorCell value={row.percent != null ? `${row.percent.toFixed(1)}%` : null} />
               {indicatorsLoading ? (
-                <span className="col-span-6 text-right text-xs text-muted-foreground animate-pulse">Loading...</span>
+                <span className="text-right text-xs text-muted-foreground animate-pulse" style={{ gridColumn: `span ${2 + SUMMARY_DESCRIPTORS.length}` }}>Loading...</span>
               ) : (
                 <>
                   <IndicatorCell value={ind?.close != null ? formatPrice(ind.close, ind.currency, 0) : null} />
                   <IndicatorCell value={chg.text} className={chg.className} />
-                  <IndicatorCell value={rsiVal != null ? rsiVal.toFixed(0) : null} className={rsiColor} />
-                  <IndicatorCell
-                    value={smaAbove !== null ? (smaAbove ? "Above" : "Below") : null}
-                    className={smaAbove === true ? "text-emerald-500" : smaAbove === false ? "text-red-500" : ""}
-                  />
-                  <IndicatorCell
-                    value={macdDir != null ? (macdDir === "bullish" ? "Bull" : "Bear") : null}
-                    className={macdDir === "bullish" ? "text-emerald-500" : macdDir === "bearish" ? "text-red-500" : ""}
-                  />
-                  <IndicatorCell
-                    value={bbPos != null ? bbPos.charAt(0).toUpperCase() + bbPos.slice(1) : null}
-                    className={bbPos === "above" ? "text-red-500" : bbPos === "below" ? "text-emerald-500" : ""}
-                  />
+                  {SUMMARY_DESCRIPTORS.map((desc) => {
+                    const hs = desc.holdingSummary!
+                    return (
+                      <HoldingSummaryCell
+                        key={desc.id}
+                        format={hs.format}
+                        field={hs.field}
+                        colorMap={hs.colorMap}
+                        values={ind?.values}
+                        close={ind?.close ?? null}
+                      />
+                    )
+                  })}
                 </>
               )}
               {hasRemove && (
@@ -117,4 +112,40 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
       </div>
     </div>
   )
+}
+
+function HoldingSummaryCell({
+  format,
+  field,
+  colorMap,
+  values,
+  close,
+}: {
+  format: "numeric" | "compare_close" | "string_map"
+  field: string
+  colorMap?: Record<string, string>
+  values?: Record<string, number | string | null>
+  close: number | null
+}) {
+  if (format === "numeric") {
+    const val = getNumericValue(values, field)
+    return <IndicatorCell value={val != null ? val.toFixed(0) : null} />
+  }
+
+  if (format === "compare_close") {
+    const val = getNumericValue(values, field)
+    const above = val != null && close != null ? close > val : null
+    return (
+      <IndicatorCell
+        value={above !== null ? (above ? "Above" : "Below") : null}
+        className={above === true ? "text-emerald-500" : above === false ? "text-red-500" : ""}
+      />
+    )
+  }
+
+  // string_map
+  const str = getStringValue(values, field)
+  const colorClass = str != null && colorMap ? (colorMap[str] ?? "") : ""
+  const display = str != null ? str.charAt(0).toUpperCase() + str.slice(1) : null
+  return <IndicatorCell value={display} className={colorClass} />
 }

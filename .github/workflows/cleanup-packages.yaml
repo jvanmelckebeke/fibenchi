@@ -1,0 +1,37 @@
+name: Cleanup GHCR packages
+
+on:
+  schedule:
+    # Every Sunday at 03:00 UTC
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup-untagged:
+    name: Delete untagged container versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all untagged versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: fibenchi
+          package-type: container
+          owner: jvanmelckebeke
+          delete-only-untagged-versions: "true"
+          min-versions-to-keep: 0
+
+  cleanup-old-tagged:
+    name: Delete old tagged container versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old versions (keep latest and dev)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: fibenchi
+          package-type: container
+          owner: jvanmelckebeke
+          min-versions-to-keep: 10
+          ignore-versions: "^(latest|dev)$"

@@ -10,5 +10,17 @@ PERIOD_DAYS: dict[str, int] = {
     "5y": 1825,
 }
 
-# Extra calendar days to fetch for indicator warmup (~50 trading days for SMA50).
-WARMUP_DAYS: int = 80
+
+def _compute_warmup_days() -> int:
+    """Derive warmup days from the indicator registry.
+
+    Imported lazily to avoid circular imports at module level.
+    ~2x the max warmup periods to account for weekends/holidays.
+    """
+    from app.services.compute.indicators import get_max_warmup_periods
+    return int(get_max_warmup_periods() * 2.3)
+
+
+# Extra calendar days to fetch for indicator warmup.
+# Derived from the indicator registry (max warmup periods × 2.3 for calendar day conversion).
+WARMUP_DAYS: int = _compute_warmup_days()

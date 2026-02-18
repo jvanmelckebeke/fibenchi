@@ -1,12 +1,17 @@
 """Yahoo Finance data fetching via yahooquery."""
 
+import logging
+import math
 from datetime import date
 
 import pandas as pd
 from yahooquery import Ticker
 from yahooquery import search as _yq_search
 
+from app.services.currency_service import lookup as currency_lookup
 from app.utils import TTLCache, async_threadable
+
+logger = logging.getLogger(__name__)
 
 # In-memory TTL cache for ETF holdings (holdings change quarterly at most)
 _holdings_cache: TTLCache = TTLCache(default_ttl=86400, max_size=100)
@@ -20,6 +25,63 @@ SUBUNIT_CURRENCIES: dict[str, tuple[str, int]] = {
     "ZAc": ("ZAR", 100),
 }
 
+# Fallback mapping from Yahoo Finance exchange suffixes to ISO 4217 currency codes.
+# Used when ticker.price doesn't return currency data for a symbol.
+EXCHANGE_CURRENCY_MAP: dict[str, str] = {
+    # Asia-Pacific
+    ".KS": "KRW",   # Korea (KOSPI)
+    ".KQ": "KRW",   # Korea (KOSDAQ)
+    ".T": "JPY",    # Tokyo
+    ".HK": "HKD",   # Hong Kong
+    ".SS": "CNY",   # Shanghai
+    ".SZ": "CNY",   # Shenzhen
+    ".TW": "TWD",   # Taiwan (TWSE)
+    ".TWO": "TWD",  # Taiwan (OTC)
+    ".SI": "SGD",   # Singapore
+    ".AX": "AUD",   # Australia (ASX)
+    ".NZ": "NZD",   # New Zealand
+    ".NS": "INR",   # India (NSE)
+    ".BO": "INR",   # India (BSE)
+    ".JK": "IDR",   # Jakarta
+    ".BK": "THB",   # Bangkok
+    # Europe
+    ".L": "GBP",    # London
+    ".IL": "GBP",   # London (IOB)
+    ".PA": "EUR",   # Paris
+    ".DE": "EUR",   # XETRA (Germany)
+    ".F": "EUR",    # Frankfurt
+    ".MI": "EUR",   # Milan
+    ".MC": "EUR",   # Madrid
+    ".AS": "EUR",   # Amsterdam
+    ".BR": "EUR",   # Brussels
+    ".LS": "EUR",   # Lisbon
+    ".HE": "EUR",   # Helsinki
+    ".AT": "EUR",   # Athens
+    ".VI": "EUR",   # Vienna
+    ".IR": "EUR",   # Dublin
+    ".OL": "NOK",   # Oslo
+    ".ST": "SEK",   # Stockholm
+    ".CO": "DKK",   # Copenhagen
+    ".IC": "ISK",   # Iceland
+    ".WA": "PLN",   # Warsaw
+    ".PR": "CZK",   # Prague
+    ".BD": "HUF",   # Budapest
+    ".SW": "CHF",   # Swiss Exchange
+    ".IS": "TRY",   # Istanbul
+    # Middle East & Africa
+    ".TA": "ILS",   # Tel Aviv
+    ".SR": "SAR",   # Saudi (Tadawul)
+    ".QA": "QAR",   # Qatar
+    ".JO": "ZAR",   # Johannesburg
+    # Americas
+    ".TO": "CAD",   # Toronto (TSX)
+    ".V": "CAD",    # TSX Venture
+    ".SA": "BRL",   # Sao Paulo
+    ".MX": "MXN",   # Mexico
+    ".SN": "CLP",   # Santiago
+    ".BA": "ARS",   # Buenos Aires
+}
+
 
 def normalize_currency(currency: str) -> tuple[str, int]:
     """Normalize a Yahoo Finance currency code.
@@ -30,6 +92,58 @@ def normalize_currency(currency: str) -> tuple[str, int]:
     if currency in SUBUNIT_CURRENCIES:
         return SUBUNIT_CURRENCIES[currency]
     return (currency, 1)
+
+
+def _currency_from_suffix(symbol: str) -> str | None:
+    """Derive currency from a Yahoo Finance exchange suffix (e.g. '.KS' → 'KRW').
+
+    Returns None if the symbol has no recognized suffix.
+    """
+    dot = symbol.rfind(".")
+    if dot == -1:
+        return None
+    suffix = symbol[dot:]
+    return EXCHANGE_CURRENCY_MAP.get(suffix.upper()) or EXCHANGE_CURRENCY_MAP.get(suffix)
+
+
+def _extract_currency(
+    ticker: Ticker,
+    symbol: str,
+    price_info: dict | None = None,
+) -> tuple[str, int]:
+    """Extract and normalize currency for a symbol from Yahoo Finance data.
+
+    Tries multiple data sources in order:
+    1. price_info dict (pre-fetched, avoids redundant API call)
+    2. ticker.summary_detail (fallback)
+    3. Exchange suffix mapping (last resort)
+
+    Pass ``price_info`` when the caller already accessed ``ticker.price``
+    to avoid a redundant Yahoo API round-trip.
+
+    Returns (normalized_currency_code, divisor).
+    """
+    # Try pre-fetched price info first (or fetch if not provided)
+    if price_info is None:
+        price_info = ticker.price.get(symbol, {})
+    if isinstance(price_info, dict):
+        raw = price_info.get("currency")
+        if raw:
+            return normalize_currency(raw)
+
+    # Try ticker.summary_detail as fallback
+    detail = ticker.summary_detail.get(symbol, {})
+    if isinstance(detail, dict):
+        raw = detail.get("currency")
+        if raw:
+            return normalize_currency(raw)
+
+    # Last resort: derive from exchange suffix
+    suffix_currency = _currency_from_suffix(symbol)
+    if suffix_currency:
+        return (suffix_currency, 1)
+
+    return ("USD", 1)
 
 
 def _normalize_ohlcv_df(df: pd.DataFrame, divisor: int) -> pd.DataFrame:
@@ -78,36 +192,50 @@ def fetch_history(
         df = df.reset_index().set_index("date")
 
     # Convert subunit prices (e.g. pence → pounds)
-    price_data = ticker.price.get(symbol, {})
-    if isinstance(price_data, dict):
-        raw_currency = price_data.get("currency", "USD") or "USD"
-        _, divisor = normalize_currency(raw_currency)
-        df = _normalize_ohlcv_df(df, divisor)
+    price_info = ticker.price.get(symbol, {})
+    raw = price_info.get("currency") if isinstance(price_info, dict) else None
+    if raw:
+        _, divisor = currency_lookup(raw)
+    else:
+        divisor = 1
+    df = _normalize_ohlcv_df(df, divisor)
 
     return df
 
 
 @async_threadable
 def validate_symbol(symbol: str) -> dict | None:
-    """Validate a ticker and return basic info, or None if invalid."""
+    """Validate a ticker and return basic info, or None if invalid.
+
+    Returns both ``currency`` (display code for API responses) and
+    ``currency_code`` (raw Yahoo code for DB storage).
+    """
     ticker = Ticker(symbol)
     quote = ticker.quote_type.get(symbol, {})
 
     if not quote or isinstance(quote, str):
         return None
 
-    # Extract currency from price data and normalize subunits
-    price_data = ticker.price.get(symbol, {})
-    currency = "USD"
-    if isinstance(price_data, dict):
-        raw_currency = price_data.get("currency", "USD") or "USD"
-        currency, _ = normalize_currency(raw_currency)
+    # Extract raw currency from Yahoo data sources
+    price_info = ticker.price.get(symbol, {})
+    raw_code = None
+    if isinstance(price_info, dict):
+        raw_code = price_info.get("currency")
+    if not raw_code:
+        detail = ticker.summary_detail.get(symbol, {})
+        if isinstance(detail, dict):
+            raw_code = detail.get("currency")
+    if not raw_code:
+        raw_code = _currency_from_suffix(symbol) or "USD"
+
+    display_code, _ = currency_lookup(raw_code)
 
     return {
         "symbol": symbol.upper(),
         "name": quote.get("shortName") or quote.get("longName") or symbol.upper(),
         "type": quote.get("quoteType", "EQUITY"),
-        "currency": currency,
+        "currency": display_code,
+        "currency_code": raw_code,
     }
 
 
@@ -182,8 +310,8 @@ def _fetch_etf_holdings_uncached(symbol: str) -> dict | None:
 def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     """Fetch currencies for multiple symbols in one batch call.
 
-    Returns a dict mapping symbol -> normalized currency code (e.g. "USD", "GBP").
-    Subunit currencies (e.g. GBp) are normalized to their main currency.
+    Returns a dict mapping symbol -> display currency code (e.g. "USD", "GBP").
+    Subunit currencies (e.g. GBp) are normalized to their main currency via lookup.
     """
     if not symbols:
         return {}
@@ -193,13 +321,91 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
 
     result = {}
     for sym in symbols:
-        info = price_data.get(sym, {})
-        if isinstance(info, dict):
-            raw_currency = info.get("currency", "USD") or "USD"
-            currency, _ = normalize_currency(raw_currency)
-            result[sym] = currency
+        info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
+        raw = info.get("currency") if isinstance(info, dict) else None
+        if raw:
+            display, _ = currency_lookup(raw)
+        else:
+            display = _currency_from_suffix(sym) or "USD"
+        result[sym] = display
 
     return result
+
+
+def _sanitize(val: float | None) -> float | None:
+    """Convert NaN/Infinity to None so json.dumps produces valid JSON."""
+    if val is None:
+        return None
+    if math.isnan(val) or math.isinf(val):
+        return None
+    return val
+
+
+def _parse_price_data(
+    ticker: Ticker,
+    symbols: list[str],
+    price_data: dict,
+) -> list[dict]:
+    """Build quote dicts from Yahoo price data, with NaN sanitization and logging."""
+    results = []
+    null_symbols: list[str] = []
+    nan_fields: list[str] = []
+
+    for sym in symbols:
+        info = price_data.get(sym, {})
+        if not isinstance(info, dict):
+            logger.warning("Yahoo returned non-dict for %s: %s", sym, repr(info)[:200])
+            results.append({"symbol": sym})
+            continue
+
+        raw = info.get("currency") if isinstance(info, dict) else None
+        if raw:
+            currency, divisor = currency_lookup(raw)
+        else:
+            currency = _currency_from_suffix(sym) or "USD"
+            divisor = 1
+
+        price = _sanitize(info.get("regularMarketPrice"))
+        prev_close = _sanitize(info.get("regularMarketPreviousClose"))
+        change = _sanitize(info.get("regularMarketChange"))
+        change_pct = _sanitize(info.get("regularMarketChangePercent"))
+
+        if price is None and info.get("regularMarketPrice") is not None:
+            nan_fields.append(f"{sym}.price")
+        if change_pct is None and info.get("regularMarketChangePercent") is not None:
+            nan_fields.append(f"{sym}.change_percent")
+
+        if price is None and change_pct is None and info.get("marketState") is None:
+            null_symbols.append(sym)
+
+        results.append({
+            "symbol": sym,
+            "price": round(float(price) / divisor, 4) if price is not None else None,
+            "previous_close": round(float(prev_close) / divisor, 4) if prev_close is not None else None,
+            "change": round(float(change) / divisor, 4) if change is not None else None,
+            "change_percent": round(float(change_pct) * 100, 2) if change_pct is not None else None,
+            "currency": currency,
+            "market_state": info.get("marketState"),
+        })
+
+    if nan_fields:
+        logger.warning("Yahoo returned NaN/Infinity for: %s", ", ".join(nan_fields))
+    if null_symbols:
+        logger.warning(
+            "Yahoo returned all-null data for %d/%d symbols: %s — "
+            "possible rate-limiting or auth issue",
+            len(null_symbols), len(symbols), ", ".join(null_symbols[:10]),
+        )
+
+    return results
+
+
+def _has_invalid_crumb(price_data: dict) -> bool:
+    """Check if Yahoo rejected the crumb for all symbols."""
+    return all(
+        isinstance(v, str) and "Invalid Crumb" in v
+        for v in price_data.values()
+    ) if price_data else False
 
 
 @async_threadable
@@ -215,32 +421,21 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
     ticker = Ticker(symbols)
     price_data = ticker.price
 
-    results = []
-    for sym in symbols:
-        info = price_data.get(sym, {})
-        if not isinstance(info, dict):
-            results.append({"symbol": sym})
-            continue
+    # Retry once with a fresh session if Yahoo rejected the crumb
+    if _has_invalid_crumb(price_data):
+        logger.warning(
+            "Yahoo rejected crumb for all %d symbols — retrying with fresh session",
+            len(symbols),
+        )
+        ticker = Ticker(symbols)
+        price_data = ticker.price
+        if _has_invalid_crumb(price_data):
+            logger.error(
+                "Yahoo crumb rejected twice — likely IP-level blocking. "
+                "Consider restarting the container or using a proxy."
+            )
 
-        raw_currency = info.get("currency", "USD") or "USD"
-        currency, divisor = normalize_currency(raw_currency)
-
-        price = info.get("regularMarketPrice")
-        prev_close = info.get("regularMarketPreviousClose")
-        change = info.get("regularMarketChange")
-        change_pct = info.get("regularMarketChangePercent")
-
-        results.append({
-            "symbol": sym,
-            "price": round(float(price) / divisor, 4) if price is not None else None,
-            "previous_close": round(float(prev_close) / divisor, 4) if prev_close is not None else None,
-            "change": round(float(change) / divisor, 4) if change is not None else None,
-            "change_percent": round(float(change_pct) * 100, 2) if change_pct is not None else None,
-            "currency": currency,
-            "market_state": info.get("marketState"),
-        })
-
-    return results
+    return _parse_price_data(ticker, symbols, price_data)
 
 
 def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
@@ -259,6 +454,8 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
     if isinstance(hist, dict) or hist.empty:
         return {}
 
+    price_data = ticker.price
+
     result = {}
     for sym in symbols:
         try:
@@ -268,11 +465,13 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
                 df = hist.copy()
             if not df.empty and len(df) >= 2:
                 # Convert subunit prices (e.g. pence → pounds)
-                info = price_data.get(sym, {})
-                if isinstance(info, dict):
-                    raw_currency = info.get("currency", "USD") or "USD"
-                    _, divisor = normalize_currency(raw_currency)
-                    df = _normalize_ohlcv_df(df, divisor)
+                info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
+                raw = info.get("currency") if isinstance(info, dict) else None
+                if raw:
+                    _, divisor = currency_lookup(raw)
+                else:
+                    divisor = 1
+                df = _normalize_ohlcv_df(df, divisor)
                 result[sym] = df
         except KeyError:
             continue

@@ -6,6 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.models import Asset, AssetType
 from app.services.asset_service import create_asset, delete_asset, list_assets
 
+# Patch ensure_currency globally for all tests in this module since
+# asset_service.create_asset() now calls it and the mock DB can't support it
+_ensure_patch = "app.services.asset_service.ensure_currency"
+
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
@@ -42,12 +46,15 @@ async def test_list_assets_delegates_to_repo(MockRepo):
     assert result == expected
 
 
+@patch(_ensure_patch, new_callable=AsyncMock)
 @patch("app.services.asset_service.GroupRepository")
+@patch("app.services.asset_service.validate_symbol", new_callable=AsyncMock)
 @patch("app.services.asset_service.AssetRepository")
-async def test_create_asset_uppercase_symbol(MockAssetRepo, MockGroupRepo):
+async def test_create_asset_uppercase_symbol(MockAssetRepo, mock_validate, MockGroupRepo, _mock_ensure):
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
+    mock_validate.return_value = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     new_asset = _make_asset()
     mock_repo.create = AsyncMock(return_value=new_asset)
 
@@ -119,15 +126,16 @@ async def test_create_asset_existing_no_group_returns_existing(MockRepo):
     mock_repo.create.assert_not_called()
 
 
+@patch(_ensure_patch, new_callable=AsyncMock)
 @patch("app.services.asset_service.GroupRepository")
 @patch("app.services.asset_service.validate_symbol", new_callable=AsyncMock)
 @patch("app.services.asset_service.AssetRepository")
-async def test_create_asset_auto_resolves_from_yahoo(MockAssetRepo, mock_validate, MockGroupRepo):
+async def test_create_asset_auto_resolves_from_yahoo(MockAssetRepo, mock_validate, MockGroupRepo, _mock_ensure):
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
 
-    mock_validate.return_value = {"symbol": "NVDA", "name": "NVIDIA Corporation", "type": "EQUITY", "currency": "USD"}
+    mock_validate.return_value = {"symbol": "NVDA", "name": "NVIDIA Corporation", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     new_asset = _make_asset(symbol="NVDA", name="NVIDIA Corporation")
     mock_repo.create = AsyncMock(return_value=new_asset)
 
@@ -157,14 +165,15 @@ async def test_create_asset_yahoo_not_found_raises_404(MockRepo, mock_validate):
     assert exc_info.value.status_code == 404
 
 
+@patch(_ensure_patch, new_callable=AsyncMock)
 @patch("app.services.asset_service.GroupRepository")
 @patch("app.services.asset_service.validate_symbol", new_callable=AsyncMock)
 @patch("app.services.asset_service.AssetRepository")
-async def test_create_asset_detects_etf_type(MockAssetRepo, mock_validate, MockGroupRepo):
+async def test_create_asset_detects_etf_type(MockAssetRepo, mock_validate, MockGroupRepo, _mock_ensure):
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.return_value = {"symbol": "SPY", "name": "SPDR S&P 500", "type": "ETF", "currency": "USD"}
+    mock_validate.return_value = {"symbol": "SPY", "name": "SPDR S&P 500", "type": "ETF", "currency": "USD", "currency_code": "USD"}
     new_asset = _make_asset(symbol="SPY", type=AssetType.ETF)
     mock_repo.create = AsyncMock(return_value=new_asset)
 
@@ -176,6 +185,87 @@ async def test_create_asset_detects_etf_type(MockAssetRepo, mock_validate, MockG
 
     call_kwargs = mock_repo.create.call_args[1]
     assert call_kwargs["type"] == AssetType.ETF
+
+
+@patch(_ensure_patch, new_callable=AsyncMock)
+@patch("app.services.asset_service.GroupRepository")
+@patch("app.services.asset_service.validate_symbol", new_callable=AsyncMock)
+@patch("app.services.asset_service.AssetRepository")
+async def test_create_asset_krw_currency_from_yahoo(MockAssetRepo, mock_validate, MockGroupRepo, _mock_ensure):
+    """Regression test for #213: KRW-denominated assets should detect currency correctly."""
+    db = AsyncMock()
+    mock_repo = MockAssetRepo.return_value
+    mock_repo.find_by_symbol = AsyncMock(return_value=None)
+    mock_validate.return_value = {
+        "symbol": "006260.KS", "name": "LS Corp", "type": "EQUITY", "currency": "KRW", "currency_code": "KRW",
+    }
+    new_asset = _make_asset(symbol="006260.KS", name="LS Corp", currency="KRW")
+    mock_repo.create = AsyncMock(return_value=new_asset)
+
+    mock_group_repo = MockGroupRepo.return_value
+    mock_group_repo.get_default = AsyncMock(return_value=_make_default_group())
+    mock_group_repo.save = AsyncMock()
+
+    result = await create_asset(db, symbol="006260.KS", name=None, asset_type=AssetType.STOCK, add_to_default_group=True)
+
+    call_kwargs = mock_repo.create.call_args[1]
+    assert call_kwargs["currency"] == "KRW"
+
+
+@patch(_ensure_patch, new_callable=AsyncMock)
+@patch("app.services.asset_service.GroupRepository")
+@patch("app.services.asset_service.validate_symbol", new_callable=AsyncMock)
+@patch("app.services.asset_service.AssetRepository")
+async def test_create_asset_with_name_still_detects_currency(MockAssetRepo, mock_validate, MockGroupRepo, _mock_ensure):
+    """When name is provided, currency should still be detected from Yahoo Finance."""
+    db = AsyncMock()
+    mock_repo = MockAssetRepo.return_value
+    mock_repo.find_by_symbol = AsyncMock(return_value=None)
+    mock_validate.return_value = {
+        "symbol": "006260.KS", "name": "LS Corp", "type": "EQUITY", "currency": "KRW", "currency_code": "KRW",
+    }
+    new_asset = _make_asset(symbol="006260.KS", name="LS Corp", currency="KRW")
+    mock_repo.create = AsyncMock(return_value=new_asset)
+
+    mock_group_repo = MockGroupRepo.return_value
+    mock_group_repo.get_default = AsyncMock(return_value=_make_default_group())
+    mock_group_repo.save = AsyncMock()
+
+    # Even with name provided, currency should come from Yahoo
+    result = await create_asset(
+        db, symbol="006260.KS", name="LS Corp", asset_type=AssetType.STOCK, add_to_default_group=True,
+    )
+
+    mock_validate.assert_awaited_once_with("006260.KS")
+    call_kwargs = mock_repo.create.call_args[1]
+    assert call_kwargs["currency"] == "KRW"
+    assert call_kwargs["name"] == "LS Corp"  # user-provided name preserved
+
+
+@patch(_ensure_patch, new_callable=AsyncMock)
+@patch("app.services.asset_service.GroupRepository")
+@patch("app.services.asset_service.validate_symbol", new_callable=AsyncMock)
+@patch("app.services.asset_service.AssetRepository")
+async def test_create_asset_with_name_yahoo_fails_uses_suffix(MockAssetRepo, mock_validate, MockGroupRepo, _mock_ensure):
+    """When name is provided but Yahoo fails, fall back to exchange suffix for currency."""
+    db = AsyncMock()
+    mock_repo = MockAssetRepo.return_value
+    mock_repo.find_by_symbol = AsyncMock(return_value=None)
+    mock_validate.return_value = None  # Yahoo validation fails
+
+    new_asset = _make_asset(symbol="006260.KS", name="LS Corp", currency="KRW")
+    mock_repo.create = AsyncMock(return_value=new_asset)
+
+    mock_group_repo = MockGroupRepo.return_value
+    mock_group_repo.get_default = AsyncMock(return_value=_make_default_group())
+    mock_group_repo.save = AsyncMock()
+
+    result = await create_asset(
+        db, symbol="006260.KS", name="LS Corp", asset_type=AssetType.STOCK, add_to_default_group=True,
+    )
+
+    call_kwargs = mock_repo.create.call_args[1]
+    assert call_kwargs["currency"] == "KRW"  # from suffix fallback
 
 
 @patch("app.services.asset_service.GroupRepository")
