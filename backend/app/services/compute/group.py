@@ -106,7 +106,11 @@ async def compute_and_cache_indicators(
 
         df = pd.DataFrame([{
             "date": p.date,
+            "open": float(p.open),
+            "high": float(p.high),
+            "low": float(p.low),
             "close": float(p.close),
+            "volume": p.volume,
         } for p in prices]).set_index("date")
 
         snapshot = build_indicator_snapshot(compute_indicators(df))
