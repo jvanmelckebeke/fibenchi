@@ -1,6 +1,6 @@
 """Shared constants for period and indicator warmup calculations."""
 
-# Calendar days for each period string used across price, watchlist, and portfolio endpoints.
+# Calendar days for each period string used across price, group, and portfolio endpoints.
 PERIOD_DAYS: dict[str, int] = {
     "1mo": 30,
     "3mo": 90,

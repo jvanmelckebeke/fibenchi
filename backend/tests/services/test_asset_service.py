@@ -55,7 +55,7 @@ async def test_create_asset_uppercase_symbol(MockAssetRepo, MockGroupRepo):
     mock_group_repo.get_default = AsyncMock(return_value=_make_default_group())
     mock_group_repo.save = AsyncMock()
 
-    result = await create_asset(db, symbol="aapl", name="Apple", asset_type=AssetType.STOCK, add_to_watchlist=True)
+    result = await create_asset(db, symbol="aapl", name="Apple", asset_type=AssetType.STOCK, add_to_default_group=True)
 
     mock_repo.create.assert_awaited_once()
     call_kwargs = mock_repo.create.call_args[1]
@@ -66,7 +66,7 @@ async def test_create_asset_uppercase_symbol(MockAssetRepo, MockGroupRepo):
 @patch("app.services.asset_service.AssetRepository")
 async def test_create_asset_existing_adds_to_default_group(MockAssetRepo, MockGroupRepo):
     """When an existing asset is not in the default group, adding with
-    add_to_watchlist=True adds it to the group."""
+    add_to_default_group=True adds it to the group."""
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     existing = _make_asset()
@@ -77,7 +77,7 @@ async def test_create_asset_existing_adds_to_default_group(MockAssetRepo, MockGr
     mock_group_repo.get_default = AsyncMock(return_value=default_group)
     mock_group_repo.save = AsyncMock()
 
-    result = await create_asset(db, symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, add_to_watchlist=True)
+    result = await create_asset(db, symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, add_to_default_group=True)
 
     assert result is existing
     assert existing in default_group.assets
@@ -97,22 +97,22 @@ async def test_create_asset_existing_already_in_group_returns_existing(MockAsset
     mock_group_repo = MockGroupRepo.return_value
     mock_group_repo.get_default = AsyncMock(return_value=default_group)
 
-    result = await create_asset(db, symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, add_to_watchlist=True)
+    result = await create_asset(db, symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, add_to_default_group=True)
 
     assert result is existing
     mock_group_repo.save.assert_not_called()
 
 
 @patch("app.services.asset_service.AssetRepository")
-async def test_create_asset_existing_no_watchlist_returns_existing(MockRepo):
-    """When asset already exists and caller passes add_to_watchlist=False (e.g. pseudo-ETF
+async def test_create_asset_existing_no_group_returns_existing(MockRepo):
+    """When asset already exists and caller passes add_to_default_group=False (e.g. pseudo-ETF
     constituent picker), return the existing record without touching groups."""
     db = AsyncMock()
     mock_repo = MockRepo.return_value
     existing = _make_asset()
     mock_repo.find_by_symbol = AsyncMock(return_value=existing)
 
-    result = await create_asset(db, symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, add_to_watchlist=False)
+    result = await create_asset(db, symbol="AAPL", name="Apple", asset_type=AssetType.STOCK, add_to_default_group=False)
 
     assert result is existing
     mock_repo.save.assert_not_called()
@@ -135,7 +135,7 @@ async def test_create_asset_auto_resolves_from_yahoo(MockAssetRepo, mock_validat
     mock_group_repo.get_default = AsyncMock(return_value=_make_default_group())
     mock_group_repo.save = AsyncMock()
 
-    result = await create_asset(db, symbol="NVDA", name=None, asset_type=AssetType.STOCK, add_to_watchlist=True)
+    result = await create_asset(db, symbol="NVDA", name=None, asset_type=AssetType.STOCK, add_to_default_group=True)
 
     mock_validate.assert_awaited_once_with("NVDA")
     call_kwargs = mock_repo.create.call_args[1]
@@ -153,7 +153,7 @@ async def test_create_asset_yahoo_not_found_raises_404(MockRepo, mock_validate):
 
     from fastapi import HTTPException
     with pytest.raises(HTTPException) as exc_info:
-        await create_asset(db, symbol="XXXX", name=None, asset_type=AssetType.STOCK, add_to_watchlist=True)
+        await create_asset(db, symbol="XXXX", name=None, asset_type=AssetType.STOCK, add_to_default_group=True)
     assert exc_info.value.status_code == 404
 
 
@@ -172,7 +172,7 @@ async def test_create_asset_detects_etf_type(MockAssetRepo, mock_validate, MockG
     mock_group_repo.get_default = AsyncMock(return_value=_make_default_group())
     mock_group_repo.save = AsyncMock()
 
-    await create_asset(db, symbol="SPY", name=None, asset_type=AssetType.STOCK, add_to_watchlist=True)
+    await create_asset(db, symbol="SPY", name=None, asset_type=AssetType.STOCK, add_to_default_group=True)
 
     call_kwargs = mock_repo.create.call_args[1]
     assert call_kwargs["type"] == AssetType.ETF

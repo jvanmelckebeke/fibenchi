@@ -26,7 +26,7 @@ export function PortfolioPage() {
         <ChartSkeleton height={480} />
       ) : !data || !data.dates.length ? (
         <div className="h-[480px] flex items-center justify-center text-muted-foreground">
-          No data yet. Add assets to your watchlist and refresh prices.
+          No data yet. Add assets to a group and refresh prices.
         </div>
       ) : (
         <div className="relative">

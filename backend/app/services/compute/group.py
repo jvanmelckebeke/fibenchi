@@ -20,7 +20,7 @@ _indicator_cache: TTLCache = TTLCache(default_ttl=600)
 
 
 async def _get_default_group_pairs(db: AsyncSession):
-    """Get (id, symbol) pairs for assets in the default Watchlist group."""
+    """Get (id, symbol) pairs for assets in the default group."""
     group = await GroupRepository(db).get_default()
     if not group:
         return []
@@ -32,7 +32,7 @@ async def get_batch_sparklines(
 ) -> dict[str, list[dict]]:
     """Return close-price sparkline data for assets in a group.
 
-    If group_id is None, uses the default Watchlist group.
+    If group_id is None, uses the default group.
     """
     days = PERIOD_DAYS.get(period, 90)
     start = date.today() - timedelta(days=days)
@@ -64,7 +64,7 @@ async def compute_and_cache_indicators(
 ) -> dict[str, dict]:
     """Compute indicator snapshots for assets in a group, with caching.
 
-    If group_id is None, uses the default Watchlist group.
+    If group_id is None, uses the default group.
     """
     if group_id is not None:
         asset_rows = await AssetRepository(db).list_in_group_id_symbol_pairs(group_id)

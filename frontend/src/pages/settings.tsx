@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useSettings, type AppSettings, type MacdStyle, type WatchlistViewMode } from "@/lib/settings"
+import { useSettings, type AppSettings, type MacdStyle, type GroupViewMode } from "@/lib/settings"
 
 function SettingSwitch({
   id,
@@ -62,14 +62,14 @@ export function SettingsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Watchlist</CardTitle>
+          <CardTitle>Group View</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <Label>Default View</Label>
             <Select
-              value={draft.watchlist_view_mode}
-              onValueChange={(v) => change({ watchlist_view_mode: v as WatchlistViewMode })}
+              value={draft.group_view_mode}
+              onValueChange={(v) => change({ group_view_mode: v as GroupViewMode })}
             >
               <SelectTrigger className="w-28">
                 <SelectValue />
@@ -80,15 +80,15 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <SettingSwitch id="wl-sparkline" label="Sparkline Chart" settingKey="watchlist_show_sparkline" draft={draft} onChange={change} />
-          <SettingSwitch id="wl-rsi" label="RSI Gauge" settingKey="watchlist_show_rsi" draft={draft} onChange={change} />
-          <SettingSwitch id="wl-macd" label="MACD Indicator" settingKey="watchlist_show_macd" draft={draft} onChange={change} />
-          {draft.watchlist_show_macd && (
+          <SettingSwitch id="wl-sparkline" label="Sparkline Chart" settingKey="group_show_sparkline" draft={draft} onChange={change} />
+          <SettingSwitch id="wl-rsi" label="RSI Gauge" settingKey="group_show_rsi" draft={draft} onChange={change} />
+          <SettingSwitch id="wl-macd" label="MACD Indicator" settingKey="group_show_macd" draft={draft} onChange={change} />
+          {draft.group_show_macd && (
             <div className="flex items-center justify-between pl-4">
               <Label className="text-muted-foreground">MACD Style</Label>
               <Select
-                value={draft.watchlist_macd_style}
-                onValueChange={(v) => change({ watchlist_macd_style: v as MacdStyle })}
+                value={draft.group_macd_style}
+                onValueChange={(v) => change({ group_macd_style: v as MacdStyle })}
               >
                 <SelectTrigger className="w-32">
                   <SelectValue />

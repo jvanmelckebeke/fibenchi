@@ -110,7 +110,7 @@ export function MacdIndicator({
     lg,
   }
 
-  return settings.watchlist_macd_style === "classic"
+  return settings.group_macd_style === "classic"
     ? <ClassicMacd {...props} />
     : <DivergenceMacd {...props} />
 }

@@ -40,7 +40,7 @@ export function AddConstituentPicker({
     if (!sym) return
     setTickerError("")
     createAsset.mutate(
-      { symbol: sym, add_to_watchlist: false },
+      { symbol: sym, add_to_default_group: false },
       {
         onSuccess: (asset) => {
           addConstituents.mutate(

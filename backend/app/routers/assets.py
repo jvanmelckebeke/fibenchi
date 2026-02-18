@@ -19,15 +19,15 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
     """Add a new asset by ticker symbol. The symbol is validated against Yahoo Finance
     which also auto-detects the asset name, type (stock/etf), and currency.
 
-    By default the asset is added to the Watchlist group. Set `add_to_watchlist=false`
+    By default the asset is added to the default group. Set `add_to_default_group=false`
     to create the asset record without group membership (e.g. for pseudo-ETF constituents).
     """
-    return await asset_service.create_asset(db, data.symbol, data.name, data.type, data.add_to_watchlist)
+    return await asset_service.create_asset(db, data.symbol, data.name, data.type, data.add_to_default_group)
 
 
-@router.delete("/{symbol}", status_code=204, summary="Remove an asset from the watchlist")
+@router.delete("/{symbol}", status_code=204, summary="Remove an asset from the default group")
 async def delete_asset(symbol: str, db: AsyncSession = Depends(get_db)):
-    """Remove the asset from the default Watchlist group. The row is preserved so that
+    """Remove the asset from the default group. The row is preserved so that
     pseudo-ETF constituent relationships remain intact.
     """
     await asset_service.delete_asset(db, symbol)

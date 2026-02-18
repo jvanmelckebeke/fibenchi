@@ -25,11 +25,11 @@ import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
-import { useSettings, type AssetTypeFilter, type WatchlistSortBy, type SortDir } from "@/lib/settings"
-import { useFilteredSortedAssets } from "@/lib/use-watchlist-filter"
-import { WatchlistTable } from "@/components/watchlist-table"
+import { useSettings, type AssetTypeFilter, type GroupSortBy, type SortDir } from "@/lib/settings"
+import { useFilteredSortedAssets } from "@/lib/use-group-filter"
+import { GroupTable } from "@/components/group-table"
 
-const SORT_OPTIONS: [WatchlistSortBy, string][] = [
+const SORT_OPTIONS: [GroupSortBy, string][] = [
   ["name", "Name"],
   ["price", "Price"],
   ["change_pct", "Change %"],
@@ -39,24 +39,24 @@ const SORT_OPTIONS: [WatchlistSortBy, string][] = [
   ["macd_hist", "MACD Hist"],
 ]
 
-const SORT_LABELS: Record<WatchlistSortBy, string> = Object.fromEntries(SORT_OPTIONS) as Record<WatchlistSortBy, string>
+const SORT_LABELS: Record<GroupSortBy, string> = Object.fromEntries(SORT_OPTIONS) as Record<GroupSortBy, string>
 
-export function WatchlistPage({ groupId }: { groupId: number }) {
+export function GroupPage({ groupId }: { groupId: number }) {
   const { data: group, isLoading: groupLoading } = useGroup(groupId)
   const { data: allTags } = useTags()
   const removeFromGroup = useRemoveAssetFromGroup()
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
-  const viewMode = settings.watchlist_view_mode
-  const setViewMode = (v: "card" | "table") => updateSettings({ watchlist_view_mode: v })
+  const viewMode = settings.group_view_mode
+  const setViewMode = (v: "card" | "table") => updateSettings({ group_view_mode: v })
   const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod)
   const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
 
-  const typeFilter = settings.watchlist_type_filter
-  const sortBy = settings.watchlist_sort_by
-  const sortDir = settings.watchlist_sort_dir
+  const typeFilter = settings.group_type_filter
+  const sortBy = settings.group_sort_by
+  const sortDir = settings.group_sort_dir
 
   const quotes = useQuotes()
 
@@ -73,14 +73,14 @@ export function WatchlistPage({ groupId }: { groupId: number }) {
   })
 
   const setTypeFilter = (v: AssetTypeFilter) =>
-    updateSettings({ watchlist_type_filter: v })
+    updateSettings({ group_type_filter: v })
 
-  const handleSort = (key: WatchlistSortBy) => {
+  const handleSort = (key: GroupSortBy) => {
     if (sortBy === key) {
-      updateSettings({ watchlist_sort_dir: sortDir === "asc" ? "desc" : "asc" })
+      updateSettings({ group_sort_dir: sortDir === "asc" ? "desc" : "asc" })
     } else {
       const defaultDir: SortDir = key === "name" ? "asc" : "desc"
-      updateSettings({ watchlist_sort_by: key, watchlist_sort_dir: defaultDir })
+      updateSettings({ group_sort_by: key, group_sort_dir: defaultDir })
     }
   }
 
@@ -191,7 +191,7 @@ export function WatchlistPage({ groupId }: { groupId: number }) {
       )}
 
       {viewMode === "table" && assets && assets.length > 0 ? (
-        <WatchlistTable
+        <GroupTable
           assets={assets}
           quotes={quotes}
           indicators={batchIndicators}
@@ -222,9 +222,9 @@ export function WatchlistPage({ groupId }: { groupId: number }) {
               indicatorData={batchIndicators?.[asset.symbol]}
               onDelete={() => handleRemove(asset.symbol)}
               onHover={() => prefetch(asset.symbol)}
-              showSparkline={settings.watchlist_show_sparkline}
-              showRsi={settings.watchlist_show_rsi}
-              showMacd={settings.watchlist_show_macd}
+              showSparkline={settings.group_show_sparkline}
+              showRsi={settings.group_show_rsi}
+              showMacd={settings.group_show_macd}
             />
           ))}
         </div>

@@ -13,7 +13,7 @@ from app.config import settings as app_settings
 from app.database import async_session, engine
 from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis
 from app.services.price_sync import sync_all_prices
-from app.services.compute.watchlist import compute_and_cache_indicators
+from app.services.compute.group import compute_and_cache_indicators
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()

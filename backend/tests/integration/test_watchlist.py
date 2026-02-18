@@ -16,7 +16,7 @@ async def _get_default_group_id(db):
 
 
 async def _seed_assets(db, count=3, n_days=200):
-    """Create multiple assets in the default Watchlist group with price history."""
+    """Create multiple assets in the default group with price history."""
     symbols = ["AAPL", "GOOGL", "MSFT"][:count]
     assets = []
     for i, sym in enumerate(symbols):

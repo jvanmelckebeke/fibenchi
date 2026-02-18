@@ -18,7 +18,7 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
   const createAsset = useCreateAsset()
   const addAssetsToGroup = useAddAssetsToGroup()
   const { data: assets } = useAssets()
-  const watchlistedSymbols = useMemo(
+  const trackedSymbols = useMemo(
     () => new Set(assets?.map((a) => a.symbol)),
     [assets],
   )
@@ -89,7 +89,7 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
                 className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-60 overflow-auto"
               >
                 {searchResults.map((r) => {
-                  const isWatchlisted = watchlistedSymbols.has(r.symbol)
+                  const isTracked = trackedSymbols.has(r.symbol)
                   return (
                     <button
                       key={r.symbol}
@@ -97,7 +97,7 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
                       className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
-                        if (isWatchlisted) {
+                        if (isTracked) {
                           setDialogOpen(false)
                           navigate(`/asset/${r.symbol}`)
                         } else {
@@ -108,10 +108,10 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
                     >
                       <span className="font-mono font-medium text-primary shrink-0">{r.symbol}</span>
                       <span className="text-muted-foreground truncate">{r.name}</span>
-                      {isWatchlisted ? (
+                      {isTracked ? (
                         <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
                           <Check className="h-3 w-3" />
-                          Watchlisted
+                          Tracked
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="ml-auto text-xs shrink-0">{r.exchange}</Badge>

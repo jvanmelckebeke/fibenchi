@@ -27,7 +27,7 @@ async def sync_asset_prices_range(
 
 
 async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int]:
-    """Fetch and upsert prices for all watchlist assets. Returns {symbol: count}."""
+    """Fetch and upsert prices for all tracked assets. Returns {symbol: count}."""
     assets = await AssetRepository(db).list_all()
 
     if not assets:

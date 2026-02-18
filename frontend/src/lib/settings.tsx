@@ -1,20 +1,20 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react"
 
 export type AssetTypeFilter = "all" | "stock" | "etf"
-export type WatchlistSortBy = "name" | "price" | "change_pct" | "rsi" | "macd" | "macd_signal" | "macd_hist"
+export type GroupSortBy = "name" | "price" | "change_pct" | "rsi" | "macd" | "macd_signal" | "macd_hist"
 export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"
-export type WatchlistViewMode = "card" | "table"
+export type GroupViewMode = "card" | "table"
 
 export interface AppSettings {
-  watchlist_show_rsi: boolean
-  watchlist_show_macd: boolean
-  watchlist_macd_style: MacdStyle
-  watchlist_show_sparkline: boolean
-  watchlist_view_mode: WatchlistViewMode
-  watchlist_type_filter: AssetTypeFilter
-  watchlist_sort_by: WatchlistSortBy
-  watchlist_sort_dir: SortDir
+  group_show_rsi: boolean
+  group_show_macd: boolean
+  group_macd_style: MacdStyle
+  group_show_sparkline: boolean
+  group_view_mode: GroupViewMode
+  group_type_filter: AssetTypeFilter
+  group_sort_by: GroupSortBy
+  group_sort_dir: SortDir
   detail_show_sma20: boolean
   detail_show_sma50: boolean
   detail_show_bollinger: boolean
@@ -29,14 +29,14 @@ export interface AppSettings {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_SETTINGS: AppSettings = {
-  watchlist_show_rsi: true,
-  watchlist_show_macd: true,
-  watchlist_macd_style: "divergence",
-  watchlist_show_sparkline: true,
-  watchlist_view_mode: "card",
-  watchlist_type_filter: "all",
-  watchlist_sort_by: "name",
-  watchlist_sort_dir: "asc",
+  group_show_rsi: true,
+  group_show_macd: true,
+  group_macd_style: "divergence",
+  group_show_sparkline: true,
+  group_view_mode: "card",
+  group_type_filter: "all",
+  group_sort_by: "name",
+  group_sort_dir: "asc",
   detail_show_sma20: true,
   detail_show_sma50: true,
   detail_show_bollinger: true,

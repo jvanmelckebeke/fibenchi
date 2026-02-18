@@ -22,7 +22,7 @@ async def seed_asset_with_prices(
     """Create an asset with n_days of realistic price data.
 
     When add_to_group is True (default), the asset is added to the default
-    Watchlist group so it appears in watchlist/portfolio queries.
+    default group so it appears in group/portfolio queries.
     """
     asset = Asset(
         symbol=symbol, name=name or f"{symbol} Inc.",

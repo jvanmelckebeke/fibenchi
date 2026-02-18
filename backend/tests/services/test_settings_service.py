@@ -28,7 +28,7 @@ async def test_get_settings_returns_row_when_found(MockRepo):
     db = AsyncMock()
     mock_repo = MockRepo.return_value
     row = MagicMock()
-    row.data = {"compact_mode": True, "watchlist_show_rsi": False}
+    row.data = {"compact_mode": True, "group_show_rsi": False}
     mock_repo.get = AsyncMock(return_value=row)
 
     result = await get_settings(db)
