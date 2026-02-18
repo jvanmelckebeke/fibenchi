@@ -11,6 +11,37 @@ from app.utils import TTLCache, async_threadable
 # In-memory TTL cache for ETF holdings (holdings change quarterly at most)
 _holdings_cache: TTLCache = TTLCache(default_ttl=86400, max_size=100)
 
+# Yahoo Finance uses non-standard currency codes for sub-unit currencies.
+# Maps subunit codes to (main_currency_code, divisor).
+SUBUNIT_CURRENCIES: dict[str, tuple[str, int]] = {
+    "GBp": ("GBP", 100),
+    "GBX": ("GBP", 100),
+    "ILA": ("ILS", 100),
+    "ZAc": ("ZAR", 100),
+}
+
+
+def normalize_currency(currency: str) -> tuple[str, int]:
+    """Normalize a Yahoo Finance currency code.
+
+    Returns (normalized_code, divisor). If currency is a subunit (e.g. GBp for pence),
+    returns the main currency (GBP) and the divisor (100) to convert prices.
+    """
+    if currency in SUBUNIT_CURRENCIES:
+        return SUBUNIT_CURRENCIES[currency]
+    return (currency, 1)
+
+
+def _normalize_ohlcv_df(df: pd.DataFrame, divisor: int) -> pd.DataFrame:
+    """Divide OHLCV price columns by divisor. Volume is left unchanged."""
+    if divisor == 1:
+        return df
+    price_cols = [c for c in ("open", "high", "low", "close", "adjclose") if c in df.columns]
+    df = df.copy()
+    df[price_cols] = df[price_cols] / divisor
+    return df
+
+
 PERIOD_MAP = {
     "1d": "1d", "5d": "5d", "1w": "5d",
     "1mo": "1mo", "3mo": "3mo", "6mo": "6mo",
@@ -30,7 +61,7 @@ def fetch_history(
     """Fetch OHLCV data from Yahoo Finance.
 
     Returns DataFrame with columns: open, high, low, close, volume.
-    Index: date.
+    Index: date. Subunit currencies (e.g. GBp) are converted to main units.
     """
     ticker = Ticker(symbol)
 
@@ -46,6 +77,13 @@ def fetch_history(
     if isinstance(df.index, pd.MultiIndex):
         df = df.reset_index().set_index("date")
 
+    # Convert subunit prices (e.g. pence → pounds)
+    price_data = ticker.price.get(symbol, {})
+    if isinstance(price_data, dict):
+        raw_currency = price_data.get("currency", "USD") or "USD"
+        _, divisor = normalize_currency(raw_currency)
+        df = _normalize_ohlcv_df(df, divisor)
+
     return df
 
 
@@ -58,11 +96,12 @@ def validate_symbol(symbol: str) -> dict | None:
     if not quote or isinstance(quote, str):
         return None
 
-    # Extract currency from price data
+    # Extract currency from price data and normalize subunits
     price_data = ticker.price.get(symbol, {})
     currency = "USD"
     if isinstance(price_data, dict):
-        currency = price_data.get("currency", "USD") or "USD"
+        raw_currency = price_data.get("currency", "USD") or "USD"
+        currency, _ = normalize_currency(raw_currency)
 
     return {
         "symbol": symbol.upper(),
@@ -143,7 +182,8 @@ def _fetch_etf_holdings_uncached(symbol: str) -> dict | None:
 def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     """Fetch currencies for multiple symbols in one batch call.
 
-    Returns a dict mapping symbol -> currency code (e.g. "USD", "EUR").
+    Returns a dict mapping symbol -> normalized currency code (e.g. "USD", "GBP").
+    Subunit currencies (e.g. GBp) are normalized to their main currency.
     """
     if not symbols:
         return {}
@@ -155,7 +195,8 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     for sym in symbols:
         info = price_data.get(sym, {})
         if isinstance(info, dict):
-            currency = info.get("currency", "USD") or "USD"
+            raw_currency = info.get("currency", "USD") or "USD"
+            currency, _ = normalize_currency(raw_currency)
             result[sym] = currency
 
     return result
@@ -181,6 +222,9 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
             results.append({"symbol": sym})
             continue
 
+        raw_currency = info.get("currency", "USD") or "USD"
+        currency, divisor = normalize_currency(raw_currency)
+
         price = info.get("regularMarketPrice")
         prev_close = info.get("regularMarketPreviousClose")
         change = info.get("regularMarketChange")
@@ -188,11 +232,11 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
 
         results.append({
             "symbol": sym,
-            "price": round(float(price), 4) if price is not None else None,
-            "previous_close": round(float(prev_close), 4) if prev_close is not None else None,
-            "change": round(float(change), 4) if change is not None else None,
+            "price": round(float(price) / divisor, 4) if price is not None else None,
+            "previous_close": round(float(prev_close) / divisor, 4) if prev_close is not None else None,
+            "change": round(float(change) / divisor, 4) if change is not None else None,
             "change_percent": round(float(change_pct) * 100, 2) if change_pct is not None else None,
-            "currency": info.get("currency", "USD") or "USD",
+            "currency": currency,
             "market_state": info.get("marketState"),
         })
 
@@ -200,11 +244,15 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
 
 
 def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
-    """Fetch history for multiple symbols in one batch call."""
+    """Fetch history for multiple symbols in one batch call.
+
+    Subunit currencies (e.g. GBp) are converted to main units.
+    """
     if not symbols:
         return {}
 
     ticker = Ticker(symbols)
+    price_data = ticker.price
     normalized = PERIOD_MAP.get(period.lower(), period)
     hist = ticker.history(period=normalized, interval="1d")
 
@@ -219,6 +267,12 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
             else:
                 df = hist.copy()
             if not df.empty and len(df) >= 2:
+                # Convert subunit prices (e.g. pence → pounds)
+                info = price_data.get(sym, {})
+                if isinstance(info, dict):
+                    raw_currency = info.get("currency", "USD") or "USD"
+                    _, divisor = normalize_currency(raw_currency)
+                    df = _normalize_ohlcv_df(df, divisor)
                 result[sym] = df
         except KeyError:
             continue
