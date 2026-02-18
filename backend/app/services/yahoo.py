@@ -1,5 +1,7 @@
 """Yahoo Finance data fetching via yahooquery."""
 
+import logging
+import math
 from datetime import date
 
 import pandas as pd
@@ -7,6 +9,8 @@ from yahooquery import Ticker
 from yahooquery import search as _yq_search
 
 from app.utils import TTLCache, async_threadable
+
+logger = logging.getLogger(__name__)
 
 # In-memory TTL cache for ETF holdings (holdings change quarterly at most)
 _holdings_cache: TTLCache = TTLCache(default_ttl=86400, max_size=100)
@@ -306,9 +310,13 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
     price_data = ticker.price
 
     results = []
+    null_symbols: list[str] = []
+    nan_fields: list[str] = []
+
     for sym in symbols:
         info = price_data.get(sym, {})
         if not isinstance(info, dict):
+            logger.warning("Yahoo returned non-dict for %s: %s", sym, repr(info)[:200])
             results.append({"symbol": sym})
             continue
 
@@ -319,6 +327,27 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
         change = info.get("regularMarketChange")
         change_pct = info.get("regularMarketChangePercent")
 
+        # Sanitize NaN/Infinity → None
+        def _sanitize(val: float | None) -> float | None:
+            if val is None:
+                return None
+            if math.isnan(val) or math.isinf(val):
+                return None
+            return val
+
+        price = _sanitize(price)
+        prev_close = _sanitize(prev_close)
+        change = _sanitize(change)
+        change_pct = _sanitize(change_pct)
+
+        if price is None and info.get("regularMarketPrice") is not None:
+            nan_fields.append(f"{sym}.price")
+        if change_pct is None and info.get("regularMarketChangePercent") is not None:
+            nan_fields.append(f"{sym}.change_percent")
+
+        if price is None and change_pct is None and info.get("marketState") is None:
+            null_symbols.append(sym)
+
         results.append({
             "symbol": sym,
             "price": round(float(price) / divisor, 4) if price is not None else None,
@@ -328,6 +357,15 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
             "currency": currency,
             "market_state": info.get("marketState"),
         })
+
+    if nan_fields:
+        logger.warning("Yahoo returned NaN/Infinity for: %s", ", ".join(nan_fields))
+    if null_symbols:
+        logger.warning(
+            "Yahoo returned all-null data for %d/%d symbols: %s — "
+            "possible rate-limiting or auth issue",
+            len(null_symbols), len(symbols), ", ".join(null_symbols[:10]),
+        )
 
     return results
 
