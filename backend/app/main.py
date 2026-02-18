@@ -11,9 +11,9 @@ from starlette.responses import FileResponse
 from app.config import settings as app_settings
 
 from app.database import async_session, engine
-from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis, watchlist
+from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis
 from app.services.price_sync import sync_all_prices
-from app.services.compute.watchlist import compute_and_cache_indicators
+from app.services.compute.group import compute_and_cache_indicators
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -31,7 +31,7 @@ async def scheduled_refresh():
             logger.exception("Scheduled refresh failed")
             return
 
-    # Pre-compute indicator snapshots so the first watchlist request is instant
+    # Pre-compute indicator snapshots so the first group page request is instant
     async with async_session() as db:
         try:
             indicators = await compute_and_cache_indicators(db)
@@ -63,23 +63,23 @@ app = FastAPI(
     title="Fibenchi",
     summary="Investment research dashboard for tracking stocks, ETFs, and custom baskets.",
     description=(
-        "Fibenchi is a self-hosted investment research tool. It lets you maintain a watchlist "
-        "of stocks and ETFs, view OHLCV price charts with technical indicators "
+        "Fibenchi is a self-hosted investment research tool. It lets you organize "
+        "stocks and ETFs into groups, view OHLCV price charts with technical indicators "
         "(RSI, SMA, Bollinger Bands, MACD), write investment theses, and annotate charts "
         "with dated notes.\n\n"
         "**Pseudo-ETFs** are user-created baskets of assets with equal-weight allocation and "
         "quarterly rebalancing. They have their own indexed performance chart, per-constituent "
         "breakdown, and indicator snapshots.\n\n"
         "**Key concepts:**\n"
-        "- Assets are stocks or ETFs identified by ticker symbol. Deleting an asset soft-deletes "
-        "it (sets `watchlisted=false`) to preserve pseudo-ETF relationships.\n"
+        "- Assets are stocks or ETFs identified by ticker symbol. Removing an asset from its "
+        "last group preserves the row for pseudo-ETF relationships.\n"
         "- Prices are sourced from Yahoo Finance and cached in PostgreSQL. A daily cron job "
-        "refreshes all watchlisted assets.\n"
-        "- Ephemeral price views allow fetching prices for non-watchlisted symbols (e.g. ETF "
+        "refreshes all grouped assets.\n"
+        "- Ephemeral price views allow fetching prices for ungrouped symbols (e.g. ETF "
         "holdings) without persisting data.\n"
-        "- Groups are user-defined collections of assets for organization.\n"
-        "- Batch watchlist endpoints provide sparklines and indicator snapshots for all "
-        "watchlisted assets in a single request, avoiding per-card N+1 queries.\n"
+        "- Groups are user-defined collections of assets. The default 'Watchlist' group "
+        "cannot be deleted or renamed. Per-group batch endpoints provide sparklines and "
+        "indicator snapshots in a single request, avoiding N+1 queries.\n"
         "- Real-time quotes are delivered via SSE with delta compression — only symbols whose "
         "data changed since the last push are included.\n"
     ),
@@ -88,11 +88,11 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "assets",
-            "description": "Manage the watchlist of tracked stocks and ETFs. Assets are identified by ticker symbol and auto-validated against Yahoo Finance.",
+            "description": "Manage tracked stocks and ETFs. Assets are identified by ticker symbol and auto-validated against Yahoo Finance.",
         },
         {
             "name": "prices",
-            "description": "OHLCV price data and technical indicators (RSI, SMA 20/50, Bollinger Bands, MACD) for individual assets. Supports both persisted (watchlisted) and ephemeral (non-watchlisted) price fetching.",
+            "description": "OHLCV price data and technical indicators (RSI, SMA 20/50, Bollinger Bands, MACD) for individual assets. Supports both persisted (grouped) and ephemeral (ungrouped) price fetching.",
         },
         {
             "name": "holdings",
@@ -100,15 +100,11 @@ app = FastAPI(
         },
         {
             "name": "portfolio",
-            "description": "Portfolio-wide analytics: composite equal-weight index of all watchlisted assets, and top/bottom performer rankings by period return.",
-        },
-        {
-            "name": "watchlist",
-            "description": "Batch endpoints for the watchlist page. Return aggregated sparklines and indicator snapshots for all watchlisted assets in a single request, eliminating N+1 per-card fetches.",
+            "description": "Portfolio-wide analytics: composite equal-weight index of all grouped assets, and top/bottom performer rankings by period return.",
         },
         {
             "name": "groups",
-            "description": "User-defined groups for organizing assets into named collections (e.g. 'Tech', 'Dividend').",
+            "description": "User-defined groups for organizing assets into named collections. The default 'Watchlist' group is protected. Per-group batch endpoints provide sparklines and indicator snapshots in a single request.",
         },
         {
             "name": "tags",
@@ -126,9 +122,9 @@ app = FastAPI(
             "name": "quotes",
             "description": (
                 "Real-time market quotes via REST and SSE. The REST endpoint returns quotes for "
-                "arbitrary symbols. The SSE stream pushes watchlisted quotes with delta compression "
-                "(only changed symbols are sent) and adaptive intervals: 15 s during regular market "
-                "hours, 60 s pre/post-market, 300 s when markets are closed."
+                "arbitrary symbols. The SSE stream pushes quotes for all grouped assets with delta "
+                "compression (only changed symbols are sent) and adaptive intervals: 15 s during "
+                "regular market hours, 60 s pre/post-market, 300 s when markets are closed."
             ),
         },
         {
@@ -159,7 +155,6 @@ app.include_router(pseudo_etfs.router)
 app.include_router(pseudo_etf_analysis.router)
 app.include_router(quotes.router)
 app.include_router(settings_router.router)
-app.include_router(watchlist.router)
 app.include_router(search.router)
 
 

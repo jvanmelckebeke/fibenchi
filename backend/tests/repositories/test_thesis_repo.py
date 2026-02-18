@@ -8,10 +8,10 @@ from app.repositories.thesis_repo import ThesisRepository
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
-async def _create_asset(db, symbol: str, watchlisted: bool = True, **kwargs) -> Asset:
+async def _create_asset(db, symbol: str, **kwargs) -> Asset:
     defaults = dict(name=f"{symbol} Inc.", type=AssetType.STOCK, currency="USD")
     defaults.update(kwargs)
-    asset = Asset(symbol=symbol, watchlisted=watchlisted, **defaults)
+    asset = Asset(symbol=symbol, **defaults)
     db.add(asset)
     await db.commit()
     await db.refresh(asset)

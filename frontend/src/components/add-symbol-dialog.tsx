@@ -11,14 +11,15 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useSymbolSearch } from "@/lib/queries"
+import { useAssets, useCreateAsset, useAddAssetsToGroup, useSymbolSearch } from "@/lib/queries"
 
-export function AddSymbolDialog() {
+export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number; isDefaultGroup?: boolean }) {
   const navigate = useNavigate()
   const createAsset = useCreateAsset()
+  const addAssetsToGroup = useAddAssetsToGroup()
   const { data: assets } = useAssets()
-  const watchlistedSymbols = useMemo(
-    () => new Set(assets?.filter((a) => a.watchlisted).map((a) => a.symbol)),
+  const trackedSymbols = useMemo(
+    () => new Set(assets?.map((a) => a.symbol)),
     [assets],
   )
   const [symbol, setSymbol] = useState("")
@@ -34,15 +35,27 @@ export function AddSymbolDialog() {
     return () => clearTimeout(timer)
   }, [symbol])
 
+  const closeDialog = () => {
+    setSymbol("")
+    setDialogOpen(false)
+  }
+
   const handleAdd = () => {
     const s = symbol.trim().toUpperCase()
     if (!s) return
     createAsset.mutate(
       { symbol: s },
       {
-        onSuccess: () => {
-          setSymbol("")
-          setDialogOpen(false)
+        onSuccess: (asset) => {
+          // If on a non-default group page, also add to that group
+          if (groupId && !isDefaultGroup) {
+            addAssetsToGroup.mutate(
+              { groupId, assetIds: [asset.id] },
+              { onSuccess: closeDialog },
+            )
+          } else {
+            closeDialog()
+          }
         },
       },
     )
@@ -76,7 +89,7 @@ export function AddSymbolDialog() {
                 className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-60 overflow-auto"
               >
                 {searchResults.map((r) => {
-                  const isWatchlisted = watchlistedSymbols.has(r.symbol)
+                  const isTracked = trackedSymbols.has(r.symbol)
                   return (
                     <button
                       key={r.symbol}
@@ -84,7 +97,7 @@ export function AddSymbolDialog() {
                       className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
-                        if (isWatchlisted) {
+                        if (isTracked) {
                           setDialogOpen(false)
                           navigate(`/asset/${r.symbol}`)
                         } else {
@@ -95,10 +108,10 @@ export function AddSymbolDialog() {
                     >
                       <span className="font-mono font-medium text-primary shrink-0">{r.symbol}</span>
                       <span className="text-muted-foreground truncate">{r.name}</span>
-                      {isWatchlisted ? (
+                      {isTracked ? (
                         <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
                           <Check className="h-3 w-3" />
-                          Watchlisted
+                          Tracked
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="ml-auto text-xs shrink-0">{r.exchange}</Badge>
@@ -113,8 +126,8 @@ export function AddSymbolDialog() {
             <p className="text-sm text-destructive">{createAsset.error.message}</p>
           )}
           <div className="flex justify-end">
-            <Button onClick={() => { setShowSuggestions(false); handleAdd() }} disabled={createAsset.isPending || !symbol.trim()}>
-              {createAsset.isPending ? "Adding…" : "Add"}
+            <Button onClick={() => { setShowSuggestions(false); handleAdd() }} disabled={createAsset.isPending || addAssetsToGroup.isPending || !symbol.trim()}>
+              {createAsset.isPending || addAssetsToGroup.isPending ? "Adding\u2026" : "Add"}
             </Button>
           </div>
         </div>

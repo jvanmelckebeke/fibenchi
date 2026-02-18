@@ -13,9 +13,9 @@ router = APIRouter(prefix="/api/assets/{symbol}", tags=["prices"])
 async def get_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
     """Return daily OHLCV price history for a symbol.
 
-    For watchlisted assets, prices are read from the database (and auto-synced
+    For tracked assets, prices are read from the database (and auto-synced
     from Yahoo Finance if the requested period isn't yet covered). For
-    non-watchlisted symbols, prices are fetched ephemerally from Yahoo without
+    untracked symbols, prices are fetched ephemerally from Yahoo without
     persisting.
 
     Supported periods: `1mo`, `3mo` (default), `6mo`, `1y`, `2y`, `5y`.
@@ -53,7 +53,7 @@ async def get_detail(symbol: str, period: str = "3mo", db: AsyncSession = Depend
 
 @router.post("/refresh", status_code=200, summary="Force-refresh prices from Yahoo Finance")
 async def refresh_prices(symbol: str, period: str = "3mo", db: AsyncSession = Depends(get_db)):
-    """Force a re-sync of price data from Yahoo Finance for a watchlisted asset.
+    """Force a re-sync of price data from Yahoo Finance for a tracked asset.
 
     Returns the number of price points upserted.
     """

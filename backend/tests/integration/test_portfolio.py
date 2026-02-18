@@ -10,7 +10,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 # --- GET /portfolio/index ---
 
 async def test_index_empty_portfolio(client):
-    """Empty watchlist returns zero values."""
+    """Empty portfolio returns zero values."""
     resp = await client.get("/api/portfolio/index?period=1y")
     assert resp.status_code == 200
     data = resp.json()

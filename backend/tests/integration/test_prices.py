@@ -38,7 +38,7 @@ async def test_get_prices_respects_period_boundary(client, db):
 
 
 async def test_get_prices_ephemeral_symbol(client):
-    """Non-watchlisted symbol fetches from Yahoo without persisting."""
+    """Untracked symbol fetches from Yahoo without persisting."""
     mock_df = make_yahoo_df()
     with patch("app.services.price_service.fetch_history", return_value=mock_df):
         resp = await client.get("/api/assets/UNKNOWN/prices?period=3mo")

@@ -20,7 +20,7 @@ from app.services.price_service import (
 
 
 def _make_asset(**overrides) -> Asset:
-    defaults = dict(id=1, symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD", watchlisted=True)
+    defaults = dict(id=1, symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD")
     defaults.update(overrides)
     return Asset(**defaults)
 

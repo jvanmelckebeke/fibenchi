@@ -31,7 +31,6 @@ export interface Asset {
   symbol: string
   name: string
   type: AssetType
-  watchlisted: boolean
   currency: string
   created_at: string
   tags: TagBrief[]
@@ -41,7 +40,7 @@ export interface AssetCreate {
   symbol: string
   name?: string
   type?: AssetType
-  watchlisted?: boolean
+  add_to_default_group?: boolean
 }
 
 export interface SymbolSearchResult {
@@ -55,6 +54,8 @@ export interface Group {
   id: number
   name: string
   description: string | null
+  is_default: boolean
+  position: number
   created_at: string
   assets: Asset[]
 }

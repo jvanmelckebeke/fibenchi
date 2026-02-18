@@ -38,14 +38,14 @@ export function AssetDetailPage() {
   const [period, setPeriod] = useState<string>(settings.chart_default_period)
   const { data: assets } = useAssets()
   const asset = assets?.find((a) => a.symbol === symbol?.toUpperCase())
-  const isWatchlisted = !!asset
+  const isTracked = !!asset
   const isEtf = asset?.type === "etf"
 
   if (!symbol) return null
 
   return (
     <div className="p-6 space-y-6">
-      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isWatchlisted={isWatchlisted} />
+      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isTracked={isTracked} />
       <ChartSection
         symbol={symbol}
         period={period}
@@ -57,7 +57,7 @@ export function AssetDetailPage() {
         chartType={settings.chart_type}
       />
       {isEtf && <HoldingsSection symbol={symbol} />}
-      {isWatchlisted && (
+      {isTracked && (
         <>
           <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
           <AssetAnnotations symbol={symbol} />
@@ -74,14 +74,14 @@ function Header({
   currency,
   period,
   setPeriod,
-  isWatchlisted,
+  isTracked,
 }: {
   symbol: string
   name?: string
   currency: string
   period: string
   setPeriod: (p: string) => void
-  isWatchlisted: boolean
+  isTracked: boolean
 }) {
   const refresh = useRefreshPrices(symbol)
   const createAsset = useCreateAsset()
@@ -132,21 +132,21 @@ function Header({
             <ExternalLink className="h-4 w-4 text-muted-foreground" />
           </Button>
         </a>
-        {!isWatchlisted && (
+        {!isTracked && (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => createAsset.mutate({ symbol: symbol.toUpperCase(), watchlisted: true })}
+            onClick={() => createAsset.mutate({ symbol: symbol.toUpperCase() })}
             disabled={createAsset.isPending}
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" />
-            {createAsset.isPending ? "Adding..." : "Add to Watchlist"}
+            {createAsset.isPending ? "Adding..." : "Track"}
           </Button>
         )}
       </div>
       <div className="flex items-center gap-2">
         <PeriodSelector value={period} onChange={setPeriod} />
-        {isWatchlisted && (
+        {isTracked && (
           <Button
             variant="outline"
             size="sm"

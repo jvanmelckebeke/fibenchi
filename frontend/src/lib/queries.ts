@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { useCallback } from "react"
-import { api, type Asset, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
+import { api, type Asset, type AssetCreate, type Group, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
 
 function useInvalidatingMutation<TData, TVariables>(
   mutationFn: (vars: TVariables) => Promise<TData>,
@@ -28,6 +28,9 @@ export const keys = {
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
   tags: ["tags"] as const,
   groups: ["groups"] as const,
+  group: (id: number) => ["groups", id] as const,
+  groupSparklines: (id: number, period?: string) => ["group-sparklines", id, period] as const,
+  groupIndicators: (id: number) => ["group-indicators", id] as const,
   thesis: (symbol: string) => ["thesis", symbol] as const,
   annotations: (symbol: string) => ["annotations", symbol] as const,
   pseudoEtfs: ["pseudo-etfs"] as const,
@@ -36,8 +39,6 @@ export const keys = {
   pseudoEtfConstituentsIndicators: (id: number) => ["pseudo-etfs", id, "constituents-indicators"] as const,
   pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
-  watchlistSparklines: (period?: string) => ["watchlist-sparklines", period] as const,
-  watchlistIndicators: ["watchlist-indicators"] as const,
   symbolSearch: (q: string) => ["symbol-search", q] as const,
 }
 
@@ -60,23 +61,6 @@ export function usePortfolioPerformers(period?: string) {
   })
 }
 
-// Watchlist batch
-export function useWatchlistSparklines(period?: string) {
-  return useQuery({
-    queryKey: keys.watchlistSparklines(period),
-    queryFn: () => api.watchlist.sparklines(period),
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-export function useWatchlistIndicators() {
-  return useQuery({
-    queryKey: keys.watchlistIndicators,
-    queryFn: () => api.watchlist.indicators(),
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
 // Assets
 export function useAssets() {
   return useQuery({ queryKey: keys.assets, queryFn: api.assets.list, staleTime: 5 * 60 * 1000 })
@@ -85,27 +69,8 @@ export function useAssets() {
 export function useCreateAsset() {
   return useInvalidatingMutation(
     (data: AssetCreate) => api.assets.create(data),
-    [keys.assets],
+    [keys.assets, keys.groups],
   )
-}
-
-export function useDeleteAsset() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (symbol: string) => api.assets.delete(symbol),
-    onMutate: async (symbol) => {
-      await qc.cancelQueries({ queryKey: keys.assets })
-      const previous = qc.getQueryData<Asset[]>(keys.assets)
-      qc.setQueryData<Asset[]>(keys.assets, (old) =>
-        old?.map((a) => (a.symbol === symbol ? { ...a, watchlisted: false } : a)),
-      )
-      return { previous }
-    },
-    onError: (_err, _symbol, context) => {
-      if (context?.previous) qc.setQueryData(keys.assets, context.previous)
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.assets }),
-  })
 }
 
 // Search
@@ -270,16 +235,58 @@ export function useAddAssetsToGroup() {
   return useInvalidatingMutation(
     ({ groupId, assetIds }: { groupId: number; assetIds: number[] }) =>
       api.groups.addAssets(groupId, assetIds),
-    [keys.groups],
+    [keys.groups, keys.assets],
   )
 }
 
 export function useRemoveAssetFromGroup() {
-  return useInvalidatingMutation(
-    ({ groupId, assetId }: { groupId: number; assetId: number }) =>
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, assetId }: { groupId: number; assetId: number }) =>
       api.groups.removeAsset(groupId, assetId),
-    [keys.groups],
-  )
+    onMutate: async ({ groupId, assetId }) => {
+      await qc.cancelQueries({ queryKey: keys.group(groupId) })
+      const previous = qc.getQueryData<Group>(keys.group(groupId))
+      qc.setQueryData<Group>(keys.group(groupId), (old) =>
+        old ? { ...old, assets: old.assets.filter((a) => a.id !== assetId) } : old,
+      )
+      return { previous, groupId }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(keys.group(context.groupId), context.previous)
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: keys.groups })
+      qc.invalidateQueries({ queryKey: keys.group(vars.groupId) })
+    },
+  })
+}
+
+export function useGroup(id: number) {
+  return useQuery({
+    queryKey: keys.group(id),
+    queryFn: () => api.groups.get(id),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useGroupSparklines(id: number, period?: string) {
+  return useQuery({
+    queryKey: keys.groupSparklines(id, period),
+    queryFn: () => api.groups.sparklines(id, period),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useGroupIndicators(id: number) {
+  return useQuery({
+    queryKey: keys.groupIndicators(id),
+    queryFn: () => api.groups.indicators(id),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  })
 }
 
 // Thesis

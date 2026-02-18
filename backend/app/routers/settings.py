@@ -20,6 +20,6 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
 @router.put("", response_model=SettingsResponse, summary="Update user settings")
 async def update_settings(body: SettingsUpdate, db: AsyncSession = Depends(get_db)):
     """Replace the user settings object. The `data` field is a free-form JSON
-    object storing preferences like `watchlist_show_rsi`, `compact_mode`, etc.
+    object storing preferences like `group_show_rsi`, `compact_mode`, etc.
     """
     return await settings_service.update_settings(db, body.data)

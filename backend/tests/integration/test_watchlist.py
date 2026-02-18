@@ -1,16 +1,22 @@
-"""Tests for batch watchlist endpoints (GET /watchlist/sparklines, GET /watchlist/indicators)."""
+"""Tests for batch group endpoints (GET /groups/:id/sparklines, GET /groups/:id/indicators)."""
 
 import pytest
 from datetime import date, timedelta
 
 from app.models import Asset, AssetType, PriceHistory
+from app.repositories.group_repo import GroupRepository
 from tests.helpers import seed_asset_with_prices
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
+async def _get_default_group_id(db):
+    group = await GroupRepository(db).get_default()
+    return group.id
+
+
 async def _seed_assets(db, count=3, n_days=200):
-    """Create multiple watchlisted assets with price history."""
+    """Create multiple assets in the default group with price history."""
     symbols = ["AAPL", "GOOGL", "MSFT"][:count]
     assets = []
     for i, sym in enumerate(symbols):
@@ -21,19 +27,21 @@ async def _seed_assets(db, count=3, n_days=200):
     return assets
 
 
-# --- GET /watchlist/sparklines ---
+# --- GET /groups/:id/sparklines ---
 
 async def test_sparklines_returns_all_symbols(client, db):
-    assets = await _seed_assets(db, count=3)
-    resp = await client.get("/api/watchlist/sparklines?period=3mo")
+    gid = await _get_default_group_id(db)
+    await _seed_assets(db, count=3)
+    resp = await client.get(f"/api/groups/{gid}/sparklines?period=3mo")
     assert resp.status_code == 200
     data = resp.json()
     assert set(data.keys()) == {"AAPL", "GOOGL", "MSFT"}
 
 
 async def test_sparklines_close_only_fields(client, db):
+    gid = await _get_default_group_id(db)
     await _seed_assets(db, count=1)
-    resp = await client.get("/api/watchlist/sparklines?period=3mo")
+    resp = await client.get(f"/api/groups/{gid}/sparklines?period=3mo")
     data = resp.json()
     points = data["AAPL"]
     assert len(points) > 0
@@ -41,50 +49,59 @@ async def test_sparklines_close_only_fields(client, db):
 
 
 async def test_sparklines_respects_period(client, db):
+    gid = await _get_default_group_id(db)
     await _seed_assets(db, count=1)
-    resp_3mo = await client.get("/api/watchlist/sparklines?period=3mo")
-    resp_1y = await client.get("/api/watchlist/sparklines?period=1y")
+    resp_3mo = await client.get(f"/api/groups/{gid}/sparklines?period=3mo")
+    resp_1y = await client.get(f"/api/groups/{gid}/sparklines?period=1y")
     assert len(resp_1y.json()["AAPL"]) > len(resp_3mo.json()["AAPL"])
 
 
-async def test_sparklines_empty_watchlist(client, db):
-    resp = await client.get("/api/watchlist/sparklines")
+async def test_sparklines_empty_group(client, db):
+    gid = await _get_default_group_id(db)
+    resp = await client.get(f"/api/groups/{gid}/sparklines")
     assert resp.status_code == 200
     assert resp.json() == {}
 
 
-async def test_sparklines_excludes_unwatchlisted(client, db):
+async def test_sparklines_excludes_ungrouped(client, db):
+    """Assets not in the group should be excluded from its sparklines."""
+    gid = await _get_default_group_id(db)
     assets = await _seed_assets(db, count=2)
-    # Unwatchlist one
-    assets[1].watchlisted = False
+    # Remove GOOGL from the default group
+    default_group = await GroupRepository(db).get_default()
+    default_group.assets = [a for a in default_group.assets if a.id != assets[1].id]
     await db.commit()
-    resp = await client.get("/api/watchlist/sparklines")
+
+    resp = await client.get(f"/api/groups/{gid}/sparklines")
     data = resp.json()
     assert "AAPL" in data
     assert "GOOGL" not in data
 
 
-# --- GET /watchlist/indicators ---
+# --- GET /groups/:id/indicators ---
 
 async def test_indicators_returns_all_symbols(client, db):
-    assets = await _seed_assets(db, count=3)
-    resp = await client.get("/api/watchlist/indicators")
+    gid = await _get_default_group_id(db)
+    await _seed_assets(db, count=3)
+    resp = await client.get(f"/api/groups/{gid}/indicators")
     assert resp.status_code == 200
     data = resp.json()
     assert set(data.keys()) == {"AAPL", "GOOGL", "MSFT"}
 
 
 async def test_indicators_has_expected_fields(client, db):
+    gid = await _get_default_group_id(db)
     await _seed_assets(db, count=1)
-    resp = await client.get("/api/watchlist/indicators")
+    resp = await client.get(f"/api/groups/{gid}/indicators")
     data = resp.json()
     ind = data["AAPL"]
     assert set(ind.keys()) == {"rsi", "macd", "macd_signal", "macd_hist"}
 
 
 async def test_indicators_values_not_null_with_enough_data(client, db):
+    gid = await _get_default_group_id(db)
     await _seed_assets(db, count=1, n_days=200)
-    resp = await client.get("/api/watchlist/indicators")
+    resp = await client.get(f"/api/groups/{gid}/indicators")
     data = resp.json()
     ind = data["AAPL"]
     assert ind["rsi"] is not None
@@ -95,12 +112,16 @@ async def test_indicators_values_not_null_with_enough_data(client, db):
 
 async def test_indicators_null_with_insufficient_data(client, db):
     """With very few data points, indicators should be null."""
+    gid = await _get_default_group_id(db)
     asset = Asset(
         symbol="TINY", name="Tiny Inc.",
-        type=AssetType.STOCK, currency="USD", watchlisted=True,
+        type=AssetType.STOCK, currency="USD",
     )
     db.add(asset)
     await db.flush()
+    # Add to default group
+    default_group = await GroupRepository(db).get_default()
+    default_group.assets.append(asset)
     # Only 5 days of data — not enough for any indicator
     today = date.today()
     for i in range(5):
@@ -111,14 +132,15 @@ async def test_indicators_null_with_insufficient_data(client, db):
         ))
     await db.commit()
 
-    resp = await client.get("/api/watchlist/indicators")
+    resp = await client.get(f"/api/groups/{gid}/indicators")
     data = resp.json()
     ind = data["TINY"]
     assert ind["rsi"] is None
     assert ind["macd"] is None
 
 
-async def test_indicators_empty_watchlist(client, db):
-    resp = await client.get("/api/watchlist/indicators")
+async def test_indicators_empty_group(client, db):
+    gid = await _get_default_group_id(db)
+    resp = await client.get(f"/api/groups/{gid}/indicators")
     assert resp.status_code == 200
     assert resp.json() == {}

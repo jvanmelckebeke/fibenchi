@@ -27,7 +27,6 @@ import type {
   Thesis,
 } from "./types"
 
-// Re-export all types for backwards compatibility
 export type * from "./types"
 
 // API client
@@ -94,6 +93,7 @@ export const api = {
   },
   groups: {
     list: () => request<Group[]>("/groups"),
+    get: (id: number) => request<Group>(`/groups/${id}`),
     create: (data: GroupCreate) =>
       request<Group>("/groups", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: GroupUpdate) =>
@@ -107,6 +107,10 @@ export const api = {
       }),
     removeAsset: (groupId: number, assetId: number) =>
       request<Group>(`/groups/${groupId}/assets/${assetId}`, { method: "DELETE" }),
+    sparklines: (id: number, period?: string) =>
+      request<Record<string, SparklinePoint[]>>(`/groups/${id}/sparklines${qs({ period })}`),
+    indicators: (id: number) =>
+      request<Record<string, IndicatorSummary>>(`/groups/${id}/indicators`),
   },
   thesis: {
     get: (symbol: string) => request<Thesis>(`/assets/${symbol}/thesis`),
@@ -125,12 +129,6 @@ export const api = {
       }),
     delete: (symbol: string, id: number) =>
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
-  },
-  watchlist: {
-    sparklines: (period?: string) =>
-      request<Record<string, SparklinePoint[]>>(`/watchlist/sparklines${qs({ period })}`),
-    indicators: () =>
-      request<Record<string, IndicatorSummary>>("/watchlist/indicators"),
   },
   search: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
   settings: {

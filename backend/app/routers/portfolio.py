@@ -27,11 +27,11 @@ class AssetPerformance(BaseModel):
 
 @router.get("/index", response_model=PortfolioIndexResponse, summary="Get composite portfolio index")
 async def get_portfolio_index(period: str = "1y", db: AsyncSession = Depends(get_db)):
-    """Compute equal-weight composite index of all watchlisted assets."""
+    """Compute equal-weight composite index of all grouped assets."""
     return await compute_portfolio_index(db, period)
 
 
 @router.get("/performers", response_model=list[AssetPerformance], summary="Get top and bottom performers by return")
 async def get_performers(period: str = "1y", db: AsyncSession = Depends(get_db)):
-    """Return watchlisted assets ranked by period return (best first)."""
+    """Return grouped assets ranked by period return (best first)."""
     return await compute_performers(db, period)

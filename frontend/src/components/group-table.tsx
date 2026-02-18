@@ -11,25 +11,25 @@ import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
 import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import type { WatchlistSortBy, SortDir } from "@/lib/settings"
+import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { formatPrice } from "@/lib/format"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
-interface WatchlistTableProps {
+interface GroupTableProps {
   assets: Asset[]
   quotes: Record<string, Quote>
   indicators?: Record<string, IndicatorSummary>
   onDelete: (symbol: string) => void
   compactMode: boolean
   onHover?: (symbol: string) => void
-  sortBy?: WatchlistSortBy
+  sortBy?: GroupSortBy
   sortDir?: SortDir
-  onSort?: (key: WatchlistSortBy) => void
+  onSort?: (key: GroupSortBy) => void
 }
 
-export function WatchlistTable({ assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: WatchlistTableProps) {
+export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
 
   const toggleExpand = (symbol: string) => {
@@ -87,11 +87,11 @@ function SortableHeader({
   onSort,
 }: {
   label: string
-  sortKey: WatchlistSortBy
+  sortKey: GroupSortBy
   align: "left" | "right"
-  sortBy?: WatchlistSortBy
+  sortBy?: GroupSortBy
   sortDir?: SortDir
-  onSort?: (key: WatchlistSortBy) => void
+  onSort?: (key: GroupSortBy) => void
 }) {
   const active = sortBy === sortKey
   const Icon = active && sortDir === "asc" ? ArrowUp : ArrowDown
