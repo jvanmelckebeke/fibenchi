@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { useCallback } from "react"
-import { api, type Asset, type AssetCreate, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
+import { api, type Asset, type AssetCreate, type Group, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
 
 function useInvalidatingMutation<TData, TVariables>(
   mutationFn: (vars: TVariables) => Promise<TData>,
@@ -88,7 +88,7 @@ export function useAssets() {
 export function useCreateAsset() {
   return useInvalidatingMutation(
     (data: AssetCreate) => api.assets.create(data),
-    [keys.assets],
+    [keys.assets, keys.groups],
   )
 }
 
@@ -276,16 +276,31 @@ export function useAddAssetsToGroup() {
   return useInvalidatingMutation(
     ({ groupId, assetIds }: { groupId: number; assetIds: number[] }) =>
       api.groups.addAssets(groupId, assetIds),
-    [keys.groups],
+    [keys.groups, keys.assets],
   )
 }
 
 export function useRemoveAssetFromGroup() {
-  return useInvalidatingMutation(
-    ({ groupId, assetId }: { groupId: number; assetId: number }) =>
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, assetId }: { groupId: number; assetId: number }) =>
       api.groups.removeAsset(groupId, assetId),
-    [keys.groups],
-  )
+    onMutate: async ({ groupId, assetId }) => {
+      await qc.cancelQueries({ queryKey: keys.group(groupId) })
+      const previous = qc.getQueryData<Group>(keys.group(groupId))
+      qc.setQueryData<Group>(keys.group(groupId), (old) =>
+        old ? { ...old, assets: old.assets.filter((a) => a.id !== assetId) } : old,
+      )
+      return { previous, groupId }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(keys.group(context.groupId), context.previous)
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: keys.groups })
+      qc.invalidateQueries({ queryKey: keys.group(vars.groupId) })
+    },
+  })
 }
 
 export function useGroup(id: number) {

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Table, TrendingUp } from "lucide-react"
+import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, Table, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -10,12 +10,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/add-symbol-dialog"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { useAssets, useDeleteAsset, useTags, useWatchlistSparklines, useWatchlistIndicators, usePrefetchAssetDetail } from "@/lib/queries"
+import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { SparklineChart } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
@@ -40,17 +41,17 @@ const SORT_OPTIONS: [WatchlistSortBy, string][] = [
 
 const SORT_LABELS: Record<WatchlistSortBy, string> = Object.fromEntries(SORT_OPTIONS) as Record<WatchlistSortBy, string>
 
-export function WatchlistPage({ groupName }: { groupName?: string }) {
-  const { data: allAssets, isLoading } = useAssets()
+export function WatchlistPage({ groupId }: { groupId: number }) {
+  const { data: group, isLoading: groupLoading } = useGroup(groupId)
   const { data: allTags } = useTags()
-  const deleteAsset = useDeleteAsset()
+  const removeFromGroup = useRemoveAssetFromGroup()
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
   const viewMode = settings.watchlist_view_mode
   const setViewMode = (v: "card" | "table") => updateSettings({ watchlist_view_mode: v })
-  const { data: batchSparklines } = useWatchlistSparklines(sparklinePeriod)
-  const { data: batchIndicators } = useWatchlistIndicators()
+  const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod)
+  const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
 
   const typeFilter = settings.watchlist_type_filter
@@ -58,6 +59,9 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
   const sortDir = settings.watchlist_sort_dir
 
   const quotes = useQuotes()
+
+  const allAssets = group?.assets
+  const isDefaultGroup = group?.is_default ?? false
 
   const assets = useFilteredSortedAssets(allAssets, {
     typeFilter,
@@ -80,6 +84,11 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
     }
   }
 
+  const handleRemove = (symbol: string) => {
+    const asset = allAssets?.find((a) => a.symbol === symbol)
+    if (asset) removeFromGroup.mutate({ groupId, assetId: asset.id })
+  }
+
   const toggleTag = (id: number) =>
     setSelectedTags((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
@@ -89,7 +98,7 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold">{groupName ?? "Watchlist"}</h1>
+          <GroupHeader groupId={groupId} group={group} isDefaultGroup={isDefaultGroup} />
           {/* Type filter */}
           <SegmentedControl
             options={[
@@ -143,7 +152,7 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
             onChange={setViewMode}
           />
         </div>
-        <AddSymbolDialog />
+        <AddSymbolDialog groupId={groupId} isDefaultGroup={isDefaultGroup} />
       </div>
 
       {allTags && allTags.length > 0 && (
@@ -168,7 +177,7 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
         </div>
       )}
 
-      {isLoading && <p className="text-muted-foreground">Loading...</p>}
+      {groupLoading && <p className="text-muted-foreground">Loading...</p>}
 
       {assets && assets.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -186,7 +195,7 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
           assets={assets}
           quotes={quotes}
           indicators={batchIndicators}
-          onDelete={(s) => deleteAsset.mutate(s)}
+          onDelete={handleRemove}
           compactMode={settings.compact_mode}
           onHover={prefetch}
           sortBy={sortBy}
@@ -211,7 +220,7 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
               sparklinePeriod={sparklinePeriod}
               sparklineData={batchSparklines?.[asset.symbol]}
               indicatorData={batchIndicators?.[asset.symbol]}
-              onDelete={() => deleteAsset.mutate(asset.symbol)}
+              onDelete={() => handleRemove(asset.symbol)}
               onHover={() => prefetch(asset.symbol)}
               showSparkline={settings.watchlist_show_sparkline}
               showRsi={settings.watchlist_show_rsi}
@@ -220,6 +229,72 @@ export function WatchlistPage({ groupName }: { groupName?: string }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function GroupHeader({ groupId, group, isDefaultGroup }: {
+  groupId: number
+  group?: { name: string; description: string | null; assets: { id: number }[] }
+  isDefaultGroup: boolean
+}) {
+  const updateGroup = useUpdateGroup()
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState("")
+
+  const startEditing = () => {
+    if (isDefaultGroup || !group) return
+    setEditName(group.name)
+    setEditing(true)
+  }
+
+  const saveEdit = () => {
+    const name = editName.trim()
+    if (!name || name === group?.name) {
+      setEditing(false)
+      return
+    }
+    updateGroup.mutate(
+      { id: groupId, data: { name } },
+      { onSuccess: () => setEditing(false) },
+    )
+  }
+
+  if (!group) {
+    return <Skeleton className="h-8 w-40" />
+  }
+
+  if (editing) {
+    return (
+      <Input
+        value={editName}
+        onChange={(e) => setEditName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") saveEdit()
+          if (e.key === "Escape") setEditing(false)
+        }}
+        onBlur={saveEdit}
+        autoFocus
+        className="h-9 w-48 text-xl font-bold"
+      />
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <h1 className="text-2xl font-bold">{group.name}</h1>
+      {!isDefaultGroup && (
+        <button
+          onClick={startEditing}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title="Rename group"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <span className="text-sm text-muted-foreground">
+        {group.assets.length} {group.assets.length === 1 ? "asset" : "assets"}
+      </span>
     </div>
   )
 }

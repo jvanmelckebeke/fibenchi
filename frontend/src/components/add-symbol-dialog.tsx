@@ -11,11 +11,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useSymbolSearch } from "@/lib/queries"
+import { useAssets, useCreateAsset, useAddAssetsToGroup, useSymbolSearch } from "@/lib/queries"
 
-export function AddSymbolDialog() {
+export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number; isDefaultGroup?: boolean }) {
   const navigate = useNavigate()
   const createAsset = useCreateAsset()
+  const addAssetsToGroup = useAddAssetsToGroup()
   const { data: assets } = useAssets()
   const watchlistedSymbols = useMemo(
     () => new Set(assets?.map((a) => a.symbol)),
@@ -34,15 +35,27 @@ export function AddSymbolDialog() {
     return () => clearTimeout(timer)
   }, [symbol])
 
+  const closeDialog = () => {
+    setSymbol("")
+    setDialogOpen(false)
+  }
+
   const handleAdd = () => {
     const s = symbol.trim().toUpperCase()
     if (!s) return
     createAsset.mutate(
       { symbol: s },
       {
-        onSuccess: () => {
-          setSymbol("")
-          setDialogOpen(false)
+        onSuccess: (asset) => {
+          // If on a non-default group page, also add to that group
+          if (groupId && !isDefaultGroup) {
+            addAssetsToGroup.mutate(
+              { groupId, assetIds: [asset.id] },
+              { onSuccess: closeDialog },
+            )
+          } else {
+            closeDialog()
+          }
         },
       },
     )
@@ -113,8 +126,8 @@ export function AddSymbolDialog() {
             <p className="text-sm text-destructive">{createAsset.error.message}</p>
           )}
           <div className="flex justify-end">
-            <Button onClick={() => { setShowSuggestions(false); handleAdd() }} disabled={createAsset.isPending || !symbol.trim()}>
-              {createAsset.isPending ? "Adding…" : "Add"}
+            <Button onClick={() => { setShowSuggestions(false); handleAdd() }} disabled={createAsset.isPending || addAssetsToGroup.isPending || !symbol.trim()}>
+              {createAsset.isPending || addAssetsToGroup.isPending ? "Adding\u2026" : "Add"}
             </Button>
           </div>
         </div>
