@@ -26,11 +26,18 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
     es.addEventListener("quotes", (e) => {
       try {
         const data = JSON.parse(e.data) as QuoteMap
+        const count = Object.keys(data).length
+        if (count === 0) return
         setQuotes((prev) => ({ ...prev, ...data }))
         setStatus("connected")
-      } catch {
-        // ignore malformed events
+      } catch (err) {
+        console.error("[QuoteStream] Failed to parse SSE event:", err, "raw:", e.data?.slice(0, 200))
       }
+    })
+
+    es.addEventListener("message", (e) => {
+      // SSE events without an "event:" field arrive as "message" — log if this happens
+      console.warn("[QuoteStream] Received unnamed SSE event (expected 'quotes'):", e.data?.slice(0, 200))
     })
 
     es.addEventListener("open", () => {
