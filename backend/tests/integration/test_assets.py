@@ -52,10 +52,12 @@ async def test_create_asset_invalid_symbol(client):
     assert resp.status_code == 404
 
 
-async def test_create_duplicate_asset(client):
-    await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
-    resp = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
-    assert resp.status_code == 400
+async def test_create_duplicate_asset_returns_existing(client):
+    """Creating an asset that already exists returns the existing record (idempotent)."""
+    resp1 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+    resp2 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+    assert resp2.status_code == 201
+    assert resp2.json()["id"] == resp1.json()["id"]
 
 
 async def test_delete_asset(client):

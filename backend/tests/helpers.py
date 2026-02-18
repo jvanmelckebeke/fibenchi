@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from app.models import Asset, AssetType, PriceHistory
+from app.repositories.group_repo import GroupRepository
 
 
 async def create_asset_via_api(client, symbol: str, name: str, **kwargs) -> dict:
@@ -16,15 +17,24 @@ async def create_asset_via_api(client, symbol: str, name: str, **kwargs) -> dict
 
 async def seed_asset_with_prices(
     db, symbol: str = "AAPL", name: str | None = None, n_days: int = 500,
-    base_price: float = 150.0, watchlisted: bool = True,
+    base_price: float = 150.0, add_to_group: bool = True,
 ) -> Asset:
-    """Create a watchlisted asset with n_days of realistic price data."""
+    """Create an asset with n_days of realistic price data.
+
+    When add_to_group is True (default), the asset is added to the default
+    Watchlist group so it appears in watchlist/portfolio queries.
+    """
     asset = Asset(
         symbol=symbol, name=name or f"{symbol} Inc.",
-        type=AssetType.STOCK, currency="USD", watchlisted=watchlisted,
+        type=AssetType.STOCK, currency="USD",
     )
     db.add(asset)
     await db.flush()
+
+    if add_to_group:
+        default_group = await GroupRepository(db).get_default()
+        if default_group:
+            default_group.assets.append(asset)
 
     today = date.today()
     for i in range(n_days):

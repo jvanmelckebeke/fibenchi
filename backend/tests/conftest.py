@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.database import Base, get_db
 from app.main import app
+from app.models.group import Group
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -15,6 +16,10 @@ TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 async def setup_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Seed the default Watchlist group (mirrors migration 0004)
+    async with TestSession() as session:
+        session.add(Group(name="Watchlist", is_default=True, position=0))
+        await session.commit()
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

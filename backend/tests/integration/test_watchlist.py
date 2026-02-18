@@ -4,13 +4,14 @@ import pytest
 from datetime import date, timedelta
 
 from app.models import Asset, AssetType, PriceHistory
+from app.repositories.group_repo import GroupRepository
 from tests.helpers import seed_asset_with_prices
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 async def _seed_assets(db, count=3, n_days=200):
-    """Create multiple watchlisted assets with price history."""
+    """Create multiple assets in the default Watchlist group with price history."""
     symbols = ["AAPL", "GOOGL", "MSFT"][:count]
     assets = []
     for i, sym in enumerate(symbols):
@@ -53,11 +54,14 @@ async def test_sparklines_empty_watchlist(client, db):
     assert resp.json() == {}
 
 
-async def test_sparklines_excludes_unwatchlisted(client, db):
+async def test_sparklines_excludes_ungrouped(client, db):
+    """Assets not in the default Watchlist group should be excluded."""
     assets = await _seed_assets(db, count=2)
-    # Unwatchlist one
-    assets[1].watchlisted = False
+    # Remove GOOGL from the default group
+    default_group = await GroupRepository(db).get_default()
+    default_group.assets = [a for a in default_group.assets if a.id != assets[1].id]
     await db.commit()
+
     resp = await client.get("/api/watchlist/sparklines")
     data = resp.json()
     assert "AAPL" in data
@@ -97,10 +101,13 @@ async def test_indicators_null_with_insufficient_data(client, db):
     """With very few data points, indicators should be null."""
     asset = Asset(
         symbol="TINY", name="Tiny Inc.",
-        type=AssetType.STOCK, currency="USD", watchlisted=True,
+        type=AssetType.STOCK, currency="USD",
     )
     db.add(asset)
     await db.flush()
+    # Add to default group
+    default_group = await GroupRepository(db).get_default()
+    default_group.assets.append(asset)
     # Only 5 days of data — not enough for any indicator
     today = date.today()
     for i in range(5):

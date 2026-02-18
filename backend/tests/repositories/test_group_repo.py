@@ -8,7 +8,7 @@ from app.repositories.group_repo import GroupRepository
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
-async def test_list_all_returns_groups_ordered_by_name(db):
+async def test_list_all_returns_groups_ordered_by_position_then_name(db):
     repo = GroupRepository(db)
     await repo.create(name="Zinc Holdings", description="Z group")
     await repo.create(name="Alpha Fund", description="A group")
@@ -16,13 +16,17 @@ async def test_list_all_returns_groups_ordered_by_name(db):
 
     result = await repo.list_all()
     names = [g.name for g in result]
-    assert names == ["Alpha Fund", "Beta Portfolio", "Zinc Holdings"]
+    # Watchlist (position=0) comes first, then the rest ordered by name (position=0)
+    assert names == ["Alpha Fund", "Beta Portfolio", "Watchlist", "Zinc Holdings"]
 
 
-async def test_list_all_returns_empty(db):
+async def test_list_all_includes_default_group(db):
+    """The seeded default Watchlist group is always present."""
     repo = GroupRepository(db)
     result = await repo.list_all()
-    assert result == []
+    assert len(result) == 1
+    assert result[0].name == "Watchlist"
+    assert result[0].is_default is True
 
 
 async def test_get_by_id_found(db):

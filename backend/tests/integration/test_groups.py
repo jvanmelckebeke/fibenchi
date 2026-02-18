@@ -18,7 +18,8 @@ async def test_list_groups(client):
     await client.post("/api/groups", json={"name": "Energy"})
 
     resp = await client.get("/api/groups")
-    assert len(resp.json()) == 2
+    # +1 for the seeded default Watchlist group
+    assert len(resp.json()) == 3
 
 
 async def test_update_group(client):

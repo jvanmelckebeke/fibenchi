@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.group import GroupAddAssets, GroupCreate, GroupResponse, GroupUpdate
 from app.services import group_service
+from app.services.compute.watchlist import compute_and_cache_indicators, get_batch_sparklines
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -41,3 +42,22 @@ async def add_assets_to_group(group_id: int, data: GroupAddAssets, db: AsyncSess
 @router.delete("/{group_id}/assets/{asset_id}", response_model=GroupResponse, summary="Remove an asset from a group")
 async def remove_asset_from_group(group_id: int, asset_id: int, db: AsyncSession = Depends(get_db)):
     return await group_service.remove_asset(db, group_id, asset_id)
+
+
+@router.get("/{group_id}/sparklines", summary="Batch close prices for group assets")
+async def group_sparklines(
+    group_id: int,
+    period: str = "3mo",
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, list[dict]]:
+    """Return close-price sparkline data for every asset in the group."""
+    return await get_batch_sparklines(db, period, group_id=group_id)
+
+
+@router.get("/{group_id}/indicators", summary="Batch indicators for group assets")
+async def group_indicators(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, dict]:
+    """Return the latest RSI and MACD indicator values for every asset in the group."""
+    return await compute_and_cache_indicators(db, group_id=group_id)

@@ -1,4 +1,4 @@
-"""Batch indicator computation and sparkline data for the watchlist page."""
+"""Batch indicator computation and sparkline data for group asset pages."""
 
 from datetime import date, timedelta
 
@@ -9,6 +9,7 @@ import pandas as pd
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import PriceHistory
 from app.repositories.asset_repo import AssetRepository
+from app.repositories.group_repo import GroupRepository
 from app.repositories.price_repo import PriceRepository
 from app.services.compute.indicators import build_indicator_snapshot, compute_indicators
 from app.utils import TTLCache
@@ -18,12 +19,29 @@ from app.utils import TTLCache
 _indicator_cache: TTLCache = TTLCache(default_ttl=600)
 
 
-async def get_batch_sparklines(db: AsyncSession, period: str = "3mo") -> dict[str, list[dict]]:
-    """Return close-price sparkline data for every watchlisted asset."""
+async def _get_default_group_pairs(db: AsyncSession):
+    """Get (id, symbol) pairs for assets in the default Watchlist group."""
+    group = await GroupRepository(db).get_default()
+    if not group:
+        return []
+    return await AssetRepository(db).list_in_group_id_symbol_pairs(group.id)
+
+
+async def get_batch_sparklines(
+    db: AsyncSession, period: str = "3mo", group_id: int | None = None,
+) -> dict[str, list[dict]]:
+    """Return close-price sparkline data for assets in a group.
+
+    If group_id is None, uses the default Watchlist group.
+    """
     days = PERIOD_DAYS.get(period, 90)
     start = date.today() - timedelta(days=days)
 
-    asset_rows = await AssetRepository(db).list_watchlisted_id_symbol_pairs()
+    if group_id is not None:
+        asset_rows = await AssetRepository(db).list_in_group_id_symbol_pairs(group_id)
+    else:
+        asset_rows = await _get_default_group_pairs(db)
+
     if not asset_rows:
         return {}
 
@@ -41,12 +59,18 @@ async def get_batch_sparklines(db: AsyncSession, period: str = "3mo") -> dict[st
     return out
 
 
-async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
-    """Compute indicator snapshots for all watchlisted assets, with caching.
+async def compute_and_cache_indicators(
+    db: AsyncSession, group_id: int | None = None,
+) -> dict[str, dict]:
+    """Compute indicator snapshots for assets in a group, with caching.
 
-    Called by the API endpoint and also by the nightly cron to warm the cache.
+    If group_id is None, uses the default Watchlist group.
     """
-    asset_rows = await AssetRepository(db).list_watchlisted_id_symbol_pairs()
+    if group_id is not None:
+        asset_rows = await AssetRepository(db).list_in_group_id_symbol_pairs(group_id)
+    else:
+        asset_rows = await _get_default_group_pairs(db)
+
     if not asset_rows:
         return {}
 
@@ -55,9 +79,9 @@ async def compute_and_cache_indicators(db: AsyncSession) -> dict[str, dict]:
 
     price_repo = PriceRepository(db)
 
-    # Build cache key: symbols + latest price date
+    # Build cache key: symbols + latest price date + group context
     latest_date = await price_repo.get_latest_date(asset_ids)
-    cache_key = (frozenset(id_to_symbol.values()), latest_date)
+    cache_key = (frozenset(id_to_symbol.values()), latest_date, group_id)
 
     cached = _indicator_cache.get_value(cache_key)
     if cached is not None:
