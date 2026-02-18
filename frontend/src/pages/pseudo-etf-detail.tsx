@@ -144,7 +144,7 @@ function PerformanceStats({ data, baseValue }: { data: PerformanceBreakdownPoint
       </div>
       <div>
         <span className="text-muted-foreground">Total return: </span>
-        <span className={`font-medium ${totalReturn >= 0 ? "text-green-500" : "text-red-500"}`}>
+        <span className={`font-medium ${totalReturn >= 0 ? "text-emerald-500" : "text-red-500"}`}>
           {totalReturn >= 0 ? "+" : ""}{totalReturn.toFixed(1)}%
         </span>
       </div>
