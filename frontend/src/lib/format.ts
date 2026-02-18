@@ -2,6 +2,12 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
   EUR: "\u20ac",
   GBP: "\u00a3",
+  GBp: "\u00a3",
+  GBX: "\u00a3",
+  ILS: "\u20aa",
+  ILA: "\u20aa",
+  ZAR: "R",
+  ZAc: "R",
   JPY: "\u00a5",
   CHF: "CHF\u00a0",
 }
