@@ -8,7 +8,7 @@ import { AnnotationsList } from "@/components/annotations-list"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/add-constituent-picker"
 import {
-  StackedAreaChart,
+  PerformanceOverlayChart,
   DailyContributionChart,
 } from "@/components/chart/pseudo-etf-charts"
 import { STACK_COLORS } from "@/lib/chart-utils"
@@ -81,7 +81,7 @@ export function PseudoEtfDetailPage() {
 
       {performance && performance.length > 0 && (
         <>
-          <StackedAreaChart data={performance} baseValue={etf.base_value} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
+          <PerformanceOverlayChart data={performance} baseValue={etf.base_value} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
           <PerformanceStats data={performance} baseValue={etf.base_value} />
           {performance.length > 1 && (
             <DailyContributionChart data={performance} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
