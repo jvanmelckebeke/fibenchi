@@ -4,8 +4,8 @@ Convert British pence (and other subunit currencies) stored by Yahoo Finance
 to their main currency. Divides historical prices by 100 and updates the
 currency code on affected assets.
 
-Revision ID: 0002
-Revises: 0001
+Revision ID: 0003
+Revises: 0002
 Create Date: 2026-02-18
 
 """
@@ -15,8 +15,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "0002"
-down_revision: Union[str, None] = "0001"
+revision: str = "0003"
+down_revision: Union[str, None] = "0002"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
