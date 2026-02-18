@@ -9,8 +9,16 @@ class GroupRepository:
         self.db = db
 
     async def list_all(self) -> list[Group]:
-        result = await self.db.execute(select(Group).order_by(Group.name))
+        result = await self.db.execute(
+            select(Group).order_by(Group.position, Group.name)
+        )
         return list(result.scalars().all())
+
+    async def get_default(self) -> Group | None:
+        result = await self.db.execute(
+            select(Group).where(Group.is_default.is_(True))
+        )
+        return result.scalar_one_or_none()
 
     async def get_by_id(self, group_id: int) -> Group | None:
         result = await self.db.execute(

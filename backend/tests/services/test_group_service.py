@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.group_service import (
     add_assets,
     create_group,
+    delete_group,
     list_groups,
     remove_asset,
     update_group,
@@ -16,11 +17,12 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 _PATCH_GET_GROUP = "app.services.group_service.get_group"
 
 
-def _make_group(id: int = 1, name: str = "Tech", description: str = "Tech stocks"):
+def _make_group(id: int = 1, name: str = "Tech", description: str = "Tech stocks", is_default: bool = False):
     group = MagicMock()
     group.id = id
     group.name = name
     group.description = description
+    group.is_default = is_default
     group.assets = []
     return group
 
@@ -140,4 +142,46 @@ async def test_remove_asset_filters_correctly(MockRepo):
 
     assert len(group.assets) == 1
     assert group.assets[0].id == 2
+    mock_repo.save.assert_awaited_once()
+
+
+# --- Default group protection ---
+
+async def test_delete_default_group_raises_400():
+    from fastapi import HTTPException
+
+    db = AsyncMock()
+    group = _make_group(is_default=True)
+
+    with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_group(db, group_id=1)
+        assert exc_info.value.status_code == 400
+        assert "default" in exc_info.value.detail.lower()
+
+
+@patch("app.services.group_service.GroupRepository")
+async def test_rename_default_group_raises_400(MockRepo):
+    from fastapi import HTTPException
+
+    db = AsyncMock()
+    group = _make_group(name="Watchlist", is_default=True)
+
+    with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
+        with pytest.raises(HTTPException) as exc_info:
+            await update_group(db, group_id=1, name="Renamed", description=None)
+        assert exc_info.value.status_code == 400
+
+
+@patch("app.services.group_service.GroupRepository")
+async def test_update_default_group_description_allowed(MockRepo):
+    db = AsyncMock()
+    group = _make_group(name="Watchlist", is_default=True)
+    mock_repo = MockRepo.return_value
+    mock_repo.save = AsyncMock(return_value=group)
+
+    with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
+        await update_group(db, group_id=1, name=None, description="Updated desc")
+
+    assert group.description == "Updated desc"
     mock_repo.save.assert_awaited_once()
