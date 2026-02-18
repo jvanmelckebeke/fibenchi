@@ -111,7 +111,7 @@ function Header({
           <span
             ref={pctRef}
             className={`text-sm font-medium tabular-nums rounded px-1 ${
-              changePct >= 0 ? "text-green-500" : "text-red-500"
+              changePct >= 0 ? "text-emerald-500" : "text-red-500"
             }`}
           >
             {changePct >= 0 ? "+" : ""}

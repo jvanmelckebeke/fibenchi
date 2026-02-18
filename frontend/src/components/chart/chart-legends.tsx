@@ -54,7 +54,7 @@ function OverlayEntry({ descriptor, v }: { descriptor: IndicatorDescriptor; v: L
 export function Legend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
   const v = values ?? latest
   const changeColor = v.c !== undefined && v.o !== undefined
-    ? v.c >= v.o ? "text-green-500" : "text-red-500"
+    ? v.c >= v.o ? "text-emerald-500" : "text-red-500"
     : ""
 
   const overlays = getOverlayDescriptors()

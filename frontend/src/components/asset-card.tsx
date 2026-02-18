@@ -49,7 +49,7 @@ export function AssetCard({
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
   const changeColor =
-    changePct != null ? (changePct >= 0 ? "text-green-500" : "text-red-500") : "text-muted-foreground"
+    changePct != null ? (changePct >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground"
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
 
