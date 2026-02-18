@@ -3,21 +3,13 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IndicatorCell } from "@/components/indicator-cell"
 import { formatPrice, formatChangePct } from "@/lib/format"
+import { getNumericValue, getStringValue } from "@/lib/indicator-registry"
 
 export interface IndicatorData {
   currency: string
   close: number | null
   change_pct: number | null
-  rsi: number | null
-  sma_20: number | null
-  macd: number | null
-  macd_signal: number | null
-  macd_hist: number | null
-  macd_signal_dir: string | null
-  bb_upper: number | null
-  bb_middle: number | null
-  bb_lower: number | null
-  bb_position: string | null
+  values: Record<string, number | string | null>
 }
 
 export interface HoldingsGridRow {
@@ -60,11 +52,12 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
         {rows.map((row) => {
           const ind = indicatorMap.get(row.symbol)
           const chg = formatChangePct(ind?.change_pct ?? null)
-          const rsiVal = ind?.rsi
+          const rsiVal = getNumericValue(ind?.values, "rsi")
           const rsiColor = rsiVal != null ? (rsiVal > 70 ? "text-red-500" : rsiVal < 30 ? "text-emerald-500" : "") : ""
-          const smaAbove = ind?.sma_20 != null && ind?.close != null ? ind.close > ind.sma_20 : null
-          const macdDir = ind?.macd_signal_dir
-          const bbPos = ind?.bb_position
+          const sma20Val = getNumericValue(ind?.values, "sma_20")
+          const smaAbove = sma20Val != null && ind?.close != null ? ind.close > sma20Val : null
+          const macdDir = getStringValue(ind?.values, "macd_signal_dir")
+          const bbPos = getStringValue(ind?.values, "bb_position")
 
           return (
             <div

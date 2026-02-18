@@ -82,15 +82,7 @@ export interface Price {
 export interface Indicator {
   date: string
   close: number
-  rsi: number | null
-  sma_20: number | null
-  sma_50: number | null
-  bb_upper: number | null
-  bb_middle: number | null
-  bb_lower: number | null
-  macd: number | null
-  macd_signal: number | null
-  macd_hist: number | null
+  values: Record<string, number | null>
 }
 
 export interface AssetDetail {
@@ -146,17 +138,7 @@ export interface HoldingIndicator {
   currency: string
   close: number | null
   change_pct: number | null
-  rsi: number | null
-  sma_20: number | null
-  sma_50: number | null
-  macd: number | null
-  macd_signal: number | null
-  macd_hist: number | null
-  macd_signal_dir: string | null
-  bb_upper: number | null
-  bb_middle: number | null
-  bb_lower: number | null
-  bb_position: string | null
+  values: Record<string, number | string | null>
 }
 
 export interface PortfolioIndex {
@@ -215,17 +197,7 @@ export interface ConstituentIndicator {
   weight_pct: number | null
   close: number | null
   change_pct: number | null
-  rsi: number | null
-  sma_20: number | null
-  sma_50: number | null
-  macd: number | null
-  macd_signal: number | null
-  macd_hist: number | null
-  macd_signal_dir: string | null
-  bb_upper: number | null
-  bb_middle: number | null
-  bb_lower: number | null
-  bb_position: string | null
+  values: Record<string, number | string | null>
 }
 
 export interface SparklinePoint {
@@ -234,10 +206,9 @@ export interface SparklinePoint {
 }
 
 export interface IndicatorSummary {
-  rsi: number | null
-  macd: number | null
-  macd_signal: number | null
-  macd_hist: number | null
+  close: number | null
+  change_pct: number | null
+  values: Record<string, number | string | null>
 }
 
 export interface Quote {

@@ -13,6 +13,7 @@ import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { formatPrice } from "@/lib/format"
+import { getNumericValue } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
@@ -127,6 +128,15 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
 
   const loading = detailLoading
 
+  const rsiVal = getNumericValue(indicator?.values, "rsi")
+  const macdVals = indicator?.values
+    ? {
+        macd: getNumericValue(indicator.values, "macd"),
+        macd_signal: getNumericValue(indicator.values, "macd_signal"),
+        macd_hist: getNumericValue(indicator.values, "macd_hist"),
+      }
+    : undefined
+
   return (
     <div className="flex gap-4">
       {/* Price chart — 80% */}
@@ -154,13 +164,13 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
       <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
         <div>
           <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
-          <RsiGauge symbol={symbol} batchRsi={indicator?.rsi} size="lg" />
+          <RsiGauge symbol={symbol} batchRsi={rsiVal} size="lg" />
         </div>
         <div>
           <span className="text-xs text-muted-foreground mb-1 block">MACD</span>
           <MacdIndicator
             symbol={symbol}
-            batchMacd={indicator ? { macd: indicator.macd, macd_signal: indicator.macd_signal, macd_hist: indicator.macd_hist } : undefined}
+            batchMacd={macdVals}
             size="lg"
           />
         </div>
@@ -257,35 +267,39 @@ function TableRow({
           )}
         </td>
         <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.rsi != null ? (
-            <span className={getRsiColor(indicator.rsi)}>{indicator.rsi.toFixed(0)}</span>
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
+          {(() => {
+            const rsi = getNumericValue(indicator?.values, "rsi")
+            return rsi != null ? (
+              <span className={getRsiColor(rsi)}>{rsi.toFixed(0)}</span>
+            ) : (
+              <span className="text-muted-foreground">&mdash;</span>
+            )
+          })()}
         </td>
         <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.macd != null ? (
-            indicator.macd.toFixed(2)
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
+          {(() => {
+            const val = getNumericValue(indicator?.values, "macd")
+            return val != null ? val.toFixed(2) : <span className="text-muted-foreground">&mdash;</span>
+          })()}
         </td>
         <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.macd_signal != null ? (
-            indicator.macd_signal.toFixed(2)
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
+          {(() => {
+            const val = getNumericValue(indicator?.values, "macd_signal")
+            return val != null ? val.toFixed(2) : <span className="text-muted-foreground">&mdash;</span>
+          })()}
         </td>
         <td className={`${py} px-3 text-right text-sm tabular-nums`}>
-          {indicator?.macd_hist != null ? (
-            <span className={indicator.macd_hist >= 0 ? "text-emerald-400" : "text-red-400"}>
-              {indicator.macd_hist >= 0 ? "+" : ""}
-              {indicator.macd_hist.toFixed(2)}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">&mdash;</span>
-          )}
+          {(() => {
+            const val = getNumericValue(indicator?.values, "macd_hist")
+            return val != null ? (
+              <span className={val >= 0 ? "text-emerald-400" : "text-red-400"}>
+                {val >= 0 ? "+" : ""}
+                {val.toFixed(2)}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">&mdash;</span>
+            )
+          })()}
         </td>
         <td className={`${py} pr-2`}>
           <AssetActionMenu

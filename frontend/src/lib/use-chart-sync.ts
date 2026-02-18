@@ -41,14 +41,15 @@ export function useChartSync() {
       ohlcByTime.current.set(p.date, { o: p.open, h: p.high, l: p.low, c: p.close })
     }
     for (const i of indicators) {
-      if (i.sma_20 !== null) sma20ByTime.current.set(i.date, i.sma_20)
-      if (i.sma_50 !== null) sma50ByTime.current.set(i.date, i.sma_50)
-      if (i.bb_upper !== null) bbUpperByTime.current.set(i.date, i.bb_upper)
-      if (i.bb_lower !== null) bbLowerByTime.current.set(i.date, i.bb_lower)
-      if (i.rsi !== null) rsiByTime.current.set(i.date, i.rsi)
-      if (i.macd !== null) macdByTime.current.set(i.date, i.macd)
-      if (i.macd_signal !== null) macdSignalByTime.current.set(i.date, i.macd_signal)
-      if (i.macd_hist !== null) macdHistByTime.current.set(i.date, i.macd_hist)
+      const v = i.values
+      if (v.sma_20 != null) sma20ByTime.current.set(i.date, v.sma_20)
+      if (v.sma_50 != null) sma50ByTime.current.set(i.date, v.sma_50)
+      if (v.bb_upper != null) bbUpperByTime.current.set(i.date, v.bb_upper)
+      if (v.bb_lower != null) bbLowerByTime.current.set(i.date, v.bb_lower)
+      if (v.rsi != null) rsiByTime.current.set(i.date, v.rsi)
+      if (v.macd != null) macdByTime.current.set(i.date, v.macd)
+      if (v.macd_signal != null) macdSignalByTime.current.set(i.date, v.macd_signal)
+      if (v.macd_hist != null) macdHistByTime.current.set(i.date, v.macd_hist)
     }
   }, [])
 

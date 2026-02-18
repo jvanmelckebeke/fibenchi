@@ -24,6 +24,7 @@ import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice } from "@/lib/format"
+import { getNumericValue } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type SortDir } from "@/lib/settings"
 import { useFilteredSortedAssets } from "@/lib/use-group-filter"
@@ -382,8 +383,8 @@ function AssetCard({
           {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
           {(showRsi || showMacd) && (
             <div className="flex gap-1.5 mt-1">
-              {showRsi && <RsiGauge symbol={symbol} batchRsi={indicatorData?.rsi} />}
-              {showMacd && <MacdIndicator symbol={symbol} batchMacd={indicatorData ? { macd: indicatorData.macd, macd_signal: indicatorData.macd_signal, macd_hist: indicatorData.macd_hist } : undefined} />}
+              {showRsi && <RsiGauge symbol={symbol} batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
+              {showMacd && <MacdIndicator symbol={symbol} batchMacd={indicatorData?.values ? { macd: getNumericValue(indicatorData.values, "macd"), macd_signal: getNumericValue(indicatorData.values, "macd_signal"), macd_hist: getNumericValue(indicatorData.values, "macd_hist") } : undefined} />}
             </div>
           )}
         </CardContent>

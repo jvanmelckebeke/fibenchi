@@ -71,19 +71,21 @@ export function PriceChart({
     if (!prices.length) return {}
     const lastPrice = prices[prices.length - 1]
     const lastIndicators = [...indicators].reverse()
+    const findVal = (field: string): number | undefined =>
+      (lastIndicators.find((i) => i.values[field] != null)?.values[field] ?? undefined) as number | undefined
     return {
       o: lastPrice.open,
       h: lastPrice.high,
       l: lastPrice.low,
       c: lastPrice.close,
-      sma20: showSma20 ? (lastIndicators.find((i) => i.sma_20 !== null)?.sma_20 ?? undefined) : undefined,
-      sma50: showSma50 ? (lastIndicators.find((i) => i.sma_50 !== null)?.sma_50 ?? undefined) : undefined,
-      bbUpper: showBollinger ? (lastIndicators.find((i) => i.bb_upper !== null)?.bb_upper ?? undefined) : undefined,
-      bbLower: showBollinger ? (lastIndicators.find((i) => i.bb_lower !== null)?.bb_lower ?? undefined) : undefined,
-      rsi: showRsiChart ? (lastIndicators.find((i) => i.rsi !== null)?.rsi ?? undefined) : undefined,
-      macd: showMacdChart ? (lastIndicators.find((i) => i.macd !== null)?.macd ?? undefined) : undefined,
-      macdSignal: showMacdChart ? (lastIndicators.find((i) => i.macd_signal !== null)?.macd_signal ?? undefined) : undefined,
-      macdHist: showMacdChart ? (lastIndicators.find((i) => i.macd_hist !== null)?.macd_hist ?? undefined) : undefined,
+      sma20: showSma20 ? findVal("sma_20") : undefined,
+      sma50: showSma50 ? findVal("sma_50") : undefined,
+      bbUpper: showBollinger ? findVal("bb_upper") : undefined,
+      bbLower: showBollinger ? findVal("bb_lower") : undefined,
+      rsi: showRsiChart ? findVal("rsi") : undefined,
+      macd: showMacdChart ? findVal("macd") : undefined,
+      macdSignal: showMacdChart ? findVal("macd_signal") : undefined,
+      macdHist: showMacdChart ? findVal("macd_hist") : undefined,
     }
   }, [prices, indicators, showSma20, showSma50, showBollinger, showRsiChart, showMacdChart])
 

@@ -205,21 +205,21 @@ export function setOverlayData(
 ): void {
   overlays.sma20.setData(
     opts.sma20
-      ? indicators.filter((i) => i.sma_20 !== null).map((i) => ({ time: i.date, value: i.sma_20! }))
+      ? indicators.filter((i) => i.values.sma_20 !== null).map((i) => ({ time: i.date, value: i.values.sma_20! }))
       : [],
   )
 
   overlays.sma50.setData(
     opts.sma50
-      ? indicators.filter((i) => i.sma_50 !== null).map((i) => ({ time: i.date, value: i.sma_50! }))
+      ? indicators.filter((i) => i.values.sma_50 !== null).map((i) => ({ time: i.date, value: i.values.sma_50! }))
       : [],
   )
 
   if (opts.bollinger) {
-    const bbData = indicators.filter((i) => i.bb_upper !== null && i.bb_lower !== null)
-    overlays.bbFill.data = bbData.map((i) => ({ time: i.date, upper: i.bb_upper!, lower: i.bb_lower! }))
-    overlays.bbUpper.setData(bbData.map((i) => ({ time: i.date, value: i.bb_upper! })))
-    overlays.bbLower.setData(bbData.map((i) => ({ time: i.date, value: i.bb_lower! })))
+    const bbData = indicators.filter((i) => i.values.bb_upper !== null && i.values.bb_lower !== null)
+    overlays.bbFill.data = bbData.map((i) => ({ time: i.date, upper: i.values.bb_upper!, lower: i.values.bb_lower! }))
+    overlays.bbUpper.setData(bbData.map((i) => ({ time: i.date, value: i.values.bb_upper! })))
+    overlays.bbLower.setData(bbData.map((i) => ({ time: i.date, value: i.values.bb_lower! })))
   } else {
     overlays.bbFill.data = []
     overlays.bbUpper.setData([])
@@ -229,8 +229,8 @@ export function setOverlayData(
 
 /** Set RSI data on the RSI sub-chart series. */
 export function setRsiData(rsi: RsiChartState, indicators: Indicator[]): void {
-  const rsiData = indicators.filter((i) => i.rsi !== null)
-  rsi.series.setData(rsiData.map((i) => ({ time: i.date, value: i.rsi! })))
+  const rsiData = indicators.filter((i) => i.values.rsi !== null)
+  rsi.series.setData(rsiData.map((i) => ({ time: i.date, value: i.values.rsi! })))
 
   const dates = rsiData.map((i) => i.date)
   rsi.overbought.setData(dates.length ? dates.map((d) => ({ time: d, value: 70 })) : [])
@@ -239,20 +239,20 @@ export function setRsiData(rsi: RsiChartState, indicators: Indicator[]): void {
 
 /** Set MACD data on the MACD sub-chart series. */
 export function setMacdData(macd: MacdChartState, indicators: Indicator[]): void {
-  const macdData = indicators.filter((i) => i.macd !== null)
+  const macdData = indicators.filter((i) => i.values.macd !== null)
 
   macd.hist.setData(
     macdData.map((i) => ({
       time: i.date,
-      value: i.macd_hist!,
-      color: i.macd_hist! >= 0 ? "rgba(34, 197, 94, 0.6)" : "rgba(239, 68, 68, 0.6)",
+      value: i.values.macd_hist!,
+      color: i.values.macd_hist! >= 0 ? "rgba(34, 197, 94, 0.6)" : "rgba(239, 68, 68, 0.6)",
     })),
   )
 
-  macd.line.setData(macdData.map((i) => ({ time: i.date, value: i.macd! })))
+  macd.line.setData(macdData.map((i) => ({ time: i.date, value: i.values.macd! })))
 
   macd.signal.setData(
-    indicators.filter((i) => i.macd_signal !== null).map((i) => ({ time: i.date, value: i.macd_signal! })),
+    indicators.filter((i) => i.values.macd_signal !== null).map((i) => ({ time: i.date, value: i.values.macd_signal! })),
   )
 
   macd.zero.setData(
