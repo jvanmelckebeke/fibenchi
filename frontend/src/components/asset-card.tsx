@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { SparklineChart } from "@/components/sparkline"
+import { DeferredSparkline } from "@/components/sparkline"
 import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
@@ -95,7 +95,7 @@ export function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
+          {showSparkline && <DeferredSparkline symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
           {(showRsi || showMacd) && (
             <div className="flex gap-1.5 mt-1">
               {showRsi && <RsiGauge batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
