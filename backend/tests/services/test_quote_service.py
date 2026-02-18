@@ -53,7 +53,7 @@ async def test_stream_emits_full_payload_first():
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
     ):
-        MockRepo.return_value.list_watchlisted_symbols = AsyncMock(return_value=["AAPL"])
+        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL"])
 
         events = []
         async for event in quote_event_generator():
@@ -93,7 +93,7 @@ async def test_stream_delta_only_changed():
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, side_effect=[quote_v1, quote_v2]),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
     ):
-        MockRepo.return_value.list_watchlisted_symbols = AsyncMock(return_value=["AAPL", "MSFT"])
+        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL", "MSFT"])
 
         events = []
         async for event in quote_event_generator():
@@ -126,7 +126,7 @@ async def test_stream_adaptive_interval_regular():
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
     ):
-        MockRepo.return_value.list_watchlisted_symbols = AsyncMock(return_value=["AAPL"])
+        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL"])
         async for _ in quote_event_generator():
             pass
 
@@ -153,7 +153,7 @@ async def test_stream_adaptive_interval_closed():
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
     ):
-        MockRepo.return_value.list_watchlisted_symbols = AsyncMock(return_value=["AAPL"])
+        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL"])
         async for _ in quote_event_generator():
             pass
 

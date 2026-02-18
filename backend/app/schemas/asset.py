@@ -9,7 +9,7 @@ class AssetCreate(BaseModel):
     symbol: str = Field(description="Ticker symbol (e.g. AAPL, VOO). Validated against Yahoo Finance.")
     name: str | None = Field(default=None, description="Display name. Auto-detected from Yahoo Finance if omitted.")
     type: AssetType = Field(default=AssetType.STOCK, description="Asset type: stock or etf. Auto-detected if name is omitted.")
-    watchlisted: bool = Field(default=True, description="Whether the asset appears on the watchlist")
+    add_to_watchlist: bool = Field(default=True, description="If true, add to the default Watchlist group after creation. Set false for pseudo-ETF constituents.")
 
 
 class TagBrief(BaseModel):
@@ -25,7 +25,6 @@ class AssetResponse(BaseModel):
     symbol: str = Field(description="Ticker symbol")
     name: str = Field(description="Display name")
     type: AssetType = Field(description="Asset type: stock or etf")
-    watchlisted: bool = Field(description="Whether the asset is currently on the watchlist")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     created_at: datetime.datetime = Field(description="Timestamp when the asset was first added")
     tags: list[TagBrief] = Field(default=[], description="Tags attached to this asset")

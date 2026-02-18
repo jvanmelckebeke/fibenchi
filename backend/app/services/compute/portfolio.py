@@ -24,7 +24,7 @@ async def compute_portfolio_index(
     days = PERIOD_DAYS.get(period, 365)
     start_date = date.today() - timedelta(days=days)
 
-    asset_ids = await AssetRepository(db).list_watchlisted_ids()
+    asset_ids = await AssetRepository(db).list_in_any_group_ids()
 
     empty = {"dates": [], "values": [], "current": 0, "change": 0, "change_pct": 0}
 
@@ -68,7 +68,7 @@ async def compute_performers(
     asset_repo = AssetRepository(db)
     price_repo = PriceRepository(db)
 
-    assets = await asset_repo.list_watchlisted()
+    assets = await asset_repo.list_in_any_group()
 
     if not assets:
         return []

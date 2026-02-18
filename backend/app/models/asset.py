@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
+from sqlalchemy import DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,7 +19,6 @@ class Asset(Base):
     symbol: Mapped[str] = mapped_column(String(20), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(200))
     type: Mapped[AssetType] = mapped_column(Enum(AssetType))
-    watchlisted: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     currency: Mapped[str] = mapped_column(String(10), default="EUR", server_default="EUR")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

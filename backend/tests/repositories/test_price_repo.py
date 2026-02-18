@@ -12,7 +12,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 async def _create_asset(db, symbol: str = "AAPL") -> Asset:
-    asset = Asset(symbol=symbol, name=f"{symbol} Inc.", type=AssetType.STOCK, currency="USD", watchlisted=True)
+    asset = Asset(symbol=symbol, name=f"{symbol} Inc.", type=AssetType.STOCK, currency="USD")
     db.add(asset)
     await db.commit()
     await db.refresh(asset)

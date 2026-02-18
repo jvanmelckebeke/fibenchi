@@ -30,7 +30,7 @@ async def quote_event_generator():
     while True:
         try:
             async with async_session() as db:
-                symbols = await AssetRepository(db).list_watchlisted_symbols()
+                symbols = await AssetRepository(db).list_in_any_group_symbols()
 
             if not symbols:
                 yield "event: quotes\ndata: {}\n\n"
