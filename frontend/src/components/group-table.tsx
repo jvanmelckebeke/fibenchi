@@ -23,6 +23,8 @@ import { usePriceFlash } from "@/lib/use-price-flash"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
+const SORTABLE_FIELDS = getAllSortableFields()
+
 interface GroupTableProps {
   assets: Asset[]
   quotes: Record<string, Quote>
@@ -57,7 +59,7 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
             <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
             <SortableHeader label="Price" sortKey="price" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
             <SortableHeader label="Change" sortKey="change_pct" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
-            {getAllSortableFields().map((field) => {
+            {SORTABLE_FIELDS.map((field) => {
               const series = getSeriesByField(field)
               return (
                 <SortableHeader
@@ -275,7 +277,7 @@ function TableRow({
             <Skeleton className="h-4 w-12 ml-auto rounded" />
           )}
         </td>
-        {getAllSortableFields().map((field) => {
+        {SORTABLE_FIELDS.map((field) => {
           const val = getNumericValue(indicator?.values, field)
           const series = getSeriesByField(field)
           const colorClass = resolveThresholdColor(series?.thresholdColors, val)
@@ -299,7 +301,7 @@ function TableRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={6 + getAllSortableFields().length} className="bg-muted/20 p-4 border-b border-border">
+          <td colSpan={6 + SORTABLE_FIELDS.length} className="bg-muted/20 p-4 border-b border-border">
             <ExpandedContent symbol={asset.symbol} indicator={indicator} />
           </td>
         </tr>
