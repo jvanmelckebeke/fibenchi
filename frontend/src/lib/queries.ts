@@ -28,6 +28,9 @@ export const keys = {
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
   tags: ["tags"] as const,
   groups: ["groups"] as const,
+  group: (id: number) => ["groups", id] as const,
+  groupSparklines: (id: number, period?: string) => ["group-sparklines", id, period] as const,
+  groupIndicators: (id: number) => ["group-indicators", id] as const,
   thesis: (symbol: string) => ["thesis", symbol] as const,
   annotations: (symbol: string) => ["annotations", symbol] as const,
   pseudoEtfs: ["pseudo-etfs"] as const,
@@ -97,14 +100,17 @@ export function useDeleteAsset() {
       await qc.cancelQueries({ queryKey: keys.assets })
       const previous = qc.getQueryData<Asset[]>(keys.assets)
       qc.setQueryData<Asset[]>(keys.assets, (old) =>
-        old?.map((a) => (a.symbol === symbol ? { ...a, watchlisted: false } : a)),
+        old?.filter((a) => a.symbol !== symbol),
       )
       return { previous }
     },
     onError: (_err, _symbol, context) => {
       if (context?.previous) qc.setQueryData(keys.assets, context.previous)
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.assets }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: keys.assets })
+      qc.invalidateQueries({ queryKey: keys.groups })
+    },
   })
 }
 
@@ -280,6 +286,33 @@ export function useRemoveAssetFromGroup() {
       api.groups.removeAsset(groupId, assetId),
     [keys.groups],
   )
+}
+
+export function useGroup(id: number) {
+  return useQuery({
+    queryKey: keys.group(id),
+    queryFn: () => api.groups.get(id),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useGroupSparklines(id: number, period?: string) {
+  return useQuery({
+    queryKey: keys.groupSparklines(id, period),
+    queryFn: () => api.groups.sparklines(id, period),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useGroupIndicators(id: number) {
+  return useQuery({
+    queryKey: keys.groupIndicators(id),
+    queryFn: () => api.groups.indicators(id),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  })
 }
 
 // Thesis

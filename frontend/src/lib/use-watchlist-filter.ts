@@ -10,7 +10,7 @@ function compareNullable(a: number | null, b: number | null): number {
 }
 
 export function useFilteredSortedAssets(
-  watchlisted: Asset[] | undefined,
+  assets: Asset[] | undefined,
   opts: {
     typeFilter: AssetTypeFilter
     selectedTags: number[]
@@ -23,9 +23,9 @@ export function useFilteredSortedAssets(
   const { typeFilter, selectedTags, sortBy, sortDir, quotes, indicators } = opts
 
   return useMemo(() => {
-    if (!watchlisted) return undefined
+    if (!assets) return undefined
 
-    let filtered = watchlisted
+    let filtered = assets
     if (typeFilter !== "all") {
       filtered = filtered.filter((a) => a.type === typeFilter)
     }
@@ -82,5 +82,5 @@ export function useFilteredSortedAssets(
     })
 
     return sorted
-  }, [watchlisted, typeFilter, selectedTags, sortBy, sortDir, quotes, indicators])
+  }, [assets, typeFilter, selectedTags, sortBy, sortDir, quotes, indicators])
 }

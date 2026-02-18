@@ -18,7 +18,7 @@ export function AddSymbolDialog() {
   const createAsset = useCreateAsset()
   const { data: assets } = useAssets()
   const watchlistedSymbols = useMemo(
-    () => new Set(assets?.filter((a) => a.watchlisted).map((a) => a.symbol)),
+    () => new Set(assets?.map((a) => a.symbol)),
     [assets],
   )
   const [symbol, setSymbol] = useState("")

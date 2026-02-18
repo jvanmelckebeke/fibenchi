@@ -40,7 +40,7 @@ const SORT_OPTIONS: [WatchlistSortBy, string][] = [
 
 const SORT_LABELS: Record<WatchlistSortBy, string> = Object.fromEntries(SORT_OPTIONS) as Record<WatchlistSortBy, string>
 
-export function WatchlistPage() {
+export function WatchlistPage({ groupName }: { groupName?: string }) {
   const { data: allAssets, isLoading } = useAssets()
   const { data: allTags } = useTags()
   const deleteAsset = useDeleteAsset()
@@ -57,10 +57,9 @@ export function WatchlistPage() {
   const sortBy = settings.watchlist_sort_by
   const sortDir = settings.watchlist_sort_dir
 
-  const watchlisted = allAssets?.filter((a) => a.watchlisted)
   const quotes = useQuotes()
 
-  const assets = useFilteredSortedAssets(watchlisted, {
+  const assets = useFilteredSortedAssets(allAssets, {
     typeFilter,
     selectedTags,
     sortBy,
@@ -90,7 +89,7 @@ export function WatchlistPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold">Watchlist</h1>
+          <h1 className="text-2xl font-bold">{groupName ?? "Watchlist"}</h1>
           {/* Type filter */}
           <SegmentedControl
             options={[
@@ -175,7 +174,7 @@ export function WatchlistPage() {
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <TrendingUp className="h-12 w-12 mb-4" />
           <p>
-            {watchlisted && watchlisted.length > 0
+            {allAssets && allAssets.length > 0
               ? "No assets match the current filters."
               : "No assets yet. Add a symbol above to get started."}
           </p>
