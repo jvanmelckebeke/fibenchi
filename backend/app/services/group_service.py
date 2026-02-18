@@ -23,6 +23,8 @@ async def get_group_detail(db: AsyncSession, group_id: int):
 
 async def update_group(db: AsyncSession, group_id: int, name: str | None, description: str | None):
     group = await get_group(group_id, db)
+    if group.is_default and name is not None and name != group.name:
+        raise HTTPException(400, "Cannot rename the default group")
     if name is not None:
         group.name = name
     if description is not None:
@@ -32,6 +34,8 @@ async def update_group(db: AsyncSession, group_id: int, name: str | None, descri
 
 async def delete_group(db: AsyncSession, group_id: int):
     group = await get_group(group_id, db)
+    if group.is_default:
+        raise HTTPException(400, "Cannot delete the default group")
     await GroupRepository(db).delete(group)
 
 

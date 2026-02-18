@@ -23,6 +23,8 @@ class GroupResponse(BaseModel):
     id: int = Field(description="Group ID")
     name: str = Field(description="Group name")
     description: str | None = Field(description="Group description")
+    is_default: bool = Field(description="Whether this is the protected default group (Watchlist)")
+    position: int = Field(description="Display order position (0 = first)")
     created_at: datetime.datetime = Field(description="Creation timestamp")
     assets: list[AssetResponse] = Field(default=[], description="Assets in this group")
 
