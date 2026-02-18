@@ -98,8 +98,8 @@ export function AssetCard({
           {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
           {(showRsi || showMacd) && (
             <div className="flex gap-1.5 mt-1">
-              {showRsi && <RsiGauge symbol={symbol} batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
-              {showMacd && <MacdIndicator symbol={symbol} batchMacd={indicatorData?.values ? { macd: getNumericValue(indicatorData.values, "macd"), macd_signal: getNumericValue(indicatorData.values, "macd_signal"), macd_hist: getNumericValue(indicatorData.values, "macd_hist") } : undefined} />}
+              {showRsi && <RsiGauge batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
+              {showMacd && <MacdIndicator batchMacd={indicatorData?.values ? { macd: getNumericValue(indicatorData.values, "macd"), macd_signal: getNumericValue(indicatorData.values, "macd_signal"), macd_hist: getNumericValue(indicatorData.values, "macd_hist") } : undefined} />}
             </div>
           )}
         </CardContent>

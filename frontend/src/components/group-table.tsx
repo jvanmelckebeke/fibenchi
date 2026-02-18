@@ -175,12 +175,11 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
       <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
         <div>
           <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
-          <RsiGauge symbol={symbol} batchRsi={rsiVal} size="lg" />
+          <RsiGauge batchRsi={rsiVal} size="lg" />
         </div>
         <div>
           <span className="text-xs text-muted-foreground mb-1 block">MACD</span>
           <MacdIndicator
-            symbol={symbol}
             batchMacd={macdVals}
             size="lg"
           />

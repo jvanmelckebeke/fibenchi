@@ -83,7 +83,6 @@ export function MacdIndicator({
   batchMacd,
   size = "sm",
 }: {
-  symbol: string
   batchMacd?: { macd: number | null; macd_signal: number | null; macd_hist: number | null } | null
   size?: "sm" | "lg"
 }) {
