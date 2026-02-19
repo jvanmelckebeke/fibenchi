@@ -344,3 +344,24 @@ export function getSeriesByField(field: string): SeriesDescriptor | undefined {
   }
   return undefined
 }
+
+/**
+ * Resolve the ADX color class based on trend strength + DI direction.
+ *
+ * - ADX < 20  → gray (no meaningful trend)
+ * - ADX 20-25 → yellow (emerging trend)
+ * - ADX >= 25 → green (+DI > -DI, bullish) or red (-DI > +DI, bearish)
+ */
+export function resolveAdxColor(
+  adx: number,
+  values: Record<string, number | string | null>,
+): string {
+  if (adx < 20) return "text-zinc-400"
+  if (adx < 25) return "text-yellow-500"
+  const plusDi = getNumericValue(values, "plus_di")
+  const minusDi = getNumericValue(values, "minus_di")
+  if (plusDi != null && minusDi != null) {
+    return plusDi > minusDi ? "text-emerald-500" : "text-red-500"
+  }
+  return "text-foreground"
+}
