@@ -212,7 +212,6 @@ export function GroupPage({ groupId }: { groupId: number }) {
               currency={asset.currency}
               tags={asset.tags}
               quote={quotes[asset.symbol]}
-              sparklinePeriod={sparklinePeriod}
               sparklineData={batchSparklines?.[asset.symbol]}
               indicatorData={batchIndicators?.[asset.symbol]}
               onDelete={() => handleRemove(asset.symbol)}

@@ -182,11 +182,6 @@ export interface PseudoETFUpdate {
   base_date?: string
 }
 
-export interface PerformancePoint {
-  date: string
-  value: number
-}
-
 export interface PerformanceBreakdownPoint {
   date: string
   value: number

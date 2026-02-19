@@ -4,13 +4,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { SparklinePoint } from "@/lib/api"
 
 export function SparklineChart({
-  period = "3mo",
   batchData,
 }: {
-  period?: string
   batchData?: SparklinePoint[]
 }) {
-  void period
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
 
@@ -89,8 +86,6 @@ export function SparklineChart({
  * the main thread and cause a visible freeze.
  */
 export function DeferredSparkline(props: {
-  symbol: string
-  period?: string
   batchData?: SparklinePoint[]
 }) {
   const [isVisible, setIsVisible] = useState(false)

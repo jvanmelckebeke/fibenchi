@@ -15,7 +15,7 @@ export function toKebab(name: string): string {
  * Convert kebab-case stored name to PascalCase for lookup.
  * e.g. "bar-chart-3" → "BarChart3"
  */
-export function toPascal(name: string): string {
+function toPascal(name: string): string {
   return name.replace(/(^|-)([a-z0-9])/g, (_, _sep, char) => char.toUpperCase())
 }
 
