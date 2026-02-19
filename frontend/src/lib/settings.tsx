@@ -24,6 +24,7 @@ export interface AppSettings {
   compact_mode: boolean
   decimal_places: number
   sync_pseudo_etf_crosshairs: boolean
+  _updated_at?: number
 }
 
 function defaultVisibility(): Record<string, boolean> {
@@ -77,7 +78,7 @@ const SettingsContext = createContext<SettingsContextValue | null>(null)
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(loadFromStorage)
 
-  // On mount: fetch from backend and merge (backend wins)
+  // On mount: fetch from backend and merge (newer timestamp wins)
   useEffect(() => {
     let cancelled = false
 
@@ -87,6 +88,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
         if (body?.data && Object.keys(body.data).length > 0) {
           setSettings((prev) => {
+            const localTs = prev._updated_at
+            const remoteTs = (body.data as Partial<AppSettings>)._updated_at
+            // Only let backend overwrite if it has a newer (or equal) timestamp,
+            // or if local has no timestamp yet (first sync)
+            if (localTs && remoteTs && remoteTs < localTs) {
+              // Local is newer — push it to backend to reconcile
+              api.settings.update(prev as unknown as Record<string, unknown>).catch(() => {})
+              return prev
+            }
             const merged = { ...prev, ...body.data }
             saveToStorage(merged)
             return merged
@@ -120,10 +130,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettings((prev) => {
-      const next = { ...prev, ...patch }
+      const next = { ...prev, ...patch, _updated_at: Date.now() }
       saveToStorage(next)
       // Fire-and-forget backend sync
-      api.settings.update(next).catch(() => {})
+      api.settings.update(next as unknown as Record<string, unknown>).catch(() => {})
       return next
     })
   }, [])
