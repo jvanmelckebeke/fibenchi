@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button"
 import { TagBadge } from "@/components/tag-badge"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
-import { CandlestickChart } from "@/components/chart/candlestick-chart"
-import { IndicatorCards } from "@/components/chart/indicator-cards"
+import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -27,12 +25,10 @@ import {
   extractMacdValues,
   getAllSortableFields,
   getSeriesByField,
-  getCardDescriptors,
   resolveThresholdColor,
   resolveAdxColor,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
-import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
 const SORTABLE_FIELDS = getAllSortableFields()
@@ -236,7 +232,7 @@ function SortableHeader({
 
   return (
     <th
-      className={`text-${align} text-xs font-medium px-3 py-2 ${
+      className={`${align === "right" ? "text-right" : "text-left"} text-xs font-medium px-3 py-2 ${
         onSort ? "cursor-pointer select-none hover:text-foreground" : ""
       } ${active ? "text-foreground" : "text-muted-foreground"}`}
       onClick={() => onSort?.(sortKey)}
@@ -246,65 +242,6 @@ function SortableHeader({
         {active && <Icon className="h-3 w-3" />}
       </span>
     </th>
-  )
-}
-
-const CARD_DESCRIPTORS = getCardDescriptors()
-
-function ExpandedContent({ symbol, currency }: { symbol: string; currency?: string }) {
-  const { settings } = useSettings()
-  const period = settings.chart_default_period
-  const { data: detail, isLoading: detailLoading } = useAssetDetail(symbol, period)
-  const prices = detail?.prices
-  const chartIndicators = detail?.indicators
-  const { data: annotations } = useAnnotations(symbol)
-
-  const enabledCards = CARD_DESCRIPTORS.filter(
-    (d) => settings.detail_indicator_visibility[d.id] !== false,
-  )
-
-  const loading = detailLoading
-
-  if (loading || !prices?.length) {
-    return (
-      <div className="flex gap-4">
-        <div className="flex-[4] min-w-0">
-          <div className="h-[300px] flex items-center justify-center">
-            <Skeleton className="h-full w-full rounded-md" />
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col gap-1.5 min-w-[140px] max-w-[200px]">
-          {enabledCards.map((d) => (
-            <Skeleton key={d.id} className="h-12 w-full rounded-md" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <ChartSyncProvider prices={prices} indicators={chartIndicators ?? []}>
-      <div className="flex gap-4">
-        {/* Price chart — 80% */}
-        <div className="flex-[4] min-w-0">
-          <CandlestickChart
-            annotations={annotations ?? []}
-            indicatorVisibility={{
-              ...settings.detail_indicator_visibility,
-              rsi: false,
-              macd: false,
-            }}
-            chartType={settings.chart_type}
-            height={300}
-            roundedClass="rounded-md"
-          />
-        </div>
-        {/* Indicator cards — 20% */}
-        <div className="flex-1 min-w-[140px] max-w-[200px] mt-8">
-          <IndicatorCards descriptors={enabledCards} currency={currency} compact />
-        </div>
-      </div>
-    </ChartSyncProvider>
   )
 }
 
@@ -333,12 +270,25 @@ function TableRow({
   visibleIndicatorFields: string[]
   totalColSpan: number
 }) {
-  const lastPrice = quote?.price ?? null
-  const changePct = quote?.change_percent ?? null
-  const changeCls = changeColor(changePct)
+  // Use live SSE quote when available, fall back to DB-cached indicator values
+  const livePrice = quote?.price ?? null
+  const livePct = quote?.change_percent ?? null
+  const displayPrice = livePrice ?? indicator?.close ?? null
+  const displayPct = livePct ?? indicator?.change_pct ?? null
+  const changeCls = changeColor(displayPct)
 
-  const [priceRef, pctRef] = usePriceFlash(lastPrice)
+  // Stale = we have DB data but no live quote yet
+  const hasLiveQuote = livePrice != null
+  const hasDbFallback = !hasLiveQuote && displayPrice != null
+  // Suppress stale indicator when market is closed — DB prices are already current.
+  // When no quote yet, market_state is unknown so we assume market hours (show stale).
+  const marketState = quote?.market_state
+  const isMarketClosed = marketState === "CLOSED" || marketState === "POSTMARKET"
+  const showStale = hasDbFallback && !isMarketClosed
+
+  const [priceRef, pctRef] = usePriceFlash(displayPrice)
   const py = compactMode ? "py-1.5" : "py-2.5"
+  const staleClass = showStale ? "stale-price" : ""
 
   return (
     <>
@@ -385,9 +335,9 @@ function TableRow({
         )}
         {isColumnVisible(columnSettings, "price") && (
           <td className={`${py} px-3 text-right tabular-nums`}>
-            {lastPrice != null ? (
-              <span ref={priceRef} className="font-medium rounded px-1 -mx-1">
-                {formatPrice(lastPrice, asset.currency)}
+            {displayPrice != null ? (
+              <span ref={priceRef} className={`font-medium rounded px-1 -mx-1 ${staleClass}`}>
+                {formatPrice(displayPrice, asset.currency)}
               </span>
             ) : (
               <Skeleton className="h-4 w-14 ml-auto rounded" />
@@ -396,10 +346,10 @@ function TableRow({
         )}
         {isColumnVisible(columnSettings, "change_pct") && (
           <td className={`${py} px-3 text-right tabular-nums`}>
-            {changePct != null ? (
-              <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls}`}>
-                {changePct >= 0 ? "+" : ""}
-                {changePct.toFixed(2)}%
+            {displayPct != null ? (
+              <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls} ${staleClass}`}>
+                {displayPct >= 0 ? "+" : ""}
+                {displayPct.toFixed(2)}%
               </span>
             ) : (
               <Skeleton className="h-4 w-12 ml-auto rounded" />
@@ -459,7 +409,7 @@ function TableRow({
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
-            <ExpandedContent symbol={asset.symbol} currency={asset.currency} />
+            <ExpandedAssetChart symbol={asset.symbol} currency={asset.currency} compact />
           </td>
         </tr>
       )}

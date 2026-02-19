@@ -10,18 +10,24 @@ async def list_groups(db: AsyncSession):
     return await GroupRepository(db).list_all()
 
 
-async def create_group(db: AsyncSession, name: str, description: str | None):
+async def create_group(db: AsyncSession, name: str, description: str | None, icon: str | None = None):
     repo = GroupRepository(db)
     if await repo.get_by_name(name):
         raise HTTPException(400, f"Group '{name}' already exists")
-    return await repo.create(name=name, description=description)
+    return await repo.create(name=name, description=description, icon=icon)
 
 
 async def get_group_detail(db: AsyncSession, group_id: int):
     return await get_group(group_id, db)
 
 
-async def update_group(db: AsyncSession, group_id: int, name: str | None, description: str | None):
+async def update_group(
+    db: AsyncSession,
+    group_id: int,
+    name: str | None,
+    description: str | None,
+    icon: str | None = None,
+):
     group = await get_group(group_id, db)
     if group.is_default and name is not None and name != group.name:
         raise HTTPException(400, "Cannot rename the default group")
@@ -29,6 +35,8 @@ async def update_group(db: AsyncSession, group_id: int, name: str | None, descri
         group.name = name
     if description is not None:
         group.description = description
+    if icon is not None:
+        group.icon = icon
     return await GroupRepository(db).save(group)
 
 
@@ -37,6 +45,17 @@ async def delete_group(db: AsyncSession, group_id: int):
     if group.is_default:
         raise HTTPException(400, "Cannot delete the default group")
     await GroupRepository(db).delete(group)
+
+
+async def reorder_groups(db: AsyncSession, group_ids: list[int]):
+    repo = GroupRepository(db)
+    groups = await repo.list_all()
+    id_to_group = {g.id: g for g in groups}
+    for position, gid in enumerate(group_ids):
+        if gid in id_to_group:
+            id_to_group[gid].position = position
+    await repo.save_all()
+    return await repo.list_all()
 
 
 async def add_assets(db: AsyncSession, group_id: int, asset_ids: list[int]):

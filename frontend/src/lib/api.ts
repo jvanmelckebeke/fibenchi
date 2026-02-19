@@ -43,7 +43,10 @@ function qs(params: Record<string, string | undefined>): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
   })
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
@@ -65,8 +68,6 @@ export const api = {
     list: () => request<Asset[]>("/assets"),
     create: (data: AssetCreate) =>
       request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
-    delete: (symbol: string) =>
-      request<void>(`/assets/${symbol}`, { method: "DELETE" }),
   },
   prices: {
     detail: (symbol: string, period?: string) =>
@@ -100,6 +101,8 @@ export const api = {
       request<Group>(`/groups/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     delete: (id: number) =>
       request<void>(`/groups/${id}`, { method: "DELETE" }),
+    reorder: (groupIds: number[]) =>
+      request<Group[]>("/groups/reorder", { method: "PUT", body: JSON.stringify({ group_ids: groupIds }) }),
     addAssets: (id: number, assetIds: number[]) =>
       request<Group>(`/groups/${id}/assets`, {
         method: "POST",

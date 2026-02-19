@@ -2,17 +2,10 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
 import { IndicatorCell } from "@/components/indicator-cell"
-import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
-import { CandlestickChart } from "@/components/chart/candlestick-chart"
-import { RsiChart } from "@/components/chart/rsi-chart"
-import { MacdChart } from "@/components/chart/macd-chart"
-import { IndicatorCards } from "@/components/chart/indicator-cards"
+import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import { formatPrice, formatChangePct } from "@/lib/format"
-import { getNumericValue, getStringValue, getHoldingSummaryDescriptors, getCardDescriptors } from "@/lib/indicator-registry"
-import { useAssetDetail, useAnnotations } from "@/lib/queries"
-import { useSettings } from "@/lib/settings"
+import { getNumericValue, getStringValue, getHoldingSummaryDescriptors } from "@/lib/indicator-registry"
 
 export interface IndicatorData {
   currency: string
@@ -68,7 +61,7 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
               <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">Chg%</th>
               {SUMMARY_DESCRIPTORS.map((desc) => (
                 <th key={desc.id} className="text-right text-xs font-medium text-muted-foreground px-2 py-1">
-                  {desc.holdingSummary!.label}
+                  {desc.holdingSummary.label}
                 </th>
               ))}
               {hasRemove && <th className="w-8" />}
@@ -161,7 +154,7 @@ function HoldingRow({
               {chg.text ?? "\u2014"}
             </td>
             {SUMMARY_DESCRIPTORS.map((desc) => {
-              const hs = desc.holdingSummary!
+              const hs = desc.holdingSummary
               return (
                 <td key={desc.id} className="py-1 px-2 text-right">
                   <HoldingSummaryCell
@@ -182,6 +175,7 @@ function HoldingRow({
               variant="ghost"
               size="icon"
               className="h-5 w-5 opacity-0 group-hover/row:opacity-100 transition-opacity"
+              aria-label={`Remove ${row.symbol}`}
               onClick={(e) => {
                 e.stopPropagation()
                 onRemove()
@@ -195,59 +189,11 @@ function HoldingRow({
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
-            <ExpandedHoldingContent symbol={row.symbol} currency={indicator?.currency} />
+            <ExpandedAssetChart symbol={row.symbol} currency={indicator?.currency} />
           </td>
         </tr>
       )}
     </>
-  )
-}
-
-const CARD_DESCRIPTORS = getCardDescriptors()
-
-function ExpandedHoldingContent({ symbol, currency }: { symbol: string; currency?: string }) {
-  const { settings } = useSettings()
-  const period = settings.chart_default_period
-  const { data: detail, isLoading } = useAssetDetail(symbol, period)
-  const prices = detail?.prices
-  const indicators = detail?.indicators
-  const { data: annotations } = useAnnotations(symbol)
-
-  const enabledCards = CARD_DESCRIPTORS.filter(
-    (d) => settings.detail_indicator_visibility[d.id] !== false,
-  )
-
-  if (isLoading || !prices?.length) {
-    return (
-      <div className="space-y-1">
-        <Skeleton className="h-[250px] w-full rounded-t-md" />
-        <Skeleton className="h-[60px] w-full" />
-        <Skeleton className="h-[60px] w-full rounded-b-md" />
-      </div>
-    )
-  }
-
-  return (
-    <ChartSyncProvider prices={prices} indicators={indicators ?? []}>
-      <div className="space-y-0">
-        <CandlestickChart
-          annotations={annotations ?? []}
-          indicatorVisibility={{
-            ...settings.detail_indicator_visibility,
-            rsi: false,
-            macd: false,
-          }}
-          chartType={settings.chart_type}
-          height={250}
-          hideTimeAxis
-          showLegend
-          roundedClass="rounded-t-md"
-        />
-        <RsiChart showLegend roundedClass="" />
-        <MacdChart showLegend roundedClass="rounded-b-md" />
-        <IndicatorCards descriptors={enabledCards} currency={currency} compact />
-      </div>
-    </ChartSyncProvider>
   )
 }
 

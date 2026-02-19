@@ -7,7 +7,7 @@ import { IndicatorCards } from "./chart/indicator-cards"
 import { getSubChartDescriptors, getCardDescriptors } from "@/lib/indicator-registry"
 
 const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()
-const CARD_DESCRIPTORS = getCardDescriptors()
+const CARD_DESCRIPTORS = getCardDescriptors(true)
 
 interface PriceChartProps {
   prices: Price[]

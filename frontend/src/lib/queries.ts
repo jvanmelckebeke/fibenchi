@@ -25,7 +25,6 @@ export const keys = {
   portfolioIndex: (period?: string) => ["portfolio-index", period] as const,
   portfolioPerformers: (period?: string) => ["portfolio-performers", period] as const,
   assets: ["assets"] as const,
-  asset: (symbol: string) => ["assets", symbol] as const,
   assetDetail: (symbol: string, period?: string) => ["asset-detail", symbol, period] as const,
   etfHoldings: (symbol: string) => ["etf-holdings", symbol] as const,
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
@@ -119,7 +118,7 @@ export function useHoldingsIndicators(symbol: string, enabled: boolean) {
 export function useRefreshPrices(symbol: string) {
   return useInvalidatingMutation(
     (period?: string) => api.prices.refresh(symbol, period),
-    [keys.assetDetail(symbol)],
+    [["asset-detail", symbol]],
   )
 }
 
@@ -221,15 +220,30 @@ export function useCreateGroup() {
 }
 
 export function useUpdateGroup() {
-  return useInvalidatingMutation(
-    ({ id, data }: { id: number; data: GroupUpdate }) => api.groups.update(id, data),
-    [keys.groups],
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: GroupUpdate }) => api.groups.update(id, data),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: keys.groups })
+      qc.invalidateQueries({ queryKey: keys.group(vars.id) })
+    },
+  })
 }
 
 export function useDeleteGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.groups.delete(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: keys.groups })
+      qc.invalidateQueries({ queryKey: keys.group(id) })
+    },
+  })
+}
+
+export function useReorderGroups() {
   return useInvalidatingMutation(
-    (id: number) => api.groups.delete(id),
+    (groupIds: number[]) => api.groups.reorder(groupIds),
     [keys.groups],
   )
 }
@@ -343,6 +357,7 @@ export function usePseudoEtf(id: number) {
     queryKey: keys.pseudoEtf(id),
     queryFn: () => api.pseudoEtfs.get(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -398,6 +413,7 @@ export function usePseudoEtfPerformance(id: number) {
     queryKey: keys.pseudoEtfPerformance(id),
     queryFn: () => api.pseudoEtfs.performance(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -416,6 +432,7 @@ export function usePseudoEtfThesis(id: number) {
     queryKey: keys.pseudoEtfThesis(id),
     queryFn: () => api.pseudoEtfs.thesis.get(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -432,6 +449,7 @@ export function usePseudoEtfAnnotations(id: number) {
     queryKey: keys.pseudoEtfAnnotations(id),
     queryFn: () => api.pseudoEtfs.annotations.list(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 

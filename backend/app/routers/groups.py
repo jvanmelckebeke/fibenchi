@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.group import GroupAddAssets, GroupCreate, GroupResponse, GroupUpdate
+from app.schemas.group import GroupAddAssets, GroupCreate, GroupReorder, GroupResponse, GroupUpdate
+from app.schemas.price import IndicatorSnapshotBase, SparklinePointResponse
 from app.services import group_service
 from app.services.compute.group import compute_and_cache_indicators, get_batch_sparklines
+
+PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -16,7 +21,12 @@ async def list_groups(db: AsyncSession = Depends(get_db)):
 
 @router.post("", response_model=GroupResponse, status_code=201, summary="Create a group")
 async def create_group(data: GroupCreate, db: AsyncSession = Depends(get_db)):
-    return await group_service.create_group(db, data.name, data.description)
+    return await group_service.create_group(db, data.name, data.description, data.icon)
+
+
+@router.put("/reorder", response_model=list[GroupResponse], summary="Reorder groups")
+async def reorder_groups(data: GroupReorder, db: AsyncSession = Depends(get_db)):
+    return await group_service.reorder_groups(db, data.group_ids)
 
 
 @router.get("/{group_id}", response_model=GroupResponse, summary="Get a group by ID")
@@ -26,7 +36,7 @@ async def get_group_detail(group_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{group_id}", response_model=GroupResponse, summary="Update a group")
 async def update_group(group_id: int, data: GroupUpdate, db: AsyncSession = Depends(get_db)):
-    return await group_service.update_group(db, group_id, data.name, data.description)
+    return await group_service.update_group(db, group_id, data.name, data.description, data.icon)
 
 
 @router.delete("/{group_id}", status_code=204, summary="Delete a group")
@@ -44,20 +54,20 @@ async def remove_asset_from_group(group_id: int, asset_id: int, db: AsyncSession
     return await group_service.remove_asset(db, group_id, asset_id)
 
 
-@router.get("/{group_id}/sparklines", summary="Batch close prices for group assets")
+@router.get("/{group_id}/sparklines", response_model=dict[str, list[SparklinePointResponse]], summary="Batch close prices for group assets")
 async def group_sparklines(
     group_id: int,
-    period: str = "3mo",
+    period: PeriodType = Query("3mo"),
     db: AsyncSession = Depends(get_db),
-) -> dict[str, list[dict]]:
+):
     """Return close-price sparkline data for every asset in the group."""
     return await get_batch_sparklines(db, period, group_id=group_id)
 
 
-@router.get("/{group_id}/indicators", summary="Batch indicators for group assets")
+@router.get("/{group_id}/indicators", response_model=dict[str, IndicatorSnapshotBase], summary="Batch indicators for group assets")
 async def group_indicators(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-) -> dict[str, dict]:
+):
     """Return the latest indicator snapshot for every asset in the group."""
     return await compute_and_cache_indicators(db, group_id=group_id)

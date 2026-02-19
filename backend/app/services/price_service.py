@@ -12,6 +12,7 @@ from app.models import Asset, PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
 from app.services.compute.indicators import INDICATOR_REGISTRY, compute_indicators, safe_round
+from app.services.compute.utils import prices_to_df
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
 from app.services.yahoo import fetch_history
 from app.utils import TTLCache
@@ -56,7 +57,7 @@ async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd
     start_date = date.today() - timedelta(days=days)
     try:
         df = await fetch_history(symbol.upper(), start=start_date, end=date.today())
-    except (ValueError, Exception):
+    except (ValueError, KeyError):
         raise HTTPException(404, f"No price data available for {symbol}")
 
     if df.empty:
@@ -93,15 +94,26 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
     return prices
 
 
-def _prices_to_df(prices: list[PriceHistory]) -> pd.DataFrame:
-    return pd.DataFrame([{
-        "date": p.date,
-        "open": float(p.open),
-        "high": float(p.high),
-        "low": float(p.low),
-        "close": float(p.close),
-        "volume": p.volume,
-    } for p in prices]).set_index("date")
+async def _ensure_warmup_prices(
+    db: AsyncSession, asset: Asset, prices: list[PriceHistory], start: date,
+) -> list[PriceHistory]:
+    """Backfill warmup-period prices if the stored history doesn't reach far enough back.
+
+    Checks whether the earliest stored price is after the warmup start date.
+    If so, attempts to sync the missing range from Yahoo.  Returns the
+    (possibly updated) price list.
+    """
+    warmup_start = start - timedelta(days=WARMUP_DAYS)
+
+    if prices and prices[0].date > warmup_start:
+        if not _backfill_already_attempted(asset.id, warmup_start):
+            earliest_before = prices[0].date
+            await sync_asset_prices_range(db, asset, warmup_start, date.today())
+            prices = await PriceRepository(db).list_by_asset(asset.id)
+            if prices and prices[0].date >= earliest_before:
+                _earliest_date_cache.set_value(asset.id, prices[0].date)
+
+    return prices
 
 
 def _df_to_price_rows(df: pd.DataFrame, start: date) -> list[PriceResponse]:
@@ -159,17 +171,9 @@ async def get_indicators(db: AsyncSession, asset: Asset | None, symbol: str, per
         if cached is not None:
             return cached
 
-        warmup_start = start - timedelta(days=WARMUP_DAYS)
+        prices = await _ensure_warmup_prices(db, asset, prices, start)
 
-        if prices and prices[0].date > warmup_start:
-            if not _backfill_already_attempted(asset.id, warmup_start):
-                earliest_before = prices[0].date
-                await sync_asset_prices_range(db, asset, warmup_start, date.today())
-                prices = await PriceRepository(db).list_by_asset(asset.id)
-                if prices and prices[0].date >= earliest_before:
-                    _earliest_date_cache.set_value(asset.id, prices[0].date)
-
-        df = _prices_to_df(prices)
+        df = prices_to_df(prices)
     else:
         cache_key = None
         df = await _fetch_ephemeral(symbol, period, warmup=True)
@@ -195,16 +199,9 @@ async def get_detail(db: AsyncSession, asset: Asset | None, symbol: str, period:
         if cached is not None:
             return AssetDetailResponse(prices=price_rows, indicators=cached)
 
-        warmup_start = start - timedelta(days=WARMUP_DAYS)
-        if prices and prices[0].date > warmup_start:
-            if not _backfill_already_attempted(asset.id, warmup_start):
-                earliest_before = prices[0].date
-                await sync_asset_prices_range(db, asset, warmup_start, date.today())
-                prices = await PriceRepository(db).list_by_asset(asset.id)
-                if prices and prices[0].date >= earliest_before:
-                    _earliest_date_cache.set_value(asset.id, prices[0].date)
+        prices = await _ensure_warmup_prices(db, asset, prices, start)
 
-        df = _prices_to_df(prices)
+        df = prices_to_df(prices)
     else:
         cache_key = None
         df = await _fetch_ephemeral(symbol, period, warmup=True)

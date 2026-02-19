@@ -91,10 +91,20 @@ export function TagInput({
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false)
+              ;(e.target as HTMLInputElement).blur()
+            }
+          }}
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
           className="h-8 text-sm"
         />
         {open && (search || filtered.length > 0) && (
-          <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+          <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md" role="listbox">
             <div className="max-h-48 overflow-y-auto p-1">
               {filtered.map((tag) => (
                 <button

@@ -16,15 +16,6 @@ logger = logging.getLogger(__name__)
 # In-memory TTL cache for ETF holdings (holdings change quarterly at most)
 _holdings_cache: TTLCache = TTLCache(default_ttl=86400, max_size=100)
 
-# Yahoo Finance uses non-standard currency codes for sub-unit currencies.
-# Maps subunit codes to (main_currency_code, divisor).
-SUBUNIT_CURRENCIES: dict[str, tuple[str, int]] = {
-    "GBp": ("GBP", 100),
-    "GBX": ("GBP", 100),
-    "ILA": ("ILS", 100),
-    "ZAc": ("ZAR", 100),
-}
-
 # Fallback mapping from Yahoo Finance exchange suffixes to ISO 4217 currency codes.
 # Used when ticker.price doesn't return currency data for a symbol.
 EXCHANGE_CURRENCY_MAP: dict[str, str] = {
@@ -83,17 +74,6 @@ EXCHANGE_CURRENCY_MAP: dict[str, str] = {
 }
 
 
-def normalize_currency(currency: str) -> tuple[str, int]:
-    """Normalize a Yahoo Finance currency code.
-
-    Returns (normalized_code, divisor). If currency is a subunit (e.g. GBp for pence),
-    returns the main currency (GBP) and the divisor (100) to convert prices.
-    """
-    if currency in SUBUNIT_CURRENCIES:
-        return SUBUNIT_CURRENCIES[currency]
-    return (currency, 1)
-
-
 def _currency_from_suffix(symbol: str) -> str | None:
     """Derive currency from a Yahoo Finance exchange suffix (e.g. '.KS' → 'KRW').
 
@@ -104,46 +84,6 @@ def _currency_from_suffix(symbol: str) -> str | None:
         return None
     suffix = symbol[dot:]
     return EXCHANGE_CURRENCY_MAP.get(suffix.upper()) or EXCHANGE_CURRENCY_MAP.get(suffix)
-
-
-def _extract_currency(
-    ticker: Ticker,
-    symbol: str,
-    price_info: dict | None = None,
-) -> tuple[str, int]:
-    """Extract and normalize currency for a symbol from Yahoo Finance data.
-
-    Tries multiple data sources in order:
-    1. price_info dict (pre-fetched, avoids redundant API call)
-    2. ticker.summary_detail (fallback)
-    3. Exchange suffix mapping (last resort)
-
-    Pass ``price_info`` when the caller already accessed ``ticker.price``
-    to avoid a redundant Yahoo API round-trip.
-
-    Returns (normalized_currency_code, divisor).
-    """
-    # Try pre-fetched price info first (or fetch if not provided)
-    if price_info is None:
-        price_info = ticker.price.get(symbol, {})
-    if isinstance(price_info, dict):
-        raw = price_info.get("currency")
-        if raw:
-            return normalize_currency(raw)
-
-    # Try ticker.summary_detail as fallback
-    detail = ticker.summary_detail.get(symbol, {})
-    if isinstance(detail, dict):
-        raw = detail.get("currency")
-        if raw:
-            return normalize_currency(raw)
-
-    # Last resort: derive from exchange suffix
-    suffix_currency = _currency_from_suffix(symbol)
-    if suffix_currency:
-        return (suffix_currency, 1)
-
-    return ("USD", 1)
 
 
 def _normalize_ohlcv_df(df: pd.DataFrame, divisor: int) -> pd.DataFrame:
@@ -453,8 +393,6 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
 
     if isinstance(hist, dict) or hist.empty:
         return {}
-
-    price_data = ticker.price
 
     result = {}
     for sym in symbols:

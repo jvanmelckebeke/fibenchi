@@ -14,15 +14,18 @@ export const STACK_COLORS = [
   "#c084fc", // purple-400
 ]
 
-export function getChartTheme() {
-  const dark = document.documentElement.classList.contains("dark")
+export function themeColors(isDark: boolean) {
   return {
-    bg: dark ? "#18181b" : "#ffffff",
-    text: dark ? "#a1a1aa" : "#71717a",
-    grid: dark ? "#27272a" : "#f4f4f5",
-    border: dark ? "#3f3f46" : "#e4e4e7",
-    dark,
+    bg: isDark ? "#18181b" : "#ffffff",
+    text: isDark ? "#a1a1aa" : "#71717a",
+    grid: isDark ? "#27272a" : "#f4f4f5",
+    border: isDark ? "#3f3f46" : "#e4e4e7",
+    dark: isDark,
   }
+}
+
+export function getChartTheme() {
+  return themeColors(document.documentElement.classList.contains("dark"))
 }
 
 export function useChartTheme() {
@@ -41,16 +44,7 @@ export function useChartTheme() {
     return () => observer.disconnect()
   }, [])
 
-  return useMemo(
-    () => ({
-      bg: isDark ? "#18181b" : "#ffffff",
-      text: isDark ? "#a1a1aa" : "#71717a",
-      grid: isDark ? "#27272a" : "#f4f4f5",
-      border: isDark ? "#3f3f46" : "#e4e4e7",
-      dark: isDark,
-    }),
-    [isDark]
-  )
+  return useMemo(() => themeColors(isDark), [isDark])
 }
 
 export type ChartTheme = ReturnType<typeof useChartTheme>

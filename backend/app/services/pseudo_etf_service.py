@@ -30,9 +30,14 @@ async def get_pseudo_etf_detail(db: AsyncSession, etf_id: int):
     return await get_pseudo_etf(etf_id, db)
 
 
+UPDATABLE_FIELDS = {"name", "description", "base_date"}
+
+
 async def update_pseudo_etf(db: AsyncSession, etf_id: int, data: dict):
     etf = await get_pseudo_etf(etf_id, db)
     for field, value in data.items():
+        if field not in UPDATABLE_FIELDS:
+            raise HTTPException(400, f"Field '{field}' is not updatable")
         setattr(etf, field, value)
     return await PseudoEtfRepository(db).save(etf)
 

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react"
 import type { Quote } from "./api"
 
 type QuoteMap = Record<string, Quote>
-type ConnectionStatus = "connecting" | "connected" | "reconnecting"
+type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "disconnected"
 
 interface QuoteStreamState {
   quotes: QuoteMap
@@ -18,42 +18,64 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
   const [quotes, setQuotes] = useState<QuoteMap>({})
   const [status, setStatus] = useState<ConnectionStatus>("connecting")
   const esRef = useRef<EventSource | null>(null)
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const backoffMs = useRef(1_000)
 
   useEffect(() => {
-    const es = new EventSource("/api/quotes/stream")
-    esRef.current = es
+    function connect() {
+      const es = new EventSource("/api/quotes/stream")
+      esRef.current = es
 
-    es.addEventListener("quotes", (e) => {
-      try {
-        const data = JSON.parse(e.data) as QuoteMap
-        const count = Object.keys(data).length
-        if (count === 0) return
-        setQuotes((prev) => ({ ...prev, ...data }))
+      es.addEventListener("quotes", (e) => {
+        try {
+          const data = JSON.parse(e.data) as QuoteMap
+          const count = Object.keys(data).length
+          if (count === 0) return
+          setQuotes((prev) => ({ ...prev, ...data }))
+          setStatus("connected")
+          backoffMs.current = 1_000 // reset backoff on successful data
+        } catch (err) {
+          console.error("[QuoteStream] Failed to parse SSE event:", err, "raw:", e.data?.slice(0, 200))
+        }
+      })
+
+      es.addEventListener("message", (e) => {
+        // SSE events without an "event:" field arrive as "message" — log if this happens
+        console.warn("[QuoteStream] Received unnamed SSE event (expected 'quotes'):", e.data?.slice(0, 200))
+      })
+
+      es.addEventListener("open", () => {
         setStatus("connected")
-      } catch (err) {
-        console.error("[QuoteStream] Failed to parse SSE event:", err, "raw:", e.data?.slice(0, 200))
-      }
-    })
+        backoffMs.current = 1_000 // reset backoff on successful connection
+      })
 
-    es.addEventListener("message", (e) => {
-      // SSE events without an "event:" field arrive as "message" — log if this happens
-      console.warn("[QuoteStream] Received unnamed SSE event (expected 'quotes'):", e.data?.slice(0, 200))
-    })
+      es.onerror = () => {
+        if (es.readyState === EventSource.CONNECTING) {
+          // Browser is auto-retrying
+          setStatus("reconnecting")
+        } else if (es.readyState === EventSource.CLOSED) {
+          // Browser gave up — manually reconnect with exponential backoff
+          setStatus("disconnected")
+          es.close()
+          esRef.current = null
 
-    es.addEventListener("open", () => {
-      setStatus("connected")
-    })
-
-    es.onerror = () => {
-      // EventSource auto-reconnects; readyState CONNECTING means it's retrying
-      if (es.readyState === EventSource.CONNECTING) {
-        setStatus("reconnecting")
+          const delay = backoffMs.current
+          console.warn(`[QuoteStream] Connection closed. Reconnecting in ${delay}ms...`)
+          reconnectTimer.current = setTimeout(() => {
+            backoffMs.current = Math.min(backoffMs.current * 2, 30_000)
+            setStatus("reconnecting")
+            connect()
+          }, delay)
+        }
       }
     }
 
+    connect()
+
     return () => {
-      es.close()
+      esRef.current?.close()
       esRef.current = null
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
     }
   }, [])
 

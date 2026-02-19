@@ -72,6 +72,11 @@ export interface IndicatorDescriptor {
   priceDenominated?: boolean
 }
 
+/** Narrowed descriptor where holdingSummary is guaranteed present. */
+export type IndicatorDescriptorWithSummary = IndicatorDescriptor & {
+  holdingSummary: NonNullable<IndicatorDescriptor["holdingSummary"]>
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -287,8 +292,10 @@ export function getSubChartDescriptors(): IndicatorDescriptor[] {
   return INDICATOR_REGISTRY.filter((d) => d.placement === "subchart")
 }
 
-export function getCardDescriptors(): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) => d.placement === "card" || d.cardEligible)
+export function getCardDescriptors(excludeSubcharts = false): IndicatorDescriptor[] {
+  return INDICATOR_REGISTRY.filter((d) =>
+    d.placement === "card" || (!excludeSubcharts && d.cardEligible),
+  )
 }
 
 export function getAllIndicatorFields(): string[] {
@@ -303,8 +310,10 @@ export function getDescriptorById(id: string): IndicatorDescriptor | undefined {
   return INDICATOR_REGISTRY.find((d) => d.id === id)
 }
 
-export function getHoldingSummaryDescriptors(): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) => d.holdingSummary != null)
+export function getHoldingSummaryDescriptors(): IndicatorDescriptorWithSummary[] {
+  return INDICATOR_REGISTRY.filter(
+    (d): d is IndicatorDescriptorWithSummary => d.holdingSummary != null,
+  )
 }
 
 /** Build sort options from registry: base fields + all sortable indicator fields. */

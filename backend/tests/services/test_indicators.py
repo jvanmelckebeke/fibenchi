@@ -15,22 +15,7 @@ from app.services.compute.indicators import (
     rsi,
     sma,
 )
-
-
-def _make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:
-    """Generate synthetic price data for testing."""
-    np.random.seed(42)
-    dates = pd.date_range("2024-01-01", periods=n, freq="B")
-    returns = np.random.normal(0.001, 0.02, n)
-    prices = start_price * np.cumprod(1 + returns)
-
-    return pd.DataFrame({
-        "open": prices * (1 - np.random.uniform(0, 0.01, n)),
-        "high": prices * (1 + np.random.uniform(0, 0.02, n)),
-        "low": prices * (1 - np.random.uniform(0, 0.02, n)),
-        "close": prices,
-        "volume": np.random.randint(1_000_000, 10_000_000, n),
-    }, index=dates)
+from tests.helpers import make_price_df as _make_price_df
 
 
 def test_rsi_range():

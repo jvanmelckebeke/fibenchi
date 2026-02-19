@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
 import { INDICATOR_REGISTRY } from "@/lib/indicator-registry"
+import { api } from "@/lib/api"
 
 export type AssetTypeFilter = "all" | "stock" | "etf"
 export type GroupSortBy = string
@@ -75,16 +76,15 @@ const SettingsContext = createContext<SettingsContextValue | null>(null)
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(loadFromStorage)
-  const initializedRef = useRef(false)
 
   // On mount: fetch from backend and merge (backend wins)
   useEffect(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
+    let cancelled = false
 
-    fetch("/api/settings")
-      .then((res) => (res.ok ? res.json() : null))
+    api.settings
+      .get()
       .then((body) => {
+        if (cancelled) return
         if (body?.data && Object.keys(body.data).length > 0) {
           setSettings((prev) => {
             const merged = { ...prev, ...body.data }
@@ -96,6 +96,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         // backend unavailable — use local settings
       })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Apply theme
@@ -119,11 +123,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const next = { ...prev, ...patch }
       saveToStorage(next)
       // Fire-and-forget backend sync
-      fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: next }),
-      }).catch(() => {})
+      api.settings.update(next).catch(() => {})
       return next
     })
   }, [])

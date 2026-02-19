@@ -141,6 +141,14 @@
 .flash-green { animation: flash-green 1.8s ease-out; }
 .flash-red   { animation: flash-red 1.8s ease-out; }
 
+@keyframes stale-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.stale-price {
+  animation: stale-pulse 2.5s ease-in-out infinite;
+}
+
 @keyframes slide {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
