@@ -1,6 +1,7 @@
 """Shared test helpers — extracted from integration tests to avoid duplication."""
 
 from datetime import date, timedelta
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
@@ -79,3 +80,53 @@ def make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:
         "close": prices,
         "volume": np.random.randint(1_000_000, 10_000_000, n),
     }, index=dates)
+
+
+# ---------------------------------------------------------------------------
+# Repository test helpers — real SQLAlchemy model instances (need db session)
+# ---------------------------------------------------------------------------
+
+async def create_test_asset(db, symbol: str = "AAPL", **kwargs) -> Asset:
+    """Create and commit a real Asset row to the test database.
+
+    Used in repository tests where a real DB session is available.
+    """
+    defaults = dict(name=f"{symbol} Inc.", type=AssetType.STOCK, currency="USD")
+    defaults.update(kwargs)
+    asset = Asset(symbol=symbol, **defaults)
+    db.add(asset)
+    await db.commit()
+    await db.refresh(asset)
+    return asset
+
+
+# ---------------------------------------------------------------------------
+# Service test helpers — lightweight mock/model instances (no db needed)
+# ---------------------------------------------------------------------------
+
+def make_mock_asset(symbol: str = "AAPL", **overrides) -> Asset:
+    """Create a MagicMock that quacks like an Asset.
+
+    Used in service tests where repos are mocked and no real DB exists.
+    """
+    asset = MagicMock(spec=Asset)
+    asset.id = overrides.pop("id", 1)
+    asset.symbol = symbol
+    asset.tags = overrides.pop("tags", [])
+    for k, v in overrides.items():
+        setattr(asset, k, v)
+    return asset
+
+
+def make_model_asset(**overrides) -> Asset:
+    """Create a real Asset model instance (not persisted to any database).
+
+    Used in service tests that patch repositories and need real model objects
+    (e.g. asset_service tests that inspect attribute values).
+    """
+    defaults = dict(
+        id=1, symbol="AAPL", name="Apple Inc.",
+        type=AssetType.STOCK, currency="USD",
+    )
+    defaults.update(overrides)
+    return Asset(**defaults)

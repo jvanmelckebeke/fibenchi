@@ -34,10 +34,8 @@ def _make_etf(**overrides) -> PseudoETF:
 
 
 def _make_asset(id: int, symbol: str) -> Asset:
-    asset = MagicMock(spec=Asset)
-    asset.id = id
-    asset.symbol = symbol
-    return asset
+    from tests.helpers import make_mock_asset
+    return make_mock_asset(symbol=symbol, id=id)
 
 
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")

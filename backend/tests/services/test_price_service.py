@@ -18,14 +18,9 @@ from app.services.price_service import (
     refresh_prices,
 )
 
+from tests.helpers import make_model_asset as _make_asset
+
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-
-def _make_asset(**overrides) -> Asset:
-    defaults = dict(id=1, symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD")
-    defaults.update(overrides)
-    return Asset(**defaults)
 
 
 def _make_price_history(asset_id: int = 1, n_days: int = 100, base_price: float = 100.0) -> list[PriceHistory]:

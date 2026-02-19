@@ -28,10 +28,8 @@ def _make_group(id: int = 1, name: str = "Tech", description: str = "Tech stocks
 
 
 def _make_asset(id: int, symbol: str = "AAPL"):
-    asset = MagicMock()
-    asset.id = id
-    asset.symbol = symbol
-    return asset
+    from tests.helpers import make_mock_asset
+    return make_mock_asset(symbol=symbol, id=id)
 
 
 @patch("app.services.group_service.GroupRepository")
