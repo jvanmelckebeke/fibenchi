@@ -263,7 +263,7 @@ export function resolveThresholdColor(
 
 /** Safely extract a numeric value from the values dict. */
 export function getNumericValue(
-  values: Record<string, number | string | null> | undefined,
+  values: Record<string, number | string | null | undefined> | undefined,
   field: string,
 ): number | null {
   const v = values?.[field]
@@ -272,7 +272,7 @@ export function getNumericValue(
 
 /** Safely extract a string value from the values dict. */
 export function getStringValue(
-  values: Record<string, number | string | null> | undefined,
+  values: Record<string, number | string | null | undefined> | undefined,
   field: string,
 ): string | null {
   const v = values?.[field]
@@ -354,7 +354,7 @@ export function getSeriesByField(field: string): SeriesDescriptor | undefined {
  */
 export function resolveAdxColor(
   adx: number,
-  values: Record<string, number | string | null>,
+  values: Record<string, number | string | null | undefined>,
 ): string {
   if (adx < 20) return "text-zinc-400"
   if (adx < 25) return "text-yellow-500"

@@ -25,7 +25,7 @@ export function IndicatorValue({
   compact,
 }: {
   descriptor: IndicatorDescriptor
-  values?: Record<string, number | string | null>
+  values?: Record<string, number | string | null | undefined>
   currency?: string
   compact?: boolean
 }) {

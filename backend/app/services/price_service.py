@@ -79,6 +79,7 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
         count = await sync_asset_prices(db, asset, period=period)
         if count == 0:
             raise HTTPException(404, f"No price data available for {asset.symbol}")
+        prices = await price_repo.list_by_asset(asset.id)
     elif prices[0].date > needed_start:
         if not _backfill_already_attempted(asset.id, needed_start):
             earliest_before = prices[0].date
@@ -88,9 +89,6 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
             # Cache this so future requests skip the fetch.
             if prices and prices[0].date >= earliest_before:
                 _earliest_date_cache.set_value(asset.id, prices[0].date)
-
-    if not prices or prices[0].date > needed_start:
-        prices = await price_repo.list_by_asset(asset.id)
 
     return prices
 
