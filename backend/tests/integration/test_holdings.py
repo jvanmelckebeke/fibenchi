@@ -6,6 +6,8 @@ from unittest.mock import patch
 from app.services.compute.indicators import bb_position
 from tests.helpers import make_price_df
 
+pytestmark = pytest.mark.asyncio(loop_scope="function")
+
 
 # ── Pure unit tests for bb_position ───────────────────────────────────
 
