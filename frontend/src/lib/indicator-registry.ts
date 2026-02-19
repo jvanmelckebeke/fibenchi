@@ -66,6 +66,8 @@ export interface IndicatorDescriptor {
     format: "numeric" | "compare_close" | "string_map"
     colorMap?: Record<string, string>
   }
+  /** When true, this indicator also renders as a card (in addition to its primary placement). */
+  cardEligible?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +103,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       range: { min: 0, max: 100 },
     },
     holdingSummary: { label: "RSI", field: "rsi", format: "numeric" },
+    cardEligible: true,
   },
   {
     id: "sma_20",
@@ -179,6 +182,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       format: "string_map",
       colorMap: { bullish: "text-emerald-500", bearish: "text-red-500" },
     },
+    cardEligible: true,
   },
   {
     id: "atr",
@@ -281,7 +285,7 @@ export function getSubChartDescriptors(): IndicatorDescriptor[] {
 }
 
 export function getCardDescriptors(): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) => d.placement === "card")
+  return INDICATOR_REGISTRY.filter((d) => d.placement === "card" || d.cardEligible)
 }
 
 export function getAllIndicatorFields(): string[] {
