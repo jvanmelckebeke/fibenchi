@@ -175,6 +175,7 @@ function HoldingRow({
               variant="ghost"
               size="icon"
               className="h-5 w-5 opacity-0 group-hover/row:opacity-100 transition-opacity"
+              aria-label={`Remove ${row.symbol}`}
               onClick={(e) => {
                 e.stopPropagation()
                 onRemove()

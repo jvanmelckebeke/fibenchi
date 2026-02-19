@@ -1,7 +1,6 @@
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -27,17 +26,15 @@ export function MarketStatusDot({
   const config = (marketState && STATE_CONFIG[marketState]) || DEFAULT_CONFIG
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            className={cn("inline-block h-2 w-2 rounded-full shrink-0", config.color, className)}
-          />
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
-          {config.label}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>
+        <span
+          className={cn("inline-block h-2 w-2 rounded-full shrink-0", config.color, className)}
+        />
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs">
+        {config.label}
+      </TooltipContent>
+    </Tooltip>
   )
 }

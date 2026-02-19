@@ -7,6 +7,17 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   useGroups,
   useCreateGroup,
   useUpdateGroup,
@@ -139,20 +150,33 @@ function GroupCard({ group }: { group: Group }) {
         )}
         {!editing && (
           <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setAddingAsset(!addingAsset)}>
+            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Add asset to group" onClick={() => setAddingAsset(!addingAsset)}>
               <UserPlus className="h-3.5 w-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(true)}>
+            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Edit group" onClick={() => setEditing(true)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => deleteGroup.mutate(group.id)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Delete group">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete group</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete &ldquo;{group.name}&rdquo;? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={() => deleteGroup.mutate(group.id)}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
       </CardHeader>
@@ -175,6 +199,7 @@ function GroupCard({ group }: { group: Group }) {
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5 opacity-0 group-hover/asset:opacity-100 transition-opacity"
+                aria-label={`Remove ${asset.symbol} from group`}
                 onClick={() => removeAsset.mutate({ groupId: group.id, assetId: asset.id })}
               >
                 <X className="h-3 w-3" />
