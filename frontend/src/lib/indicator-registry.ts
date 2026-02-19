@@ -72,6 +72,11 @@ export interface IndicatorDescriptor {
   priceDenominated?: boolean
 }
 
+/** Narrowed descriptor where holdingSummary is guaranteed present. */
+export type IndicatorDescriptorWithSummary = IndicatorDescriptor & {
+  holdingSummary: NonNullable<IndicatorDescriptor["holdingSummary"]>
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -303,8 +308,10 @@ export function getDescriptorById(id: string): IndicatorDescriptor | undefined {
   return INDICATOR_REGISTRY.find((d) => d.id === id)
 }
 
-export function getHoldingSummaryDescriptors(): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) => d.holdingSummary != null)
+export function getHoldingSummaryDescriptors(): IndicatorDescriptorWithSummary[] {
+  return INDICATOR_REGISTRY.filter(
+    (d): d is IndicatorDescriptorWithSummary => d.holdingSummary != null,
+  )
 }
 
 /** Build sort options from registry: base fields + all sortable indicator fields. */

@@ -61,12 +61,12 @@ export function Legend({ values, latest }: { values: LegendValues | null; latest
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
-      {v.o !== undefined && (
+      {v.o !== undefined && v.h !== undefined && v.l !== undefined && v.c !== undefined && (
         <>
           <span className="text-muted-foreground">O <span className={changeColor}>{v.o.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">H <span className={changeColor}>{v.h!.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">L <span className={changeColor}>{v.l!.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">C <span className={changeColor}>{v.c!.toFixed(2)}</span></span>
+          <span className="text-muted-foreground">H <span className={changeColor}>{v.h.toFixed(2)}</span></span>
+          <span className="text-muted-foreground">L <span className={changeColor}>{v.l.toFixed(2)}</span></span>
+          <span className="text-muted-foreground">C <span className={changeColor}>{v.c.toFixed(2)}</span></span>
         </>
       )}
       {overlays.map((desc) => (
