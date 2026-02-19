@@ -17,6 +17,8 @@ interface PriceChartProps {
   indicatorVisibility?: Record<string, boolean>
   chartType?: "candle" | "line"
   mainChartHeight?: number
+  /** ISO 4217 currency code for formatting price-denominated indicators (e.g. ATR). */
+  currency?: string
 }
 
 export function PriceChart({
@@ -26,6 +28,7 @@ export function PriceChart({
   indicatorVisibility,
   chartType = "candle",
   mainChartHeight = 400,
+  currency,
 }: PriceChartProps) {
   const isVisible = useCallback(
     (id: string) => indicatorVisibility?.[id] !== false,
@@ -63,7 +66,7 @@ export function PriceChart({
             roundedClass={idx === enabledSubCharts.length - 1 ? "rounded-b-md" : ""}
           />
         ))}
-        <IndicatorCards descriptors={enabledCards} />
+        <IndicatorCards descriptors={enabledCards} currency={currency} />
       </div>
     </ChartSyncProvider>
   )

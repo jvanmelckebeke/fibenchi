@@ -51,6 +51,7 @@ export function AssetDetailPage() {
         period={period}
         indicatorVisibility={settings.detail_indicator_visibility}
         chartType={settings.chart_type}
+        currency={asset?.currency}
       />
       {isEtf && <HoldingsSection symbol={symbol} />}
       {isTracked && (
@@ -163,11 +164,13 @@ function ChartSection({
   period,
   indicatorVisibility,
   chartType,
+  currency,
 }: {
   symbol: string
   period: string
   indicatorVisibility: Record<string, boolean>
   chartType: "candle" | "line"
+  currency?: string
 }) {
   const { data: detail, isLoading: detailLoading, isFetching: detailFetching } = useAssetDetail(symbol, period)
   const prices = detail?.prices
@@ -199,6 +202,7 @@ function ChartSection({
         annotations={annotations ?? []}
         indicatorVisibility={indicatorVisibility}
         chartType={chartType}
+        currency={currency}
       />
     </div>
   )

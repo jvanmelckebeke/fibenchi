@@ -11,6 +11,7 @@ import { RsiGauge } from "@/components/rsi-gauge"
 import { MacdIndicator } from "@/components/macd-indicator"
 import { ChartSyncProvider, useChartHoverValues } from "@/components/chart/chart-sync-provider"
 import { CandlestickChart } from "@/components/chart/candlestick-chart"
+import { IndicatorCards } from "@/components/chart/indicator-cards"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -28,6 +29,7 @@ import {
   extractMacdValues,
   getAllSortableFields,
   getSeriesByField,
+  getCardDescriptors,
   resolveThresholdColor,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
@@ -264,7 +266,7 @@ function HoverReactiveGauges({ fallbackIndicator }: { fallbackIndicator?: Indica
   const hoverActive = hoverValues !== null
 
   return (
-    <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
+    <>
       <div>
         <span className="text-xs text-muted-foreground mb-1 block">
           RSI{hoverActive ? <span className="ml-1 text-muted-foreground/50">(hover)</span> : ""}
@@ -280,17 +282,23 @@ function HoverReactiveGauges({ fallbackIndicator }: { fallbackIndicator?: Indica
           size="lg"
         />
       </div>
-    </div>
+    </>
   )
 }
 
-function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: IndicatorSummary }) {
+const CARD_DESCRIPTORS = getCardDescriptors()
+
+function ExpandedContent({ symbol, indicator, currency }: { symbol: string; indicator?: IndicatorSummary; currency?: string }) {
   const { settings } = useSettings()
   const period = settings.chart_default_period
   const { data: detail, isLoading: detailLoading } = useAssetDetail(symbol, period)
   const prices = detail?.prices
   const chartIndicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
+
+  const enabledCards = CARD_DESCRIPTORS.filter(
+    (d) => settings.detail_indicator_visibility[d.id] !== false,
+  )
 
   const loading = detailLoading
 
@@ -302,7 +310,7 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
             <Skeleton className="h-full w-full rounded-md" />
           </div>
         </div>
-        <div className="flex-1 flex flex-col gap-3 justify-center min-w-[140px] max-w-[200px]">
+        <div className="flex-1 flex flex-col gap-3 min-w-[140px] max-w-[200px]">
           <div>
             <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
             <RsiGauge batchRsi={getNumericValue(indicator?.values, "rsi")} size="lg" />
@@ -320,7 +328,7 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
     <ChartSyncProvider prices={prices} indicators={chartIndicators ?? []}>
       <div className="flex gap-4">
         {/* Price chart — 80% */}
-        <div className="flex-[4] min-w-0 mb-4">
+        <div className="flex-[4] min-w-0">
           <CandlestickChart
             annotations={annotations ?? []}
             indicatorVisibility={{
@@ -334,7 +342,10 @@ function ExpandedContent({ symbol, indicator }: { symbol: string; indicator?: In
           />
         </div>
         {/* Hover-reactive indicators — 20% */}
-        <HoverReactiveGauges fallbackIndicator={indicator} />
+        <div className="flex-1 flex flex-col gap-3 min-w-[140px] max-w-[200px]">
+          <HoverReactiveGauges fallbackIndicator={indicator} />
+          <IndicatorCards descriptors={enabledCards} currency={currency} compact />
+        </div>
       </div>
     </ChartSyncProvider>
   )
@@ -490,7 +501,7 @@ function TableRow({
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
-            <ExpandedContent symbol={asset.symbol} indicator={indicator} />
+            <ExpandedContent symbol={asset.symbol} indicator={indicator} currency={asset.currency} />
           </td>
         </tr>
       )}

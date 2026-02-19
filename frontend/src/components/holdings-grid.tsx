@@ -8,8 +8,9 @@ import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
 import { CandlestickChart } from "@/components/chart/candlestick-chart"
 import { RsiChart } from "@/components/chart/rsi-chart"
 import { MacdChart } from "@/components/chart/macd-chart"
+import { IndicatorCards } from "@/components/chart/indicator-cards"
 import { formatPrice, formatChangePct } from "@/lib/format"
-import { getNumericValue, getStringValue, getHoldingSummaryDescriptors } from "@/lib/indicator-registry"
+import { getNumericValue, getStringValue, getHoldingSummaryDescriptors, getCardDescriptors } from "@/lib/indicator-registry"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
@@ -194,7 +195,7 @@ function HoldingRow({
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
-            <ExpandedHoldingContent symbol={row.symbol} />
+            <ExpandedHoldingContent symbol={row.symbol} currency={indicator?.currency} />
           </td>
         </tr>
       )}
@@ -202,13 +203,19 @@ function HoldingRow({
   )
 }
 
-function ExpandedHoldingContent({ symbol }: { symbol: string }) {
+const CARD_DESCRIPTORS = getCardDescriptors()
+
+function ExpandedHoldingContent({ symbol, currency }: { symbol: string; currency?: string }) {
   const { settings } = useSettings()
   const period = settings.chart_default_period
   const { data: detail, isLoading } = useAssetDetail(symbol, period)
   const prices = detail?.prices
   const indicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
+
+  const enabledCards = CARD_DESCRIPTORS.filter(
+    (d) => settings.detail_indicator_visibility[d.id] !== false,
+  )
 
   if (isLoading || !prices?.length) {
     return (
@@ -238,6 +245,7 @@ function ExpandedHoldingContent({ symbol }: { symbol: string }) {
         />
         <RsiChart showLegend roundedClass="" />
         <MacdChart showLegend roundedClass="rounded-b-md" />
+        <IndicatorCards descriptors={enabledCards} currency={currency} compact />
       </div>
     </ChartSyncProvider>
   )
@@ -274,7 +282,17 @@ function HoldingSummaryCell({
 
   // string_map
   const str = getStringValue(values, field)
-  const colorClass = str != null && colorMap ? (colorMap[str] ?? "") : ""
+  let colorClass = str != null && colorMap ? (colorMap[str] ?? "") : ""
+
+  // ADX "strong" → color by direction (+DI vs -DI)
+  if (field === "adx_trend" && str === "strong") {
+    const plusDi = getNumericValue(values, "plus_di")
+    const minusDi = getNumericValue(values, "minus_di")
+    if (plusDi != null && minusDi != null) {
+      colorClass = plusDi > minusDi ? "text-emerald-500" : "text-red-500"
+    }
+  }
+
   const display = str != null ? str.charAt(0).toUpperCase() + str.slice(1) : null
   return <IndicatorCell value={display} className={colorClass} />
 }
