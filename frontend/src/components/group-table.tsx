@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button"
 import { TagBadge } from "@/components/tag-badge"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { RsiGauge } from "@/components/rsi-gauge"
-import { MacdIndicator } from "@/components/macd-indicator"
-import { ChartSyncProvider, useChartHoverValues } from "@/components/chart/chart-sync-provider"
+import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
 import { CandlestickChart } from "@/components/chart/candlestick-chart"
 import { IndicatorCards } from "@/components/chart/indicator-cards"
 import {
@@ -250,45 +248,9 @@ function SortableHeader({
   )
 }
 
-/** Gauges that react to crosshair hover values from the ChartSyncProvider. */
-function HoverReactiveGauges({ fallbackIndicator }: { fallbackIndicator?: IndicatorSummary }) {
-  const { hoverValues, latestValues } = useChartHoverValues()
-
-  // Use hover values when available, fall back to latest chart data, then batch indicator
-  const vals = hoverValues ?? latestValues
-  const rsiVal = vals.indicators.rsi ?? getNumericValue(fallbackIndicator?.values, "rsi")
-  const macdVals = {
-    macd: vals.indicators.macd ?? getNumericValue(fallbackIndicator?.values, "macd"),
-    macd_signal: vals.indicators.macd_signal ?? getNumericValue(fallbackIndicator?.values, "macd_signal"),
-    macd_hist: vals.indicators.macd_hist ?? getNumericValue(fallbackIndicator?.values, "macd_hist"),
-  }
-
-  const hoverActive = hoverValues !== null
-
-  return (
-    <>
-      <div>
-        <span className="text-xs text-muted-foreground mb-1 block">
-          RSI{hoverActive ? <span className="ml-1 text-muted-foreground/50">(hover)</span> : ""}
-        </span>
-        <RsiGauge batchRsi={rsiVal} size="lg" />
-      </div>
-      <div>
-        <span className="text-xs text-muted-foreground mb-1 block">
-          MACD{hoverActive ? <span className="ml-1 text-muted-foreground/50">(hover)</span> : ""}
-        </span>
-        <MacdIndicator
-          batchMacd={macdVals}
-          size="lg"
-        />
-      </div>
-    </>
-  )
-}
-
 const CARD_DESCRIPTORS = getCardDescriptors()
 
-function ExpandedContent({ symbol, indicator, currency }: { symbol: string; indicator?: IndicatorSummary; currency?: string }) {
+function ExpandedContent({ symbol, currency }: { symbol: string; currency?: string }) {
   const { settings } = useSettings()
   const period = settings.chart_default_period
   const { data: detail, isLoading: detailLoading } = useAssetDetail(symbol, period)
@@ -310,15 +272,10 @@ function ExpandedContent({ symbol, indicator, currency }: { symbol: string; indi
             <Skeleton className="h-full w-full rounded-md" />
           </div>
         </div>
-        <div className="flex-1 flex flex-col gap-3 min-w-[140px] max-w-[200px]">
-          <div>
-            <span className="text-xs text-muted-foreground mb-1 block">RSI</span>
-            <RsiGauge batchRsi={getNumericValue(indicator?.values, "rsi")} size="lg" />
-          </div>
-          <div>
-            <span className="text-xs text-muted-foreground mb-1 block">MACD</span>
-            <MacdIndicator batchMacd={extractMacdValues(indicator?.values)} size="lg" />
-          </div>
+        <div className="flex-1 flex flex-col gap-1.5 min-w-[140px] max-w-[200px]">
+          {enabledCards.map((d) => (
+            <Skeleton key={d.id} className="h-12 w-full rounded-md" />
+          ))}
         </div>
       </div>
     )
@@ -341,9 +298,8 @@ function ExpandedContent({ symbol, indicator, currency }: { symbol: string; indi
             roundedClass="rounded-md"
           />
         </div>
-        {/* Hover-reactive indicators — 20% */}
-        <div className="flex-1 flex flex-col gap-3 min-w-[140px] max-w-[200px]">
-          <HoverReactiveGauges fallbackIndicator={indicator} />
+        {/* Indicator cards — 20% */}
+        <div className="flex-1 min-w-[140px] max-w-[200px] mt-8">
           <IndicatorCards descriptors={enabledCards} currency={currency} compact />
         </div>
       </div>
@@ -501,7 +457,7 @@ function TableRow({
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
-            <ExpandedContent symbol={asset.symbol} indicator={indicator} currency={asset.currency} />
+            <ExpandedContent symbol={asset.symbol} currency={asset.currency} />
           </td>
         </tr>
       )}

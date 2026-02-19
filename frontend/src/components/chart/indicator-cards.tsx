@@ -23,6 +23,8 @@ import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 // ---------------------------------------------------------------------------
 
 const CARD_HELP: Record<string, string> = {
+  rsi: "Momentum oscillator — below 30 is oversold, above 70 is overbought",
+  macd: "Momentum crossover — positive histogram is bullish, negative is bearish",
   atr: "Average daily high-to-low range — higher means more volatile",
   adx: "Trend strength & direction — green is bullish, red is bearish",
 }
@@ -85,6 +87,17 @@ function CardValue({
           </span>
           <span className="text-red-500">
             -DI {getNumericValue(values as Record<string, number | null>, "minus_di")?.toFixed(1) ?? "--"}
+          </span>
+        </div>
+      )}
+      {/* MACD: show line + signal below histogram */}
+      {descriptor.id === "macd" && (
+        <div className={`flex gap-3 tabular-nums mt-0.5 ${compact ? "text-[10px]" : "text-xs"}`}>
+          <span className="text-sky-400">
+            M {getNumericValue(values as Record<string, number | null>, "macd")?.toFixed(2) ?? "--"}
+          </span>
+          <span className="text-orange-400">
+            S {getNumericValue(values as Record<string, number | null>, "macd_signal")?.toFixed(2) ?? "--"}
           </span>
         </div>
       )}
@@ -205,7 +218,7 @@ export function IndicatorCards({ descriptors, currency, compact }: IndicatorCard
   if (descriptors.length === 0) return null
 
   const gridClass = compact
-    ? "grid grid-cols-1 gap-1.5 mt-1.5"
+    ? "grid grid-cols-1 gap-2"
     : "grid grid-cols-2 gap-2 mt-2"
 
   const cardClass = compact
