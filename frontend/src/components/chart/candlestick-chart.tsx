@@ -13,7 +13,7 @@ import {
 } from "./chart-builders"
 import { Legend } from "./chart-legends"
 import { useRegisterChart, useChartHoverValues, useChartData } from "./chart-sync-provider"
-import { getOverlayDescriptors } from "@/lib/indicator-registry"
+import { getOverlayDescriptors, isIndicatorVisible } from "@/lib/indicator-registry"
 
 interface CandlestickChartProps {
   annotations: Annotation[]
@@ -61,7 +61,7 @@ export function CandlestickChart({
   const { prices, indicators } = useChartData()
 
   const isVisible = useCallback(
-    (id: string) => indicatorVisibility?.[id] !== false,
+    (id: string) => isIndicatorVisible(indicatorVisibility, id),
     [indicatorVisibility],
   )
 

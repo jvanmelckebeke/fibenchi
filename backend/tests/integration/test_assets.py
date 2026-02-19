@@ -5,12 +5,6 @@ from unittest.mock import patch
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
-def _mock_validate(symbol, currency="USD", currency_code=None):
-    """Return a validate_symbol mock result for common test symbols."""
-    code = currency_code or currency
-    return {"symbol": symbol.upper(), "name": symbol.upper(), "type": "EQUITY", "currency": currency, "currency_code": code}
-
-
 async def test_list_assets_empty(client):
     resp = await client.get("/api/assets")
     assert resp.status_code == 200

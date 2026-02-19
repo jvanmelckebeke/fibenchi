@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronRight, ChevronDown, Settings2 } from "lucide-react"
+import { ChevronRight, ChevronDown, ChevronsUpDown, ChevronsDownUp, Settings2 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,7 @@ import {
 import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
-import { formatPrice, changeColor } from "@/lib/format"
+import { formatPrice, changeColor, formatChangePct } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -27,7 +27,9 @@ import {
   getSeriesByField,
   resolveThresholdColor,
   resolveAdxColor,
+  isIndicatorVisible,
 } from "@/lib/indicator-registry"
+import { toggleSetItem } from "@/lib/utils"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 
@@ -42,7 +44,7 @@ const BASE_COLUMN_DEFS: { key: string; label: string }[] = [
 
 /** Check whether a column is visible. Missing key = visible (opt-out model). */
 function isColumnVisible(columnSettings: Record<string, boolean>, key: string): boolean {
-  return columnSettings[key] !== false
+  return isIndicatorVisible(columnSettings, key)
 }
 
 interface GroupTableProps {
@@ -63,12 +65,7 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
   const columnSettings = settings.group_table_columns
 
   const toggleExpand = (symbol: string) => {
-    setExpandedSymbols((prev) => {
-      const next = new Set(prev)
-      if (next.has(symbol)) next.delete(symbol)
-      else next.add(symbol)
-      return next
-    })
+    setExpandedSymbols((prev) => toggleSetItem(prev, symbol))
   }
 
   const toggleColumn = (key: string) => {
@@ -76,6 +73,16 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
     updateSettings({
       group_table_columns: { ...columnSettings, [key]: !current },
     })
+  }
+
+  const allExpanded = assets.length > 0 && assets.every((a) => expandedSymbols.has(a.symbol))
+
+  const toggleExpandAll = () => {
+    if (allExpanded) {
+      setExpandedSymbols(new Set())
+    } else {
+      setExpandedSymbols(new Set(assets.map((a) => a.symbol)))
+    }
   }
 
   const visibleIndicatorFields = useMemo(
@@ -119,10 +126,25 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
               )
             })}
             <th className="w-8 text-right pr-1">
-              <ColumnVisibilityMenu
-                columnSettings={columnSettings}
-                onToggle={toggleColumn}
-              />
+              <div className="flex items-center justify-end gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  aria-label={allExpanded ? "Collapse all rows" : "Expand all rows"}
+                  onClick={toggleExpandAll}
+                >
+                  {allExpanded ? (
+                    <ChevronsDownUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronsUpDown className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <ColumnVisibilityMenu
+                  columnSettings={columnSettings}
+                  onToggle={toggleColumn}
+                />
+              </div>
             </th>
           </tr>
         </thead>
@@ -348,8 +370,7 @@ function TableRow({
           <td className={`${py} px-3 text-right tabular-nums`}>
             {displayPct != null ? (
               <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls} ${staleClass}`}>
-                {displayPct >= 0 ? "+" : ""}
-                {displayPct.toFixed(2)}%
+                {formatChangePct(displayPct).text}
               </span>
             ) : (
               <Skeleton className="h-4 w-12 ml-auto rounded" />

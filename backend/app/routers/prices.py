@@ -1,14 +1,11 @@
-from typing import Literal
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import PeriodType
 from app.database import get_db
 from app.services.entity_lookups import find_asset, get_asset
 from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse, RefreshResponse
 from app.services import price_service
-
-PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
 
 router = APIRouter(prefix="/api/assets/{symbol}", tags=["prices"])
 

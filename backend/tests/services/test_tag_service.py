@@ -11,6 +11,7 @@ from app.services.tag_service import (
     detach_tag,
     update_tag,
 )
+from tests.helpers import make_mock_asset as _make_asset
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -24,13 +25,6 @@ def _make_tag(id: int = 1, name: str = "tech", color: str = "#3b82f6") -> Tag:
     tag.name = name
     tag.color = color
     return tag
-
-
-def _make_asset(symbol: str = "AAPL") -> Asset:
-    asset = MagicMock(spec=Asset)
-    asset.symbol = symbol
-    asset.tags = []
-    return asset
 
 
 @patch("app.services.tag_service.TagRepository")

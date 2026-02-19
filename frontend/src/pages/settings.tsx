@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
-import { INDICATOR_REGISTRY } from "@/lib/indicator-registry"
+import { INDICATOR_REGISTRY, isIndicatorVisible } from "@/lib/indicator-registry"
 
 function VisibilityToggle({
   id,
@@ -86,7 +86,7 @@ export function SettingsPage() {
               key={`grp-${desc.id}`}
               id={`grp-${desc.id}`}
               label={desc.label}
-              checked={draft.group_indicator_visibility[desc.id] !== false}
+              checked={isIndicatorVisible(draft.group_indicator_visibility, desc.id)}
               onCheckedChange={(v) =>
                 change({
                   group_indicator_visibility: { ...draft.group_indicator_visibility, [desc.id]: v },
@@ -107,7 +107,7 @@ export function SettingsPage() {
               key={`dtl-${desc.id}`}
               id={`dtl-${desc.id}`}
               label={desc.label}
-              checked={draft.detail_indicator_visibility[desc.id] !== false}
+              checked={isIndicatorVisible(draft.detail_indicator_visibility, desc.id)}
               onCheckedChange={(v) =>
                 change({
                   detail_indicator_visibility: { ...draft.detail_indicator_visibility, [desc.id]: v },
@@ -193,24 +193,6 @@ export function SettingsPage() {
             checked={draft.compact_mode}
             onCheckedChange={(v) => change({ compact_mode: v })}
           />
-          <div className="flex items-center justify-between">
-            <Label>Decimal Places</Label>
-            <Select
-              value={String(draft.decimal_places)}
-              onValueChange={(v) => change({ decimal_places: Number(v) })}
-            >
-              <SelectTrigger className="w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">0</SelectItem>
-                <SelectItem value="1">1</SelectItem>
-                <SelectItem value="2">2</SelectItem>
-                <SelectItem value="3">3</SelectItem>
-                <SelectItem value="4">4</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </CardContent>
       </Card>
       </div>

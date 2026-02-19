@@ -7,8 +7,8 @@ import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatPrice, changeColor } from "@/lib/format"
-import { getCardDescriptors, type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { formatPrice, changeColor, formatChangePct } from "@/lib/format"
+import { getCardDescriptors, isIndicatorVisible, type IndicatorDescriptor } from "@/lib/indicator-registry"
 import { IndicatorValue } from "@/components/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
 
@@ -21,7 +21,6 @@ export interface AssetCardProps {
   currency: string
   tags: TagBrief[]
   quote?: Quote
-  sparklinePeriod: string
   sparklineData?: SparklinePoint[]
   indicatorData?: IndicatorSummary
   onDelete: () => void
@@ -54,7 +53,6 @@ export function AssetCard({
   currency,
   tags,
   quote,
-  sparklinePeriod,
   sparklineData,
   indicatorData,
   onDelete,
@@ -63,7 +61,7 @@ export function AssetCard({
   indicatorVisibility,
 }: AssetCardProps) {
   const enabledCards = CARD_DESCRIPTORS.filter(
-    (d) => indicatorVisibility[d.id] !== false,
+    (d) => isIndicatorVisible(indicatorVisibility, d.id),
   )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
@@ -97,8 +95,7 @@ export function AssetCard({
             <p className="text-xs text-muted-foreground truncate">{name}</p>
             {changePct != null ? (
               <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeCls}`}>
-                {changePct >= 0 ? "+" : ""}
-                {changePct.toFixed(2)}%
+                {formatChangePct(changePct).text}
               </span>
             ) : (
               <Skeleton className="h-3.5 w-12 rounded" />
@@ -113,7 +110,7 @@ export function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          {showSparkline && <DeferredSparkline symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
+          {showSparkline && <DeferredSparkline batchData={sparklineData} />}
           {enabledCards.length > 0 && (
             <div className="grid grid-cols-2 gap-1.5 mt-1">
               {enabledCards.map((desc) => (

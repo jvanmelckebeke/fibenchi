@@ -1,5 +1,10 @@
 """Shared constants for period and indicator warmup calculations."""
 
+from typing import Literal
+
+# Canonical period type used by price, group, and portfolio endpoints.
+PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
+
 # Calendar days for each period string used across price, group, and portfolio endpoints.
 PERIOD_DAYS: dict[str, int] = {
     "1mo": 30,

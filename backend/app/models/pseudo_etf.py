@@ -20,7 +20,7 @@ class PseudoETF(Base):
     name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_date: Mapped[date] = mapped_column(Date, nullable=False)
-    base_value: Mapped[float] = mapped_column(Numeric(12, 4), default=100.0)
+    base_value: Mapped[float] = mapped_column(Numeric(12, 4, asdecimal=False), default=100.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     constituents = relationship("Asset", secondary=pseudo_etf_constituents, lazy="selectin")

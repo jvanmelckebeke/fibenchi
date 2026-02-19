@@ -1,6 +1,5 @@
 """Sync price data from Yahoo Finance to the database."""
 
-import asyncio
 from datetime import date
 
 import pandas as pd
@@ -35,7 +34,7 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
 
     symbols = [a.symbol for a in assets]
     asset_map = {a.symbol: a.id for a in assets}
-    data = await asyncio.to_thread(batch_fetch_history, symbols, period=period)
+    data = await batch_fetch_history(symbols, period=period)
 
     counts = {}
     for sym, df in data.items():

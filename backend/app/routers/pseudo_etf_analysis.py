@@ -19,7 +19,7 @@ async def get_performance(etf_id: int, db: AsyncSession = Depends(get_db)):
         return []
 
     return await calculate_performance(
-        db, asset_ids, etf.base_date, float(etf.base_value), include_breakdown=True
+        db, asset_ids, etf.base_date, etf.base_value, include_breakdown=True
     )
 
 
@@ -34,13 +34,13 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
     # Get latest performance breakdown for weight calculation
     asset_ids = [a.id for a in etf.constituents]
     perf = await calculate_performance(
-        db, asset_ids, etf.base_date, float(etf.base_value), include_breakdown=True
+        db, asset_ids, etf.base_date, etf.base_value, include_breakdown=True
     )
     weight_map: dict[str, float] = {}
     if perf:
         last_point = perf[-1]
         breakdown = last_point.get("breakdown", {})
-        total = last_point["value"]
+        total = last_point.get("value", 0)
         if total > 0:
             weight_map = {sym: round(val / total * 100, 2) for sym, val in breakdown.items()}
 

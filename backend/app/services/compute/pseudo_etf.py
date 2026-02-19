@@ -61,7 +61,7 @@ async def calculate_performance(
         return []
 
     # Build a DataFrame: rows=dates, columns=asset_id, values=close price
-    data = [(r.date, r.asset_id, float(r.close)) for r in rows]
+    data = [(r.date, r.asset_id, r.close) for r in rows]
     df = pd.DataFrame(data, columns=["date", "asset_id", "close"])
     pivot = df.pivot_table(index="date", columns="asset_id", values="close")
     pivot = pivot.sort_index()

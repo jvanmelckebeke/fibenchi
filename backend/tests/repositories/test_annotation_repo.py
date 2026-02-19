@@ -6,18 +6,9 @@ import pytest
 
 from app.models import Annotation, Asset, AssetType
 from app.repositories.annotation_repo import AnnotationRepository
+from tests.helpers import create_test_asset as _create_asset
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-async def _create_asset(db, symbol: str, **kwargs) -> Asset:
-    defaults = dict(name=f"{symbol} Inc.", type=AssetType.STOCK, currency="USD")
-    defaults.update(kwargs)
-    asset = Asset(symbol=symbol, **defaults)
-    db.add(asset)
-    await db.commit()
-    await db.refresh(asset)
-    return asset
 
 
 async def test_list_by_asset_returns_correct_annotations_ordered_by_date(db):

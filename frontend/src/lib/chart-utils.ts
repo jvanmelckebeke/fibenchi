@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { ColorType } from "lightweight-charts"
+import type { Indicator } from "@/lib/api"
 
 export const STACK_COLORS = [
   "#6366f1", // indigo-500
@@ -14,7 +15,7 @@ export const STACK_COLORS = [
   "#c084fc", // purple-400
 ]
 
-export function themeColors(isDark: boolean) {
+function themeColors(isDark: boolean) {
   return {
     bg: isDark ? "#18181b" : "#ffffff",
     text: isDark ? "#a1a1aa" : "#71717a",
@@ -24,7 +25,7 @@ export function themeColors(isDark: boolean) {
   }
 }
 
-export function getChartTheme() {
+function getChartTheme() {
   return themeColors(document.documentElement.classList.contains("dark"))
 }
 
@@ -69,16 +70,11 @@ export function baseChartOptions(container: HTMLElement, height: number) {
   return {
     width: container.clientWidth,
     height,
+    ...chartThemeOptions(theme),
     layout: {
-      background: { type: ColorType.Solid, color: theme.bg },
-      textColor: theme.text,
+      ...chartThemeOptions(theme).layout,
       attributionLogo: false,
     },
-    grid: {
-      vertLines: { color: theme.grid },
-      horzLines: { color: theme.grid },
-    },
-    rightPriceScale: { borderColor: theme.border },
     timeScale: { borderColor: theme.border, timeVisible: false },
     crosshair: { mode: 0 as const },
     handleScroll: {
@@ -94,4 +90,19 @@ export function baseChartOptions(container: HTMLElement, height: number) {
       axisDoubleClickReset: { time: true, price: false },
     },
   }
+}
+
+/** Build a Map from date string to numeric indicator values, filtering out nulls/non-numbers. */
+export function buildIndicatorTimeMap(indicators: Indicator[]): Map<string, Record<string, number>> {
+  const map = new Map<string, Record<string, number>>()
+  for (const i of indicators) {
+    const vals: Record<string, number> = {}
+    for (const [field, value] of Object.entries(i.values)) {
+      if (value != null && typeof value === "number") {
+        vals[field] = value
+      }
+    }
+    map.set(i.date, vals)
+  }
+  return map
 }

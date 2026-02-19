@@ -2,22 +2,12 @@
 
 import pytest
 
-from app.models import Asset, AssetType, Group
-from app.models.group import group_assets
+from app.models import Asset, AssetType
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
+from tests.helpers import create_test_asset as _create_asset
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-async def _create_asset(db, symbol: str, **kwargs) -> Asset:
-    defaults = dict(name=f"{symbol} Inc.", type=AssetType.STOCK, currency="USD")
-    defaults.update(kwargs)
-    asset = Asset(symbol=symbol, **defaults)
-    db.add(asset)
-    await db.commit()
-    await db.refresh(asset)
-    return asset
 
 
 async def _add_to_default_group(db, asset: Asset) -> None:

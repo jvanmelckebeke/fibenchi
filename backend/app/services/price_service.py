@@ -81,6 +81,8 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
         if count == 0:
             raise HTTPException(404, f"No price data available for {asset.symbol}")
         prices = await price_repo.list_by_asset(asset.id)
+        if not prices:
+            raise HTTPException(404, f"No price data available for {asset.symbol}")
     elif prices[0].date > needed_start:
         if not _backfill_already_attempted(asset.id, needed_start):
             earliest_before = prices[0].date
@@ -159,20 +161,28 @@ async def get_prices(db: AsyncSession, asset: Asset | None, symbol: str, period:
     return _df_to_price_rows(df, _display_start(period))
 
 
-async def get_indicators(db: AsyncSession, asset: Asset | None, symbol: str, period: str):
+async def _compute_or_cached_indicators(
+    db: AsyncSession, asset: Asset | None, symbol: str, period: str,
+) -> tuple[list[IndicatorResponse], pd.DataFrame | None]:
+    """Shared indicator computation with caching.
+
+    Returns (indicator_rows, df_or_none).  ``df_or_none`` is the full
+    DataFrame (including warmup) when indicators were freshly computed
+    (callers may need it for price rows), or ``None`` when the result
+    came from the cache.
+    """
     start = _display_start(period)
 
     if asset:
         prices = await _ensure_prices(db, asset, period)
-        last_date = prices[-1].date if prices else None
+        last_date = prices[-1].date
 
         cache_key = f"{symbol}:{period}:{last_date}"
         cached = _indicator_cache.get_value(cache_key)
         if cached is not None:
-            return cached
+            return cached, None
 
         prices = await _ensure_warmup_prices(db, asset, prices, start)
-
         df = prices_to_df(prices)
     else:
         cache_key = None
@@ -183,34 +193,30 @@ async def get_indicators(db: AsyncSession, asset: Asset | None, symbol: str, per
     if cache_key:
         _indicator_cache.set_value(cache_key, rows)
 
+    return rows, df
+
+
+async def get_indicators(db: AsyncSession, asset: Asset | None, symbol: str, period: str):
+    rows, _ = await _compute_or_cached_indicators(db, asset, symbol, period)
     return rows
 
 
 async def get_detail(db: AsyncSession, asset: Asset | None, symbol: str, period: str):
     start = _display_start(period)
 
+    indicator_rows, df = await _compute_or_cached_indicators(db, asset, symbol, period)
+
     if asset:
-        prices = await _ensure_prices(db, asset, period)
-        price_rows = [p for p in prices if p.date >= start]
-
-        last_date = prices[-1].date if prices else None
-        cache_key = f"{symbol}:{period}:{last_date}"
-        cached = _indicator_cache.get_value(cache_key)
-        if cached is not None:
-            return AssetDetailResponse(prices=price_rows, indicators=cached)
-
-        prices = await _ensure_warmup_prices(db, asset, prices, start)
-
-        df = prices_to_df(prices)
+        if df is not None:
+            # Freshly computed — we have the full warmup DF; filter price rows
+            price_rows = _df_to_price_rows(df, start)
+        else:
+            # Cache hit — fetch display prices from DB directly
+            prices = await _ensure_prices(db, asset, period)
+            price_rows = [p for p in prices if p.date >= start]
     else:
-        cache_key = None
-        df = await _fetch_ephemeral(symbol, period, warmup=True)
+        # Ephemeral — df was computed fresh, use it for price rows
         price_rows = _df_to_price_rows(df, start)
-
-    indicator_rows = _df_to_indicator_rows(compute_indicators(df), start)
-
-    if cache_key:
-        _indicator_cache.set_value(cache_key, indicator_rows)
 
     return AssetDetailResponse(prices=price_rows, indicators=indicator_rows)
 

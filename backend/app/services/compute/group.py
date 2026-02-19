@@ -53,7 +53,7 @@ async def get_batch_sparklines(
     for p in prices:
         sym = id_to_symbol.get(p.asset_id)
         if sym:
-            out[sym].append({"date": p.date.isoformat(), "close": round(float(p.close), 4)})
+            out[sym].append({"date": p.date.isoformat(), "close": round(p.close, 4)})
 
     return out
 
@@ -108,8 +108,6 @@ async def compute_and_cache_indicators(
         snapshot = build_indicator_snapshot(compute_indicators(df))
         out[symbol] = snapshot
 
-    # Store in cache (single-entry — only latest key matters)
-    _indicator_cache.clear()
     _indicator_cache.set_value(cache_key, out)
 
     return out

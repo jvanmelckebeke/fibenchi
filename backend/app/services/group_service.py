@@ -21,22 +21,22 @@ async def get_group_detail(db: AsyncSession, group_id: int):
     return await get_group(group_id, db)
 
 
-async def update_group(
-    db: AsyncSession,
-    group_id: int,
-    name: str | None,
-    description: str | None,
-    icon: str | None = None,
-):
+UPDATABLE_GROUP_FIELDS = {"name", "description", "icon"}
+
+
+async def update_group(db: AsyncSession, group_id: int, data: dict):
+    """Update a group using only the fields the client explicitly sent.
+
+    ``data`` should come from ``GroupUpdate.model_dump(exclude_unset=True)``
+    so that omitted fields are not touched and fields set to ``None`` are
+    cleared (e.g. resetting description or icon to null).
+    """
     group = await get_group(group_id, db)
-    if group.is_default and name is not None and name != group.name:
+    if group.is_default and "name" in data and data["name"] != group.name:
         raise HTTPException(400, "Cannot rename the default group")
-    if name is not None:
-        group.name = name
-    if description is not None:
-        group.description = description
-    if icon is not None:
-        group.icon = icon
+    for field, value in data.items():
+        if field in UPDATABLE_GROUP_FIELDS:
+            setattr(group, field, value)
     return await GroupRepository(db).save(group)
 
 

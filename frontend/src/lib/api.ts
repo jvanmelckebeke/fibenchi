@@ -23,7 +23,6 @@ import type {
   Tag,
   TagBrief,
   TagCreate,
-  TagUpdate,
   Thesis,
 } from "./types"
 
@@ -83,10 +82,6 @@ export const api = {
     list: () => request<Tag[]>("/tags"),
     create: (data: TagCreate) =>
       request<Tag>("/tags", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: TagUpdate) =>
-      request<Tag>(`/tags/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    delete: (id: number) =>
-      request<void>(`/tags/${id}`, { method: "DELETE" }),
     attach: (symbol: string, tagId: number) =>
       request<TagBrief[]>(`/assets/${symbol}/tags/${tagId}`, { method: "POST" }),
     detach: (symbol: string, tagId: number) =>

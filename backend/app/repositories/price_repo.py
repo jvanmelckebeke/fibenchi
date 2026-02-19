@@ -94,7 +94,7 @@ class PriceRepository:
             )
         )
         return {
-            (p.asset_id, p.date): float(p.close)
+            (p.asset_id, p.date): p.close
             for p in result.scalars().all()
         }
 

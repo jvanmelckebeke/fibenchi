@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { buildIndicatorTimeMap } from "@/lib/chart-utils"
 import { IndicatorValue } from "@/components/indicator-value"
 import { useChartHoverValues, useChartData } from "./chart-sync-provider"
 import { createSubChart, setSubChartData, type SubChartState } from "./chart-builders"
@@ -46,14 +47,7 @@ function ModalChart({
   // Build a time → indicator values lookup from the indicators array
   const indicatorsByTime = useRef(new Map<string, Record<string, number>>())
   useEffect(() => {
-    indicatorsByTime.current.clear()
-    for (const i of indicators) {
-      const vals: Record<string, number> = {}
-      for (const [field, value] of Object.entries(i.values)) {
-        if (value != null && typeof value === "number") vals[field] = value
-      }
-      indicatorsByTime.current.set(i.date, vals)
-    }
+    indicatorsByTime.current = buildIndicatorTimeMap(indicators)
   }, [indicators])
 
   useEffect(() => {

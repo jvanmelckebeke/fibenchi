@@ -7,7 +7,7 @@ from typing import Callable
 
 import pandas as pd
 
-from app.services.yahoo import batch_fetch_currencies, batch_fetch_history
+from app.services.yahoo import _batch_fetch_history_sync, batch_fetch_currencies
 from app.utils import async_threadable
 
 
@@ -327,7 +327,7 @@ def compute_batch_indicator_snapshots(
     if not symbols:
         return []
 
-    histories = batch_fetch_history(symbols, period="3mo")
+    histories = _batch_fetch_history_sync(symbols, period="3mo")
     currencies = batch_fetch_currencies(symbols)
 
     results = []

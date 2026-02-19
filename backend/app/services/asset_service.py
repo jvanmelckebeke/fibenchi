@@ -42,8 +42,8 @@ async def create_asset(
         if not name:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
         # Name was provided manually — proceed with exchange-suffix currency fallback
-        from app.services.yahoo import _currency_from_suffix
-        currency = _currency_from_suffix(symbol) or "USD"
+        from app.services.yahoo import currency_from_suffix
+        currency = currency_from_suffix(symbol) or "USD"
     else:
         # Store raw Yahoo currency code (e.g. "GBp") — the currencies table
         # provides display_code and divisor via lookup.
