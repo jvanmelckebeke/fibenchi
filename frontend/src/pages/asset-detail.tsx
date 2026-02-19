@@ -12,7 +12,7 @@ import { TagInput } from "@/components/tag-input"
 import { PeriodSelector } from "@/components/period-selector"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { buildYahooFinanceUrl, formatPrice } from "@/lib/format"
+import { buildYahooFinanceUrl, formatPrice, formatChangePct } from "@/lib/format"
 import { useQuotes } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import type { EtfHoldings } from "@/lib/api"
@@ -108,17 +108,17 @@ function Header({
             {formatPrice(price, currency)}
           </span>
         )}
-        {changePct != null && (
-          <span
-            ref={pctRef}
-            className={`text-sm font-medium tabular-nums rounded px-1 ${
-              changePct >= 0 ? "text-emerald-500" : "text-red-500"
-            }`}
-          >
-            {changePct >= 0 ? "+" : ""}
-            {changePct.toFixed(2)}%
-          </span>
-        )}
+        {changePct != null && (() => {
+          const chg = formatChangePct(changePct)
+          return (
+            <span
+              ref={pctRef}
+              className={`text-sm font-medium tabular-nums rounded px-1 ${chg.className}`}
+            >
+              {chg.text}
+            </span>
+          )
+        })()}
         <a
           href={buildYahooFinanceUrl(symbol)}
           target="_blank"

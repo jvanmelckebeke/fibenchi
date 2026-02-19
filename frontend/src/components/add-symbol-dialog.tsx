@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { Check, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,30 +10,22 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { useAssets, useCreateAsset, useAddAssetsToGroup, useSymbolSearch } from "@/lib/queries"
+import { SearchResultItem } from "@/components/search-result-item"
+import { useCreateAsset, useAddAssetsToGroup, useSymbolSearch } from "@/lib/queries"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { useTrackedSymbols } from "@/hooks/use-tracked-symbols"
 
 export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number; isDefaultGroup?: boolean }) {
   const navigate = useNavigate()
   const createAsset = useCreateAsset()
   const addAssetsToGroup = useAddAssetsToGroup()
-  const { data: assets } = useAssets()
-  const trackedSymbols = useMemo(
-    () => new Set(assets?.map((a) => a.symbol)),
-    [assets],
-  )
+  const trackedSymbols = useTrackedSymbols()
   const [symbol, setSymbol] = useState("")
-  const [debouncedQuery, setDebouncedQuery] = useState("")
+  const debouncedQuery = useDebouncedValue(symbol.trim(), 300)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const { data: searchResults } = useSymbolSearch(debouncedQuery)
   const suggestionsRef = useRef<HTMLDivElement>(null)
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(symbol.trim()), 300)
-    return () => clearTimeout(timer)
-  }, [symbol])
 
   const closeDialog = () => {
     setSymbol("")
@@ -106,16 +98,7 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
                         }
                       }}
                     >
-                      <span className="font-mono font-medium text-primary shrink-0">{r.symbol}</span>
-                      <span className="text-muted-foreground truncate">{r.name}</span>
-                      {isTracked ? (
-                        <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
-                          <Check className="h-3 w-3" />
-                          Tracked
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="ml-auto text-xs shrink-0">{r.exchange}</Badge>
-                      )}
+                      <SearchResultItem result={r} isTracked={isTracked} />
                     </button>
                   )
                 })}

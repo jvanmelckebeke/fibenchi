@@ -13,6 +13,7 @@ import {
   DailyContributionChart,
 } from "@/components/chart/pseudo-etf-charts"
 import { STACK_COLORS } from "@/lib/chart-utils"
+import { formatChangePct } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
 import type { PerformanceBreakdownPoint } from "@/lib/api"
 import {
@@ -137,6 +138,7 @@ function PerformanceStats({ data, baseValue }: { data: PerformanceBreakdownPoint
 
   const last = data[data.length - 1]
   const totalReturn = ((last.value - baseValue) / baseValue) * 100
+  const returnFmt = formatChangePct(totalReturn)
 
   return (
     <div className="flex gap-6 text-sm">
@@ -146,8 +148,8 @@ function PerformanceStats({ data, baseValue }: { data: PerformanceBreakdownPoint
       </div>
       <div>
         <span className="text-muted-foreground">Total return: </span>
-        <span className={`font-medium ${totalReturn >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-          {totalReturn >= 0 ? "+" : ""}{totalReturn.toFixed(1)}%
+        <span className={`font-medium ${returnFmt.className}`}>
+          {returnFmt.text}
         </span>
       </div>
       <div>
