@@ -12,6 +12,7 @@ import {
   getNumericValue,
   getCardDescriptors,
   resolveThresholdColor,
+  resolveAdxColor,
   type IndicatorDescriptor,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
@@ -32,21 +33,6 @@ export interface AssetCardProps {
   onHover: () => void
   showSparkline: boolean
   indicatorVisibility: Record<string, boolean>
-}
-
-/** Resolve the ADX color class based on strength + direction. */
-function resolveAdxColor(
-  adx: number,
-  values: Record<string, number | string | null>,
-): string {
-  if (adx < 20) return "text-zinc-400"
-  if (adx < 25) return "text-yellow-500"
-  const plusDi = getNumericValue(values, "plus_di")
-  const minusDi = getNumericValue(values, "minus_di")
-  if (plusDi != null && minusDi != null) {
-    return plusDi > minusDi ? "text-emerald-500" : "text-red-500"
-  }
-  return "text-foreground"
 }
 
 function MiniIndicatorCard({

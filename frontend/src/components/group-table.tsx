@@ -29,6 +29,7 @@ import {
   getSeriesByField,
   getCardDescriptors,
   resolveThresholdColor,
+  resolveAdxColor,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
@@ -434,7 +435,9 @@ function TableRow({
           }
           const val = getNumericValue(indicator?.values, field)
           const series = getSeriesByField(field)
-          const colorClass = resolveThresholdColor(series?.thresholdColors, val)
+          const colorClass = field === "adx" && val != null && indicator?.values
+            ? resolveAdxColor(val, indicator.values)
+            : resolveThresholdColor(series?.thresholdColors, val)
           const decimals = val != null && Math.abs(val) >= 100 ? 0 : 2
           return (
             <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>

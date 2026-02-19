@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import {
   resolveThresholdColor,
+  resolveAdxColor,
   getNumericValue,
   type IndicatorDescriptor,
 } from "@/lib/indicator-registry"
@@ -33,20 +34,6 @@ const CARD_HELP: Record<string, string> = {
 // Card value display
 // ---------------------------------------------------------------------------
 
-/** Resolve the ADX color class based on strength + direction. */
-function resolveAdxColor(
-  adx: number,
-  values: Record<string, number | undefined>,
-): string {
-  if (adx < 20) return "text-zinc-400"           // no meaningful trend
-  if (adx < 25) return "text-yellow-500"          // emerging trend
-  const plusDi = getNumericValue(values as Record<string, number | null>, "plus_di")
-  const minusDi = getNumericValue(values as Record<string, number | null>, "minus_di")
-  if (plusDi != null && minusDi != null) {
-    return plusDi > minusDi ? "text-emerald-500" : "text-red-500"
-  }
-  return "text-foreground"
-}
 
 function CardValue({
   descriptor,
@@ -68,7 +55,7 @@ function CardValue({
   }
 
   const colorClass = descriptor.id === "adx"
-    ? resolveAdxColor(mainVal, values)
+    ? resolveAdxColor(mainVal, values as Record<string, number | string | null>)
     : resolveThresholdColor(mainSeries.thresholdColors, mainVal)
 
   return (
