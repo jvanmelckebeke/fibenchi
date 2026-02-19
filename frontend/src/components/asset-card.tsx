@@ -7,7 +7,7 @@ import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatPrice, currencySymbol } from "@/lib/format"
+import { formatPrice, currencySymbol, changeColor } from "@/lib/format"
 import {
   getNumericValue,
   getCardDescriptors,
@@ -127,8 +127,7 @@ export function AssetCard({
   )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
-  const changeColor =
-    changePct != null ? (changePct >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground"
+  const changeCls = changeColor(changePct)
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
 
@@ -157,7 +156,7 @@ export function AssetCard({
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground truncate">{name}</p>
             {changePct != null ? (
-              <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeColor}`}>
+              <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeCls}`}>
                 {changePct >= 0 ? "+" : ""}
                 {changePct.toFixed(2)}%
               </span>
