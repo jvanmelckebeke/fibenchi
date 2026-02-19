@@ -19,7 +19,7 @@ import {
 import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
-import { formatPrice, changeColor } from "@/lib/format"
+import { formatPrice, changeColor, formatChangePct } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -27,7 +27,9 @@ import {
   getSeriesByField,
   resolveThresholdColor,
   resolveAdxColor,
+  isIndicatorVisible,
 } from "@/lib/indicator-registry"
+import { toggleSetItem } from "@/lib/utils"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 
@@ -42,7 +44,7 @@ const BASE_COLUMN_DEFS: { key: string; label: string }[] = [
 
 /** Check whether a column is visible. Missing key = visible (opt-out model). */
 function isColumnVisible(columnSettings: Record<string, boolean>, key: string): boolean {
-  return columnSettings[key] !== false
+  return isIndicatorVisible(columnSettings, key)
 }
 
 interface GroupTableProps {
@@ -63,12 +65,7 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
   const columnSettings = settings.group_table_columns
 
   const toggleExpand = (symbol: string) => {
-    setExpandedSymbols((prev) => {
-      const next = new Set(prev)
-      if (next.has(symbol)) next.delete(symbol)
-      else next.add(symbol)
-      return next
-    })
+    setExpandedSymbols((prev) => toggleSetItem(prev, symbol))
   }
 
   const toggleColumn = (key: string) => {
@@ -373,8 +370,7 @@ function TableRow({
           <td className={`${py} px-3 text-right tabular-nums`}>
             {displayPct != null ? (
               <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls} ${staleClass}`}>
-                {displayPct >= 0 ? "+" : ""}
-                {displayPct.toFixed(2)}%
+                {formatChangePct(displayPct).text}
               </span>
             ) : (
               <Skeleton className="h-4 w-12 ml-auto rounded" />

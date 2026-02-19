@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
-import { INDICATOR_REGISTRY } from "@/lib/indicator-registry"
+import { INDICATOR_REGISTRY, isIndicatorVisible } from "@/lib/indicator-registry"
 
 function VisibilityToggle({
   id,
@@ -86,7 +86,7 @@ export function SettingsPage() {
               key={`grp-${desc.id}`}
               id={`grp-${desc.id}`}
               label={desc.label}
-              checked={draft.group_indicator_visibility[desc.id] !== false}
+              checked={isIndicatorVisible(draft.group_indicator_visibility, desc.id)}
               onCheckedChange={(v) =>
                 change({
                   group_indicator_visibility: { ...draft.group_indicator_visibility, [desc.id]: v },
@@ -107,7 +107,7 @@ export function SettingsPage() {
               key={`dtl-${desc.id}`}
               id={`dtl-${desc.id}`}
               label={desc.label}
-              checked={draft.detail_indicator_visibility[desc.id] !== false}
+              checked={isIndicatorVisible(draft.detail_indicator_visibility, desc.id)}
               onCheckedChange={(v) =>
                 change({
                   detail_indicator_visibility: { ...draft.detail_indicator_visibility, [desc.id]: v },

@@ -4,7 +4,7 @@ import { CandlestickChart } from "@/components/chart/candlestick-chart"
 import { RsiChart } from "@/components/chart/rsi-chart"
 import { MacdChart } from "@/components/chart/macd-chart"
 import { IndicatorCards } from "@/components/chart/indicator-cards"
-import { getCardDescriptors } from "@/lib/indicator-registry"
+import { getCardDescriptors, isIndicatorVisible } from "@/lib/indicator-registry"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
@@ -37,7 +37,7 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
 
   const cardDescs = compact ? CARD_DESCRIPTORS_ALL : CARD_DESCRIPTORS_EXCLUSIVE
   const enabledCards = cardDescs.filter(
-    (d) => settings.detail_indicator_visibility[d.id] !== false,
+    (d) => isIndicatorVisible(settings.detail_indicator_visibility, d.id),
   )
 
   if (isLoading || !prices?.length) {

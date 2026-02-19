@@ -12,6 +12,7 @@ import type { IChartApi } from "lightweight-charts"
 import type { Price, Indicator } from "@/lib/api"
 import type { LegendValues } from "./chart-legends"
 import { getAllIndicatorFields } from "@/lib/indicator-registry"
+import { buildIndicatorTimeMap } from "@/lib/chart-utils"
 import { useCrosshairTimeSync } from "./crosshair-time-sync"
 
 // ---------------------------------------------------------------------------
@@ -76,21 +77,12 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
   useEffect(() => {
     closeByTime.current.clear()
     ohlcByTime.current.clear()
-    indicatorsByTime.current.clear()
 
     for (const p of prices) {
       closeByTime.current.set(p.date, p.close)
       ohlcByTime.current.set(p.date, { o: p.open, h: p.high, l: p.low, c: p.close })
     }
-    for (const i of indicators) {
-      const vals: Record<string, number> = {}
-      for (const [field, value] of Object.entries(i.values)) {
-        if (value != null && typeof value === "number") {
-          vals[field] = value
-        }
-      }
-      indicatorsByTime.current.set(i.date, vals)
-    }
+    indicatorsByTime.current = buildIndicatorTimeMap(indicators)
   }, [prices, indicators])
 
   const getValuesForTime = useCallback((key: string): LegendValues => {

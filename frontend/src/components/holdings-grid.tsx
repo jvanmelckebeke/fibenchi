@@ -6,6 +6,7 @@ import { IndicatorCell } from "@/components/indicator-cell"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import { formatPrice, formatChangePct } from "@/lib/format"
 import { getNumericValue, getStringValue, getHoldingSummaryDescriptors } from "@/lib/indicator-registry"
+import { toggleSetItem } from "@/lib/utils"
 
 export interface IndicatorData {
   currency: string
@@ -36,12 +37,7 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
   const hasRemove = !!onRemove
 
   const toggleExpand = (key: string | number) => {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    setExpandedKeys((prev) => toggleSetItem(prev, key))
   }
 
   // base columns: chevron + symbol + name + % + price + chg% + indicator summary columns + optional remove
