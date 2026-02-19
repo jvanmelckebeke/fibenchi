@@ -21,7 +21,7 @@ import {
 import { ArrowUp, ArrowDown } from "lucide-react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
-import { formatPrice } from "@/lib/format"
+import { formatPrice, changeColor } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -334,8 +334,7 @@ function TableRow({
 }) {
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
-  const changeColor =
-    changePct != null ? (changePct >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground"
+  const changeCls = changeColor(changePct)
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
   const py = compactMode ? "py-1.5" : "py-2.5"
@@ -397,7 +396,7 @@ function TableRow({
         {isColumnVisible(columnSettings, "change_pct") && (
           <td className={`${py} px-3 text-right tabular-nums`}>
             {changePct != null ? (
-              <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeColor}`}>
+              <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls}`}>
                 {changePct >= 0 ? "+" : ""}
                 {changePct.toFixed(2)}%
               </span>
