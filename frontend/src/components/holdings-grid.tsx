@@ -68,7 +68,7 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
               <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">Chg%</th>
               {SUMMARY_DESCRIPTORS.map((desc) => (
                 <th key={desc.id} className="text-right text-xs font-medium text-muted-foreground px-2 py-1">
-                  {desc.holdingSummary!.label}
+                  {desc.holdingSummary.label}
                 </th>
               ))}
               {hasRemove && <th className="w-8" />}
@@ -161,7 +161,7 @@ function HoldingRow({
               {chg.text ?? "\u2014"}
             </td>
             {SUMMARY_DESCRIPTORS.map((desc) => {
-              const hs = desc.holdingSummary!
+              const hs = desc.holdingSummary
               return (
                 <td key={desc.id} className="py-1 px-2 text-right">
                   <HoldingSummaryCell
