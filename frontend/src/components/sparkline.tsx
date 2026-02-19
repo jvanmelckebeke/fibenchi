@@ -7,7 +7,6 @@ export function SparklineChart({
   period = "3mo",
   batchData,
 }: {
-  symbol: string
   period?: string
   batchData?: SparklinePoint[]
 }) {

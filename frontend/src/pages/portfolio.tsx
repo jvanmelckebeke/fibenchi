@@ -8,7 +8,6 @@ import { ChartSkeleton } from "@/components/chart-skeleton"
 import { PeriodSelector } from "@/components/period-selector"
 import { usePortfolioIndex, usePortfolioPerformers, usePrefetchAssetDetail } from "@/lib/queries"
 import { formatChangePct, changeColor } from "@/lib/format"
-import { getChartTheme } from "@/lib/chart-utils"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import type { AssetPerformance } from "@/lib/api"
 
@@ -49,12 +48,10 @@ export function PortfolioPage() {
 function PortfolioChart({ dates, values, up }: { dates: string[]; values: number[]; up: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const { startLifecycle } = useChartLifecycle(containerRef, [chartRef])
+  const { theme, startLifecycle } = useChartLifecycle(containerRef, [chartRef])
 
   useEffect(() => {
     if (!containerRef.current || !dates.length) return
-
-    const theme = getChartTheme()
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,

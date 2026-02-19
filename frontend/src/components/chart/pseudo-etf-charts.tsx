@@ -6,7 +6,7 @@ import {
   LineSeries,
   HistogramSeries,
 } from "lightweight-charts"
-import { baseChartOptions, getChartTheme, STACK_COLORS } from "@/lib/chart-utils"
+import { baseChartOptions, STACK_COLORS } from "@/lib/chart-utils"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import type { PerformanceBreakdownPoint } from "@/lib/api"
 
@@ -96,9 +96,8 @@ export function PerformanceOverlayChart({
     }
 
     // Dashed base value reference line
-    const chartTheme = getChartTheme()
     const baseLine = chart.addSeries(LineSeries, {
-      color: chartTheme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
+      color: theme.dark ? "rgba(161, 161, 170, 0.5)" : "rgba(113, 113, 122, 0.5)",
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
