@@ -19,6 +19,7 @@ import { buildSortOptions } from "@/lib/indicator-registry"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type SortDir } from "@/lib/settings"
 import { useFilteredSortedAssets } from "@/lib/use-group-filter"
 import { GroupTable } from "@/components/group-table"
+import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 
 const SORT_OPTIONS = buildSortOptions()
 
@@ -182,17 +183,19 @@ export function GroupPage({ groupId }: { groupId: number }) {
 
       <div className={isPending ? "opacity-70 transition-opacity" : "transition-opacity"}>
       {viewMode === "table" && assets && assets.length > 0 ? (
-        <GroupTable
-          assets={assets}
-          quotes={quotes}
-          indicators={batchIndicators}
-          onDelete={handleRemove}
-          compactMode={settings.compact_mode}
-          onHover={prefetch}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSort={handleSort}
-        />
+        <CrosshairTimeSyncProvider enabled={true}>
+          <GroupTable
+            assets={assets}
+            quotes={quotes}
+            indicators={batchIndicators}
+            onDelete={handleRemove}
+            compactMode={settings.compact_mode}
+            onHover={prefetch}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
+        </CrosshairTimeSyncProvider>
       ) : (
         <div className={`grid gap-4 ${
           settings.compact_mode
