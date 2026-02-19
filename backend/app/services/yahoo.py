@@ -14,7 +14,7 @@ from app.utils import TTLCache, async_threadable
 logger = logging.getLogger(__name__)
 
 # In-memory TTL cache for ETF holdings (holdings change quarterly at most)
-_holdings_cache: TTLCache = TTLCache(default_ttl=86400, max_size=100)
+_holdings_cache: TTLCache = TTLCache(default_ttl=86400, max_size=100, thread_safe=True)
 
 # Fallback mapping from Yahoo Finance exchange suffixes to ISO 4217 currency codes.
 # Used when ticker.price doesn't return currency data for a symbol.
