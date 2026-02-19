@@ -25,7 +25,6 @@ export const keys = {
   portfolioIndex: (period?: string) => ["portfolio-index", period] as const,
   portfolioPerformers: (period?: string) => ["portfolio-performers", period] as const,
   assets: ["assets"] as const,
-  asset: (symbol: string) => ["assets", symbol] as const,
   assetDetail: (symbol: string, period?: string) => ["asset-detail", symbol, period] as const,
   etfHoldings: (symbol: string) => ["etf-holdings", symbol] as const,
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
@@ -351,6 +350,7 @@ export function usePseudoEtf(id: number) {
     queryKey: keys.pseudoEtf(id),
     queryFn: () => api.pseudoEtfs.get(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -406,6 +406,7 @@ export function usePseudoEtfPerformance(id: number) {
     queryKey: keys.pseudoEtfPerformance(id),
     queryFn: () => api.pseudoEtfs.performance(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -424,6 +425,7 @@ export function usePseudoEtfThesis(id: number) {
     queryKey: keys.pseudoEtfThesis(id),
     queryFn: () => api.pseudoEtfs.thesis.get(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 
@@ -440,6 +442,7 @@ export function usePseudoEtfAnnotations(id: number) {
     queryKey: keys.pseudoEtfAnnotations(id),
     queryFn: () => api.pseudoEtfs.annotations.list(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
   })
 }
 
