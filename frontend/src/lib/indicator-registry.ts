@@ -10,7 +10,7 @@
 // Types
 // ---------------------------------------------------------------------------
 
-export type IndicatorPlacement = "overlay" | "subchart"
+export type IndicatorPlacement = "overlay" | "subchart" | "card"
 
 /** Declarative conditional-color rule (pure data, no callbacks). */
 export interface ThresholdColor {
@@ -180,6 +180,55 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       colorMap: { bullish: "text-emerald-500", bearish: "text-red-500" },
     },
   },
+  {
+    id: "atr",
+    label: "ATR (14)",
+    shortLabel: "ATR",
+    placement: "card",
+    fields: ["atr"],
+    sortableFields: ["atr"],
+    series: [
+      { field: "atr", label: "ATR", color: "#f97316", lineWidth: 2 },
+    ],
+    decimals: 2,
+    holdingSummary: { label: "ATR", field: "atr", format: "numeric" },
+  },
+  {
+    id: "adx",
+    label: "ADX (14)",
+    shortLabel: "ADX",
+    placement: "card",
+    fields: ["adx", "plus_di", "minus_di"],
+    sortableFields: ["adx"],
+    series: [
+      {
+        field: "adx",
+        label: "ADX",
+        color: "#06b6d4",
+        lineWidth: 2,
+        thresholdColors: [
+          { condition: "gte", value: 25, className: "text-emerald-500" },
+          { condition: "lt", value: 20, className: "text-zinc-400" },
+        ],
+      },
+      { field: "plus_di", label: "+DI", color: "#22c55e", lineWidth: 1 },
+      { field: "minus_di", label: "-DI", color: "#ef4444", lineWidth: 1 },
+    ],
+    decimals: 1,
+    chartConfig: {
+      lines: [
+        { value: 25, color: "rgba(34, 197, 94, 0.4)" },
+        { value: 20, color: "rgba(161, 161, 170, 0.3)" },
+      ],
+      range: { min: 0, max: 60 },
+    },
+    holdingSummary: {
+      label: "ADX",
+      field: "adx_trend",
+      format: "string_map",
+      colorMap: { strong: "text-emerald-500", weak: "text-yellow-500", absent: "text-zinc-400" },
+    },
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -229,6 +278,10 @@ export function getOverlayDescriptors(): IndicatorDescriptor[] {
 
 export function getSubChartDescriptors(): IndicatorDescriptor[] {
   return INDICATOR_REGISTRY.filter((d) => d.placement === "subchart")
+}
+
+export function getCardDescriptors(): IndicatorDescriptor[] {
+  return INDICATOR_REGISTRY.filter((d) => d.placement === "card")
 }
 
 export function getAllIndicatorFields(): string[] {

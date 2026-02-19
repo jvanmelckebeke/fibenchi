@@ -112,9 +112,10 @@ export function createOverlays(chart: IChartApi): OverlayState {
 export function createSubChart(
   container: HTMLElement,
   descriptor: IndicatorDescriptor,
+  height = 120,
 ): SubChartState {
   const hasFixedRange = !!descriptor.chartConfig?.range
-  const opts = baseChartOptions(container, 120)
+  const opts = baseChartOptions(container, height)
   const chart = createChart(container, {
     ...opts,
     ...(hasFixedRange && {
