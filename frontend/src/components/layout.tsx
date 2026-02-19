@@ -147,6 +147,9 @@ function SortableGroupItem({
                 <span>{group.name}</span>
               </Link>
             </SidebarMenuButton>
+            {group.assets.length > 0 && (
+              <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>
+            )}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
@@ -164,9 +167,6 @@ function SortableGroupItem({
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      {group.assets.length > 0 && (
-        <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>
-      )}
     </SidebarMenuItem>
   )
 }
