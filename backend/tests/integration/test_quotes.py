@@ -3,9 +3,12 @@
 import asyncio
 import json
 
+import pytest
 from unittest.mock import patch
 
 from tests.conftest import TestSession
+
+pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 _MOCK_QUOTES = [

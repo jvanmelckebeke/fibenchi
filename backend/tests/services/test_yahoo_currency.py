@@ -1,4 +1,4 @@
-"""Tests for Yahoo Finance currency normalization and detection."""
+"""Tests for Yahoo Finance currency detection and OHLCV normalization."""
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -8,52 +8,8 @@ import pytest
 from app.services.yahoo import (
     EXCHANGE_CURRENCY_MAP,
     _currency_from_suffix,
-    _extract_currency,
     _normalize_ohlcv_df,
-    normalize_currency,
 )
-
-
-class TestNormalizeCurrency:
-    def test_gbp_pence_lowercase_p(self):
-        code, divisor = normalize_currency("GBp")
-        assert code == "GBP"
-        assert divisor == 100
-
-    def test_gbx(self):
-        code, divisor = normalize_currency("GBX")
-        assert code == "GBP"
-        assert divisor == 100
-
-    def test_israeli_agorot(self):
-        code, divisor = normalize_currency("ILA")
-        assert code == "ILS"
-        assert divisor == 100
-
-    def test_south_african_cents(self):
-        code, divisor = normalize_currency("ZAc")
-        assert code == "ZAR"
-        assert divisor == 100
-
-    def test_usd_unchanged(self):
-        code, divisor = normalize_currency("USD")
-        assert code == "USD"
-        assert divisor == 1
-
-    def test_eur_unchanged(self):
-        code, divisor = normalize_currency("EUR")
-        assert code == "EUR"
-        assert divisor == 1
-
-    def test_gbp_already_normalized(self):
-        code, divisor = normalize_currency("GBP")
-        assert code == "GBP"
-        assert divisor == 1
-
-    def test_unknown_currency_passthrough(self):
-        code, divisor = normalize_currency("XYZ")
-        assert code == "XYZ"
-        assert divisor == 1
 
 
 class TestCurrencyFromSuffix:
@@ -119,105 +75,6 @@ class TestCurrencyFromSuffix:
         for suffix, currency in EXCHANGE_CURRENCY_MAP.items():
             assert len(currency) == 3, f"{suffix} maps to non-ISO code: {currency}"
             assert currency == currency.upper(), f"{suffix} maps to non-uppercase: {currency}"
-
-
-class TestExtractCurrency:
-    """Tests for _extract_currency which tries multiple Yahoo data sources."""
-
-    def _make_ticker(self, price_data=None, detail_data=None):
-        """Create a mock Ticker with configurable price and summary_detail."""
-        ticker = MagicMock()
-        type(ticker).price = PropertyMock(return_value=price_data or {})
-        type(ticker).summary_detail = PropertyMock(return_value=detail_data or {})
-        return ticker
-
-    def test_extracts_from_price_data(self):
-        """Primary path: currency from ticker.price."""
-        ticker = self._make_ticker(
-            price_data={"006260.KS": {"currency": "KRW", "regularMarketPrice": 50000}},
-        )
-        currency, divisor = _extract_currency(ticker, "006260.KS")
-        assert currency == "KRW"
-        assert divisor == 1
-
-    def test_normalizes_subunit_from_price_data(self):
-        """Subunit currency (GBp) from ticker.price is normalized to GBP."""
-        ticker = self._make_ticker(
-            price_data={"HSBA.L": {"currency": "GBp"}},
-        )
-        currency, divisor = _extract_currency(ticker, "HSBA.L")
-        assert currency == "GBP"
-        assert divisor == 100
-
-    def test_falls_back_to_summary_detail(self):
-        """When ticker.price has no currency, try ticker.summary_detail."""
-        ticker = self._make_ticker(
-            price_data={"006260.KS": "No data found"},  # error string, not dict
-            detail_data={"006260.KS": {"currency": "KRW"}},
-        )
-        currency, divisor = _extract_currency(ticker, "006260.KS")
-        assert currency == "KRW"
-        assert divisor == 1
-
-    def test_falls_back_to_suffix_when_both_fail(self):
-        """When both Yahoo data sources fail, use exchange suffix mapping."""
-        ticker = self._make_ticker(
-            price_data={"006260.KS": "No data found"},
-            detail_data={"006260.KS": "No data found"},
-        )
-        currency, divisor = _extract_currency(ticker, "006260.KS")
-        assert currency == "KRW"
-        assert divisor == 1
-
-    def test_defaults_to_usd_when_all_fail(self):
-        """When all sources fail and there's no recognized suffix, default to USD."""
-        ticker = self._make_ticker(
-            price_data={"UNKNOWN": "error"},
-            detail_data={"UNKNOWN": "error"},
-        )
-        currency, divisor = _extract_currency(ticker, "UNKNOWN")
-        assert currency == "USD"
-        assert divisor == 1
-
-    def test_price_data_missing_currency_key(self):
-        """When ticker.price returns a dict but without 'currency' key, try fallback."""
-        ticker = self._make_ticker(
-            price_data={"006260.KS": {"regularMarketPrice": 50000}},  # no currency key
-            detail_data={"006260.KS": {"currency": "KRW"}},
-        )
-        currency, divisor = _extract_currency(ticker, "006260.KS")
-        assert currency == "KRW"
-        assert divisor == 1
-
-    def test_price_data_none_currency(self):
-        """When ticker.price has currency=None, try fallback."""
-        ticker = self._make_ticker(
-            price_data={"006260.KS": {"currency": None}},
-            detail_data={"006260.KS": {"currency": "KRW"}},
-        )
-        currency, divisor = _extract_currency(ticker, "006260.KS")
-        assert currency == "KRW"
-        assert divisor == 1
-
-    def test_summary_detail_normalizes_subunit(self):
-        """Subunit from summary_detail is also normalized."""
-        ticker = self._make_ticker(
-            price_data={"HSBA.L": "error"},
-            detail_data={"HSBA.L": {"currency": "GBp"}},
-        )
-        currency, divisor = _extract_currency(ticker, "HSBA.L")
-        assert currency == "GBP"
-        assert divisor == 100
-
-    def test_empty_price_data_dict(self):
-        """Empty dict from ticker.price triggers fallback."""
-        ticker = self._make_ticker(
-            price_data={},
-            detail_data={"AAPL": {"currency": "USD"}},
-        )
-        currency, divisor = _extract_currency(ticker, "AAPL")
-        assert currency == "USD"
-        assert divisor == 1
 
 
 class TestNormalizeOhlcvDf:
