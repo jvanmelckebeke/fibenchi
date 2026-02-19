@@ -74,7 +74,7 @@ EXCHANGE_CURRENCY_MAP: dict[str, str] = {
 }
 
 
-def _currency_from_suffix(symbol: str) -> str | None:
+def currency_from_suffix(symbol: str) -> str | None:
     """Derive currency from a Yahoo Finance exchange suffix (e.g. '.KS' → 'KRW').
 
     Returns None if the symbol has no recognized suffix.
@@ -84,6 +84,26 @@ def _currency_from_suffix(symbol: str) -> str | None:
         return None
     suffix = symbol[dot:]
     return EXCHANGE_CURRENCY_MAP.get(suffix.upper()) or EXCHANGE_CURRENCY_MAP.get(suffix)
+
+
+def resolve_currency(info: dict, symbol: str) -> tuple[str, int]:
+    """Resolve display currency and subunit divisor from Yahoo price info.
+
+    Applies the standard fallback chain:
+      1. Extract raw currency from the price info dict
+      2. Look it up in the currency cache (handles subunits like GBp → GBP/100)
+      3. Fall back to exchange-suffix mapping
+      4. Default to ("USD", 1)
+
+    Returns (display_code, divisor).
+    """
+    raw = info.get("currency") if isinstance(info, dict) else None
+    if raw:
+        return currency_lookup(raw)
+    suffix_currency = currency_from_suffix(symbol)
+    if suffix_currency:
+        return (suffix_currency, 1)
+    return ("USD", 1)
 
 
 def _normalize_ohlcv_df(df: pd.DataFrame, divisor: int) -> pd.DataFrame:
@@ -133,11 +153,7 @@ def fetch_history(
 
     # Convert subunit prices (e.g. pence → pounds)
     price_info = ticker.price.get(symbol, {})
-    raw = price_info.get("currency") if isinstance(price_info, dict) else None
-    if raw:
-        _, divisor = currency_lookup(raw)
-    else:
-        divisor = 1
+    _, divisor = resolve_currency(price_info, symbol)
     df = _normalize_ohlcv_df(df, divisor)
 
     return df
@@ -166,7 +182,7 @@ def validate_symbol(symbol: str) -> dict | None:
         if isinstance(detail, dict):
             raw_code = detail.get("currency")
     if not raw_code:
-        raw_code = _currency_from_suffix(symbol) or "USD"
+        raw_code = currency_from_suffix(symbol) or "USD"
 
     display_code, _ = currency_lookup(raw_code)
 
@@ -262,11 +278,7 @@ def batch_fetch_currencies(symbols: list[str]) -> dict[str, str]:
     result = {}
     for sym in symbols:
         info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
-        raw = info.get("currency") if isinstance(info, dict) else None
-        if raw:
-            display, _ = currency_lookup(raw)
-        else:
-            display = _currency_from_suffix(sym) or "USD"
+        display, _ = resolve_currency(info, sym)
         result[sym] = display
 
     return result
@@ -298,12 +310,7 @@ def _parse_price_data(
             results.append({"symbol": sym})
             continue
 
-        raw = info.get("currency") if isinstance(info, dict) else None
-        if raw:
-            currency, divisor = currency_lookup(raw)
-        else:
-            currency = _currency_from_suffix(sym) or "USD"
-            divisor = 1
+        currency, divisor = resolve_currency(info, sym)
 
         price = _sanitize(info.get("regularMarketPrice"))
         prev_close = _sanitize(info.get("regularMarketPreviousClose"))
@@ -378,11 +385,8 @@ def batch_fetch_quotes(symbols: list[str]) -> list[dict]:
     return _parse_price_data(ticker, symbols, price_data)
 
 
-def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
-    """Fetch history for multiple symbols in one batch call.
-
-    Subunit currencies (e.g. GBp) are converted to main units.
-    """
+def _batch_fetch_history_sync(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
+    """Sync implementation of batch history fetch (used by other sync Yahoo helpers)."""
     if not symbols:
         return {}
 
@@ -404,17 +408,24 @@ def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.
             if not df.empty and len(df) >= 2:
                 # Convert subunit prices (e.g. pence → pounds)
                 info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
-                raw = info.get("currency") if isinstance(info, dict) else None
-                if raw:
-                    _, divisor = currency_lookup(raw)
-                else:
-                    divisor = 1
+                _, divisor = resolve_currency(info, sym)
                 df = _normalize_ohlcv_df(df, divisor)
                 result[sym] = df
         except KeyError:
             continue
 
     return result
+
+
+@async_threadable
+def batch_fetch_history(symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
+    """Fetch history for multiple symbols in one batch call.
+
+    Subunit currencies (e.g. GBp) are converted to main units.
+    This is the async version — use ``_batch_fetch_history_sync`` for
+    calls from within other sync Yahoo helpers running in a thread.
+    """
+    return _batch_fetch_history_sync(symbols, period=period)
 
 
 @async_threadable
