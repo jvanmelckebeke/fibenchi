@@ -56,7 +56,7 @@ async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd
     start_date = date.today() - timedelta(days=days)
     try:
         df = await fetch_history(symbol.upper(), start=start_date, end=date.today())
-    except (ValueError, Exception):
+    except (ValueError, KeyError):
         raise HTTPException(404, f"No price data available for {symbol}")
 
     if df.empty:

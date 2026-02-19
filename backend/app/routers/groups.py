@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.group import GroupAddAssets, GroupCreate, GroupResponse, GroupUpdate
 from app.services import group_service
 from app.services.compute.group import compute_and_cache_indicators, get_batch_sparklines
+
+PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -47,7 +51,7 @@ async def remove_asset_from_group(group_id: int, asset_id: int, db: AsyncSession
 @router.get("/{group_id}/sparklines", summary="Batch close prices for group assets")
 async def group_sparklines(
     group_id: int,
-    period: str = "3mo",
+    period: PeriodType = Query("3mo"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, list[dict]]:
     """Return close-price sparkline data for every asset in the group."""
