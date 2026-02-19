@@ -5,22 +5,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.models import Asset, AssetType
 from app.services.asset_service import create_asset, delete_asset, list_assets
+from tests.helpers import make_model_asset as _make_asset
 
 # Patch ensure_currency globally for all tests in this module since
 # asset_service.create_asset() now calls it and the mock DB can't support it
 _ensure_patch = "app.services.asset_service.ensure_currency"
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-def _make_asset(**overrides) -> Asset:
-    defaults = dict(
-        id=1, symbol="AAPL", name="Apple Inc.",
-        type=AssetType.STOCK, currency="USD",
-    )
-    defaults.update(overrides)
-    asset = Asset(**defaults)
-    return asset
 
 
 def _make_default_group(assets=None):

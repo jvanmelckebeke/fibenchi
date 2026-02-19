@@ -7,16 +7,9 @@ import pandas as pd
 
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.price_repo import PriceRepository
+from tests.helpers import create_test_asset as _create_asset
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-async def _create_asset(db, symbol: str = "AAPL") -> Asset:
-    asset = Asset(symbol=symbol, name=f"{symbol} Inc.", type=AssetType.STOCK, currency="USD")
-    db.add(asset)
-    await db.commit()
-    await db.refresh(asset)
-    return asset
 
 
 async def _seed_prices(db, asset_id: int, n_days: int = 30, base_price: float = 100.0) -> list[PriceHistory]:
