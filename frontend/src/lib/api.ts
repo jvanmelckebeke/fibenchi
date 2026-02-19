@@ -43,7 +43,10 @@ function qs(params: Record<string, string | undefined>): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
   })
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
@@ -65,8 +68,6 @@ export const api = {
     list: () => request<Asset[]>("/assets"),
     create: (data: AssetCreate) =>
       request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
-    delete: (symbol: string) =>
-      request<void>(`/assets/${symbol}`, { method: "DELETE" }),
   },
   prices: {
     detail: (symbol: string, period?: string) =>
