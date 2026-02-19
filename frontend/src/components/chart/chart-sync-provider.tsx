@@ -12,6 +12,7 @@ import type { IChartApi } from "lightweight-charts"
 import type { Price, Indicator } from "@/lib/api"
 import type { LegendValues } from "./chart-legends"
 import { getAllIndicatorFields } from "@/lib/indicator-registry"
+import { useCrosshairTimeSync } from "./crosshair-time-sync"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,6 +66,12 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
   // Track subscription cleanup functions per chart
   const cleanupFns = useRef(new Map<IChartApi, (() => void)[]>())
 
+  // Stable identity for cross-provider time sync
+  const identityRef = useRef({})
+
+  // Optional cross-provider time sync context
+  const timeSync = useCrosshairTimeSync()
+
   // Build lookup maps whenever data changes
   useEffect(() => {
     closeByTime.current.clear()
@@ -97,6 +104,53 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
       indicators: indVals,
     }
   }, [])
+
+  /** Snap all registered charts to a given time key using local data maps. */
+  const snapChartsToTime = useCallback((key: string) => {
+    const entries = registrations.current
+    for (const entry of entries) {
+      if (entry.role === "main") {
+        const closeVal = closeByTime.current.get(key)
+        if (closeVal !== undefined) {
+          entry.chart.setCrosshairPosition(closeVal, key, entry.series)
+        }
+      } else if (entry.snapField) {
+        const val = indicatorsByTime.current.get(key)?.[entry.snapField]
+        if (val !== undefined) {
+          entry.chart.setCrosshairPosition(val, key, entry.series)
+        }
+      }
+    }
+  }, [])
+
+  /** Clear crosshair on all registered charts. */
+  const clearAllCrosshairs = useCallback(() => {
+    for (const entry of registrations.current) {
+      entry.chart.clearCrosshairPosition()
+    }
+  }, [])
+
+  // Subscribe to cross-provider time sync
+  useEffect(() => {
+    if (!timeSync) return
+
+    const unsubscribe = timeSync.subscribe((time) => {
+      if (syncingRef.current) return
+      syncingRef.current = true
+
+      if (time) {
+        setHoverValues(getValuesForTime(time))
+        snapChartsToTime(time)
+      } else {
+        setHoverValues(null)
+        clearAllCrosshairs()
+      }
+
+      syncingRef.current = false
+    }, identityRef.current)
+
+    return unsubscribe
+  }, [timeSync, getValuesForTime, snapChartsToTime, clearAllCrosshairs])
 
   // Compute latest values for default legend display
   const latestValues = useMemo<LegendValues>(() => {
@@ -187,10 +241,13 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
               }
             }
           }
+          // Broadcast to other ChartSyncProviders via shared time context
+          timeSync?.broadcast(key, identityRef.current)
         } else {
           for (const chart of charts) {
             if (chart !== source) chart.clearCrosshairPosition()
           }
+          timeSync?.broadcast(null, identityRef.current)
         }
 
         syncingRef.current = false
@@ -200,7 +257,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
 
       cleanupFns.current.set(source, fns)
     }
-  }, [getValuesForTime])
+  }, [getValuesForTime, timeSync])
 
   // Single-chart crosshair setup (when only one chart is registered)
   const wireSingleCrosshair = useCallback(
@@ -217,10 +274,15 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
             if (closeVal !== undefined) {
               entry.chart.setCrosshairPosition(closeVal, param.time, entry.series)
             }
+            // Broadcast to other ChartSyncProviders via shared time context
+            timeSync?.broadcast(key, identityRef.current)
             syncingRef.current = false
           }
         } else {
           setHoverValues(null)
+          if (!syncingRef.current) {
+            timeSync?.broadcast(null, identityRef.current)
+          }
         }
       }
       entry.chart.subscribeCrosshairMove(handler)
@@ -228,7 +290,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
 
       cleanupFns.current.set(entry.chart, fns)
     },
-    [getValuesForTime],
+    [getValuesForTime, timeSync],
   )
 
   const register = useCallback(
