@@ -58,3 +58,13 @@ class IndicatorSnapshotBase(BaseModel):
 class HoldingIndicatorResponse(IndicatorSnapshotBase):
     symbol: str = Field(description="Holding ticker symbol")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
+
+
+class SparklinePointResponse(BaseModel):
+    date: str = Field(description="Trading date as ISO 8601 string")
+    close: float = Field(description="Closing price")
+
+
+class RefreshResponse(BaseModel):
+    symbol: str = Field(description="Ticker symbol that was refreshed")
+    synced: int = Field(description="Number of price points upserted")

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.services.entity_lookups import find_asset, get_asset
-from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
+from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse, RefreshResponse
 from app.services import price_service
 
 PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
@@ -56,7 +56,7 @@ async def get_detail(symbol: str, period: PeriodType = Query("3mo"), db: AsyncSe
     return await price_service.get_detail(db, asset, symbol, period)
 
 
-@router.post("/refresh", status_code=200, summary="Force-refresh prices from Yahoo Finance")
+@router.post("/refresh", response_model=RefreshResponse, status_code=200, summary="Force-refresh prices from Yahoo Finance")
 async def refresh_prices(symbol: str, period: PeriodType = Query("3mo"), db: AsyncSession = Depends(get_db)):
     """Force a re-sync of price data from Yahoo Finance for a tracked asset.
 
