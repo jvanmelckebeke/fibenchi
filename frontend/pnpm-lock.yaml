@@ -59,9 +59,6 @@ importers:
       react-router-dom:
         specifier: ^7.13.0
         version: 7.13.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      shadcn:
-        specifier: ^3.8.4
-        version: 3.8.4(@types/node@24.10.12)(typescript@5.9.3)
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
@@ -102,6 +99,9 @@ importers:
       globals:
         specifier: ^16.5.0
         version: 16.5.0
+      shadcn:
+        specifier: ^3.8.4
+        version: 3.8.4(@types/node@24.10.12)(typescript@5.9.3)
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
