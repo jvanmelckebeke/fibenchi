@@ -140,6 +140,12 @@ export function SettingsPage() {
           <CardTitle>Chart Preferences</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <VisibilityToggle
+            id="sync-crosshairs"
+            label="Sync Pseudo-ETF Crosshairs"
+            checked={draft.sync_pseudo_etf_crosshairs}
+            onCheckedChange={(v) => change({ sync_pseudo_etf_crosshairs: v })}
+          />
           <div className="flex items-center justify-between">
             <Label>Default Period</Label>
             <Select
