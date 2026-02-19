@@ -19,11 +19,33 @@ from app.utils import TTLCache
 # In-memory indicator cache: keyed by "SYMBOL:period:last_price_date"
 _indicator_cache: TTLCache = TTLCache(default_ttl=300, max_size=200)
 
+# Cache of earliest known price dates per asset.  Keyed by asset_id, stores the
+# earliest date available after a backfill attempt was made.  When a requested
+# period starts before this date we know Yahoo has no data for the gap, so we
+# skip the fetch.  TTL of 24h means at most one redundant Yahoo call per day per
+# asset after a restart — acceptable since the daily cron updates prices anyway.
+_earliest_date_cache: TTLCache = TTLCache(default_ttl=86400, max_size=500)
+
 
 def _display_start(period: str) -> date:
     """Return the earliest date to include in the response for a given period."""
     days = PERIOD_DAYS.get(period, 90)
     return date.today() - timedelta(days=days)
+
+
+def _backfill_already_attempted(asset_id: int, requested_start: date) -> bool:
+    """Check if we already know that no data exists before the cached earliest date.
+
+    Returns True if we previously attempted a backfill for this asset and the
+    earliest available date in the DB is still after ``requested_start``.  This
+    means Yahoo has no data for the gap, so fetching again would be a no-op.
+    """
+    cached_earliest = _earliest_date_cache.get_value(asset_id)
+    if cached_earliest is None:
+        return False
+    # If the requested start is before (or equal to) what we already know is
+    # the earliest available date, skip the fetch — there's nothing to get.
+    return requested_start <= cached_earliest
 
 
 async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd.DataFrame:
@@ -58,7 +80,14 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
         if count == 0:
             raise HTTPException(404, f"No price data available for {asset.symbol}")
     elif prices[0].date > needed_start:
-        await sync_asset_prices_range(db, asset, needed_start, date.today())
+        if not _backfill_already_attempted(asset.id, needed_start):
+            earliest_before = prices[0].date
+            await sync_asset_prices_range(db, asset, needed_start, date.today())
+            prices = await price_repo.list_by_asset(asset.id)
+            # If the earliest date didn't move, Yahoo has no data for the gap.
+            # Cache this so future requests skip the fetch.
+            if prices and prices[0].date >= earliest_before:
+                _earliest_date_cache.set_value(asset.id, prices[0].date)
 
     if not prices or prices[0].date > needed_start:
         prices = await price_repo.list_by_asset(asset.id)
@@ -135,8 +164,12 @@ async def get_indicators(db: AsyncSession, asset: Asset | None, symbol: str, per
         warmup_start = start - timedelta(days=WARMUP_DAYS)
 
         if prices and prices[0].date > warmup_start:
-            await sync_asset_prices_range(db, asset, warmup_start, date.today())
-            prices = await PriceRepository(db).list_by_asset(asset.id)
+            if not _backfill_already_attempted(asset.id, warmup_start):
+                earliest_before = prices[0].date
+                await sync_asset_prices_range(db, asset, warmup_start, date.today())
+                prices = await PriceRepository(db).list_by_asset(asset.id)
+                if prices and prices[0].date >= earliest_before:
+                    _earliest_date_cache.set_value(asset.id, prices[0].date)
 
         df = _prices_to_df(prices)
     else:
@@ -166,8 +199,12 @@ async def get_detail(db: AsyncSession, asset: Asset | None, symbol: str, period:
 
         warmup_start = start - timedelta(days=WARMUP_DAYS)
         if prices and prices[0].date > warmup_start:
-            await sync_asset_prices_range(db, asset, warmup_start, date.today())
-            prices = await PriceRepository(db).list_by_asset(asset.id)
+            if not _backfill_already_attempted(asset.id, warmup_start):
+                earliest_before = prices[0].date
+                await sync_asset_prices_range(db, asset, warmup_start, date.today())
+                prices = await PriceRepository(db).list_by_asset(asset.id)
+                if prices and prices[0].date >= earliest_before:
+                    _earliest_date_cache.set_value(asset.id, prices[0].date)
 
         df = _prices_to_df(prices)
     else:

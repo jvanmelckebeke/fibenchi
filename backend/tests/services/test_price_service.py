@@ -8,7 +8,9 @@ import pandas as pd
 
 from app.models import Asset, AssetType, PriceHistory
 from app.services.price_service import (
+    _backfill_already_attempted,
     _display_start,
+    _earliest_date_cache,
     _fetch_ephemeral,
     get_detail,
     get_indicators,
@@ -130,3 +132,113 @@ async def test_refresh_delegates_to_sync(mock_sync):
 
     mock_sync.assert_awaited_once_with(db, asset, period="3mo")
     assert result == {"symbol": "AAPL", "synced": 42}
+
+
+# ---------------------------------------------------------------------------
+# Tests for earliest-date cache (skip redundant Yahoo fetches)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_earliest_cache():
+    """Ensure the earliest-date cache is empty before each test."""
+    _earliest_date_cache.clear()
+    yield
+    _earliest_date_cache.clear()
+
+
+def test_backfill_already_attempted_no_cache():
+    """Without any cache entry, _backfill_already_attempted returns False."""
+    assert _backfill_already_attempted(1, date(2021, 1, 1)) is False
+
+
+def test_backfill_already_attempted_with_cache():
+    """With a cached earliest date, returns True when requested start is before it."""
+    _earliest_date_cache.set_value(1, date(2022, 9, 30))
+    # Requesting data from 2021 — earlier than the cached earliest 2022-09-30
+    assert _backfill_already_attempted(1, date(2021, 1, 1)) is True
+    # Requesting data from exactly the cached date
+    assert _backfill_already_attempted(1, date(2022, 9, 30)) is True
+
+
+def test_backfill_already_attempted_cache_does_not_block_newer_requests():
+    """Cache does not interfere when requested start is after the cached earliest."""
+    _earliest_date_cache.set_value(1, date(2022, 9, 30))
+    # Requesting data from 2023 — after the cached earliest, so this is a normal
+    # gap (maybe the daily cron missed some data), not a "stock didn't exist" gap.
+    assert _backfill_already_attempted(1, date(2023, 1, 1)) is False
+
+
+@patch("app.services.price_service.PriceRepository")
+@patch("app.services.price_service.sync_asset_prices_range", new_callable=AsyncMock)
+async def test_ensure_prices_caches_earliest_after_noop_backfill(mock_sync_range, MockPriceRepo):
+    """After a backfill attempt that doesn't move the earliest date, the cache is populated."""
+    db = AsyncMock()
+    asset = _make_asset(id=42)
+    # Simulate stock that IPO'd ~200 days ago — prices start at day -200
+    prices = _make_price_history(asset_id=42, n_days=200)
+    earliest = prices[0].date
+
+    mock_repo = MockPriceRepo.return_value
+    # list_by_asset called twice: once initially, once after sync
+    mock_repo.list_by_asset = AsyncMock(side_effect=[prices, prices])
+    mock_sync_range.return_value = 0  # sync returned nothing new
+
+    from app.services.price_service import _ensure_prices
+    await _ensure_prices(db, asset, "5y")  # 5y goes back ~1825 days
+
+    # sync_asset_prices_range was called (first attempt)
+    mock_sync_range.assert_awaited_once()
+    # earliest date is now cached
+    cached = _earliest_date_cache.get_value(42)
+    assert cached == earliest
+
+
+@patch("app.services.price_service.PriceRepository")
+@patch("app.services.price_service.sync_asset_prices_range", new_callable=AsyncMock)
+async def test_ensure_prices_skips_fetch_on_second_request(mock_sync_range, MockPriceRepo):
+    """Second request for the same long period skips the Yahoo fetch entirely."""
+    db = AsyncMock()
+    asset = _make_asset(id=42)
+    prices = _make_price_history(asset_id=42, n_days=200)
+
+    mock_repo = MockPriceRepo.return_value
+
+    # First call: sync is attempted, earliest doesn't move
+    mock_repo.list_by_asset = AsyncMock(side_effect=[prices, prices])
+    mock_sync_range.return_value = 0
+
+    from app.services.price_service import _ensure_prices
+    await _ensure_prices(db, asset, "5y")
+    assert mock_sync_range.await_count == 1
+
+    # Second call: sync should be skipped because cache knows there's no more data
+    mock_repo.list_by_asset = AsyncMock(return_value=prices)
+    await _ensure_prices(db, asset, "5y")
+    # Still only 1 call — the second request did NOT trigger sync
+    assert mock_sync_range.await_count == 1
+
+
+@patch("app.services.price_service.PriceRepository")
+@patch("app.services.price_service.sync_asset_prices_range", new_callable=AsyncMock)
+async def test_ensure_prices_does_not_cache_when_backfill_succeeds(mock_sync_range, MockPriceRepo):
+    """When backfill actually moves the earliest date, don't cache (more data may exist)."""
+    db = AsyncMock()
+    asset = _make_asset(id=42)
+    # Initial prices start 200 days ago
+    prices_before = _make_price_history(asset_id=42, n_days=200)
+    # After sync, prices now start 400 days ago (backfill succeeded)
+    prices_after = _make_price_history(asset_id=42, n_days=400)
+
+    mock_repo = MockPriceRepo.return_value
+    mock_repo.list_by_asset = AsyncMock(side_effect=[prices_before, prices_after])
+    mock_sync_range.return_value = 200
+
+    from app.services.price_service import _ensure_prices
+    await _ensure_prices(db, asset, "5y")
+
+    # Sync was called
+    mock_sync_range.assert_awaited_once()
+    # Cache should NOT be populated — more data might exist even further back
+    cached = _earliest_date_cache.get_value(42)
+    assert cached is None
