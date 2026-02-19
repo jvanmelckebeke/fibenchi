@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useSettings, type AppSettings, type MacdStyle, type GroupViewMode } from "@/lib/settings"
+import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
 import { INDICATOR_REGISTRY } from "@/lib/indicator-registry"
 
 function VisibilityToggle({
@@ -94,23 +94,6 @@ export function SettingsPage() {
               }
             />
           ))}
-          {draft.group_indicator_visibility.macd !== false && (
-            <div className="flex items-center justify-between pl-4">
-              <Label className="text-muted-foreground">MACD Style</Label>
-              <Select
-                value={draft.group_macd_style}
-                onValueChange={(v) => change({ group_macd_style: v as MacdStyle })}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="classic">Classic</SelectItem>
-                  <SelectItem value="divergence">Divergence</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </CardContent>
       </Card>
 
