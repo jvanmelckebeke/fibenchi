@@ -4,14 +4,13 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import pandas as pd
-
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import PriceHistory
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
 from app.repositories.price_repo import PriceRepository
 from app.services.compute.indicators import build_indicator_snapshot, compute_indicators
+from app.services.compute.utils import prices_to_df
 from app.utils import TTLCache
 
 # In-memory cache for batch indicator snapshots.
@@ -104,14 +103,7 @@ async def compute_and_cache_indicators(
             out[symbol] = {"values": {}}
             continue
 
-        df = pd.DataFrame([{
-            "date": p.date,
-            "open": float(p.open),
-            "high": float(p.high),
-            "low": float(p.low),
-            "close": float(p.close),
-            "volume": p.volume,
-        } for p in prices]).set_index("date")
+        df = prices_to_df(prices)
 
         snapshot = build_indicator_snapshot(compute_indicators(df))
         out[symbol] = snapshot
