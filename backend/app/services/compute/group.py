@@ -108,8 +108,6 @@ async def compute_and_cache_indicators(
         snapshot = build_indicator_snapshot(compute_indicators(df))
         out[symbol] = snapshot
 
-    # Store in cache (single-entry — only latest key matters)
-    _indicator_cache.clear()
     _indicator_cache.set_value(cache_key, out)
 
     return out
