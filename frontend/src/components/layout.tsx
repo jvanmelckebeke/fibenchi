@@ -43,6 +43,7 @@ const STATUS_CONFIG = {
   connecting: { color: "bg-yellow-500", label: "Connecting..." },
   connected: { color: "bg-green-500", label: "Live" },
   reconnecting: { color: "bg-yellow-500 animate-pulse", label: "Reconnecting..." },
+  disconnected: { color: "bg-red-500", label: "Disconnected" },
 } as const
 
 function GroupsSection() {
