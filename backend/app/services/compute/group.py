@@ -53,7 +53,7 @@ async def get_batch_sparklines(
     for p in prices:
         sym = id_to_symbol.get(p.asset_id)
         if sym:
-            out[sym].append({"date": p.date.isoformat(), "close": round(float(p.close), 4)})
+            out[sym].append({"date": p.date.isoformat(), "close": round(p.close, 4)})
 
     return out
 

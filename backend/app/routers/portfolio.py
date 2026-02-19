@@ -1,32 +1,12 @@
-from datetime import date
-from typing import Literal
-
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import PeriodType
 from app.database import get_db
-from app.models.asset import AssetType
+from app.schemas.portfolio import AssetPerformance, PortfolioIndexResponse
 from app.services.compute.portfolio import compute_performers, compute_portfolio_index
 
-PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
-
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
-
-
-class PortfolioIndexResponse(BaseModel):
-    dates: list[date]
-    values: list[float]
-    current: float
-    change: float
-    change_pct: float
-
-
-class AssetPerformance(BaseModel):
-    symbol: str
-    name: str
-    type: AssetType
-    change_pct: float
 
 
 @router.get("/index", response_model=PortfolioIndexResponse, summary="Get composite portfolio index")
