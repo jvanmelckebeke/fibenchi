@@ -105,6 +105,8 @@ export function DeferredSparkline(props: {
     }
   }, [])
 
+  const hasData = !!props.batchData
+
   useEffect(() => {
     const el = sentinelRef.current
     if (!el || isVisible) return
@@ -114,7 +116,7 @@ export function DeferredSparkline(props: {
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [isVisible, observerCallback])
+  }, [isVisible, observerCallback, hasData])
 
   if (isVisible) {
     return <SparklineChart {...props} />
