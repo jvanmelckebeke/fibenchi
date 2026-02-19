@@ -8,7 +8,8 @@ import { getCardDescriptors } from "@/lib/indicator-registry"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
-const CARD_DESCRIPTORS = getCardDescriptors()
+const CARD_DESCRIPTORS_ALL = getCardDescriptors()
+const CARD_DESCRIPTORS_EXCLUSIVE = getCardDescriptors(true)
 
 interface ExpandedAssetChartProps {
   symbol: string
@@ -34,7 +35,8 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
   const indicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
 
-  const enabledCards = CARD_DESCRIPTORS.filter(
+  const cardDescs = compact ? CARD_DESCRIPTORS_ALL : CARD_DESCRIPTORS_EXCLUSIVE
+  const enabledCards = cardDescs.filter(
     (d) => settings.detail_indicator_visibility[d.id] !== false,
   )
 

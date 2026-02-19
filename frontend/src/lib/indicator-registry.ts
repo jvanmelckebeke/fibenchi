@@ -292,8 +292,10 @@ export function getSubChartDescriptors(): IndicatorDescriptor[] {
   return INDICATOR_REGISTRY.filter((d) => d.placement === "subchart")
 }
 
-export function getCardDescriptors(): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) => d.placement === "card" || d.cardEligible)
+export function getCardDescriptors(excludeSubcharts = false): IndicatorDescriptor[] {
+  return INDICATOR_REGISTRY.filter((d) =>
+    d.placement === "card" || (!excludeSubcharts && d.cardEligible),
+  )
 }
 
 export function getAllIndicatorFields(): string[] {
