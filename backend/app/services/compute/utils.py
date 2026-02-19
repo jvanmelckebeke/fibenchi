@@ -12,9 +12,9 @@ def prices_to_df(prices: list[PriceHistory]) -> pd.DataFrame:
     """
     return pd.DataFrame([{
         "date": p.date,
-        "open": float(p.open),
-        "high": float(p.high),
-        "low": float(p.low),
-        "close": float(p.close),
+        "open": p.open,
+        "high": p.high,
+        "low": p.low,
+        "close": p.close,
         "volume": p.volume,
     } for p in prices]).set_index("date")

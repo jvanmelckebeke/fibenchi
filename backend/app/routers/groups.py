@@ -1,15 +1,12 @@
-from typing import Literal
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import PeriodType
 from app.database import get_db
 from app.schemas.group import GroupAddAssets, GroupCreate, GroupReorder, GroupResponse, GroupUpdate
 from app.schemas.price import IndicatorSnapshotBase, SparklinePointResponse
 from app.services import group_service
 from app.services.compute.group import compute_and_cache_indicators, get_batch_sparklines
-
-PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
