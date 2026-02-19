@@ -344,11 +344,6 @@ export function extractMacdValues(values?: Record<string, number | string | null
   } : undefined
 }
 
-/** Check whether an indicator's values are denominated in the asset's currency. */
-export function isPriceDenominated(id: string): boolean {
-  return INDICATOR_REGISTRY.find((d) => d.id === id)?.priceDenominated === true
-}
-
 export function getSeriesByField(field: string): SeriesDescriptor | undefined {
   for (const desc of INDICATOR_REGISTRY) {
     const s = desc.series.find((ser) => ser.field === field)

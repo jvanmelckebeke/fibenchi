@@ -14,7 +14,7 @@ export const STACK_COLORS = [
   "#c084fc", // purple-400
 ]
 
-export function themeColors(isDark: boolean) {
+function themeColors(isDark: boolean) {
   return {
     bg: isDark ? "#18181b" : "#ffffff",
     text: isDark ? "#a1a1aa" : "#71717a",
@@ -24,7 +24,7 @@ export function themeColors(isDark: boolean) {
   }
 }
 
-export function getChartTheme() {
+function getChartTheme() {
   return themeColors(document.documentElement.classList.contains("dark"))
 }
 

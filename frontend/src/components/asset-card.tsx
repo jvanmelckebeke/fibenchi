@@ -21,7 +21,6 @@ export interface AssetCardProps {
   currency: string
   tags: TagBrief[]
   quote?: Quote
-  sparklinePeriod: string
   sparklineData?: SparklinePoint[]
   indicatorData?: IndicatorSummary
   onDelete: () => void
@@ -54,7 +53,6 @@ export function AssetCard({
   currency,
   tags,
   quote,
-  sparklinePeriod,
   sparklineData,
   indicatorData,
   onDelete,
@@ -113,7 +111,7 @@ export function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          {showSparkline && <DeferredSparkline symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
+          {showSparkline && <DeferredSparkline batchData={sparklineData} />}
           {enabledCards.length > 0 && (
             <div className="grid grid-cols-2 gap-1.5 mt-1">
               {enabledCards.map((desc) => (
