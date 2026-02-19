@@ -5,13 +5,21 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
-import { RsiGauge } from "@/components/rsi-gauge"
-import { MacdIndicator } from "@/components/macd-indicator"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatPrice } from "@/lib/format"
-import { getNumericValue, extractMacdValues } from "@/lib/indicator-registry"
+import { formatPrice, currencySymbol } from "@/lib/format"
+import {
+  getNumericValue,
+  getCardDescriptors,
+  resolveThresholdColor,
+  type IndicatorDescriptor,
+} from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
+
+const CARD_DESCRIPTORS = getCardDescriptors()
+
+/** IDs of indicators whose values are denominated in the asset's currency. */
+const PRICE_DENOMINATED = new Set(["atr"])
 
 export interface AssetCardProps {
   symbol: string
@@ -29,6 +37,76 @@ export interface AssetCardProps {
   indicatorVisibility: Record<string, boolean>
 }
 
+/** Resolve the ADX color class based on strength + direction. */
+function resolveAdxColor(
+  adx: number,
+  values: Record<string, number | string | null>,
+): string {
+  if (adx < 20) return "text-zinc-400"
+  if (adx < 25) return "text-yellow-500"
+  const plusDi = getNumericValue(values, "plus_di")
+  const minusDi = getNumericValue(values, "minus_di")
+  if (plusDi != null && minusDi != null) {
+    return plusDi > minusDi ? "text-emerald-500" : "text-red-500"
+  }
+  return "text-foreground"
+}
+
+function MiniIndicatorCard({
+  descriptor,
+  values,
+  currency,
+}: {
+  descriptor: IndicatorDescriptor
+  values?: Record<string, number | string | null>
+  currency: string
+}) {
+  const mainSeries = descriptor.series[0]
+  const mainVal = getNumericValue(values, mainSeries.field)
+
+  if (mainVal == null) {
+    return (
+      <div className="rounded bg-muted/50 px-2 py-1">
+        <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
+        <span className="block text-sm font-semibold tabular-nums text-muted-foreground">--</span>
+      </div>
+    )
+  }
+
+  const colorClass = descriptor.id === "adx"
+    ? resolveAdxColor(mainVal, values ?? {})
+    : resolveThresholdColor(mainSeries.thresholdColors, mainVal)
+
+  return (
+    <div className="rounded bg-muted/50 px-2 py-1">
+      <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
+      <span className={`block text-sm font-semibold tabular-nums ${colorClass || "text-foreground"}`}>
+        {currency && PRICE_DENOMINATED.has(descriptor.id) ? currencySymbol(currency) : ""}{mainVal.toFixed(descriptor.decimals)}
+      </span>
+      {descriptor.id === "adx" && (
+        <div className="flex gap-2 tabular-nums text-[10px] mt-0.5">
+          <span className="text-emerald-500">
+            +DI {getNumericValue(values, "plus_di")?.toFixed(1) ?? "--"}
+          </span>
+          <span className="text-red-500">
+            -DI {getNumericValue(values, "minus_di")?.toFixed(1) ?? "--"}
+          </span>
+        </div>
+      )}
+      {descriptor.id === "macd" && (
+        <div className="flex gap-2 tabular-nums text-[10px] mt-0.5">
+          <span className="text-sky-400">
+            M {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
+          </span>
+          <span className="text-orange-400">
+            S {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AssetCard({
   symbol,
   name,
@@ -44,8 +122,9 @@ export function AssetCard({
   showSparkline,
   indicatorVisibility,
 }: AssetCardProps) {
-  const showRsi = indicatorVisibility.rsi !== false
-  const showMacd = indicatorVisibility.macd !== false
+  const enabledCards = CARD_DESCRIPTORS.filter(
+    (d) => indicatorVisibility[d.id] !== false,
+  )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
   const changeColor =
@@ -96,10 +175,16 @@ export function AssetCard({
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
           {showSparkline && <DeferredSparkline symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
-          {(showRsi || showMacd) && (
-            <div className="flex gap-1.5 mt-1">
-              {showRsi && <RsiGauge batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
-              {showMacd && <MacdIndicator batchMacd={extractMacdValues(indicatorData?.values)} />}
+          {enabledCards.length > 0 && (
+            <div className="grid grid-cols-2 gap-1.5 mt-1">
+              {enabledCards.map((desc) => (
+                <MiniIndicatorCard
+                  key={desc.id}
+                  descriptor={desc}
+                  values={indicatorData?.values}
+                  currency={currency}
+                />
+              ))}
             </div>
           )}
         </CardContent>
