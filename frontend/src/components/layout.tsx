@@ -8,11 +8,28 @@ import {
   FolderOpen,
   Plus,
   X,
+  Trash2,
 } from "lucide-react"
 import { useQuoteStatus } from "@/lib/quote-stream"
 import { CommandSearch } from "@/components/command-search"
-import { useGroups, useCreateGroup } from "@/lib/queries"
+import { useGroups, useCreateGroup, useDeleteGroup } from "@/lib/queries"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Sidebar,
   SidebarContent,
@@ -49,10 +66,12 @@ const STATUS_CONFIG = {
 function GroupsSection() {
   const { data: groups } = useGroups()
   const createGroup = useCreateGroup()
+  const deleteGroup = useDeleteGroup()
   const location = useLocation()
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
   const { state } = useSidebar()
 
   const handleCreate = () => {
@@ -68,6 +87,18 @@ function GroupsSection() {
         },
       },
     )
+  }
+
+  const handleDelete = () => {
+    if (!deleteTarget) return
+    const id = deleteTarget.id
+    deleteGroup.mutate(id, {
+      onSuccess: () => {
+        if (location.pathname === `/groups/${id}`) navigate("/")
+        setDeleteTarget(null)
+      },
+      onError: () => setDeleteTarget(null),
+    })
   }
 
   if (!groups) return null
@@ -129,16 +160,29 @@ function GroupsSection() {
           )}
           {customGroups.map((group) => (
             <SidebarMenuItem key={group.id}>
-              <SidebarMenuButton
-                asChild
-                isActive={location.pathname === `/groups/${group.id}`}
-                tooltip={group.name}
-              >
-                <Link to={`/groups/${group.id}`}>
-                  <FolderOpen />
-                  <span>{group.name}</span>
-                </Link>
-              </SidebarMenuButton>
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === `/groups/${group.id}`}
+                    tooltip={group.name}
+                  >
+                    <Link to={`/groups/${group.id}`}>
+                      <FolderOpen />
+                      <span>{group.name}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    variant="destructive"
+                    onClick={() => setDeleteTarget({ id: group.id, name: group.name })}
+                  >
+                    <Trash2 />
+                    Delete group
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
               {group.assets.length > 0 && (
                 <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>
               )}
@@ -146,6 +190,23 @@ function GroupsSection() {
           ))}
         </SidebarMenu>
       </SidebarGroupContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{deleteTarget?.name}&rdquo;? Assets in this group will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarGroup>
   )
 }
