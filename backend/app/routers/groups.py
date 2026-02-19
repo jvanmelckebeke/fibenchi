@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.group import GroupAddAssets, GroupCreate, GroupResponse, GroupUpdate
+from app.schemas.price import IndicatorSnapshotBase, SparklinePointResponse
 from app.services import group_service
 from app.services.compute.group import compute_and_cache_indicators, get_batch_sparklines
 
@@ -48,20 +49,20 @@ async def remove_asset_from_group(group_id: int, asset_id: int, db: AsyncSession
     return await group_service.remove_asset(db, group_id, asset_id)
 
 
-@router.get("/{group_id}/sparklines", summary="Batch close prices for group assets")
+@router.get("/{group_id}/sparklines", response_model=dict[str, list[SparklinePointResponse]], summary="Batch close prices for group assets")
 async def group_sparklines(
     group_id: int,
     period: PeriodType = Query("3mo"),
     db: AsyncSession = Depends(get_db),
-) -> dict[str, list[dict]]:
+):
     """Return close-price sparkline data for every asset in the group."""
     return await get_batch_sparklines(db, period, group_id=group_id)
 
 
-@router.get("/{group_id}/indicators", summary="Batch indicators for group assets")
+@router.get("/{group_id}/indicators", response_model=dict[str, IndicatorSnapshotBase], summary="Batch indicators for group assets")
 async def group_indicators(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-) -> dict[str, dict]:
+):
     """Return the latest indicator snapshot for every asset in the group."""
     return await compute_and_cache_indicators(db, group_id=group_id)

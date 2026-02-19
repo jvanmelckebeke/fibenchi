@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.asset import AssetType
 from app.services.compute.portfolio import compute_performers, compute_portfolio_index
 
 PeriodType = Literal["1mo", "3mo", "6mo", "1y", "2y", "5y"]
@@ -24,7 +25,7 @@ class PortfolioIndexResponse(BaseModel):
 class AssetPerformance(BaseModel):
     symbol: str
     name: str
-    type: str
+    type: AssetType
     change_pct: float
 
 
