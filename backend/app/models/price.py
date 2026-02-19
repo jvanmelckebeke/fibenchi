@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, UniqueConstraint
+from sqlalchemy import BigInteger, Date, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -17,7 +17,7 @@ class PriceHistory(Base):
     high: Mapped[float] = mapped_column(Numeric(12, 4))
     low: Mapped[float] = mapped_column(Numeric(12, 4))
     close: Mapped[float] = mapped_column(Numeric(12, 4))
-    volume: Mapped[int] = mapped_column(Integer)
+    volume: Mapped[int] = mapped_column(BigInteger)
 
     asset: Mapped["Asset"] = relationship(back_populates="prices")
 
