@@ -241,6 +241,13 @@ export function useDeleteGroup() {
   })
 }
 
+export function useReorderGroups() {
+  return useInvalidatingMutation(
+    (groupIds: number[]) => api.groups.reorder(groupIds),
+    [keys.groups],
+  )
+}
+
 export function useAddAssetsToGroup() {
   return useInvalidatingMutation(
     ({ groupId, assetIds }: { groupId: number; assetIds: number[] }) =>

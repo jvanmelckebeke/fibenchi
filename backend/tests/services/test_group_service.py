@@ -71,7 +71,7 @@ async def test_create_group_success(MockRepo):
 
     result = await create_group(db, name="Tech", description="Tech stocks")
 
-    mock_repo.create.assert_awaited_once_with(name="Tech", description="Tech stocks")
+    mock_repo.create.assert_awaited_once_with(name="Tech", description="Tech stocks", icon=None)
     assert result == new_group
 
 

@@ -54,6 +54,7 @@ export interface Group {
   id: number
   name: string
   description: string | null
+  icon: string | null
   is_default: boolean
   position: number
   created_at: string
@@ -63,11 +64,13 @@ export interface Group {
 export interface GroupCreate {
   name: string
   description?: string
+  icon?: string
 }
 
 export interface GroupUpdate {
   name?: string
   description?: string
+  icon?: string
 }
 
 export interface Price {

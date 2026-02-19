@@ -101,6 +101,8 @@ export const api = {
       request<Group>(`/groups/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     delete: (id: number) =>
       request<void>(`/groups/${id}`, { method: "DELETE" }),
+    reorder: (groupIds: number[]) =>
+      request<Group[]>("/groups/reorder", { method: "PUT", body: JSON.stringify({ group_ids: groupIds }) }),
     addAssets: (id: number, assetIds: number[]) =>
       request<Group>(`/groups/${id}/assets`, {
         method: "POST",

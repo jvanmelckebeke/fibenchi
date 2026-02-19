@@ -8,11 +8,17 @@ from app.schemas.asset import AssetResponse
 class GroupCreate(BaseModel):
     name: str = Field(description="Unique group name")
     description: str | None = Field(default=None, description="Optional group description")
+    icon: str | None = Field(default=None, description="Lucide icon name (e.g. 'briefcase', 'globe')")
 
 
 class GroupUpdate(BaseModel):
     name: str | None = Field(default=None, description="New group name")
     description: str | None = Field(default=None, description="New description")
+    icon: str | None = Field(default=None, description="Lucide icon name")
+
+
+class GroupReorder(BaseModel):
+    group_ids: list[int] = Field(description="Ordered list of group IDs (position derived from index)")
 
 
 class GroupAddAssets(BaseModel):
@@ -23,6 +29,7 @@ class GroupResponse(BaseModel):
     id: int = Field(description="Group ID")
     name: str = Field(description="Group name")
     description: str | None = Field(description="Group description")
+    icon: str | None = Field(description="Lucide icon name")
     is_default: bool = Field(description="Whether this is the protected default group (Watchlist)")
     position: int = Field(description="Display order position (0 = first)")
     created_at: datetime.datetime = Field(description="Creation timestamp")
