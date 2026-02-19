@@ -1,5 +1,6 @@
-import { useState, useTransition } from "react"
-import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, Table, TrendingUp } from "lucide-react"
+import { useState, useMemo, useTransition } from "react"
+import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, Star, Table, TrendingUp } from "lucide-react"
+import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -229,12 +230,17 @@ export function GroupPage({ groupId }: { groupId: number }) {
 
 function GroupHeader({ groupId, group, isDefaultGroup }: {
   groupId: number
-  group?: { name: string; description: string | null; assets: { id: number }[] }
+  group?: { name: string; description: string | null; icon: string | null; assets: { id: number }[] }
   isDefaultGroup: boolean
 }) {
   const updateGroup = useUpdateGroup()
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState("")
+
+  const HeaderIcon = useMemo(
+    () => isDefaultGroup ? Star : resolveIcon(group?.icon),
+    [isDefaultGroup, group?.icon],
+  )
 
   const startEditing = () => {
     if (isDefaultGroup || !group) return
@@ -276,6 +282,8 @@ function GroupHeader({ groupId, group, isDefaultGroup }: {
 
   return (
     <div className="flex items-center gap-2">
+      {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
+      <HeaderIcon className="h-5 w-5 text-muted-foreground" />
       <h1 className="text-2xl font-bold">{group.name}</h1>
       {!isDefaultGroup && (
         <button

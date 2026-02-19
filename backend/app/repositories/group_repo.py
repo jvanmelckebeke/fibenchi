@@ -44,6 +44,9 @@ class GroupRepository:
         await self.db.refresh(group)
         return group
 
+    async def save_all(self) -> None:
+        await self.db.commit()
+
     async def delete(self, group: Group) -> None:
         await self.db.delete(group)
         await self.db.commit()
