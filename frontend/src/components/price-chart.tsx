@@ -3,9 +3,11 @@ import type { Price, Indicator, Annotation } from "@/lib/api"
 import { ChartSyncProvider } from "./chart/chart-sync-provider"
 import { CandlestickChart } from "./chart/candlestick-chart"
 import { SubChart } from "./chart/sub-chart"
-import { getSubChartDescriptors } from "@/lib/indicator-registry"
+import { IndicatorCards } from "./chart/indicator-cards"
+import { getSubChartDescriptors, getCardDescriptors } from "@/lib/indicator-registry"
 
 const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()
+const CARD_DESCRIPTORS = getCardDescriptors()
 
 interface PriceChartProps {
   prices: Price[]
@@ -15,6 +17,8 @@ interface PriceChartProps {
   indicatorVisibility?: Record<string, boolean>
   chartType?: "candle" | "line"
   mainChartHeight?: number
+  /** ISO 4217 currency code for formatting price-denominated indicators (e.g. ATR). */
+  currency?: string
 }
 
 export function PriceChart({
@@ -24,6 +28,7 @@ export function PriceChart({
   indicatorVisibility,
   chartType = "candle",
   mainChartHeight = 400,
+  currency,
 }: PriceChartProps) {
   const isVisible = useCallback(
     (id: string) => indicatorVisibility?.[id] !== false,
@@ -32,6 +37,11 @@ export function PriceChart({
 
   const enabledSubCharts = useMemo(
     () => SUB_CHART_DESCRIPTORS.filter((d) => isVisible(d.id)),
+    [isVisible],
+  )
+
+  const enabledCards = useMemo(
+    () => CARD_DESCRIPTORS.filter((d) => isVisible(d.id)),
     [isVisible],
   )
 
@@ -56,6 +66,7 @@ export function PriceChart({
             roundedClass={idx === enabledSubCharts.length - 1 ? "rounded-b-md" : ""}
           />
         ))}
+        <IndicatorCards descriptors={enabledCards} currency={currency} />
       </div>
     </ChartSyncProvider>
   )
