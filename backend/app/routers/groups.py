@@ -36,7 +36,7 @@ async def get_group_detail(group_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{group_id}", response_model=GroupResponse, summary="Update a group")
 async def update_group(group_id: int, data: GroupUpdate, db: AsyncSession = Depends(get_db)):
-    return await group_service.update_group(db, group_id, data.name, data.description, data.icon)
+    return await group_service.update_group(db, group_id, data.model_dump(exclude_unset=True))
 
 
 @router.delete("/{group_id}", status_code=204, summary="Delete a group")

@@ -59,5 +59,9 @@ async def ensure_currency(db: AsyncSession, raw_code: str) -> None:
     currency = Currency(code=raw_code, display_code=raw_code, divisor=1)
     db.add(currency)
     await db.flush()
+    # Cache is updated eagerly (before the caller commits). This is safe because
+    # the caller is responsible for committing the transaction — if it rolls back,
+    # the stale cache entry merely maps to (raw_code, 1) which is the same
+    # fallback that lookup() would return for an unknown code anyway.
     _cache[raw_code] = (raw_code, 1)
     logger.info("Auto-registered unknown currency: %s", raw_code)

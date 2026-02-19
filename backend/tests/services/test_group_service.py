@@ -74,18 +74,34 @@ async def test_create_group_success(MockRepo):
 
 
 @patch("app.services.group_service.GroupRepository")
-async def test_update_group_patches_only_non_none_fields(MockRepo):
+async def test_update_group_only_sets_provided_fields(MockRepo):
+    """Fields not in the data dict (omitted by client) are untouched."""
     db = AsyncMock()
     group = _make_group(name="Old", description="Old desc")
     mock_repo = MockRepo.return_value
     mock_repo.save = AsyncMock(return_value=group)
 
     with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
-        await update_group(db, group_id=1, name="New", description=None)
+        await update_group(db, group_id=1, data={"name": "New"})
 
     assert group.name == "New"
     assert group.description == "Old desc"
     mock_repo.save.assert_awaited_once_with(group)
+
+
+@patch("app.services.group_service.GroupRepository")
+async def test_update_group_can_clear_optional_field(MockRepo):
+    """Explicitly sending None clears an optional field (exclude_unset pattern)."""
+    db = AsyncMock()
+    group = _make_group(name="Old", description="Old desc")
+    mock_repo = MockRepo.return_value
+    mock_repo.save = AsyncMock(return_value=group)
+
+    with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
+        await update_group(db, group_id=1, data={"description": None})
+
+    assert group.name == "Old"
+    assert group.description is None
 
 
 @patch("app.services.group_service.GroupRepository")
@@ -96,7 +112,7 @@ async def test_update_group_patches_both_fields(MockRepo):
     mock_repo.save = AsyncMock(return_value=group)
 
     with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
-        await update_group(db, group_id=1, name="New", description="New desc")
+        await update_group(db, group_id=1, data={"name": "New", "description": "New desc"})
 
     assert group.name == "New"
     assert group.description == "New desc"
@@ -167,7 +183,7 @@ async def test_rename_default_group_raises_400(MockRepo):
 
     with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
         with pytest.raises(HTTPException) as exc_info:
-            await update_group(db, group_id=1, name="Renamed", description=None)
+            await update_group(db, group_id=1, data={"name": "Renamed"})
         assert exc_info.value.status_code == 400
 
 
@@ -179,7 +195,7 @@ async def test_update_default_group_description_allowed(MockRepo):
     mock_repo.save = AsyncMock(return_value=group)
 
     with patch(_PATCH_GET_GROUP, new_callable=AsyncMock, return_value=group):
-        await update_group(db, group_id=1, name=None, description="Updated desc")
+        await update_group(db, group_id=1, data={"description": "Updated desc"})
 
     assert group.description == "Updated desc"
     mock_repo.save.assert_awaited_once()

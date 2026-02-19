@@ -7,68 +7,68 @@ import pytest
 
 from app.services.yahoo import (
     EXCHANGE_CURRENCY_MAP,
-    _currency_from_suffix,
+    currency_from_suffix,
     _normalize_ohlcv_df,
 )
 
 
 class TestCurrencyFromSuffix:
-    """Tests for _currency_from_suffix exchange-suffix-to-currency mapping."""
+    """Tests for currency_from_suffix exchange-suffix-to-currency mapping."""
 
     def test_kospi_returns_krw(self):
-        assert _currency_from_suffix("006260.KS") == "KRW"
+        assert currency_from_suffix("006260.KS") == "KRW"
 
     def test_kosdaq_returns_krw(self):
-        assert _currency_from_suffix("035420.KQ") == "KRW"
+        assert currency_from_suffix("035420.KQ") == "KRW"
 
     def test_tokyo_returns_jpy(self):
-        assert _currency_from_suffix("7203.T") == "JPY"
+        assert currency_from_suffix("7203.T") == "JPY"
 
     def test_hong_kong_returns_hkd(self):
-        assert _currency_from_suffix("0700.HK") == "HKD"
+        assert currency_from_suffix("0700.HK") == "HKD"
 
     def test_xetra_returns_eur(self):
-        assert _currency_from_suffix("VWCE.DE") == "EUR"
+        assert currency_from_suffix("VWCE.DE") == "EUR"
 
     def test_london_returns_gbp(self):
-        assert _currency_from_suffix("HSBA.L") == "GBP"
+        assert currency_from_suffix("HSBA.L") == "GBP"
 
     def test_toronto_returns_cad(self):
-        assert _currency_from_suffix("RY.TO") == "CAD"
+        assert currency_from_suffix("RY.TO") == "CAD"
 
     def test_australia_returns_aud(self):
-        assert _currency_from_suffix("CBA.AX") == "AUD"
+        assert currency_from_suffix("CBA.AX") == "AUD"
 
     def test_india_nse_returns_inr(self):
-        assert _currency_from_suffix("RELIANCE.NS") == "INR"
+        assert currency_from_suffix("RELIANCE.NS") == "INR"
 
     def test_india_bse_returns_inr(self):
-        assert _currency_from_suffix("RELIANCE.BO") == "INR"
+        assert currency_from_suffix("RELIANCE.BO") == "INR"
 
     def test_shanghai_returns_cny(self):
-        assert _currency_from_suffix("600519.SS") == "CNY"
+        assert currency_from_suffix("600519.SS") == "CNY"
 
     def test_swiss_returns_chf(self):
-        assert _currency_from_suffix("NESN.SW") == "CHF"
+        assert currency_from_suffix("NESN.SW") == "CHF"
 
     def test_copenhagen_returns_dkk(self):
-        assert _currency_from_suffix("NOVO-B.CO") == "DKK"
+        assert currency_from_suffix("NOVO-B.CO") == "DKK"
 
     def test_oslo_returns_nok(self):
-        assert _currency_from_suffix("EQNR.OL") == "NOK"
+        assert currency_from_suffix("EQNR.OL") == "NOK"
 
     def test_stockholm_returns_sek(self):
-        assert _currency_from_suffix("VOLV-B.ST") == "SEK"
+        assert currency_from_suffix("VOLV-B.ST") == "SEK"
 
     def test_no_suffix_returns_none(self):
-        assert _currency_from_suffix("AAPL") is None
+        assert currency_from_suffix("AAPL") is None
 
     def test_unknown_suffix_returns_none(self):
-        assert _currency_from_suffix("FOO.ZZ") is None
+        assert currency_from_suffix("FOO.ZZ") is None
 
     def test_case_insensitive_suffix(self):
         """Suffix lookup handles case variations (e.g. '.ks' vs '.KS')."""
-        assert _currency_from_suffix("006260.ks") == "KRW"
+        assert currency_from_suffix("006260.ks") == "KRW"
 
     def test_all_map_entries_are_iso_4217_length(self):
         """All currency codes in the exchange map are 3 characters (ISO 4217)."""
