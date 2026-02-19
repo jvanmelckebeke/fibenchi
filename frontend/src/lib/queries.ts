@@ -119,7 +119,7 @@ export function useHoldingsIndicators(symbol: string, enabled: boolean) {
 export function useRefreshPrices(symbol: string) {
   return useInvalidatingMutation(
     (period?: string) => api.prices.refresh(symbol, period),
-    [keys.assetDetail(symbol)],
+    [["asset-detail", symbol]],
   )
 }
 
@@ -221,17 +221,25 @@ export function useCreateGroup() {
 }
 
 export function useUpdateGroup() {
-  return useInvalidatingMutation(
-    ({ id, data }: { id: number; data: GroupUpdate }) => api.groups.update(id, data),
-    [keys.groups],
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: GroupUpdate }) => api.groups.update(id, data),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: keys.groups })
+      qc.invalidateQueries({ queryKey: keys.group(vars.id) })
+    },
+  })
 }
 
 export function useDeleteGroup() {
-  return useInvalidatingMutation(
-    (id: number) => api.groups.delete(id),
-    [keys.groups],
-  )
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.groups.delete(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: keys.groups })
+      qc.invalidateQueries({ queryKey: keys.group(id) })
+    },
+  })
 }
 
 export function useAddAssetsToGroup() {
