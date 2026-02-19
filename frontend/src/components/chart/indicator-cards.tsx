@@ -33,9 +33,6 @@ const CARD_HELP: Record<string, string> = {
 // Card value display
 // ---------------------------------------------------------------------------
 
-/** IDs of indicators whose values are denominated in the asset's currency. */
-const PRICE_DENOMINATED = new Set(["atr"])
-
 /** Resolve the ADX color class based on strength + direction. */
 function resolveAdxColor(
   adx: number,
@@ -77,7 +74,7 @@ function CardValue({
   return (
     <div className="flex flex-col">
       <span className={`${sizeClass} font-semibold tabular-nums ${colorClass || "text-foreground"}`}>
-        {currency && PRICE_DENOMINATED.has(descriptor.id) ? currencySymbol(currency) : ""}{mainVal.toFixed(descriptor.decimals)}
+        {currency && descriptor.priceDenominated ? currencySymbol(currency) : ""}{mainVal.toFixed(descriptor.decimals)}
       </span>
       {/* ADX: show +DI / -DI below the main value */}
       {descriptor.id === "adx" && (

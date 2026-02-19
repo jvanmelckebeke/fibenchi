@@ -18,9 +18,6 @@ import { usePriceFlash } from "@/lib/use-price-flash"
 
 const CARD_DESCRIPTORS = getCardDescriptors()
 
-/** IDs of indicators whose values are denominated in the asset's currency. */
-const PRICE_DENOMINATED = new Set(["atr"])
-
 export interface AssetCardProps {
   symbol: string
   name: string
@@ -81,7 +78,7 @@ function MiniIndicatorCard({
     <div className="rounded bg-muted/50 px-2 py-1">
       <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
       <span className={`block text-sm font-semibold tabular-nums ${colorClass || "text-foreground"}`}>
-        {currency && PRICE_DENOMINATED.has(descriptor.id) ? currencySymbol(currency) : ""}{mainVal.toFixed(descriptor.decimals)}
+        {currency && descriptor.priceDenominated ? currencySymbol(currency) : ""}{mainVal.toFixed(descriptor.decimals)}
       </span>
       {descriptor.id === "adx" && (
         <div className="flex gap-2 tabular-nums text-[10px] mt-0.5">

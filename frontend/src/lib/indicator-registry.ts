@@ -68,6 +68,8 @@ export interface IndicatorDescriptor {
   }
   /** When true, this indicator also renders as a card (in addition to its primary placement). */
   cardEligible?: boolean
+  /** When true, the indicator's values are denominated in the asset's currency (e.g. ATR). */
+  priceDenominated?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +198,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     ],
     decimals: 2,
     holdingSummary: { label: "ATR", field: "atr", format: "numeric" },
+    priceDenominated: true,
   },
   {
     id: "adx",
@@ -327,6 +330,11 @@ export function extractMacdValues(values?: Record<string, number | string | null
     macd_signal: getNumericValue(values, "macd_signal"),
     macd_hist: getNumericValue(values, "macd_hist"),
   } : undefined
+}
+
+/** Check whether an indicator's values are denominated in the asset's currency. */
+export function isPriceDenominated(id: string): boolean {
+  return INDICATOR_REGISTRY.find((d) => d.id === id)?.priceDenominated === true
 }
 
 export function getSeriesByField(field: string): SeriesDescriptor | undefined {
