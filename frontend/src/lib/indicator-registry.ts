@@ -10,7 +10,7 @@
 // Types
 // ---------------------------------------------------------------------------
 
-export type IndicatorPlacement = "overlay" | "subchart"
+export type IndicatorPlacement = "overlay" | "subchart" | "card"
 
 /** Declarative conditional-color rule (pure data, no callbacks). */
 export interface ThresholdColor {
@@ -66,6 +66,10 @@ export interface IndicatorDescriptor {
     format: "numeric" | "compare_close" | "string_map"
     colorMap?: Record<string, string>
   }
+  /** When true, this indicator also renders as a card (in addition to its primary placement). */
+  cardEligible?: boolean
+  /** When true, the indicator's values are denominated in the asset's currency (e.g. ATR). */
+  priceDenominated?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +105,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       range: { min: 0, max: 100 },
     },
     holdingSummary: { label: "RSI", field: "rsi", format: "numeric" },
+    cardEligible: true,
   },
   {
     id: "sma_20",
@@ -153,7 +158,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     shortLabel: "MACD",
     placement: "subchart",
     fields: ["macd", "macd_signal", "macd_hist"],
-    sortableFields: ["macd", "macd_signal", "macd_hist"],
+    sortableFields: ["macd"],
     series: [
       {
         field: "macd_hist",
@@ -178,6 +183,57 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       field: "macd_signal_dir",
       format: "string_map",
       colorMap: { bullish: "text-emerald-500", bearish: "text-red-500" },
+    },
+    cardEligible: true,
+  },
+  {
+    id: "atr",
+    label: "ATR (14)",
+    shortLabel: "ATR",
+    placement: "card",
+    fields: ["atr"],
+    sortableFields: ["atr"],
+    series: [
+      { field: "atr", label: "ATR", color: "#f97316", lineWidth: 2 },
+    ],
+    decimals: 2,
+    holdingSummary: { label: "ATR", field: "atr", format: "numeric" },
+    priceDenominated: true,
+  },
+  {
+    id: "adx",
+    label: "ADX (14)",
+    shortLabel: "ADX",
+    placement: "card",
+    fields: ["adx", "plus_di", "minus_di"],
+    sortableFields: ["adx"],
+    series: [
+      {
+        field: "adx",
+        label: "ADX",
+        color: "#06b6d4",
+        lineWidth: 2,
+        thresholdColors: [
+          { condition: "gte", value: 25, className: "text-emerald-500" },
+          { condition: "lt", value: 20, className: "text-zinc-400" },
+        ],
+      },
+      { field: "plus_di", label: "+DI", color: "#22c55e", lineWidth: 1 },
+      { field: "minus_di", label: "-DI", color: "#ef4444", lineWidth: 1 },
+    ],
+    decimals: 1,
+    chartConfig: {
+      lines: [
+        { value: 25, color: "rgba(34, 197, 94, 0.4)" },
+        { value: 20, color: "rgba(161, 161, 170, 0.3)" },
+      ],
+      range: { min: 0, max: 60 },
+    },
+    holdingSummary: {
+      label: "ADX",
+      field: "adx_trend",
+      format: "string_map",
+      colorMap: { strong: "text-emerald-500", weak: "text-yellow-500", absent: "text-zinc-400" },
     },
   },
 ]
@@ -207,7 +263,7 @@ export function resolveThresholdColor(
 
 /** Safely extract a numeric value from the values dict. */
 export function getNumericValue(
-  values: Record<string, number | string | null> | undefined,
+  values: Record<string, number | string | null | undefined> | undefined,
   field: string,
 ): number | null {
   const v = values?.[field]
@@ -216,7 +272,7 @@ export function getNumericValue(
 
 /** Safely extract a string value from the values dict. */
 export function getStringValue(
-  values: Record<string, number | string | null> | undefined,
+  values: Record<string, number | string | null | undefined> | undefined,
   field: string,
 ): string | null {
   const v = values?.[field]
@@ -229,6 +285,10 @@ export function getOverlayDescriptors(): IndicatorDescriptor[] {
 
 export function getSubChartDescriptors(): IndicatorDescriptor[] {
   return INDICATOR_REGISTRY.filter((d) => d.placement === "subchart")
+}
+
+export function getCardDescriptors(): IndicatorDescriptor[] {
+  return INDICATOR_REGISTRY.filter((d) => d.placement === "card" || d.cardEligible)
 }
 
 export function getAllIndicatorFields(): string[] {
@@ -272,10 +332,36 @@ export function extractMacdValues(values?: Record<string, number | string | null
   } : undefined
 }
 
+/** Check whether an indicator's values are denominated in the asset's currency. */
+export function isPriceDenominated(id: string): boolean {
+  return INDICATOR_REGISTRY.find((d) => d.id === id)?.priceDenominated === true
+}
+
 export function getSeriesByField(field: string): SeriesDescriptor | undefined {
   for (const desc of INDICATOR_REGISTRY) {
     const s = desc.series.find((ser) => ser.field === field)
     if (s) return s
   }
   return undefined
+}
+
+/**
+ * Resolve the ADX color class based on trend strength + DI direction.
+ *
+ * - ADX < 20  → gray (no meaningful trend)
+ * - ADX 20-25 → yellow (emerging trend)
+ * - ADX >= 25 → green (+DI > -DI, bullish) or red (-DI > +DI, bearish)
+ */
+export function resolveAdxColor(
+  adx: number,
+  values: Record<string, number | string | null | undefined>,
+): string {
+  if (adx < 20) return "text-zinc-400"
+  if (adx < 25) return "text-yellow-500"
+  const plusDi = getNumericValue(values, "plus_di")
+  const minusDi = getNumericValue(values, "minus_di")
+  if (plusDi != null && minusDi != null) {
+    return plusDi > minusDi ? "text-emerald-500" : "text-red-500"
+  }
+  return "text-foreground"
 }

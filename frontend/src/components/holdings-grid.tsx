@@ -1,9 +1,18 @@
+import { useState } from "react"
 import { Link } from "react-router-dom"
-import { X } from "lucide-react"
+import { ChevronRight, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { IndicatorCell } from "@/components/indicator-cell"
+import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
+import { CandlestickChart } from "@/components/chart/candlestick-chart"
+import { RsiChart } from "@/components/chart/rsi-chart"
+import { MacdChart } from "@/components/chart/macd-chart"
+import { IndicatorCards } from "@/components/chart/indicator-cards"
 import { formatPrice, formatChangePct } from "@/lib/format"
-import { getNumericValue, getStringValue, getHoldingSummaryDescriptors } from "@/lib/indicator-registry"
+import { getNumericValue, getStringValue, getHoldingSummaryDescriptors, getCardDescriptors } from "@/lib/indicator-registry"
+import { useAssetDetail, useAnnotations } from "@/lib/queries"
+import { useSettings } from "@/lib/settings"
 
 export interface IndicatorData {
   currency: string
@@ -29,88 +38,216 @@ interface HoldingsGridProps {
 
 const SUMMARY_DESCRIPTORS = getHoldingSummaryDescriptors()
 
-function buildGridTemplate(hasRemove: boolean): string {
-  // base: symbol, name, %, price, chg%
-  const base = "4rem 1fr 3.5rem 5rem 4rem"
-  const indicatorCols = SUMMARY_DESCRIPTORS.map(() => "3.5rem").join(" ")
-  const removePart = hasRemove ? " 2rem" : ""
-  return `${base} ${indicatorCols}${removePart}`
-}
-
 export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, linkTarget }: HoldingsGridProps) {
+  const [expandedKeys, setExpandedKeys] = useState<Set<string | number>>(new Set())
   const hasRemove = !!onRemove
-  const gridTemplate = buildGridTemplate(hasRemove)
-  const gridStyle = { gridTemplateColumns: gridTemplate }
+
+  const toggleExpand = (key: string | number) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // base columns: chevron + symbol + name + % + price + chg% + indicator summary columns + optional remove
+  const totalColSpan = 1 + 1 + 1 + 1 + 1 + 1 + SUMMARY_DESCRIPTORS.length + (hasRemove ? 1 : 0)
 
   return (
     <div className="overflow-x-auto">
-      <div className={`${hasRemove ? "min-w-[750px]" : "min-w-[700px]"} space-y-0`}>
-        <div className="grid text-xs text-muted-foreground border-b border-border pb-1 mb-1 gap-x-2" style={gridStyle}>
-          <span>Symbol</span>
-          <span>Name</span>
-          <span className="text-right">%</span>
-          <span className="text-right">Price</span>
-          <span className="text-right">Chg%</span>
-          {SUMMARY_DESCRIPTORS.map((desc) => (
-            <span key={desc.id} className="text-right">{desc.holdingSummary!.label}</span>
-          ))}
-          {hasRemove && <span></span>}
-        </div>
-        {rows.map((row) => {
-          const ind = indicatorMap.get(row.symbol)
-          const chg = formatChangePct(ind?.change_pct ?? null)
-
-          return (
-            <div
-              key={row.key}
-              className={`grid text-sm py-1 hover:bg-muted/50 rounded gap-x-2 items-center${hasRemove ? " group/row" : ""}`}
-              style={gridStyle}
-            >
-              <Link
-                to={`/asset/${row.symbol}`}
-                {...(linkTarget === "_blank" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                className="font-mono text-xs text-primary hover:underline"
-              >
-                {row.symbol}
-              </Link>
-              <span className="text-muted-foreground truncate text-xs">{row.name}</span>
-              <IndicatorCell value={row.percent != null ? `${row.percent.toFixed(1)}%` : null} />
-              {indicatorsLoading ? (
-                <span className="text-right text-xs text-muted-foreground animate-pulse" style={{ gridColumn: `span ${2 + SUMMARY_DESCRIPTORS.length}` }}>Loading...</span>
-              ) : (
-                <>
-                  <IndicatorCell value={ind?.close != null ? formatPrice(ind.close, ind.currency, 0) : null} />
-                  <IndicatorCell value={chg.text} className={chg.className} />
-                  {SUMMARY_DESCRIPTORS.map((desc) => {
-                    const hs = desc.holdingSummary!
-                    return (
-                      <HoldingSummaryCell
-                        key={desc.id}
-                        format={hs.format}
-                        field={hs.field}
-                        colorMap={hs.colorMap}
-                        values={ind?.values}
-                        close={ind?.close ?? null}
-                      />
-                    )
-                  })}
-                </>
-              )}
-              {hasRemove && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 opacity-0 group-hover/row:opacity-100 transition-opacity"
-                  onClick={() => onRemove!(row.key)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          )
-        })}
+      <div className={hasRemove ? "min-w-[750px]" : "min-w-[700px]"}>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="w-6" />
+              <th className="text-left text-xs font-medium text-muted-foreground px-2 py-1">Symbol</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-2 py-1">Name</th>
+              <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">%</th>
+              <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">Price</th>
+              <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">Chg%</th>
+              {SUMMARY_DESCRIPTORS.map((desc) => (
+                <th key={desc.id} className="text-right text-xs font-medium text-muted-foreground px-2 py-1">
+                  {desc.holdingSummary!.label}
+                </th>
+              ))}
+              {hasRemove && <th className="w-8" />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <HoldingRow
+                key={row.key}
+                row={row}
+                indicator={indicatorMap.get(row.symbol)}
+                indicatorsLoading={indicatorsLoading}
+                expanded={expandedKeys.has(row.key)}
+                onToggle={() => toggleExpand(row.key)}
+                onRemove={onRemove ? () => onRemove(row.key) : undefined}
+                linkTarget={linkTarget}
+                totalColSpan={totalColSpan}
+              />
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
+  )
+}
+
+function HoldingRow({
+  row,
+  indicator,
+  indicatorsLoading,
+  expanded,
+  onToggle,
+  onRemove,
+  linkTarget,
+  totalColSpan,
+}: {
+  row: HoldingsGridRow
+  indicator: IndicatorData | undefined
+  indicatorsLoading: boolean
+  expanded: boolean
+  onToggle: () => void
+  onRemove?: () => void
+  linkTarget?: "_blank"
+  totalColSpan: number
+}) {
+  const chg = formatChangePct(indicator?.change_pct ?? null)
+
+  return (
+    <>
+      <tr
+        className="border-b border-border hover:bg-muted/30 cursor-pointer group/row transition-colors"
+        onClick={onToggle}
+      >
+        <td className="py-1 pl-2">
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+        </td>
+        <td className="py-1 px-2">
+          <Link
+            to={`/asset/${row.symbol}`}
+            {...(linkTarget === "_blank" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            className="font-mono text-xs text-primary hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {row.symbol}
+          </Link>
+        </td>
+        <td className="py-1 px-2 text-muted-foreground truncate text-xs max-w-[200px]">
+          {row.name}
+        </td>
+        <td className="py-1 px-2 text-right text-xs">
+          {row.percent != null ? `${row.percent.toFixed(1)}%` : "\u2014"}
+        </td>
+        {indicatorsLoading ? (
+          <td
+            colSpan={2 + SUMMARY_DESCRIPTORS.length}
+            className="py-1 px-2 text-right text-xs text-muted-foreground animate-pulse"
+          >
+            Loading...
+          </td>
+        ) : (
+          <>
+            <td className="py-1 px-2 text-right text-xs">
+              {indicator?.close != null ? formatPrice(indicator.close, indicator.currency, 0) : "\u2014"}
+            </td>
+            <td className={`py-1 px-2 text-right text-xs ${chg.className}`}>
+              {chg.text ?? "\u2014"}
+            </td>
+            {SUMMARY_DESCRIPTORS.map((desc) => {
+              const hs = desc.holdingSummary!
+              return (
+                <td key={desc.id} className="py-1 px-2 text-right">
+                  <HoldingSummaryCell
+                    format={hs.format}
+                    field={hs.field}
+                    colorMap={hs.colorMap}
+                    values={indicator?.values}
+                    close={indicator?.close ?? null}
+                  />
+                </td>
+              )
+            })}
+          </>
+        )}
+        {onRemove && (
+          <td className="py-1 pr-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 opacity-0 group-hover/row:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemove()
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </td>
+        )}
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
+            <ExpandedHoldingContent symbol={row.symbol} currency={indicator?.currency} />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+const CARD_DESCRIPTORS = getCardDescriptors()
+
+function ExpandedHoldingContent({ symbol, currency }: { symbol: string; currency?: string }) {
+  const { settings } = useSettings()
+  const period = settings.chart_default_period
+  const { data: detail, isLoading } = useAssetDetail(symbol, period)
+  const prices = detail?.prices
+  const indicators = detail?.indicators
+  const { data: annotations } = useAnnotations(symbol)
+
+  const enabledCards = CARD_DESCRIPTORS.filter(
+    (d) => settings.detail_indicator_visibility[d.id] !== false,
+  )
+
+  if (isLoading || !prices?.length) {
+    return (
+      <div className="space-y-1">
+        <Skeleton className="h-[250px] w-full rounded-t-md" />
+        <Skeleton className="h-[60px] w-full" />
+        <Skeleton className="h-[60px] w-full rounded-b-md" />
+      </div>
+    )
+  }
+
+  return (
+    <ChartSyncProvider prices={prices} indicators={indicators ?? []}>
+      <div className="space-y-0">
+        <CandlestickChart
+          annotations={annotations ?? []}
+          indicatorVisibility={{
+            ...settings.detail_indicator_visibility,
+            rsi: false,
+            macd: false,
+          }}
+          chartType={settings.chart_type}
+          height={250}
+          hideTimeAxis
+          showLegend
+          roundedClass="rounded-t-md"
+        />
+        <RsiChart showLegend roundedClass="" />
+        <MacdChart showLegend roundedClass="rounded-b-md" />
+        <IndicatorCards descriptors={enabledCards} currency={currency} compact />
+      </div>
+    </ChartSyncProvider>
   )
 }
 
@@ -145,7 +282,17 @@ function HoldingSummaryCell({
 
   // string_map
   const str = getStringValue(values, field)
-  const colorClass = str != null && colorMap ? (colorMap[str] ?? "") : ""
+  let colorClass = str != null && colorMap ? (colorMap[str] ?? "") : ""
+
+  // ADX "strong" → color by direction (+DI vs -DI)
+  if (field === "adx_trend" && str === "strong") {
+    const plusDi = getNumericValue(values, "plus_di")
+    const minusDi = getNumericValue(values, "minus_di")
+    if (plusDi != null && minusDi != null) {
+      colorClass = plusDi > minusDi ? "text-emerald-500" : "text-red-500"
+    }
+  }
+
   const display = str != null ? str.charAt(0).toUpperCase() + str.slice(1) : null
   return <IndicatorCell value={display} className={colorClass} />
 }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, Table, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,7 @@ import { buildSortOptions } from "@/lib/indicator-registry"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type SortDir } from "@/lib/settings"
 import { useFilteredSortedAssets } from "@/lib/use-group-filter"
 import { GroupTable } from "@/components/group-table"
+import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 
 const SORT_OPTIONS = buildSortOptions()
 
@@ -31,8 +32,15 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
-  const viewMode = settings.group_view_mode
-  const setViewMode = (v: "card" | "table") => updateSettings({ group_view_mode: v })
+  const [isPending, startTransition] = useTransition()
+  const [deferredViewMode, setDeferredViewMode] = useState(settings.group_view_mode)
+  const viewMode = deferredViewMode
+  const setViewMode = (v: "card" | "table") => {
+    updateSettings({ group_view_mode: v })
+    startTransition(() => {
+      setDeferredViewMode(v)
+    })
+  }
   const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod)
   const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
@@ -131,7 +139,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               { value: "card", label: <LayoutGrid className="h-3.5 w-3.5" /> },
               { value: "table", label: <Table className="h-3.5 w-3.5" /> },
             ]}
-            value={viewMode}
+            value={settings.group_view_mode}
             onChange={setViewMode}
           />
         </div>
@@ -173,18 +181,21 @@ export function GroupPage({ groupId }: { groupId: number }) {
         </div>
       )}
 
+      <div className={isPending ? "opacity-70 transition-opacity" : "transition-opacity"}>
       {viewMode === "table" && assets && assets.length > 0 ? (
-        <GroupTable
-          assets={assets}
-          quotes={quotes}
-          indicators={batchIndicators}
-          onDelete={handleRemove}
-          compactMode={settings.compact_mode}
-          onHover={prefetch}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSort={handleSort}
-        />
+        <CrosshairTimeSyncProvider enabled={true}>
+          <GroupTable
+            assets={assets}
+            quotes={quotes}
+            indicators={batchIndicators}
+            onDelete={handleRemove}
+            compactMode={settings.compact_mode}
+            onHover={prefetch}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
+        </CrosshairTimeSyncProvider>
       ) : (
         <div className={`grid gap-4 ${
           settings.compact_mode
@@ -211,6 +222,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }

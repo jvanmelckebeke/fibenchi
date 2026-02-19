@@ -2,10 +2,16 @@ import { useState, useEffect, useMemo } from "react"
 import { ColorType } from "lightweight-charts"
 
 export const STACK_COLORS = [
-  "#2563eb", "#dc2626", "#16a34a", "#d97706", "#9333ea",
-  "#0891b2", "#e11d48", "#65a30d", "#c026d3", "#0d9488",
-  "#ea580c", "#4f46e5", "#059669", "#db2777", "#ca8a04",
-  "#7c3aed", "#0284c7", "#be123c", "#15803d", "#a21caf",
+  "#6366f1", // indigo-500
+  "#a78bfa", // violet-400
+  "#2dd4bf", // teal-400
+  "#fbbf24", // amber-400
+  "#f87171", // red-400
+  "#34d399", // emerald-400
+  "#fb923c", // orange-400
+  "#818cf8", // indigo-400
+  "#94a3b8", // slate-400
+  "#c084fc", // purple-400
 ]
 
 export function getChartTheme() {

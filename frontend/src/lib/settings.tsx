@@ -15,12 +15,14 @@ export interface AppSettings {
   group_type_filter: AssetTypeFilter
   group_sort_by: GroupSortBy
   group_sort_dir: SortDir
+  group_table_columns: Record<string, boolean>
   detail_indicator_visibility: Record<string, boolean>
   chart_default_period: string
   chart_type: "candle" | "line"
   theme: "dark" | "light" | "system"
   compact_mode: boolean
   decimal_places: number
+  sync_pseudo_etf_crosshairs: boolean
 }
 
 function defaultVisibility(): Record<string, boolean> {
@@ -36,12 +38,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
   group_type_filter: "all",
   group_sort_by: "name",
   group_sort_dir: "asc",
+  group_table_columns: {},
   detail_indicator_visibility: defaultVisibility(),
   chart_default_period: "1y",
   chart_type: "candle",
   theme: "system",
   compact_mode: false,
   decimal_places: 2,
+  sync_pseudo_etf_crosshairs: false,
 }
 
 const STORAGE_KEY = "fibenchi-settings"

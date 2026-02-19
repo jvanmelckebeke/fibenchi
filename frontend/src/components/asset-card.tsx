@@ -4,14 +4,15 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { SparklineChart } from "@/components/sparkline"
-import { RsiGauge } from "@/components/rsi-gauge"
-import { MacdIndicator } from "@/components/macd-indicator"
+import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatPrice } from "@/lib/format"
-import { getNumericValue, extractMacdValues } from "@/lib/indicator-registry"
+import { formatPrice, changeColor } from "@/lib/format"
+import { getCardDescriptors, type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { IndicatorValue } from "@/components/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
+
+const CARD_DESCRIPTORS = getCardDescriptors()
 
 export interface AssetCardProps {
   symbol: string
@@ -29,6 +30,23 @@ export interface AssetCardProps {
   indicatorVisibility: Record<string, boolean>
 }
 
+function MiniIndicatorCard({
+  descriptor,
+  values,
+  currency,
+}: {
+  descriptor: IndicatorDescriptor
+  values?: Record<string, number | string | null>
+  currency: string
+}) {
+  return (
+    <div className="rounded bg-muted/50 px-2 py-1">
+      <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
+      <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact />
+    </div>
+  )
+}
+
 export function AssetCard({
   symbol,
   name,
@@ -44,12 +62,12 @@ export function AssetCard({
   showSparkline,
   indicatorVisibility,
 }: AssetCardProps) {
-  const showRsi = indicatorVisibility.rsi !== false
-  const showMacd = indicatorVisibility.macd !== false
+  const enabledCards = CARD_DESCRIPTORS.filter(
+    (d) => indicatorVisibility[d.id] !== false,
+  )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
-  const changeColor =
-    changePct != null ? (changePct >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground"
+  const changeCls = changeColor(changePct)
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
 
@@ -78,7 +96,7 @@ export function AssetCard({
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground truncate">{name}</p>
             {changePct != null ? (
-              <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeColor}`}>
+              <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeCls}`}>
                 {changePct >= 0 ? "+" : ""}
                 {changePct.toFixed(2)}%
               </span>
@@ -95,11 +113,17 @@ export function AssetCard({
           )}
         </CardHeader>
         <CardContent className="pt-0 space-y-2">
-          {showSparkline && <SparklineChart symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
-          {(showRsi || showMacd) && (
-            <div className="flex gap-1.5 mt-1">
-              {showRsi && <RsiGauge batchRsi={getNumericValue(indicatorData?.values, "rsi")} />}
-              {showMacd && <MacdIndicator batchMacd={extractMacdValues(indicatorData?.values)} />}
+          {showSparkline && <DeferredSparkline symbol={symbol} period={sparklinePeriod} batchData={sparklineData} />}
+          {enabledCards.length > 0 && (
+            <div className="grid grid-cols-2 gap-1.5 mt-1">
+              {enabledCards.map((desc) => (
+                <MiniIndicatorCard
+                  key={desc.id}
+                  descriptor={desc}
+                  values={indicatorData?.values}
+                  currency={currency}
+                />
+              ))}
             </div>
           )}
         </CardContent>

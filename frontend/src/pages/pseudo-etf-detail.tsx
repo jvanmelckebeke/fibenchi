@@ -7,11 +7,13 @@ import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/add-constituent-picker"
+import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 import {
-  StackedAreaChart,
+  PerformanceOverlayChart,
   DailyContributionChart,
 } from "@/components/chart/pseudo-etf-charts"
 import { STACK_COLORS } from "@/lib/chart-utils"
+import { useSettings } from "@/lib/settings"
 import type { PerformanceBreakdownPoint } from "@/lib/api"
 import {
   usePseudoEtf,
@@ -81,7 +83,7 @@ export function PseudoEtfDetailPage() {
 
       {performance && performance.length > 0 && (
         <>
-          <StackedAreaChart data={performance} baseValue={etf.base_value} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
+          <PerformanceOverlayChart data={performance} baseValue={etf.base_value} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
           <PerformanceStats data={performance} baseValue={etf.base_value} />
           {performance.length > 1 && (
             <DailyContributionChart data={performance} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
@@ -164,6 +166,8 @@ function HoldingsTable({ etfId }: { etfId: number }) {
   )
   const removeConstituent = useRemovePseudoEtfConstituent()
   const [addingAsset, setAddingAsset] = useState(false)
+  const { settings } = useSettings()
+  const syncEnabled = settings.sync_pseudo_etf_crosshairs
 
   if (!etf) return null
 
@@ -202,12 +206,14 @@ function HoldingsTable({ etfId }: { etfId: number }) {
         )}
 
         {etf.constituents.length > 0 && (
-          <HoldingsGrid
-            rows={rows}
-            indicatorMap={indicatorMap}
-            indicatorsLoading={indicatorsLoading}
-            onRemove={(key) => removeConstituent.mutate({ etfId, assetId: key as number })}
-          />
+          <CrosshairTimeSyncProvider enabled={syncEnabled}>
+            <HoldingsGrid
+              rows={rows}
+              indicatorMap={indicatorMap}
+              indicatorsLoading={indicatorsLoading}
+              onRemove={(key) => removeConstituent.mutate({ etfId, assetId: key as number })}
+            />
+          </CrosshairTimeSyncProvider>
         )}
       </CardContent>
     </Card>

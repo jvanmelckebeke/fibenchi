@@ -20,6 +20,11 @@ export function formatPrice(value: number, currency: string, decimals = 2): stri
   return `${currencySymbol(currency)}${value.toFixed(decimals)}`
 }
 
+export function changeColor(pct: number | null | undefined): string {
+  if (pct == null) return "text-muted-foreground"
+  return pct >= 0 ? "text-emerald-500" : "text-red-500"
+}
+
 export function formatChangePct(v: number | null): { text: string | null; className: string } {
   if (v === null) return { text: null, className: "" }
   const sign = v >= 0 ? "+" : ""
