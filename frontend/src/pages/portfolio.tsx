@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { ChartSkeleton } from "@/components/chart-skeleton"
 import { PeriodSelector } from "@/components/period-selector"
 import { usePortfolioIndex, usePortfolioPerformers, usePrefetchAssetDetail } from "@/lib/queries"
+import { formatChangePct, changeColor } from "@/lib/format"
 import { getChartTheme } from "@/lib/chart-utils"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import type { AssetPerformance } from "@/lib/api"
@@ -107,9 +108,9 @@ function PortfolioChart({ dates, values, up }: { dates: string[]; values: number
 }
 
 function ValueDisplay({ current, change, changePct }: { current: number; change: number; changePct: number }) {
-  const positive = change >= 0
-  const sign = positive ? "+" : ""
-  const colorClass = positive ? "text-emerald-500" : "text-red-500"
+  const sign = change >= 0 ? "+" : ""
+  const colorClass = changeColor(change)
+  const chg = formatChangePct(changePct)
 
   return (
     <div className="text-center space-y-1">
@@ -118,7 +119,7 @@ function ValueDisplay({ current, change, changePct }: { current: number; change:
       </div>
       <div className={`text-sm font-medium ${colorClass} flex items-center justify-center gap-3`}>
         <span>{sign}{change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        <span>{sign}{changePct.toFixed(2)}%</span>
+        <span>{chg.text}</span>
       </div>
     </div>
   )
@@ -187,8 +188,7 @@ function PerformersList({
       </div>
       <div className="space-y-0">
         {assets.map((a) => {
-          const positive = a.change_pct >= 0
-          const sign = positive ? "+" : ""
+          const chg = formatChangePct(a.change_pct)
           return (
             <Link
               key={a.symbol}
@@ -200,8 +200,8 @@ function PerformersList({
                 <span className="font-mono text-sm text-primary">{a.symbol}</span>
                 <span className="text-xs text-muted-foreground truncate">{a.name}</span>
               </div>
-              <span className={`text-sm font-medium tabular-nums ${positive ? "text-emerald-500" : "text-red-500"}`}>
-                {sign}{a.change_pct.toFixed(2)}%
+              <span className={`text-sm font-medium tabular-nums ${chg.className}`}>
+                {chg.text}
               </span>
             </Link>
           )

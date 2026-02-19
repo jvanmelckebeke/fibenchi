@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button"
 import { TagBadge } from "@/components/tag-badge"
 import { AssetActionMenu } from "@/components/asset-action-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
-import { CandlestickChart } from "@/components/chart/candlestick-chart"
-import { IndicatorCards } from "@/components/chart/indicator-cards"
+import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -27,12 +25,10 @@ import {
   extractMacdValues,
   getAllSortableFields,
   getSeriesByField,
-  getCardDescriptors,
   resolveThresholdColor,
   resolveAdxColor,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
-import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
 const SORTABLE_FIELDS = getAllSortableFields()
@@ -249,65 +245,6 @@ function SortableHeader({
   )
 }
 
-const CARD_DESCRIPTORS = getCardDescriptors()
-
-function ExpandedContent({ symbol, currency }: { symbol: string; currency?: string }) {
-  const { settings } = useSettings()
-  const period = settings.chart_default_period
-  const { data: detail, isLoading: detailLoading } = useAssetDetail(symbol, period)
-  const prices = detail?.prices
-  const chartIndicators = detail?.indicators
-  const { data: annotations } = useAnnotations(symbol)
-
-  const enabledCards = CARD_DESCRIPTORS.filter(
-    (d) => settings.detail_indicator_visibility[d.id] !== false,
-  )
-
-  const loading = detailLoading
-
-  if (loading || !prices?.length) {
-    return (
-      <div className="flex gap-4">
-        <div className="flex-[4] min-w-0">
-          <div className="h-[300px] flex items-center justify-center">
-            <Skeleton className="h-full w-full rounded-md" />
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col gap-1.5 min-w-[140px] max-w-[200px]">
-          {enabledCards.map((d) => (
-            <Skeleton key={d.id} className="h-12 w-full rounded-md" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <ChartSyncProvider prices={prices} indicators={chartIndicators ?? []}>
-      <div className="flex gap-4">
-        {/* Price chart — 80% */}
-        <div className="flex-[4] min-w-0">
-          <CandlestickChart
-            annotations={annotations ?? []}
-            indicatorVisibility={{
-              ...settings.detail_indicator_visibility,
-              rsi: false,
-              macd: false,
-            }}
-            chartType={settings.chart_type}
-            height={300}
-            roundedClass="rounded-md"
-          />
-        </div>
-        {/* Indicator cards — 20% */}
-        <div className="flex-1 min-w-[140px] max-w-[200px] mt-8">
-          <IndicatorCards descriptors={enabledCards} currency={currency} compact />
-        </div>
-      </div>
-    </ChartSyncProvider>
-  )
-}
-
 function TableRow({
   asset,
   quote,
@@ -459,7 +396,7 @@ function TableRow({
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
-            <ExpandedContent symbol={asset.symbol} currency={asset.currency} />
+            <ExpandedAssetChart symbol={asset.symbol} currency={asset.currency} compact />
           </td>
         </tr>
       )}

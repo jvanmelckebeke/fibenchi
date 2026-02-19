@@ -1,30 +1,22 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { Check, Search } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Search } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { useAssets, useSymbolSearch } from "@/lib/queries"
+import { SearchResultItem } from "@/components/search-result-item"
+import { useSymbolSearch } from "@/lib/queries"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { useTrackedSymbols } from "@/hooks/use-tracked-symbols"
 
 export function CommandSearch() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const [debouncedQuery, setDebouncedQuery] = useState("")
+  const debouncedQuery = useDebouncedValue(query.trim(), 300)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
   const prevResultsRef = useRef<string>("")
   const { data: results } = useSymbolSearch(debouncedQuery)
-  const { data: assets } = useAssets()
-  const trackedSymbols = useMemo(
-    () => new Set(assets?.map((a) => a.symbol)),
-    [assets],
-  )
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => clearTimeout(timer)
-  }, [query])
+  const trackedSymbols = useTrackedSymbols()
 
   // Reset selection when results change (derived — no effect needed)
   const resultsKey = useMemo(() => results?.map((r) => r.symbol).join(",") ?? "", [results])
@@ -49,7 +41,6 @@ export function CommandSearch() {
     setOpen(nextOpen)
     if (nextOpen) {
       setQuery("")
-      setDebouncedQuery("")
       setSelectedIndex(0)
       requestAnimationFrame(() => inputRef.current?.focus())
     }
@@ -131,20 +122,7 @@ export function CommandSearch() {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => goToSymbol(r.symbol)}
                   >
-                    <span className="font-mono font-medium text-primary shrink-0 w-16">
-                      {r.symbol}
-                    </span>
-                    <span className="text-muted-foreground truncate">{r.name}</span>
-                    {isTracked ? (
-                      <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
-                        <Check className="h-3 w-3" />
-                        Tracked
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="ml-auto text-xs shrink-0">
-                        {r.exchange}
-                      </Badge>
-                    )}
+                    <SearchResultItem result={r} isTracked={isTracked} symbolClassName="w-16" />
                   </button>
                 )
               })}
