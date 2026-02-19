@@ -250,6 +250,14 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Check whether an indicator is visible in a visibility map (opt-out model: missing = visible). */
+export function isIndicatorVisible(
+  visibilityMap: Record<string, boolean> | undefined,
+  key: string,
+): boolean {
+  return visibilityMap?.[key] !== false
+}
+
 /** Resolve the first matching threshold color class for a value. */
 export function resolveThresholdColor(
   thresholds: ThresholdColor[] | undefined,

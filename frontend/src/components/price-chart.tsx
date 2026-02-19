@@ -4,7 +4,7 @@ import { ChartSyncProvider } from "./chart/chart-sync-provider"
 import { CandlestickChart } from "./chart/candlestick-chart"
 import { SubChart } from "./chart/sub-chart"
 import { IndicatorCards } from "./chart/indicator-cards"
-import { getSubChartDescriptors, getCardDescriptors } from "@/lib/indicator-registry"
+import { getSubChartDescriptors, getCardDescriptors, isIndicatorVisible } from "@/lib/indicator-registry"
 
 const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()
 const CARD_DESCRIPTORS = getCardDescriptors(true)
@@ -31,7 +31,7 @@ export function PriceChart({
   currency,
 }: PriceChartProps) {
   const isVisible = useCallback(
-    (id: string) => indicatorVisibility?.[id] !== false,
+    (id: string) => isIndicatorVisible(indicatorVisibility, id),
     [indicatorVisibility],
   )
 
