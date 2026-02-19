@@ -155,8 +155,8 @@ export function createSubChart(
     }
   }
 
-  // Snap field = first data series field
-  const snapField = descriptor.series[0]?.field ?? descriptor.fields[0]
+  // Snap field: prefer explicit override, then fall back to first data series field
+  const snapField = descriptor.snapField ?? descriptor.series[0]?.field ?? descriptor.fields[0]
 
   return { chart, descriptorId: descriptor.id, seriesMap, thresholdSeries, snapField }
 }

@@ -68,6 +68,8 @@ export interface IndicatorDescriptor {
   }
   /** When true, this indicator also renders as a card (in addition to its primary placement). */
   cardEligible?: boolean
+  /** Override the default crosshair snap target (defaults to series[0].field). */
+  snapField?: string
   /** When true, the indicator's values are denominated in the asset's currency (e.g. ATR). */
   priceDenominated?: boolean
 }
@@ -190,6 +192,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       colorMap: { bullish: "text-emerald-500", bearish: "text-red-500" },
     },
     cardEligible: true,
+    snapField: "macd",
   },
   {
     id: "atr",
