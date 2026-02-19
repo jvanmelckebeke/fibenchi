@@ -7,6 +7,17 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   usePseudoEtfs,
   useCreatePseudoEtf,
   useUpdatePseudoEtf,
@@ -140,12 +151,30 @@ function EtfCard({ etf }: { etf: PseudoETF }) {
         )}
         {!editing && (
           <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(true)}>
+            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Edit pseudo-ETF" onClick={() => setEditing(true)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteEtf.mutate(etf.id)}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Delete pseudo-ETF">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete pseudo-ETF</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete &ldquo;{etf.name}&rdquo;? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={() => deleteEtf.mutate(etf.id)}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
       </CardHeader>
