@@ -22,6 +22,7 @@ export interface AppSettings {
   theme: "dark" | "light" | "system"
   compact_mode: boolean
   decimal_places: number
+  sync_pseudo_etf_crosshairs: boolean
 }
 
 function defaultVisibility(): Record<string, boolean> {
@@ -44,6 +45,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
   compact_mode: false,
   decimal_places: 2,
+  sync_pseudo_etf_crosshairs: false,
 }
 
 const STORAGE_KEY = "fibenchi-settings"

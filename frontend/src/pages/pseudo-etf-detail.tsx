@@ -3,15 +3,19 @@ import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { ThesisEditor } from "@/components/thesis-editor"
 import { AnnotationsList } from "@/components/annotations-list"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/add-constituent-picker"
+import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 import {
   PerformanceOverlayChart,
   DailyContributionChart,
 } from "@/components/chart/pseudo-etf-charts"
 import { STACK_COLORS } from "@/lib/chart-utils"
+import { useSettings } from "@/lib/settings"
 import type { PerformanceBreakdownPoint } from "@/lib/api"
 import {
   usePseudoEtf,
@@ -164,6 +168,8 @@ function HoldingsTable({ etfId }: { etfId: number }) {
   )
   const removeConstituent = useRemovePseudoEtfConstituent()
   const [addingAsset, setAddingAsset] = useState(false)
+  const { settings, updateSettings } = useSettings()
+  const syncEnabled = settings.sync_pseudo_etf_crosshairs
 
   if (!etf) return null
 
@@ -182,7 +188,27 @@ function HoldingsTable({ etfId }: { etfId: number }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base">Holdings ({etf.constituents.length})</CardTitle>
+        <div className="flex items-center gap-4">
+          <CardTitle className="text-base">Holdings ({etf.constituents.length})</CardTitle>
+          {etf.constituents.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <Switch
+                id="sync-crosshairs"
+                size="sm"
+                checked={syncEnabled}
+                onCheckedChange={(checked: boolean) =>
+                  updateSettings({ sync_pseudo_etf_crosshairs: checked })
+                }
+              />
+              <Label
+                htmlFor="sync-crosshairs"
+                className="text-xs text-muted-foreground font-normal cursor-pointer"
+              >
+                Sync crosshairs
+              </Label>
+            </div>
+          )}
+        </div>
         <Button size="sm" variant="ghost" onClick={() => setAddingAsset(!addingAsset)}>
           <UserPlus className="h-3.5 w-3.5 mr-1" />
           Add
@@ -202,12 +228,14 @@ function HoldingsTable({ etfId }: { etfId: number }) {
         )}
 
         {etf.constituents.length > 0 && (
-          <HoldingsGrid
-            rows={rows}
-            indicatorMap={indicatorMap}
-            indicatorsLoading={indicatorsLoading}
-            onRemove={(key) => removeConstituent.mutate({ etfId, assetId: key as number })}
-          />
+          <CrosshairTimeSyncProvider enabled={syncEnabled}>
+            <HoldingsGrid
+              rows={rows}
+              indicatorMap={indicatorMap}
+              indicatorsLoading={indicatorsLoading}
+              onRemove={(key) => removeConstituent.mutate({ etfId, assetId: key as number })}
+            />
+          </CrosshairTimeSyncProvider>
         )}
       </CardContent>
     </Card>
