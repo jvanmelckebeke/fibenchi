@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { ChevronRight, ChevronDown, Settings2 } from "lucide-react"
+import { ChevronRight, ChevronDown, ChevronsUpDown, ChevronsDownUp, Settings2 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -78,6 +78,16 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
     })
   }
 
+  const allExpanded = assets.length > 0 && assets.every((a) => expandedSymbols.has(a.symbol))
+
+  const toggleExpandAll = () => {
+    if (allExpanded) {
+      setExpandedSymbols(new Set())
+    } else {
+      setExpandedSymbols(new Set(assets.map((a) => a.symbol)))
+    }
+  }
+
   const visibleIndicatorFields = useMemo(
     () => SORTABLE_FIELDS.filter((f) => isColumnVisible(columnSettings, f)),
     [columnSettings],
@@ -119,10 +129,25 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
               )
             })}
             <th className="w-8 text-right pr-1">
-              <ColumnVisibilityMenu
-                columnSettings={columnSettings}
-                onToggle={toggleColumn}
-              />
+              <div className="flex items-center justify-end gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  aria-label={allExpanded ? "Collapse all rows" : "Expand all rows"}
+                  onClick={toggleExpandAll}
+                >
+                  {allExpanded ? (
+                    <ChevronsDownUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronsUpDown className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+                <ColumnVisibilityMenu
+                  columnSettings={columnSettings}
+                  onToggle={toggleColumn}
+                />
+              </div>
             </th>
           </tr>
         </thead>
