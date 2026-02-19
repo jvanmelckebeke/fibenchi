@@ -7,14 +7,9 @@ import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatPrice, currencySymbol, changeColor } from "@/lib/format"
-import {
-  getNumericValue,
-  getCardDescriptors,
-  resolveThresholdColor,
-  resolveAdxColor,
-  type IndicatorDescriptor,
-} from "@/lib/indicator-registry"
+import { formatPrice, changeColor } from "@/lib/format"
+import { getCardDescriptors, type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { IndicatorValue } from "@/components/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
 
 const CARD_DESCRIPTORS = getCardDescriptors()
@@ -44,48 +39,10 @@ function MiniIndicatorCard({
   values?: Record<string, number | string | null>
   currency: string
 }) {
-  const mainSeries = descriptor.series[0]
-  const mainVal = getNumericValue(values, mainSeries.field)
-
-  if (mainVal == null) {
-    return (
-      <div className="rounded bg-muted/50 px-2 py-1">
-        <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
-        <span className="block text-sm font-semibold tabular-nums text-muted-foreground">--</span>
-      </div>
-    )
-  }
-
-  const colorClass = descriptor.id === "adx"
-    ? resolveAdxColor(mainVal, values ?? {})
-    : resolveThresholdColor(mainSeries.thresholdColors, mainVal)
-
   return (
     <div className="rounded bg-muted/50 px-2 py-1">
       <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
-      <span className={`block text-sm font-semibold tabular-nums ${colorClass || "text-foreground"}`}>
-        {currency && descriptor.priceDenominated ? currencySymbol(currency) : ""}{mainVal.toFixed(descriptor.decimals)}
-      </span>
-      {descriptor.id === "adx" && (
-        <div className="flex gap-2 tabular-nums text-[10px] mt-0.5">
-          <span className="text-emerald-500">
-            +DI {getNumericValue(values, "plus_di")?.toFixed(1) ?? "--"}
-          </span>
-          <span className="text-red-500">
-            -DI {getNumericValue(values, "minus_di")?.toFixed(1) ?? "--"}
-          </span>
-        </div>
-      )}
-      {descriptor.id === "macd" && (
-        <div className="flex gap-2 tabular-nums text-[10px] mt-0.5">
-          <span className="text-sky-400">
-            M {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
-          </span>
-          <span className="text-orange-400">
-            S {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
-          </span>
-        </div>
-      )}
+      <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact />
     </div>
   )
 }

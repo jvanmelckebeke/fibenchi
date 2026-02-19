@@ -7,13 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  resolveThresholdColor,
-  resolveAdxColor,
-  getNumericValue,
-  type IndicatorDescriptor,
-} from "@/lib/indicator-registry"
-import { currencySymbol } from "@/lib/format"
+import { type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { IndicatorValue } from "@/components/indicator-value"
 import { useChartHoverValues, useChartData } from "./chart-sync-provider"
 import { createSubChart, setSubChartData, type SubChartState } from "./chart-builders"
 import { SubChartLegend } from "./chart-legends"
@@ -31,63 +26,8 @@ const CARD_HELP: Record<string, string> = {
 }
 
 // ---------------------------------------------------------------------------
-// Card value display
+// Card value display (delegates to shared IndicatorValue)
 // ---------------------------------------------------------------------------
-
-
-function CardValue({
-  descriptor,
-  values,
-  currency,
-  compact,
-}: {
-  descriptor: IndicatorDescriptor
-  values: Record<string, number | undefined>
-  currency?: string
-  compact?: boolean
-}) {
-  const mainSeries = descriptor.series[0]
-  const mainVal = getNumericValue(values as Record<string, number | null>, mainSeries.field)
-  const sizeClass = compact ? "text-sm" : "text-2xl"
-
-  if (mainVal == null) {
-    return <span className={`${sizeClass} font-semibold tabular-nums text-muted-foreground`}>--</span>
-  }
-
-  const colorClass = descriptor.id === "adx"
-    ? resolveAdxColor(mainVal, values as Record<string, number | string | null>)
-    : resolveThresholdColor(mainSeries.thresholdColors, mainVal)
-
-  return (
-    <div className="flex flex-col">
-      <span className={`${sizeClass} font-semibold tabular-nums ${colorClass || "text-foreground"}`}>
-        {currency && descriptor.priceDenominated ? currencySymbol(currency) : ""}{mainVal.toFixed(descriptor.decimals)}
-      </span>
-      {/* ADX: show +DI / -DI below the main value */}
-      {descriptor.id === "adx" && (
-        <div className={`flex gap-3 tabular-nums mt-0.5 ${compact ? "text-[10px]" : "text-xs"}`}>
-          <span className="text-emerald-500">
-            +DI {getNumericValue(values as Record<string, number | null>, "plus_di")?.toFixed(1) ?? "--"}
-          </span>
-          <span className="text-red-500">
-            -DI {getNumericValue(values as Record<string, number | null>, "minus_di")?.toFixed(1) ?? "--"}
-          </span>
-        </div>
-      )}
-      {/* MACD: show line + signal below histogram */}
-      {descriptor.id === "macd" && (
-        <div className={`flex gap-3 tabular-nums mt-0.5 ${compact ? "text-[10px]" : "text-xs"}`}>
-          <span className="text-sky-400">
-            M {getNumericValue(values as Record<string, number | null>, "macd")?.toFixed(2) ?? "--"}
-          </span>
-          <span className="text-orange-400">
-            S {getNumericValue(values as Record<string, number | null>, "macd_signal")?.toFixed(2) ?? "--"}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Modal chart (standalone, no crosshair sync)
@@ -225,7 +165,7 @@ export function IndicatorCards({ descriptors, currency, compact }: IndicatorCard
                 <span className="text-[11px] leading-tight text-muted-foreground">{CARD_HELP[desc.id]}</span>
               )}
             </div>
-            <CardValue descriptor={desc} values={values} currency={currency} compact={compact} />
+            <IndicatorValue descriptor={desc} values={values} currency={currency} compact={compact} />
           </button>
         ))}
       </div>
