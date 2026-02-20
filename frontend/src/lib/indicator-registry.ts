@@ -321,6 +321,10 @@ export function getDescriptorById(id: string): IndicatorDescriptor | undefined {
   return INDICATOR_REGISTRY.find((d) => d.id === id)
 }
 
+export function getScannableDescriptors(): IndicatorDescriptor[] {
+  return INDICATOR_REGISTRY.filter((d) => d.placement !== "overlay")
+}
+
 export function getHoldingSummaryDescriptors(): IndicatorDescriptorWithSummary[] {
   return INDICATOR_REGISTRY.filter(
     (d): d is IndicatorDescriptorWithSummary => d.holdingSummary != null,

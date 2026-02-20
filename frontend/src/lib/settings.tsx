@@ -6,7 +6,7 @@ export type AssetTypeFilter = "all" | "stock" | "etf"
 export type GroupSortBy = string
 export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"
-export type GroupViewMode = "card" | "table"
+export type GroupViewMode = "card" | "table" | "scanner"
 
 export interface AppSettings {
   group_indicator_visibility: Record<string, boolean>
