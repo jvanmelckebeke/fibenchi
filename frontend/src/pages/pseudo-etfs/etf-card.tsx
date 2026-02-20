@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { Plus, Trash2, Pencil } from "lucide-react"
+import { Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,98 +17,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  usePseudoEtfs,
-  useCreatePseudoEtf,
-  useUpdatePseudoEtf,
-  useDeletePseudoEtf,
-} from "@/lib/queries"
+import { useUpdatePseudoEtf, useDeletePseudoEtf } from "@/lib/queries"
 import type { PseudoETF } from "@/lib/api"
 
-export function PseudoEtfsPage() {
-  const { data: etfs, isLoading } = usePseudoEtfs()
-  const [creating, setCreating] = useState(false)
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Pseudo-ETFs</h1>
-        <Button onClick={() => setCreating(true)} disabled={creating}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          New Pseudo-ETF
-        </Button>
-      </div>
-
-      {creating && <CreateForm onClose={() => setCreating(false)} />}
-
-      {isLoading && <p className="text-muted-foreground">Loading...</p>}
-
-      {etfs && etfs.length === 0 && !creating && (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-          <p>No pseudo-ETFs yet. Create one to track a custom basket of stocks.</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {etfs?.map((etf) => (
-          <EtfCard key={etf.id} etf={etf} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CreateForm({ onClose }: { onClose: () => void }) {
-  const create = useCreatePseudoEtf()
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [baseDate, setBaseDate] = useState("")
-
-  const handleSubmit = () => {
-    if (!name.trim() || !baseDate) return
-    create.mutate(
-      { name: name.trim(), description: description.trim() || undefined, base_date: baseDate },
-      { onSuccess: () => onClose() }
-    )
-  }
-
-  return (
-    <Card>
-      <CardContent className="pt-6 space-y-3">
-        <Input
-          placeholder="Name (e.g. Quantum Computing)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          autoFocus
-        />
-        <Textarea
-          placeholder="Description (optional)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="min-h-[60px]"
-        />
-        <div className="flex items-center gap-2">
-          <label htmlFor="pseudo-etf-base-date" className="text-sm text-muted-foreground">Base date:</label>
-          <Input
-            id="pseudo-etf-base-date"
-            type="date"
-            value={baseDate}
-            onChange={(e) => setBaseDate(e.target.value)}
-            className="w-44"
-          />
-          <span className="text-xs text-muted-foreground">Indexed to 100 at this date</span>
-        </div>
-        {create.isError && <p className="text-sm text-destructive">{create.error.message}</p>}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={create.isPending}>Create</Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function EtfCard({ etf }: { etf: PseudoETF }) {
+export function EtfCard({ etf }: { etf: PseudoETF }) {
   const deleteEtf = useDeletePseudoEtf()
   const updateEtf = useUpdatePseudoEtf()
   const [editing, setEditing] = useState(false)
