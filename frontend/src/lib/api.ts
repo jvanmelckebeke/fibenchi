@@ -14,11 +14,15 @@ import type {
   IndicatorSummary,
   PerformanceBreakdownPoint,
   PortfolioIndex,
+  ProviderInfo,
   PseudoETF,
   PseudoETFCreate,
   PseudoETFUpdate,
   SparklinePoint,
   SymbolSearchResult,
+  SymbolSource,
+  SymbolSourceCreate,
+  SymbolSourceUpdate,
   SyncResult,
   Tag,
   TagBrief,
@@ -129,6 +133,8 @@ export const api = {
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
   },
   search: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
+  searchLocal: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=local`),
+  searchYahoo: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=yahoo`),
   settings: {
     get: () => request<{ data: Record<string, unknown> }>("/settings"),
     update: (data: Record<string, unknown>) =>
@@ -136,6 +142,20 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ data }),
       }),
+  },
+  symbolSources: {
+    list: () => request<SymbolSource[]>("/symbol-sources"),
+    providers: () => request<Record<string, ProviderInfo>>("/symbol-sources/providers"),
+    create: (data: SymbolSourceCreate) =>
+      request<SymbolSource>("/symbol-sources", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SymbolSourceUpdate) =>
+      request<SymbolSource>(`/symbol-sources/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    sync: (id: number) =>
+      request<{ source_id: number; symbols_synced: number; message: string }>(
+        `/symbol-sources/${id}/sync`, { method: "POST" },
+      ),
+    delete: (id: number) =>
+      request<void>(`/symbol-sources/${id}`, { method: "DELETE" }),
   },
   pseudoEtfs: {
     list: () => request<PseudoETF[]>("/pseudo-etfs"),
