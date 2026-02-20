@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useRef, useCallback, useMemo, type ReactNode } from "react"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,10 +63,12 @@ export function CrosshairTimeSyncProvider({ enabled, children }: CrosshairTimeSy
     }
   }, [])
 
+  const value = useMemo(() => ({ subscribe, broadcast }), [subscribe, broadcast])
+
   if (!enabled) return <>{children}</>
 
   return (
-    <CrosshairTimeSyncContext.Provider value={{ subscribe, broadcast }}>
+    <CrosshairTimeSyncContext.Provider value={value}>
       {children}
     </CrosshairTimeSyncContext.Provider>
   )

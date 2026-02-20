@@ -1,5 +1,5 @@
 import { useState, useMemo, useTransition } from "react"
-import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, Star, Table, TrendingUp } from "lucide-react"
+import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,11 +16,14 @@ import { AssetCard } from "@/components/asset-card"
 import { TagBadge } from "@/components/tag-badge"
 import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
-import { buildSortOptions } from "@/lib/indicator-registry"
-import { useSettings, type AssetTypeFilter, type GroupSortBy, type SortDir } from "@/lib/settings"
+import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
+import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode, type SortDir } from "@/lib/settings"
 import { useFilteredSortedAssets } from "@/lib/use-group-filter"
 import { GroupTable } from "@/components/group-table"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
+import { ScannerView } from "@/components/scanner-view"
+
+const SCANNABLE_DESCRIPTORS = getScannableDescriptors()
 
 const SORT_OPTIONS = buildSortOptions()
 
@@ -36,12 +39,14 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const [isPending, startTransition] = useTransition()
   const [deferredViewMode, setDeferredViewMode] = useState(settings.group_view_mode)
   const viewMode = deferredViewMode
-  const setViewMode = (v: "card" | "table") => {
+  const setViewMode = (v: GroupViewMode) => {
     updateSettings({ group_view_mode: v })
     startTransition(() => {
       setDeferredViewMode(v)
     })
   }
+  const [scannerIndicator, setScannerIndicator] = useState("macd")
+  const [scannerPeriod, setScannerPeriod] = useState(settings.chart_default_period)
   const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod)
   const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
@@ -101,44 +106,74 @@ export function GroupPage({ groupId }: { groupId: number }) {
             value={typeFilter}
             onChange={setTypeFilter}
           />
-          {/* Sparkline period */}
-          <SegmentedControl
-            options={[
-              { value: "3mo", label: "3M" },
-              { value: "6mo", label: "6M" },
-              { value: "1y", label: "1Y" },
-            ]}
-            value={sparklinePeriod}
-            onChange={setSparklinePeriod}
-          />
-          {/* Sort */}
-          <div className="flex items-center gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
-                  {sortDir === "asc" ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />}
-                  {SORT_LABELS[sortBy]}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {SORT_OPTIONS.map(([key, label]) => (
-                  <DropdownMenuItem key={key} onClick={() => handleSort(key)}>
-                    {label}
-                    {sortBy === key && (
-                      <span className="ml-auto text-muted-foreground text-xs">
-                        {sortDir === "asc" ? "\u2191" : "\u2193"}
-                      </span>
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {viewMode === "scanner" ? (
+            <>
+              {/* Indicator selector */}
+              <SegmentedControl
+                options={SCANNABLE_DESCRIPTORS.map((d) => ({
+                  value: d.id,
+                  label: d.shortLabel,
+                }))}
+                value={scannerIndicator}
+                onChange={setScannerIndicator}
+              />
+              {/* Period selector */}
+              <SegmentedControl
+                options={[
+                  { value: "1mo", label: "1M" },
+                  { value: "3mo", label: "3M" },
+                  { value: "6mo", label: "6M" },
+                  { value: "1y", label: "1Y" },
+                  { value: "2y", label: "2Y" },
+                  { value: "5y", label: "5Y" },
+                ]}
+                value={scannerPeriod}
+                onChange={setScannerPeriod}
+              />
+            </>
+          ) : (
+            <>
+              {/* Sparkline period */}
+              <SegmentedControl
+                options={[
+                  { value: "3mo", label: "3M" },
+                  { value: "6mo", label: "6M" },
+                  { value: "1y", label: "1Y" },
+                ]}
+                value={sparklinePeriod}
+                onChange={setSparklinePeriod}
+              />
+              {/* Sort */}
+              <div className="flex items-center gap-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                      {sortDir === "asc" ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />}
+                      {SORT_LABELS[sortBy]}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {SORT_OPTIONS.map(([key, label]) => (
+                      <DropdownMenuItem key={key} onClick={() => handleSort(key)}>
+                        {label}
+                        {sortBy === key && (
+                          <span className="ml-auto text-muted-foreground text-xs">
+                            {sortDir === "asc" ? "\u2191" : "\u2193"}
+                          </span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </>
+          )}
           {/* View mode toggle */}
           <SegmentedControl
             options={[
               { value: "card", label: <LayoutGrid className="h-3.5 w-3.5" /> },
               { value: "table", label: <Table className="h-3.5 w-3.5" /> },
+              { value: "scanner", label: <ScanLine className="h-3.5 w-3.5" /> },
             ]}
             value={settings.group_view_mode}
             onChange={setViewMode}
@@ -183,7 +218,11 @@ export function GroupPage({ groupId }: { groupId: number }) {
       )}
 
       <div className={isPending ? "opacity-70 transition-opacity" : "transition-opacity"}>
-      {viewMode === "table" && assets && assets.length > 0 ? (
+      {viewMode === "scanner" && assets && assets.length > 0 ? (
+        <CrosshairTimeSyncProvider enabled={true}>
+          <ScannerView assets={assets} descriptorId={scannerIndicator} period={scannerPeriod} />
+        </CrosshairTimeSyncProvider>
+      ) : viewMode === "table" && assets && assets.length > 0 ? (
         <CrosshairTimeSyncProvider enabled={true}>
           <GroupTable
             assets={assets}
