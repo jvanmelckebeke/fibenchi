@@ -3,8 +3,8 @@ import { useParams, Link } from "react-router-dom"
 import { ArrowLeft, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ThesisEditor } from "@/components/thesis-editor"
-import { AnnotationsList } from "@/components/annotations-list"
+import { ConnectedThesis } from "@/components/connected-thesis"
+import { ConnectedAnnotations } from "@/components/connected-annotations"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/add-constituent-picker"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
@@ -107,28 +107,21 @@ export function PseudoEtfDetailPage() {
 
 function EtfAnnotations({ etfId }: { etfId: number }) {
   const { data: annotations } = usePseudoEtfAnnotations(etfId)
-  const createAnnotation = useCreatePseudoEtfAnnotation(etfId)
-  const deleteAnnotation = useDeletePseudoEtfAnnotation(etfId)
-
   return (
-    <AnnotationsList
+    <ConnectedAnnotations
       annotations={annotations}
-      onCreate={(data) => createAnnotation.mutate(data)}
-      onDelete={(id) => deleteAnnotation.mutate(id)}
-      isCreating={createAnnotation.isPending}
+      createMutation={useCreatePseudoEtfAnnotation(etfId)}
+      deleteMutation={useDeletePseudoEtfAnnotation(etfId)}
     />
   )
 }
 
 function EtfThesis({ etfId }: { etfId: number }) {
   const { data: thesis } = usePseudoEtfThesis(etfId)
-  const updateThesis = useUpdatePseudoEtfThesis(etfId)
-
   return (
-    <ThesisEditor
+    <ConnectedThesis
       thesis={thesis}
-      onSave={(content) => updateThesis.mutate(content)}
-      isSaving={updateThesis.isPending}
+      updateMutation={useUpdatePseudoEtfThesis(etfId)}
     />
   )
 }
