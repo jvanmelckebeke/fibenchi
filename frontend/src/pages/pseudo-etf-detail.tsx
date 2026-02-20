@@ -11,7 +11,7 @@ import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-syn
 import {
   PerformanceOverlayChart,
   DailyContributionChart,
-} from "@/components/chart/pseudo-etf-charts"
+} from "@/components/chart/pseudo-etf"
 import { STACK_COLORS } from "@/lib/chart-utils"
 import { formatChangePct } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
