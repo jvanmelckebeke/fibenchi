@@ -22,17 +22,19 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
   const addAssetsToGroup = useAddAssetsToGroup()
   const trackedSymbols = useTrackedSymbols()
   const [symbol, setSymbol] = useState("")
-  const debouncedQuery = useDebouncedValue(symbol.trim(), 300)
+  const trimmedQuery = symbol.trim()
+  const localQuery = useDebouncedValue(trimmedQuery, 100)
+  const yahooQuery = useDebouncedValue(trimmedQuery, 400)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const { data: localResults } = useLocalSearch(debouncedQuery)
-  const { data: yahooResults, isFetching: yahooLoading } = useYahooSearch(debouncedQuery)
+  const { data: localResults } = useLocalSearch(localQuery)
+  const { data: yahooResults, isFetching: yahooLoading } = useYahooSearch(yahooQuery)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const hasLocal = localResults && localResults.length > 0
   const hasYahoo = yahooResults && yahooResults.length > 0
   const hasResults = hasLocal || hasYahoo
-  const showDropdown = showSuggestions && hasResults && symbol.trim()
+  const showDropdown = showSuggestions && (hasResults || yahooLoading) && trimmedQuery
 
   const closeDialog = () => {
     setSymbol("")
@@ -123,11 +125,9 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
                 {hasYahoo && yahooResults.map(renderRow)}
               </div>
             )}
-            {showSuggestions && !hasResults && !yahooLoading && debouncedQuery.length >= 1 && (
+            {showSuggestions && !hasResults && !yahooLoading && localQuery.length >= 1 && yahooQuery === trimmedQuery && (
               <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md">
-                {symbol.trim() && debouncedQuery === symbol.trim() && (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">No results found</div>
-                )}
+                <div className="px-3 py-2 text-sm text-muted-foreground">No results found</div>
               </div>
             )}
           </div>
