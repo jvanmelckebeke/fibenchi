@@ -1,33 +1,19 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
-import { Loader2, Search } from "lucide-react"
+import { Search } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { SearchResultItem } from "@/components/search-result-item"
-import { useLocalSearch, useYahooSearch } from "@/lib/queries"
-import { useDebouncedValue } from "@/hooks/use-debounced-value"
-import { useTrackedSymbols } from "@/hooks/use-tracked-symbols"
-import type { SymbolSearchResult } from "@/lib/api"
+import { SearchResultsList } from "@/components/search-results-list"
+import { useTwoPhaseSearch } from "@/hooks/use-two-phase-search"
 
 export function CommandSearch() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const trimmedQuery = query.trim()
-  const localQuery = useDebouncedValue(trimmedQuery, 100)
-  const yahooQuery = useDebouncedValue(trimmedQuery, 400)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
-  const { data: localResults } = useLocalSearch(localQuery)
-  const { data: yahooResults, isFetching: yahooLoading } = useYahooSearch(yahooQuery)
-  const trackedSymbols = useTrackedSymbols()
 
-  // Combine local + yahoo for keyboard navigation
-  const allResults = useMemo(() => {
-    const combined: SymbolSearchResult[] = []
-    if (localResults) combined.push(...localResults)
-    if (yahooResults) combined.push(...yahooResults)
-    return combined
-  }, [localResults, yahooResults])
+  const { localResults, yahooLoading, allResults } = useTwoPhaseSearch(trimmedQuery)
 
   // Clamp selectedIndex when results shrink
   const clampedIndex = allResults.length > 0 ? Math.min(selectedIndex, allResults.length - 1) : 0
@@ -63,8 +49,8 @@ export function CommandSearch() {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!allResults.length) {
-      if (e.key === "Enter" && query.trim()) {
-        goToSymbol(query.trim().toUpperCase())
+      if (e.key === "Enter" && trimmedQuery) {
+        goToSymbol(trimmedQuery.toUpperCase())
       }
       return
     }
@@ -115,46 +101,25 @@ export function CommandSearch() {
 
           {(allResults.length > 0 || yahooLoading) && trimmedQuery && (
             <div className="max-h-72 overflow-auto py-1">
-              {allResults.map((r, i) => {
-                const isTracked = trackedSymbols.has(r.symbol)
-                const isYahooSection = localResults && i === localResults.length && localResults.length > 0
-                return (
-                  <div key={r.symbol}>
-                    {isYahooSection && <div className="border-t border-border my-1" />}
-                    <button
-                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
-                        i === clampedIndex
-                          ? "bg-primary/10 text-foreground"
-                          : "text-foreground hover:bg-muted"
-                      }`}
-                      onMouseEnter={() => setSelectedIndex(i)}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => goToSymbol(r.symbol)}
-                    >
-                      <SearchResultItem result={r} isTracked={isTracked} symbolClassName="w-16" />
-                    </button>
-                  </div>
-                )
-              })}
-              {yahooLoading && (
-                <>
-                  {allResults.length > 0 && <div className="border-t border-border my-1" />}
-                  <div className="flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Searching Yahoo Finance…
-                  </div>
-                </>
-              )}
+              <SearchResultsList
+                localResults={localResults}
+                yahooLoading={yahooLoading}
+                allResults={allResults}
+                selectedIndex={clampedIndex}
+                onSelect={(r) => goToSymbol(r.symbol)}
+                onHover={setSelectedIndex}
+                symbolClassName="w-16"
+              />
             </div>
           )}
 
-          {trimmedQuery && localQuery === trimmedQuery && !yahooLoading && allResults.length === 0 && (
+          {trimmedQuery && !yahooLoading && allResults.length === 0 && (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No results found for "{trimmedQuery}"
+              No results found for &ldquo;{trimmedQuery}&rdquo;
             </div>
           )}
 
-          {!query.trim() && (
+          {!trimmedQuery && (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               Type a symbol or company name to search
             </div>
