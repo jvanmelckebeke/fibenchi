@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -11,26 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
-import { INDICATOR_REGISTRY, isIndicatorVisible } from "@/lib/indicator-registry"
-
-function VisibilityToggle({
-  id,
-  label,
-  checked,
-  onCheckedChange,
-}: {
-  id: string
-  label: string
-  checked: boolean
-  onCheckedChange: (v: boolean) => void
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <Label htmlFor={id}>{label}</Label>
-      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
-    </div>
-  )
-}
+import { VisibilityToggle, IndicatorVisibilitySection } from "@/components/visibility-toggle"
 
 export function SettingsPage() {
   const { settings, updateSettings } = useSettings()
@@ -81,19 +61,15 @@ export function SettingsPage() {
             checked={draft.group_show_sparkline}
             onCheckedChange={(v) => change({ group_show_sparkline: v })}
           />
-          {INDICATOR_REGISTRY.map((desc) => (
-            <VisibilityToggle
-              key={`grp-${desc.id}`}
-              id={`grp-${desc.id}`}
-              label={desc.label}
-              checked={isIndicatorVisible(draft.group_indicator_visibility, desc.id)}
-              onCheckedChange={(v) =>
-                change({
-                  group_indicator_visibility: { ...draft.group_indicator_visibility, [desc.id]: v },
-                })
-              }
-            />
-          ))}
+          <IndicatorVisibilitySection
+            visibility={draft.group_indicator_visibility}
+            idPrefix="grp"
+            onChange={(id, v) =>
+              change({
+                group_indicator_visibility: { ...draft.group_indicator_visibility, [id]: v },
+              })
+            }
+          />
         </CardContent>
       </Card>
 
@@ -102,19 +78,15 @@ export function SettingsPage() {
           <CardTitle>Detail Page Chart</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {INDICATOR_REGISTRY.map((desc) => (
-            <VisibilityToggle
-              key={`dtl-${desc.id}`}
-              id={`dtl-${desc.id}`}
-              label={desc.label}
-              checked={isIndicatorVisible(draft.detail_indicator_visibility, desc.id)}
-              onCheckedChange={(v) =>
-                change({
-                  detail_indicator_visibility: { ...draft.detail_indicator_visibility, [desc.id]: v },
-                })
-              }
-            />
-          ))}
+          <IndicatorVisibilitySection
+            visibility={draft.detail_indicator_visibility}
+            idPrefix="dtl"
+            onChange={(id, v) =>
+              change({
+                detail_indicator_visibility: { ...draft.detail_indicator_visibility, [id]: v },
+              })
+            }
+          />
         </CardContent>
       </Card>
 
