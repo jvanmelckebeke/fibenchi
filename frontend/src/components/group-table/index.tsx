@@ -11,7 +11,6 @@ import { ColumnVisibilityMenu } from "./column-visibility-menu"
 import { TableRow } from "./table-row"
 import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible } from "./shared"
 
-export { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible }
 
 interface GroupTableProps {
   assets: Asset[]

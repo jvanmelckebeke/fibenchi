@@ -56,6 +56,7 @@ export function PortfolioChart({ dates, values, up }: { dates: string[]; values:
     chartRef.current = chart
 
     return startLifecycle([chart])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- structural dependencies only
   }, [dates, values, up, startLifecycle])
 
   return <div ref={containerRef} className="w-full rounded-md overflow-hidden" />
