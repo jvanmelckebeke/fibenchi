@@ -6,8 +6,8 @@ import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PriceChart } from "@/components/price-chart"
 import { ChartSkeleton } from "@/components/chart-skeleton"
-import { ThesisEditor } from "@/components/thesis-editor"
-import { AnnotationsList } from "@/components/annotations-list"
+import { ConnectedThesis } from "@/components/connected-thesis"
+import { ConnectedAnnotations } from "@/components/connected-annotations"
 import { TagInput } from "@/components/tag-input"
 import { PeriodSelector } from "@/components/period-selector"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
@@ -292,28 +292,21 @@ function TopHoldingsCard({
 
 function AssetAnnotations({ symbol }: { symbol: string }) {
   const { data: annotations } = useAnnotations(symbol)
-  const createAnnotation = useCreateAnnotation(symbol)
-  const deleteAnnotation = useDeleteAnnotation(symbol)
-
   return (
-    <AnnotationsList
+    <ConnectedAnnotations
       annotations={annotations}
-      onCreate={(data) => createAnnotation.mutate(data)}
-      onDelete={(id) => deleteAnnotation.mutate(id)}
-      isCreating={createAnnotation.isPending}
+      createMutation={useCreateAnnotation(symbol)}
+      deleteMutation={useDeleteAnnotation(symbol)}
     />
   )
 }
 
 function AssetThesis({ symbol }: { symbol: string }) {
   const { data: thesis } = useThesis(symbol)
-  const updateThesis = useUpdateThesis(symbol)
-
   return (
-    <ThesisEditor
+    <ConnectedThesis
       thesis={thesis}
-      onSave={(content) => updateThesis.mutate(content)}
-      isSaving={updateThesis.isPending}
+      updateMutation={useUpdateThesis(symbol)}
     />
   )
 }
