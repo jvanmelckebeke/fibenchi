@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select"
 import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
 import { VisibilityToggle, IndicatorVisibilitySection } from "@/components/visibility-toggle"
+import { SymbolSourcesSettings } from "@/components/symbol-sources-settings"
 
 export function SettingsPage() {
   const { settings, updateSettings } = useSettings()
@@ -168,6 +169,8 @@ export function SettingsPage() {
         </CardContent>
       </Card>
       </div>
+
+      <SymbolSourcesSettings />
 
       <div className="flex items-center justify-end gap-2">
         {isDirty && (

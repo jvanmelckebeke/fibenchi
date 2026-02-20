@@ -209,6 +209,35 @@ export interface IndicatorSummary {
   values: Record<string, number | string | null>
 }
 
+export interface SymbolSource {
+  id: number
+  name: string
+  provider_type: string
+  enabled: boolean
+  config: Record<string, unknown>
+  last_synced_at: string | null
+  symbol_count: number
+  created_at: string
+}
+
+export interface SymbolSourceCreate {
+  name: string
+  provider_type: string
+  config?: Record<string, unknown>
+}
+
+export interface SymbolSourceUpdate {
+  enabled?: boolean
+  config?: Record<string, unknown>
+  name?: string
+}
+
+export interface ProviderInfo {
+  key: string
+  label: string
+  markets: { key: string; label: string }[]
+}
+
 export interface Quote {
   symbol: string
   price: number | null

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { useCallback } from "react"
-import { api, type Asset, type AssetCreate, type Group, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult } from "./api"
+import { api, type Asset, type AssetCreate, type Group, type GroupCreate, type GroupUpdate, type TagCreate, type AnnotationCreate, type PseudoETFCreate, type PseudoETFUpdate, type SymbolSearchResult, type SymbolSourceCreate, type SymbolSourceUpdate } from "./api"
 
 const STALE_5MIN = 5 * 60_000
 const STALE_24H = 24 * 60 * 60_000
@@ -42,6 +42,8 @@ export const keys = {
   pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
   symbolSearch: (q: string) => ["symbol-search", q] as const,
+  symbolSources: ["symbol-sources"] as const,
+  symbolSourceProviders: ["symbol-source-providers"] as const,
 }
 
 // Portfolio
@@ -464,6 +466,47 @@ export function useDeletePseudoEtfAnnotation(id: number) {
   return useInvalidatingMutation(
     (annotationId: number) => api.pseudoEtfs.annotations.delete(id, annotationId),
     [keys.pseudoEtfAnnotations(id)],
+  )
+}
+
+// Symbol Sources
+export function useSymbolSources() {
+  return useQuery({ queryKey: keys.symbolSources, queryFn: api.symbolSources.list, staleTime: STALE_5MIN })
+}
+
+export function useSymbolSourceProviders() {
+  return useQuery({ queryKey: keys.symbolSourceProviders, queryFn: api.symbolSources.providers, staleTime: STALE_24H })
+}
+
+export function useCreateSymbolSource() {
+  return useInvalidatingMutation(
+    (data: SymbolSourceCreate) => api.symbolSources.create(data),
+    [keys.symbolSources],
+  )
+}
+
+export function useUpdateSymbolSource() {
+  return useInvalidatingMutation(
+    ({ id, data }: { id: number; data: SymbolSourceUpdate }) => api.symbolSources.update(id, data),
+    [keys.symbolSources],
+  )
+}
+
+export function useSyncSymbolSource() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.symbolSources.sync(id),
+    onSuccess: () => {
+      // Refetch sources after a delay to get updated stats
+      setTimeout(() => qc.invalidateQueries({ queryKey: keys.symbolSources }), 3000)
+    },
+  })
+}
+
+export function useDeleteSymbolSource() {
+  return useInvalidatingMutation(
+    (id: number) => api.symbolSources.delete(id),
+    [keys.symbolSources],
   )
 }
 
