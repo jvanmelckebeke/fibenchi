@@ -10,10 +10,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { SearchResultItem } from "@/components/search-result-item"
-import { useCreateAsset, useAddAssetsToGroup, useSymbolSearch } from "@/lib/queries"
-import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { SearchResultsList } from "@/components/search-results-list"
+import { useCreateAsset, useAddAssetsToGroup } from "@/lib/queries"
 import { useTrackedSymbols } from "@/hooks/use-tracked-symbols"
+import { useTwoPhaseSearch } from "@/hooks/use-two-phase-search"
 
 export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number; isDefaultGroup?: boolean }) {
   const navigate = useNavigate()
@@ -21,11 +21,15 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
   const addAssetsToGroup = useAddAssetsToGroup()
   const trackedSymbols = useTrackedSymbols()
   const [symbol, setSymbol] = useState("")
-  const debouncedQuery = useDebouncedValue(symbol.trim(), 300)
+  const trimmedQuery = symbol.trim()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const { data: searchResults } = useSymbolSearch(debouncedQuery)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+
+  const { localResults, yahooLoading, allResults } = useTwoPhaseSearch(trimmedQuery)
+
+  const hasResults = allResults.length > 0
+  const showDropdown = showSuggestions && (hasResults || yahooLoading) && trimmedQuery
 
   const closeDialog = () => {
     setSymbol("")
@@ -39,7 +43,6 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
       { symbol: s },
       {
         onSuccess: (asset) => {
-          // If on a non-default group page, also add to that group
           if (groupId && !isDefaultGroup) {
             addAssetsToGroup.mutate(
               { groupId, assetIds: [asset.id] },
@@ -75,33 +78,31 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
               onFocus={() => setShowSuggestions(true)}
               autoFocus
             />
-            {showSuggestions && searchResults && searchResults.length > 0 && symbol.trim() && (
+            {showDropdown && (
               <div
                 ref={suggestionsRef}
-                className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-60 overflow-auto"
+                className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-72 overflow-auto"
               >
-                {searchResults.map((r) => {
-                  const isTracked = trackedSymbols.has(r.symbol)
-                  return (
-                    <button
-                      key={r.symbol}
-                      type="button"
-                      className="flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        if (isTracked) {
-                          setDialogOpen(false)
-                          navigate(`/asset/${r.symbol}`)
-                        } else {
-                          setSymbol(r.symbol)
-                          setShowSuggestions(false)
-                        }
-                      }}
-                    >
-                      <SearchResultItem result={r} isTracked={isTracked} />
-                    </button>
-                  )
-                })}
+                <SearchResultsList
+                  localResults={localResults}
+                  yahooLoading={yahooLoading}
+                  allResults={allResults}
+                  onSelect={(r) => {
+                    if (trackedSymbols.has(r.symbol)) {
+                      setDialogOpen(false)
+                      navigate(`/asset/${r.symbol}`)
+                    } else {
+                      setSymbol(r.symbol)
+                      setShowSuggestions(false)
+                    }
+                  }}
+                  rowClassName="px-3 py-2"
+                />
+              </div>
+            )}
+            {showSuggestions && !hasResults && !yahooLoading && trimmedQuery && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md">
+                <div className="px-3 py-2 text-sm text-muted-foreground">No results found</div>
               </div>
             )}
           </div>

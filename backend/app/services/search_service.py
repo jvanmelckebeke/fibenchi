@@ -114,3 +114,34 @@ async def search_symbols(query: str, db: AsyncSession) -> list[dict]:
 
     # If we got Yahoo results, return those (fresher); otherwise return whatever local had
     return yahoo_results if yahoo_results else local_results
+
+
+async def search_local(query: str, db: AsyncSession) -> list[dict]:
+    """Search only the local symbol_directory table (instant, no Yahoo)."""
+    q_lower = query.strip().lower()
+    return await _query_local(db, q_lower, limit=8)
+
+
+async def search_yahoo(query: str, db: AsyncSession) -> list[dict]:
+    """Search Yahoo Finance only, excluding symbols already in local results."""
+    q_lower = query.strip().lower()
+
+    # Get local symbols to exclude from Yahoo results
+    local_results = await _query_local(db, q_lower, limit=20)
+    local_symbols = {r["symbol"] for r in local_results}
+
+    # Query Yahoo
+    raw = await yahoo_search(q_lower, first_quote=False)
+    yahoo_results = _parse_yahoo_results(raw.get("quotes", []))
+
+    # Filter out duplicates already in local DB
+    unique_yahoo = [r for r in yahoo_results if r["symbol"] not in local_symbols]
+
+    # Persist new Yahoo results to the directory
+    if unique_yahoo:
+        try:
+            await _upsert_symbols(db, unique_yahoo)
+        except Exception:
+            await db.rollback()
+
+    return unique_yahoo

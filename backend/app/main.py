@@ -11,10 +11,11 @@ from starlette.responses import FileResponse
 from app.config import settings as app_settings
 
 from app.database import async_session, engine
-from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, tags, thesis
+from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
+from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -41,6 +42,18 @@ async def scheduled_refresh():
             logger.exception("Indicator pre-computation failed (non-fatal)")
 
 
+async def scheduled_symbol_sync():
+    """Background job: sync all enabled symbol directory sources."""
+    logger.info("Running scheduled symbol directory sync...")
+    async with async_session() as db:
+        try:
+            counts = await sync_all_symbol_sources(db)
+            total = sum(counts.values())
+            logger.info(f"Symbol sync complete: {len(counts)} sources, {total} symbols")
+        except Exception:
+            logger.exception("Scheduled symbol sync failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load currency lookup cache from DB
@@ -55,6 +68,14 @@ async def lifespan(app: FastAPI):
             month=parts[3], day_of_week=parts[4],
         )
         scheduler.add_job(scheduled_refresh, trigger, id="price_refresh")
+
+        # Weekly symbol directory sync (Sundays at 02:00)
+        scheduler.add_job(
+            scheduled_symbol_sync,
+            CronTrigger(minute="0", hour="2", day_of_week="sun"),
+            id="symbol_directory_sync",
+        )
+
         scheduler.start()
         logger.info(f"Scheduler started with cron: {app_settings.refresh_cron}")
 
@@ -161,6 +182,7 @@ app.include_router(pseudo_etf_analysis.router)
 app.include_router(quotes.router)
 app.include_router(settings_router.router)
 app.include_router(search.router)
+app.include_router(symbol_sources.router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])
