@@ -42,6 +42,8 @@ export const keys = {
   pseudoEtfThesis: (id: number) => ["pseudo-etfs", id, "thesis"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
   symbolSearch: (q: string) => ["symbol-search", q] as const,
+  symbolSearchLocal: (q: string) => ["symbol-search-local", q] as const,
+  symbolSearchYahoo: (q: string) => ["symbol-search-yahoo", q] as const,
   symbolSources: ["symbol-sources"] as const,
   symbolSourceProviders: ["symbol-source-providers"] as const,
 }
@@ -82,6 +84,26 @@ export function useSymbolSearch(query: string) {
   return useQuery<SymbolSearchResult[]>({
     queryKey: keys.symbolSearch(query),
     queryFn: () => api.search(query),
+    enabled: query.length >= 1,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useLocalSearch(query: string) {
+  return useQuery<SymbolSearchResult[]>({
+    queryKey: keys.symbolSearchLocal(query),
+    queryFn: () => api.searchLocal(query),
+    enabled: query.length >= 1,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useYahooSearch(query: string) {
+  return useQuery<SymbolSearchResult[]>({
+    queryKey: keys.symbolSearchYahoo(query),
+    queryFn: () => api.searchYahoo(query),
     enabled: query.length >= 1,
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,

@@ -133,6 +133,8 @@ export const api = {
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
   },
   search: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
+  searchLocal: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=local`),
+  searchYahoo: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=yahoo`),
   settings: {
     get: () => request<{ data: Record<string, unknown> }>("/settings"),
     update: (data: Record<string, unknown>) =>
