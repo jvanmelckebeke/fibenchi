@@ -1,4 +1,4 @@
-"""Euronext symbol provider — fetches stock listings from Euronext's public CSV export."""
+"""Euronext symbol provider — fetches stock + ETF listings from Euronext's public CSV exports."""
 
 import csv
 import io
@@ -10,9 +10,16 @@ from app.services.symbol_providers.base import SymbolEntry, SymbolProvider
 
 logger = logging.getLogger(__name__)
 
-EURONEXT_CSV_URL = (
+EURONEXT_STOCKS_URL = (
     "https://live.euronext.com/en/pd_es/data/stocks/download"
     "?mics=dm_all_stock&initialLetter=&fe_type=csv&fe_decimal_separator=.&fe_date_format=d%2Fm%2FY"
+)
+
+# ETF download requires explicit MIC codes (dm_all_track returns no data rows)
+_ETF_MICS = "XAMS,XBRU,XPAR,XOSL,XMIL,XLIS,XMSM"
+EURONEXT_ETFS_URL = (
+    f"https://live.euronext.com/en/pd_es/data/track/download"
+    f"?mics={_ETF_MICS}&initialLetter=&fe_type=csv&fe_decimal_separator=.&fe_date_format=d%2Fm%2FY"
 )
 
 # Maps Euronext market display names to Yahoo Finance ticker suffixes.
@@ -99,60 +106,75 @@ def _resolve_market(raw_market: str | None) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _parse_csv(raw_text: str, asset_type: str, enabled_markets: set[str]) -> list[SymbolEntry]:
+    """Parse a Euronext CSV export into SymbolEntry objects."""
+    text = raw_text.lstrip("\ufeff")
+    lines = text.splitlines()
+
+    # Find the actual header row (contains "Name;ISIN;Symbol;...")
+    header_idx = 0
+    for i, line in enumerate(lines):
+        if line.startswith("Name;") or line.startswith('"Name"'):
+            header_idx = i
+            break
+
+    data_lines = lines[header_idx:]  # header + data rows
+    reader = csv.DictReader(io.StringIO("\n".join(data_lines)), delimiter=";")
+
+    results: list[SymbolEntry] = []
+    for row in reader:
+        raw_market = row.get("Market", "")
+        suffix, market_key = _resolve_market(raw_market)
+
+        if suffix is None:
+            continue
+
+        if enabled_markets and market_key not in enabled_markets:
+            continue
+
+        raw_symbol = row.get("Symbol", "").strip().strip('"')
+        raw_name = row.get("Name", "").strip().strip('"')
+        raw_currency = row.get("Currency", "").strip().strip('"')
+
+        if not raw_symbol or not raw_name:
+            continue
+
+        yahoo_symbol = f"{raw_symbol}{suffix}"
+
+        results.append(SymbolEntry(
+            symbol=yahoo_symbol,
+            name=raw_name,
+            exchange=raw_market.strip().strip('"'),
+            currency=raw_currency,
+            type=asset_type,
+        ))
+
+    return results
+
+
 class EuronextProvider(SymbolProvider):
-    """Fetches stock listings from Euronext's public CSV export."""
+    """Fetches stock + ETF listings from Euronext's public CSV exports."""
 
     async def fetch_symbols(self, config: dict) -> list[SymbolEntry]:
         enabled_markets: set[str] = set(config.get("markets", []))
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            resp = await client.get(config.get("url", EURONEXT_CSV_URL))
-            resp.raise_for_status()
-
-        # CSV starts with BOM + 4 header/info rows before data
-        text = resp.text.lstrip("\ufeff")
-        lines = text.splitlines()
-
-        # Find the actual header row (contains "Name;ISIN;Symbol;...")
-        header_idx = 0
-        for i, line in enumerate(lines):
-            if line.startswith("Name;") or line.startswith('"Name"'):
-                header_idx = i
-                break
-
-        data_lines = lines[header_idx:]  # header + data rows
-        reader = csv.DictReader(io.StringIO("\n".join(data_lines)), delimiter=";")
+            stock_resp = await client.get(config.get("url", EURONEXT_STOCKS_URL))
+            stock_resp.raise_for_status()
+            etf_resp = await client.get(EURONEXT_ETFS_URL)
+            etf_resp.raise_for_status()
 
         results: list[SymbolEntry] = []
-        for row in reader:
-            raw_market = row.get("Market", "")
-            suffix, market_key = _resolve_market(raw_market)
+        results.extend(_parse_csv(stock_resp.text, "stock", enabled_markets))
+        results.extend(_parse_csv(etf_resp.text, "etf", enabled_markets))
 
-            if suffix is None:
-                continue
-
-            # Filter by enabled markets if any are specified
-            if enabled_markets and market_key not in enabled_markets:
-                continue
-
-            raw_symbol = row.get("Symbol", "").strip().strip('"')
-            raw_name = row.get("Name", "").strip().strip('"')
-            raw_currency = row.get("Currency", "").strip().strip('"')
-
-            if not raw_symbol or not raw_name:
-                continue
-
-            yahoo_symbol = f"{raw_symbol}{suffix}"
-
-            results.append(SymbolEntry(
-                symbol=yahoo_symbol,
-                name=raw_name,
-                exchange=raw_market.strip().strip('"'),
-                currency=raw_currency,
-                type="stock",
-            ))
-
-        logger.info("Euronext provider fetched %d symbols (markets=%s)", len(results), enabled_markets or "all")
+        logger.info(
+            "Euronext provider fetched %d symbols (%d stocks, %d ETFs, markets=%s)",
+            len(results),
+            sum(1 for r in results if r.type == "stock"),
+            sum(1 for r in results if r.type == "etf"),
+            enabled_markets or "all",
+        )
         return results
 
     @staticmethod

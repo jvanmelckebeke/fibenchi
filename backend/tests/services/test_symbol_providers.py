@@ -101,7 +101,7 @@ def test_resolve_unknown_market():
 # CSV parsing integration test (with mocked HTTP)
 # ---------------------------------------------------------------------------
 
-SAMPLE_CSV = """\
+SAMPLE_STOCKS_CSV = """\
 \ufeffName;ISIN;Symbol;Market;Currency;"Open Price";"High Price";"low Price";"last Price";"last Trade MIC Time";"Time Zone";Volume;Turnover;"Closing Price";"Closing Price DateTime"
 "European Equities"
 "20 Feb 2026"
@@ -116,40 +116,67 @@ ACCOR;FR0000120404;AC;"Euronext Paris";EUR;38.10;38.50;37.90;38.30;"19/02/2026 1
 "GROWTH PARIS CO";FR9999999999;GPC;"Euronext Growth Paris";EUR;5.00;5.10;4.90;5.05;"19/02/2026 16:00";CET;3000;15150.00;5.05;19/02/2026
 """
 
+SAMPLE_ETFS_CSV = """\
+\ufeffName;ISIN;Symbol;Market;Currency;"Open Price";"High Price";"low Price";"last Price";"last Trade MIC Time";"Time Zone";Volume;Turnover;"Closing Price";"Closing Price DateTime"
+"European ETFS, Funds, ETVs, ETNs. Type : ETFs"
+"20 Feb 2026"
+"All datapoints provided as of end of last active trading day."
+"ISHARES MSCI WOR A";IE00B4L5Y983;IWDA;"Euronext Amsterdam";EUR;113.515;113.63;112.925;113.385;"19/02/2026 17:38";CET;47814;5417502.86;113.385;19/02/2026
+"ISHARES EMIM";IE00BKM4GZ66;EMIM;"Euronext Amsterdam";EUR;42.699;42.699;42.336;42.546;"19/02/2026 17:35";CET;71784;3052652.58;42.546;19/02/2026
+"AM ASIP EXJ PEA";FR0011869312;PAEJ;"Euronext Paris";EUR;24.219;24.219;23.874;24.009;"19/02/2026 17:35";CET;12302;295691.36;24.009;19/02/2026
+"""
 
-async def test_euronext_provider_parses_csv(monkeypatch):
-    """Test full CSV parsing with mocked HTTP response."""
+
+def _make_mock_client(stocks_csv, etfs_csv):
+    """Create a mock httpx.AsyncClient that returns different CSVs per URL."""
+    from app.services.symbol_providers.euronext import EURONEXT_STOCKS_URL, EURONEXT_ETFS_URL
 
     class MockResponse:
-        status_code = 200
-        text = SAMPLE_CSV
-
+        def __init__(self, text):
+            self.text = text
+            self.status_code = 200
         def raise_for_status(self):
             pass
 
     class MockClient:
         async def get(self, url):
-            return MockResponse()
-
+            if "track" in url:
+                return MockResponse(etfs_csv)
+            return MockResponse(stocks_csv)
         async def __aenter__(self):
             return self
-
         async def __aexit__(self, *args):
             pass
 
+    return MockClient
+
+
+async def test_euronext_provider_parses_csv(monkeypatch):
+    """Test full CSV parsing with mocked HTTP response."""
     import httpx
-    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: MockClient())
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: _make_mock_client(SAMPLE_STOCKS_CSV, SAMPLE_ETFS_CSV)())
 
     provider = EuronextProvider()
     results = await provider.fetch_symbols({"markets": []})
 
     symbols = {r.symbol for r in results}
-    assert "AALB.AS" in symbols  # Amsterdam
-    assert "ABI.BR" in symbols  # Brussels
-    assert "AC.PA" in symbols  # Paris
-    assert "DNB.OL" in symbols  # Oslo
+    assert "AALB.AS" in symbols  # Amsterdam stock
+    assert "ABI.BR" in symbols  # Brussels stock
+    assert "AC.PA" in symbols  # Paris stock
+    assert "DNB.OL" in symbols  # Oslo stock
     assert "XLIST.BR" in symbols  # Multi-market → first market (Brussels)
     assert "GPC.PA" in symbols  # Growth Paris → .PA
+
+    # ETFs
+    assert "IWDA.AS" in symbols  # Amsterdam ETF
+    assert "EMIM.AS" in symbols  # Amsterdam ETF
+    assert "PAEJ.PA" in symbols  # Paris ETF
+
+    # Type checks
+    by_symbol = {r.symbol: r for r in results}
+    assert by_symbol["AALB.AS"].type == "stock"
+    assert by_symbol["IWDA.AS"].type == "etf"
+    assert by_symbol["EMIM.AS"].type == "etf"
 
     # Skipped markets
     assert "2ZM" not in symbols and not any("2ZM" in s for s in symbols)  # Trading After Hours
@@ -158,34 +185,18 @@ async def test_euronext_provider_parses_csv(monkeypatch):
 
 async def test_euronext_provider_filters_by_market(monkeypatch):
     """Test that market filter restricts results."""
-
-    class MockResponse:
-        status_code = 200
-        text = SAMPLE_CSV
-
-        def raise_for_status(self):
-            pass
-
-    class MockClient:
-        async def get(self, url):
-            return MockResponse()
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
     import httpx
-    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: MockClient())
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: _make_mock_client(SAMPLE_STOCKS_CSV, SAMPLE_ETFS_CSV)())
 
     provider = EuronextProvider()
     results = await provider.fetch_symbols({"markets": ["amsterdam"]})
 
     symbols = {r.symbol for r in results}
-    assert "AALB.AS" in symbols
+    assert "AALB.AS" in symbols  # Amsterdam stock
+    assert "IWDA.AS" in symbols  # Amsterdam ETF
     assert "ABI.BR" not in symbols  # Brussels filtered out
     assert "AC.PA" not in symbols  # Paris filtered out
+    assert "PAEJ.PA" not in symbols  # Paris ETF filtered out
 
 
 # ---------------------------------------------------------------------------
