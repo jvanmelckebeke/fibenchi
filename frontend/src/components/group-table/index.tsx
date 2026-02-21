@@ -13,6 +13,7 @@ import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible } from "./shared"
 
 
 interface GroupTableProps {
+  groupId: number
   assets: Asset[]
   quotes: Record<string, Quote>
   indicators?: Record<string, IndicatorSummary>
@@ -24,7 +25,7 @@ interface GroupTableProps {
   onSort?: (key: GroupSortBy) => void
 }
 
-export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: GroupTableProps) {
+export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
   const { settings, updateSettings } = useSettings()
   const columnSettings = settings.group_table_columns
@@ -117,6 +118,7 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
           {assets.map((asset) => (
             <TableRow
               key={asset.id}
+              groupId={groupId}
               asset={asset}
               quote={quotes[asset.symbol]}
               indicator={indicators?.[asset.symbol]}

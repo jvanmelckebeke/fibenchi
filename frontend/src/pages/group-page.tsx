@@ -211,6 +211,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
       ) : viewMode === "table" && assets && assets.length > 0 ? (
         <CrosshairTimeSyncProvider enabled={true}>
           <GroupTable
+            groupId={groupId}
             assets={assets}
             quotes={quotes}
             indicators={batchIndicators}
@@ -231,6 +232,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
           {assets?.map((asset) => (
             <AssetCard
               key={asset.id}
+              groupId={groupId}
+              assetId={asset.id}
               symbol={asset.symbol}
               name={asset.name}
               type={asset.type}
