@@ -22,6 +22,7 @@ export interface AppSettings {
   chart_type: "candle" | "line"
   theme: "dark" | "light" | "system"
   compact_mode: boolean
+  show_asset_type_badge: boolean
   decimal_places: number
   sync_pseudo_etf_crosshairs: boolean
   _updated_at?: number
@@ -46,6 +47,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   chart_type: "candle",
   theme: "system",
   compact_mode: false,
+  show_asset_type_badge: true,
   decimal_places: 2,
   sync_pseudo_etf_crosshairs: false,
 }
