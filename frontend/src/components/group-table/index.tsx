@@ -91,13 +91,12 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
                 />
               )
             })}
-            <th className="w-8 text-right pr-1">
+            <th className="w-28 text-right pr-1">
               <div className="flex items-center justify-end gap-0.5">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0"
-                  aria-label={allExpanded ? "Collapse all rows" : "Expand all rows"}
+                  className="h-6 gap-1 px-1.5 text-xs text-muted-foreground"
                   onClick={toggleExpandAll}
                 >
                   {allExpanded ? (
@@ -105,6 +104,7 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
                   ) : (
                     <ChevronsUpDown className="h-3.5 w-3.5" />
                   )}
+                  {allExpanded ? "Collapse" : "Expand"}
                 </Button>
                 <ColumnVisibilityMenu
                   columnSettings={columnSettings}
