@@ -77,12 +77,12 @@ export function TableRow({
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           )}
         </td>
-        <td className={`${py} px-2`}>
-          <div className="flex items-center gap-1.5">
+        <td className={`${py} px-3`}>
+          <div className="flex items-center gap-2">
             <MarketStatusDot marketState={quote?.market_state} />
             <Link
               to={`/asset/${asset.symbol}`}
-              className="font-semibold hover:underline whitespace-nowrap"
+              className="font-semibold hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
               {asset.symbol}
@@ -93,7 +93,7 @@ export function TableRow({
           </div>
         </td>
         {isColumnVisible(columnSettings, "name") && (
-          <td className={`${py} px-2 text-sm text-muted-foreground max-w-[120px] lg:max-w-[250px]`}>
+          <td className={`${py} px-3 text-sm text-muted-foreground`}>
             <div className="flex items-center gap-2 truncate">
               <span className="truncate">{asset.name}</span>
               {asset.tags.length > 0 && (
@@ -107,7 +107,7 @@ export function TableRow({
           </td>
         )}
         {isColumnVisible(columnSettings, "price") && (
-          <td className={`${py} px-2 text-right tabular-nums`}>
+          <td className={`${py} px-3 text-right tabular-nums`}>
             {displayPrice != null ? (
               <span ref={priceRef} className={`font-medium rounded px-1 -mx-1 ${staleClass}`}>
                 {formatPrice(displayPrice, asset.currency)}
@@ -118,7 +118,7 @@ export function TableRow({
           </td>
         )}
         {isColumnVisible(columnSettings, "change_pct") && (
-          <td className={`${py} px-2 text-right tabular-nums`}>
+          <td className={`${py} px-3 text-right tabular-nums`}>
             {displayPct != null ? (
               <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls} ${staleClass}`}>
                 {formatChangePct(displayPct).text}
@@ -139,9 +139,9 @@ export function TableRow({
             const fmt = (v: number | null | undefined) =>
               v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
             return (
-              <td key={field} className={`${py} px-2 text-right text-sm tabular-nums whitespace-nowrap`}>
+              <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
                 {hasValues ? (
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-2 overflow-hidden">
                     <span className="text-muted-foreground">M</span>
                     <span>{fmt(m)}</span>
                     <span className="text-muted-foreground">S</span>
@@ -162,7 +162,7 @@ export function TableRow({
             : resolveThresholdColor(series?.thresholdColors, val)
           const decimals = val != null && Math.abs(val) >= 100 ? 0 : 2
           return (
-            <td key={field} className={`${py} px-2 text-right text-sm tabular-nums`}>
+            <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
               {val != null ? (
                 <span className={colorClass}>{val.toFixed(decimals)}</span>
               ) : (

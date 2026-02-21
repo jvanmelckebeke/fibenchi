@@ -62,13 +62,13 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
 
   return (
     <div className="rounded-md border border-border overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full table-fixed">
         <thead>
           <tr className="border-b border-border bg-muted/50">
             <th className="w-8" />
             <SortableHeader label="Symbol" sortKey="name" align="left" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
             {isColumnVisible(columnSettings, "name") && (
-              <th className="text-left text-xs font-medium text-muted-foreground px-2 py-2">Name</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
             )}
             {isColumnVisible(columnSettings, "price") && (
               <SortableHeader label="Price" sortKey="price" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
