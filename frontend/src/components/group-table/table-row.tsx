@@ -18,6 +18,7 @@ import {
   resolveAdxColor,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
+import { useSettings } from "@/lib/settings"
 import { isColumnVisible } from "./shared"
 
 function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: string }) {
@@ -94,6 +95,7 @@ export function TableRow({
   const isMarketClosed = marketState === "CLOSED" || marketState === "POSTMARKET"
   const showStale = hasDbFallback && !isMarketClosed
 
+  const { settings } = useSettings()
   const [priceRef, pctRef] = usePriceFlash(displayPrice)
   const py = compactMode ? "py-1.5" : "py-2.5"
   const staleClass = showStale ? "stale-price" : ""
@@ -123,9 +125,11 @@ export function TableRow({
               >
                 {asset.symbol}
               </Link>
-              <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                {asset.type}
-              </Badge>
+              {settings.show_asset_type_badge && (
+                <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                  {asset.type}
+                </Badge>
+              )}
             </div>
           </td>
           {isColumnVisible(columnSettings, "name") && (
