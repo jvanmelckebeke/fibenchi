@@ -46,7 +46,7 @@ export function AssetContextMenuContent({
       {otherGroups.length > 0 && (
         <>
           <ContextMenuSub>
-            <ContextMenuSubTrigger>
+            <ContextMenuSubTrigger className="gap-2">
               <ArrowRightLeft className="h-4 w-4" />
               Move to group
             </ContextMenuSubTrigger>
@@ -63,7 +63,7 @@ export function AssetContextMenuContent({
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
-            <ContextMenuSubTrigger>
+            <ContextMenuSubTrigger className="gap-2">
               <Copy className="h-4 w-4" />
               Copy to group
             </ContextMenuSubTrigger>

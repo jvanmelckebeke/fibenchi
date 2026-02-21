@@ -70,7 +70,7 @@ export function TableRow({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <tr
-          className="border-b border-border hover:bg-muted/30 cursor-pointer group transition-colors"
+          className="border-b border-border hover:bg-muted/30 data-[state=open]:bg-muted/30 cursor-pointer group transition-colors"
           onClick={onToggle}
           onMouseEnter={onHover}
         >

@@ -77,7 +77,7 @@ export function AssetCard({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <Card className="group relative hover:border-primary/50 transition-colors" onMouseEnter={onHover}>
+        <Card className="group relative hover:border-primary/50 data-[state=open]:border-primary/50 transition-colors" onMouseEnter={onHover}>
           <Link to={`/asset/${symbol}`}>
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
