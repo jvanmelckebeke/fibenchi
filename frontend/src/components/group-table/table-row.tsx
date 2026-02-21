@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -18,6 +19,37 @@ import {
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { isColumnVisible } from "./shared"
+
+function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: "200px" },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref}>
+      {visible ? (
+        <ExpandedAssetChart symbol={symbol} currency={currency} compact />
+      ) : (
+        <Skeleton className="h-[200px] lg:h-[300px] w-full rounded-md" />
+      )}
+    </div>
+  )
+}
 
 export function TableRow({
   groupId,
@@ -188,7 +220,7 @@ export function TableRow({
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
             <div className="max-w-[calc(100vw-4rem)]">
-              <ExpandedAssetChart symbol={asset.symbol} currency={asset.currency} compact />
+              <LazyExpandedChart symbol={asset.symbol} currency={asset.currency} />
             </div>
           </td>
         </tr>
