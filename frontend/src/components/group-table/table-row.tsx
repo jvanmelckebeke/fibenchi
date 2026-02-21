@@ -139,9 +139,9 @@ export function TableRow({
             const fmt = (v: number | null | undefined) =>
               v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
             return (
-              <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+              <td key={field} className={`${py} px-3 text-right text-sm tabular-nums overflow-hidden`}>
                 {hasValues ? (
-                  <span className="inline-flex items-center gap-2 overflow-hidden">
+                  <span className="inline-flex items-center gap-2">
                     <span className="text-muted-foreground">M</span>
                     <span>{fmt(m)}</span>
                     <span className="text-muted-foreground">S</span>
