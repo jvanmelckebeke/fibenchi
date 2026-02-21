@@ -1,8 +1,14 @@
 import { Link } from "react-router-dom"
+import { Trash2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AssetActionMenu } from "@/components/asset-action-menu"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
@@ -70,61 +76,67 @@ export function AssetCard({
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
 
   return (
-    <Card className="group relative hover:border-primary/50 transition-colors" onMouseEnter={onHover}>
-      <AssetActionMenu
-        onDelete={onDelete}
-        triggerClassName="absolute right-2 top-2 h-7 w-7 opacity-0 group-hover:opacity-100 z-10"
-      />
-      <Link to={`/asset/${symbol}`}>
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <MarketStatusDot marketState={quote?.market_state} />
-            <CardTitle className="text-base">{symbol}</CardTitle>
-            <Badge variant="secondary" className="text-xs">
-              {type}
-            </Badge>
-            {lastPrice != null ? (
-              <span ref={priceRef} className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1">
-                {formatPrice(lastPrice, currency)}
-              </span>
-            ) : (
-              <Skeleton className="ml-auto h-5 w-16 rounded" />
-            )}
-          </div>
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground truncate">{name}</p>
-            {changePct != null ? (
-              <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeCls}`}>
-                {formatChangePct(changePct).text}
-              </span>
-            ) : (
-              <Skeleton className="h-3.5 w-12 rounded" />
-            )}
-          </div>
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {tags.map((tag) => (
-                <TagBadge key={tag.id} name={tag.name} color={tag.color} />
-              ))}
-            </div>
-          )}
-        </CardHeader>
-        <CardContent className="pt-0 space-y-2">
-          {showSparkline && <DeferredSparkline batchData={sparklineData} />}
-          {enabledCards.length > 0 && (
-            <div className="grid grid-cols-2 gap-1.5 mt-1">
-              {enabledCards.map((desc) => (
-                <MiniIndicatorCard
-                  key={desc.id}
-                  descriptor={desc}
-                  values={indicatorData?.values}
-                  currency={currency}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Link>
-    </Card>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <Card className="group relative hover:border-primary/50 transition-colors" onMouseEnter={onHover}>
+          <Link to={`/asset/${symbol}`}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <MarketStatusDot marketState={quote?.market_state} />
+                <CardTitle className="text-base">{symbol}</CardTitle>
+                <Badge variant="secondary" className="text-xs">
+                  {type}
+                </Badge>
+                {lastPrice != null ? (
+                  <span ref={priceRef} className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1">
+                    {formatPrice(lastPrice, currency)}
+                  </span>
+                ) : (
+                  <Skeleton className="ml-auto h-5 w-16 rounded" />
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground truncate">{name}</p>
+                {changePct != null ? (
+                  <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeCls}`}>
+                    {formatChangePct(changePct).text}
+                  </span>
+                ) : (
+                  <Skeleton className="h-3.5 w-12 rounded" />
+                )}
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {tags.map((tag) => (
+                    <TagBadge key={tag.id} name={tag.name} color={tag.color} />
+                  ))}
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="pt-0 space-y-2">
+              {showSparkline && <DeferredSparkline batchData={sparklineData} />}
+              {enabledCards.length > 0 && (
+                <div className="grid grid-cols-2 gap-1.5 mt-1">
+                  {enabledCards.map((desc) => (
+                    <MiniIndicatorCard
+                      key={desc.id}
+                      descriptor={desc}
+                      values={indicatorData?.values}
+                      currency={currency}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Link>
+        </Card>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem variant="destructive" onClick={onDelete}>
+          <Trash2 />
+          Remove from group
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
