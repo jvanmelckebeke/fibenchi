@@ -7,3 +7,4 @@ yahooquery>=2.3.7,<3.0
 pandas==2.2.3
 apscheduler==3.11.0
 pydantic-settings==2.9.1
+httpx>=0.27,<1.0

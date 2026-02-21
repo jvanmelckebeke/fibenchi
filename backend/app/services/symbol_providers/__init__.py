@@ -2,11 +2,13 @@
 
 from app.services.symbol_providers.base import SymbolEntry, SymbolProvider
 from app.services.symbol_providers.euronext import EuronextProvider
+from app.services.symbol_providers.xetra import XetraProvider
 
 __all__ = ["SymbolEntry", "SymbolProvider", "get_provider", "get_available_providers"]
 
 _PROVIDERS: dict[str, type[SymbolProvider]] = {
     "euronext": EuronextProvider,
+    "xetra": XetraProvider,
 }
 
 

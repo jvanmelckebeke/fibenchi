@@ -1,9 +1,10 @@
-"""Tests for the symbol provider registry and Euronext provider."""
+"""Tests for the symbol provider registry and individual providers."""
 
 import pytest
 
 from app.services.symbol_providers import get_provider, get_available_providers
 from app.services.symbol_providers.euronext import _resolve_market, EuronextProvider
+from app.services.symbol_providers.xetra import XetraProvider
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -219,3 +220,77 @@ def test_get_available_providers():
     assert "euronext" in providers
     assert len(providers["euronext"]["markets"]) >= 7
     assert providers["euronext"]["markets"][0]["key"] == "amsterdam"
+    assert "xetra" in providers
+    assert providers["xetra"]["markets"][0]["key"] == "xetra"
+
+
+# ---------------------------------------------------------------------------
+# Xetra provider tests
+# ---------------------------------------------------------------------------
+
+SAMPLE_XETRA_CSV = """\
+Market:;XETR
+Date Last Update:;20.02.2026
+Product Status;Instrument Status;Instrument;ISIN;Product ID;Instrument ID;WKN;Mnemonic;MIC Code;CCP eligible Code;Trading Model Type;Product Assignment Group;Product Assignment Group Description;Designated Sponsor Member ID;Designated Sponsor;Price Range Value;Price Range Percentage;Minimum Quote Size;Instrument Type;Currency
+Active;Active;SIEMENS AG NA O.N.;DE0007236101;40001;2504193;723610;SIE;XETR;Y;Continuous;DAX0;DAX;BALFR;BAADER BANK AG;;2;111;CS;EUR
+Active;Active;ISHARES CORE DAX;DE0005933931;40002;2504194;593393;EXS1;XETR;Y;Continuous;FON1;EXCHANGE TRADED FUNDS;LSTDU;LANG & SCHWARZ;;6;53400;ETF;EUR
+Active;Active;21SHARES BITCOIN ETP;CH0454664001;40003;2504195;A2T64E;2BTC;XETR;Y;Continuous;ETN0;EXCHANGE TRADED NOTES;BALFR;BAADER BANK;;5;2600;ETN;EUR
+Active;Active;SAP SE O.N.;DE0007164600;40004;2504196;716460;SAP;XETR;Y;Continuous;DAX0;DAX;BALFR;BAADER BANK AG;;2;111;CS;EUR
+Inactive;Active;DELISTED AG;DE9999999999;40005;2504197;999999;DEL;XETR;Y;Continuous;AST0;GENERAL STANDARD;BALFR;BAADER BANK;;2;111;CS;EUR
+Active;Inactive;SUSPENDED AG;DE8888888888;40006;2504198;888888;SUS;XETR;Y;Continuous;AST0;GENERAL STANDARD;BALFR;BAADER BANK;;2;111;CS;EUR
+Active;Active;XETRA GOLD;DE000A0S9GB0;40007;2504199;A0S9GB;4GLD;XETR;Y;Continuous;ETC0;EXCHANGE TRADED COMMODITIES;BALFR;BAADER BANK;;5;2600;ETC;EUR
+"""
+
+
+def _make_xetra_mock_client(csv_text):
+    """Create a mock httpx.AsyncClient that returns the given CSV."""
+
+    class MockResponse:
+        def __init__(self, text):
+            self.text = text
+            self.status_code = 200
+        def raise_for_status(self):
+            pass
+
+    class MockClient:
+        async def get(self, url):
+            return MockResponse(csv_text)
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+
+    return MockClient
+
+
+async def test_xetra_provider_parses_csv(monkeypatch):
+    """Test full CSV parsing with mocked HTTP response."""
+    import httpx
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: _make_xetra_mock_client(SAMPLE_XETRA_CSV)())
+
+    provider = XetraProvider()
+    results = await provider.fetch_symbols({})
+
+    symbols = {r.symbol for r in results}
+    assert "SIE.DE" in symbols  # Siemens stock
+    assert "SAP.DE" in symbols  # SAP stock
+    assert "EXS1.DE" in symbols  # iShares Core DAX ETF
+
+    # Type checks
+    by_symbol = {r.symbol: r for r in results}
+    assert by_symbol["SIE.DE"].type == "stock"
+    assert by_symbol["SAP.DE"].type == "stock"
+    assert by_symbol["EXS1.DE"].type == "etf"
+    assert by_symbol["SIE.DE"].exchange == "Xetra"
+    assert by_symbol["SIE.DE"].currency == "EUR"
+
+    # Filtered out: ETN, ETC, inactive products
+    assert "2BTC.DE" not in symbols  # ETN
+    assert "4GLD.DE" not in symbols  # ETC
+    assert "DEL.DE" not in symbols  # Inactive product
+    assert "SUS.DE" not in symbols  # Inactive instrument
+
+
+def test_get_provider_xetra():
+    provider = get_provider("xetra")
+    assert isinstance(provider, XetraProvider)
