@@ -13,7 +13,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/add-symbol-dialog"
 import { AssetCard } from "@/components/asset-card"
-import { TagBadge } from "@/components/tag-badge"
+import { TagFilterPopover } from "@/components/tag-filter-popover"
 import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
@@ -92,7 +92,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
     )
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <GroupHeader groupId={groupId} group={group} isDefaultGroup={isDefaultGroup} />
@@ -178,31 +178,17 @@ export function GroupPage({ groupId }: { groupId: number }) {
             value={settings.group_view_mode}
             onChange={setViewMode}
           />
+          {allTags && allTags.length > 0 && (
+            <TagFilterPopover
+              tags={allTags}
+              selectedTags={selectedTags}
+              onToggleTag={toggleTag}
+              onClear={() => setSelectedTags([])}
+            />
+          )}
         </div>
         <AddSymbolDialog groupId={groupId} isDefaultGroup={isDefaultGroup} />
       </div>
-
-      {allTags && allTags.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {allTags.map((tag) => (
-            <TagBadge
-              key={tag.id}
-              name={tag.name}
-              color={tag.color}
-              active={selectedTags.length === 0 || selectedTags.includes(tag.id)}
-              onClick={() => toggleTag(tag.id)}
-            />
-          ))}
-          {selectedTags.length > 0 && (
-            <button
-              className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => setSelectedTags([])}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      )}
 
       {groupLoading && <p className="text-muted-foreground">Loading...</p>}
 
@@ -225,6 +211,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
       ) : viewMode === "table" && assets && assets.length > 0 ? (
         <CrosshairTimeSyncProvider enabled={true}>
           <GroupTable
+            groupId={groupId}
             assets={assets}
             quotes={quotes}
             indicators={batchIndicators}
@@ -245,6 +232,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
           {assets?.map((asset) => (
             <AssetCard
               key={asset.id}
+              groupId={groupId}
+              assetId={asset.id}
               symbol={asset.symbol}
               name={asset.name}
               type={asset.type}

@@ -13,6 +13,7 @@ import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible } from "./shared"
 
 
 interface GroupTableProps {
+  groupId: number
   assets: Asset[]
   quotes: Record<string, Quote>
   indicators?: Record<string, IndicatorSummary>
@@ -24,7 +25,7 @@ interface GroupTableProps {
   onSort?: (key: GroupSortBy) => void
 }
 
-export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: GroupTableProps) {
+export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
   const { settings, updateSettings } = useSettings()
   const columnSettings = settings.group_table_columns
@@ -61,8 +62,8 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
   const totalColSpan = 1 + 1 + visibleBaseCount + visibleIndicatorFields.length + 1
 
   return (
-    <div className="rounded-md border border-border overflow-hidden">
-      <table className="w-full">
+    <div className="rounded-md border border-border overflow-x-auto">
+      <table className="w-full table-fixed">
         <thead>
           <tr className="border-b border-border bg-muted/50">
             <th className="w-8" />
@@ -90,13 +91,12 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
                 />
               )
             })}
-            <th className="w-8 text-right pr-1">
+            <th className="w-28 text-right pr-1">
               <div className="flex items-center justify-end gap-0.5">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0"
-                  aria-label={allExpanded ? "Collapse all rows" : "Expand all rows"}
+                  className="h-6 gap-1 px-1.5 text-xs text-muted-foreground"
                   onClick={toggleExpandAll}
                 >
                   {allExpanded ? (
@@ -104,6 +104,7 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
                   ) : (
                     <ChevronsUpDown className="h-3.5 w-3.5" />
                   )}
+                  {allExpanded ? "Collapse" : "Expand"}
                 </Button>
                 <ColumnVisibilityMenu
                   columnSettings={columnSettings}
@@ -117,6 +118,7 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
           {assets.map((asset) => (
             <TableRow
               key={asset.id}
+              groupId={groupId}
               asset={asset}
               quote={quotes[asset.symbol]}
               indicator={indicators?.[asset.symbol]}

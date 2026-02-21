@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
 import { CandlestickChart } from "@/components/chart/candlestick-chart"
@@ -10,6 +11,18 @@ import { useSettings } from "@/lib/settings"
 
 const CARD_DESCRIPTORS_ALL = getCardDescriptors()
 const CARD_DESCRIPTORS_EXCLUSIVE = getCardDescriptors(true)
+
+/** Tailwind `lg` breakpoint (1024px) */
+function useIsWide() {
+  const [wide, setWide] = useState(() => window.matchMedia("(min-width: 1024px)").matches)
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)")
+    const onChange = () => setWide(mql.matches)
+    mql.addEventListener("change", onChange)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+  return wide
+}
 
 interface ExpandedAssetChartProps {
   symbol: string
@@ -34,24 +47,27 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
   const prices = detail?.prices
   const indicators = detail?.indicators
   const { data: annotations } = useAnnotations(symbol)
+  const isWide = useIsWide()
 
   const cardDescs = compact ? CARD_DESCRIPTORS_ALL : CARD_DESCRIPTORS_EXCLUSIVE
   const enabledCards = cardDescs.filter(
     (d) => isIndicatorVisible(settings.detail_indicator_visibility, d.id),
   )
 
+  const compactChartHeight = isWide ? 300 : 200
+
   if (isLoading || !prices?.length) {
     if (compact) {
       return (
-        <div className="flex gap-4">
-          <div className="flex-[4] min-w-0">
-            <div className="h-[300px] flex items-center justify-center">
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="min-w-0 lg:flex-[4]">
+            <div className="h-[200px] lg:h-[300px] flex items-center justify-center">
               <Skeleton className="h-full w-full rounded-md" />
             </div>
           </div>
-          <div className="flex-1 flex flex-col gap-1.5 min-w-[140px] max-w-[200px]">
+          <div className="flex flex-row flex-wrap lg:flex-col gap-1.5 lg:min-w-[140px] lg:max-w-[200px]">
             {enabledCards.map((d) => (
-              <Skeleton key={d.id} className="h-12 w-full rounded-md" />
+              <Skeleton key={d.id} className="h-12 w-24 lg:w-full rounded-md" />
             ))}
           </div>
         </div>
@@ -70,8 +86,8 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
   if (compact) {
     return (
       <ChartSyncProvider prices={prices} indicators={indicators ?? []}>
-        <div className="flex gap-4">
-          <div className="flex-[4] min-w-0">
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="min-w-0 lg:flex-[4]">
             <CandlestickChart
               annotations={annotations ?? []}
               indicatorVisibility={{
@@ -80,11 +96,11 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
                 macd: false,
               }}
               chartType={settings.chart_type}
-              height={300}
+              height={compactChartHeight}
               roundedClass="rounded-md"
             />
           </div>
-          <div className="flex-1 min-w-[140px] max-w-[200px] mt-8">
+          <div className="flex flex-row flex-wrap lg:flex-col gap-1.5 lg:min-w-[140px] lg:max-w-[200px] lg:mt-8">
             <IndicatorCards descriptors={enabledCards} currency={currency} compact />
           </div>
         </div>
