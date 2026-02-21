@@ -93,7 +93,7 @@ export function TableRow({
           </div>
         </td>
         {isColumnVisible(columnSettings, "name") && (
-          <td className={`${py} px-3 text-sm text-muted-foreground max-w-[250px]`}>
+          <td className={`${py} px-3 text-sm text-muted-foreground`}>
             <div className="flex items-center gap-2 truncate">
               <span className="truncate">{asset.name}</span>
               {asset.tags.length > 0 && (
@@ -139,7 +139,7 @@ export function TableRow({
             const fmt = (v: number | null | undefined) =>
               v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
             return (
-              <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+              <td key={field} className={`${py} px-3 text-right text-sm tabular-nums overflow-hidden`}>
                 {hasValues ? (
                   <span className="inline-flex items-center gap-2">
                     <span className="text-muted-foreground">M</span>
@@ -181,7 +181,9 @@ export function TableRow({
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
-            <ExpandedAssetChart symbol={asset.symbol} currency={asset.currency} compact />
+            <div className="max-w-[calc(100vw-4rem)]">
+              <ExpandedAssetChart symbol={asset.symbol} currency={asset.currency} compact />
+            </div>
           </td>
         </tr>
       )}

@@ -61,8 +61,8 @@ export function GroupTable({ assets, quotes, indicators, onDelete, compactMode, 
   const totalColSpan = 1 + 1 + visibleBaseCount + visibleIndicatorFields.length + 1
 
   return (
-    <div className="rounded-md border border-border overflow-hidden">
-      <table className="w-full">
+    <div className="rounded-md border border-border overflow-x-auto">
+      <table className="w-full table-fixed">
         <thead>
           <tr className="border-b border-border bg-muted/50">
             <th className="w-8" />
