@@ -9,7 +9,7 @@ import { useSettings } from "@/lib/settings"
 import { SortableHeader } from "./sortable-header"
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
 import { TableRow } from "./table-row"
-import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible } from "./shared"
+import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden } from "./shared"
 
 
 interface GroupTableProps {
@@ -29,6 +29,7 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
   const { settings, updateSettings } = useSettings()
   const columnSettings = settings.group_table_columns
+  const responsiveHidden = useResponsiveHidden()
 
   const toggleExpand = (symbol: string) => {
     setExpandedSymbols((prev) => toggleSetItem(prev, symbol))
@@ -52,17 +53,37 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
   }
 
   const visibleIndicatorFields = useMemo(
-    () => SORTABLE_FIELDS.filter((f) => isColumnVisible(columnSettings, f)),
-    [columnSettings],
+    () => SORTABLE_FIELDS.filter((f) => isColumnVisible(columnSettings, f) && !responsiveHidden.has(f)),
+    [columnSettings, responsiveHidden],
   )
 
-  // Total visible columns: expand chevron (1) + symbol (1) + toggleable base + toggleable indicators + action menu (1)
+  // Total visible columns: expand chevron (1) + symbol (1) + toggleable base + toggleable indicators
   const visibleBaseCount =
     BASE_COLUMN_DEFS.filter((c) => isColumnVisible(columnSettings, c.key)).length
-  const totalColSpan = 1 + 1 + visibleBaseCount + visibleIndicatorFields.length + 1
+  const totalColSpan = 1 + 1 + visibleBaseCount + visibleIndicatorFields.length
 
   return (
     <div className="rounded-md border border-border overflow-x-auto">
+      <div className="flex items-center justify-end gap-0.5 px-1 py-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 gap-1 px-1.5 text-xs text-muted-foreground"
+          onClick={toggleExpandAll}
+        >
+          {allExpanded ? (
+            <ChevronsDownUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronsUpDown className="h-3.5 w-3.5" />
+          )}
+          {allExpanded ? "Collapse" : "Expand"}
+        </Button>
+        <ColumnVisibilityMenu
+          columnSettings={columnSettings}
+          onToggle={toggleColumn}
+          responsiveHidden={responsiveHidden}
+        />
+      </div>
       <table className="w-full table-fixed">
         <thead>
           <tr className="border-b border-border bg-muted/50">
@@ -91,27 +112,6 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
                 />
               )
             })}
-            <th className="w-28 text-right pr-1">
-              <div className="flex items-center justify-end gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 gap-1 px-1.5 text-xs text-muted-foreground"
-                  onClick={toggleExpandAll}
-                >
-                  {allExpanded ? (
-                    <ChevronsDownUp className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronsUpDown className="h-3.5 w-3.5" />
-                  )}
-                  {allExpanded ? "Collapse" : "Expand"}
-                </Button>
-                <ColumnVisibilityMenu
-                  columnSettings={columnSettings}
-                  onToggle={toggleColumn}
-                />
-              </div>
-            </th>
           </tr>
         </thead>
         <tbody>

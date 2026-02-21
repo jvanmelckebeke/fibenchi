@@ -207,7 +207,6 @@ export function TableRow({
               </td>
             )
           })}
-          <td className={`${py} pr-2`} />
         </tr>
       </ContextMenuTrigger>
       <AssetContextMenuContent

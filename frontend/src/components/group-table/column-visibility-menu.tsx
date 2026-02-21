@@ -15,9 +15,11 @@ import { BASE_COLUMN_DEFS, SORTABLE_FIELDS, isColumnVisible } from "./shared"
 export function ColumnVisibilityMenu({
   columnSettings,
   onToggle,
+  responsiveHidden,
 }: {
   columnSettings: Record<string, boolean>
   onToggle: (key: string) => void
+  responsiveHidden: Set<string>
 }) {
   // Build indicator column defs from registry
   const indicatorColumnDefs = useMemo(
@@ -58,16 +60,23 @@ export function ColumnVisibilityMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Indicators</DropdownMenuLabel>
-            {indicatorColumnDefs.map(({ key, label }) => (
-              <DropdownMenuCheckboxItem
-                key={key}
-                checked={isColumnVisible(columnSettings, key)}
-                onCheckedChange={() => onToggle(key)}
-                onSelect={(e) => e.preventDefault()}
-              >
-                {label}
-              </DropdownMenuCheckboxItem>
-            ))}
+            {indicatorColumnDefs.map(({ key, label }) => {
+              const isHidden = responsiveHidden.has(key)
+              return (
+                <DropdownMenuCheckboxItem
+                  key={key}
+                  checked={isColumnVisible(columnSettings, key)}
+                  disabled={isHidden}
+                  onCheckedChange={() => onToggle(key)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  <span className="flex items-center justify-between w-full gap-2">
+                    {label}
+                    {isHidden && <span className="text-[10px] text-muted-foreground">narrow</span>}
+                  </span>
+                </DropdownMenuCheckboxItem>
+              )
+            })}
           </>
         )}
       </DropdownMenuContent>
