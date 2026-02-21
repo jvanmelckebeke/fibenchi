@@ -1,13 +1,9 @@
 import { Link } from "react-router-dom"
-import { ChevronRight, ChevronDown, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronDown } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { AssetContextMenuContent } from "@/components/asset-context-menu"
 import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
@@ -24,6 +20,7 @@ import { usePriceFlash } from "@/lib/use-price-flash"
 import { isColumnVisible } from "./shared"
 
 export function TableRow({
+  groupId,
   asset,
   quote,
   indicator,
@@ -36,6 +33,7 @@ export function TableRow({
   visibleIndicatorFields,
   totalColSpan,
 }: {
+  groupId: number
   asset: Asset
   quote?: Quote
   indicator?: IndicatorSummary
@@ -180,12 +178,12 @@ export function TableRow({
           <td className={`${py} pr-2`} />
         </tr>
       </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem variant="destructive" onClick={onDelete}>
-          <Trash2 />
-          Remove from group
-        </ContextMenuItem>
-      </ContextMenuContent>
+      <AssetContextMenuContent
+        groupId={groupId}
+        assetId={asset.id}
+        symbol={asset.symbol}
+        onRemove={onDelete}
+      />
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">

@@ -1,14 +1,9 @@
 import { Link } from "react-router-dom"
-import { Trash2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { AssetContextMenuContent } from "@/components/asset-context-menu"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
@@ -21,6 +16,8 @@ import { usePriceFlash } from "@/lib/use-price-flash"
 const CARD_DESCRIPTORS = getCardDescriptors()
 
 export interface AssetCardProps {
+  groupId: number
+  assetId: number
   symbol: string
   name: string
   type: AssetType
@@ -53,6 +50,8 @@ function MiniIndicatorCard({
 }
 
 export function AssetCard({
+  groupId,
+  assetId,
   symbol,
   name,
   type,
@@ -131,12 +130,12 @@ export function AssetCard({
           </Link>
         </Card>
       </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem variant="destructive" onClick={onDelete}>
-          <Trash2 />
-          Remove from group
-        </ContextMenuItem>
-      </ContextMenuContent>
+      <AssetContextMenuContent
+        groupId={groupId}
+        assetId={assetId}
+        symbol={symbol}
+        onRemove={onDelete}
+      />
     </ContextMenu>
   )
 }
