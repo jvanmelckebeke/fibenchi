@@ -116,6 +116,11 @@ def adx(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
     return {"adx": adx_series, "plus_di": plus_di, "minus_di": minus_di}
 
 
+def volume_stats(df: pd.DataFrame, period: int = 20) -> dict[str, pd.Series]:
+    """Volume and average volume (SMA of volume)."""
+    return {"volume": df["volume"], "avg_volume": df["volume"].rolling(window=period).mean()}
+
+
 def bb_position(close: float, upper: float, middle: float, lower: float) -> str:
     """Classify where price sits relative to Bollinger Bands."""
     if close > upper:
@@ -250,6 +255,15 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         decimals=2,
         warmup_periods=28,
         snapshot_derived=_adx_snapshot_derived,
+        uses_ohlc=True,
+    ),
+    "volume": IndicatorDef(
+        func=volume_stats,
+        params={"period": 20},
+        output_fields=["volume", "avg_volume"],
+        result_mapping={"volume": "volume", "avg_volume": "avg_volume"},
+        decimals=0,
+        warmup_periods=20,
         uses_ohlc=True,
     ),
 }

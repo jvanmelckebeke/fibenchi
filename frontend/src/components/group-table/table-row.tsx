@@ -9,7 +9,7 @@ import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatPrice, formatCompactPrice, changeColor, formatChangePct } from "@/lib/format"
+import { formatPrice, formatCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -209,10 +209,20 @@ export function TableRow({
               ? resolveAdxColor(val, indicator.values)
               : resolveThresholdColor(series?.thresholdColors, val)
             const decimals = desc?.decimals ?? (val != null && Math.abs(val) >= 100 ? 0 : 2)
+            const formatted = val != null
+              ? desc?.compactFormat
+                ? formatCompactNumber(val)
+                : `${val.toFixed(decimals)}${desc?.suffix ?? ""}`
+              : null
             return (
               <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
-                {val != null ? (
-                  <span className={colorClass}>{val.toFixed(decimals)}{desc?.suffix ?? ""}</span>
+                {formatted != null ? (
+                  <span
+                    className={colorClass}
+                    title={desc?.compactFormat && val != null ? val.toLocaleString() : undefined}
+                  >
+                    {formatted}
+                  </span>
                 ) : (
                   <span className="text-muted-foreground">&mdash;</span>
                 )}

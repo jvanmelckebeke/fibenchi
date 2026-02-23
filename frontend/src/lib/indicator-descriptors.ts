@@ -188,4 +188,18 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       colorMap: { strong: "text-emerald-500", weak: "text-yellow-500", absent: "text-zinc-400" },
     },
   },
+  {
+    id: "volume",
+    label: "Volume",
+    shortLabel: "Vol",
+    placement: "card",
+    fields: ["volume", "avg_volume"],
+    sortableFields: ["volume", "avg_volume"],
+    series: [
+      { field: "volume", label: "Vol", color: "#64748b" },
+      { field: "avg_volume", label: "Avg Vol", color: "#94a3b8" },
+    ],
+    decimals: 0,
+    compactFormat: true,
+  },
 ]
