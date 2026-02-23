@@ -82,6 +82,7 @@ export function HoldingRow({
                     colorMap={hs.colorMap}
                     values={indicator?.values}
                     close={indicator?.close ?? null}
+                    suffix={desc.suffix}
                   />
                 </td>
               )

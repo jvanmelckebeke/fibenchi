@@ -57,7 +57,7 @@ export function IndicatorValue({
         className={`${sizeClass} font-semibold tabular-nums ${colorClass || "text-foreground"}`}
       >
         {currency && descriptor.priceDenominated ? currencySymbol(currency) : ""}
-        {mainVal.toFixed(descriptor.decimals)}
+        {mainVal.toFixed(descriptor.decimals)}{descriptor.suffix ?? ""}
       </span>
 
       {/* ADX: show +DI / -DI below the main value */}

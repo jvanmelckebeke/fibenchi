@@ -31,7 +31,7 @@ function OverlayEntry({ descriptor, v }: { descriptor: IndicatorDescriptor; v: L
       <span>
         <span className="inline-block w-2 h-0.5 mr-1 align-middle" style={{ backgroundColor: color }} />
         {s.label}{" "}
-        <span style={{ color }}>{val?.toFixed(descriptor.decimals)}</span>
+        <span style={{ color }}>{val?.toFixed(descriptor.decimals)}{descriptor.suffix ?? ""}</span>
       </span>
     )
   }
@@ -44,7 +44,7 @@ function OverlayEntry({ descriptor, v }: { descriptor: IndicatorDescriptor; v: L
       {descriptor.series.map((s, i) => (
         <Fragment key={s.field}>
           {i > 0 && " / "}
-          <span>{v.indicators[s.field]?.toFixed(descriptor.decimals)}</span>
+          <span>{v.indicators[s.field]?.toFixed(descriptor.decimals)}{descriptor.suffix ?? ""}</span>
         </Fragment>
       ))}
     </span>
@@ -100,7 +100,7 @@ export function SubChartLegend({ descriptorId, values, latest }: {
         if (thresholdClass) {
           return (
             <span key={s.field} className={thresholdClass}>
-              {s.label} {val.toFixed(desc.decimals)}
+              {s.label} {val.toFixed(desc.decimals)}{desc.suffix ?? ""}
             </span>
           )
         }
@@ -109,7 +109,7 @@ export function SubChartLegend({ descriptorId, values, latest }: {
           <span key={s.field}>
             <span className="inline-block w-2 h-0.5 mr-1 align-middle" style={{ backgroundColor: color }} />
             {s.label}{" "}
-            <span style={{ color }}>{val.toFixed(desc.decimals)}</span>
+            <span style={{ color }}>{val.toFixed(desc.decimals)}{desc.suffix ?? ""}</span>
           </span>
         )
       })}

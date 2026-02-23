@@ -18,6 +18,7 @@ export function isColumnVisible(columnSettings: Record<string, boolean>, key: st
 /** Minimum viewport width (px) for a column to be auto-shown. */
 const RESPONSIVE_HIDE_BREAKPOINTS: Record<string, number> = {
   adx: 1280,
+  atr_pct: 1280,
   atr: 1024,
   macd: 768,
   rsi: 640,

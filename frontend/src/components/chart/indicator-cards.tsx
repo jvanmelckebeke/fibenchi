@@ -23,6 +23,7 @@ const CARD_HELP: Record<string, string> = {
   rsi: "Momentum oscillator — below 30 is oversold, above 70 is overbought",
   macd: "Momentum crossover — positive histogram is bullish, negative is bearish",
   atr: "Average daily high-to-low range — higher means more volatile",
+  atr_pct: "ATR as % of price — comparable across different price levels",
   adx: "Trend strength & direction — green is bullish, red is bearish",
 }
 

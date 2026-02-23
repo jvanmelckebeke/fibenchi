@@ -72,6 +72,8 @@ export interface IndicatorDescriptor {
   snapField?: string
   /** When true, the indicator's values are denominated in the asset's currency (e.g. ATR). */
   priceDenominated?: boolean
+  /** Suffix appended after the formatted value (e.g. "%" for ATR%). */
+  suffix?: string
 }
 
 /** Narrowed descriptor where holdingSummary is guaranteed present. */
@@ -207,6 +209,25 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     decimals: 2,
     holdingSummary: { label: "ATR", field: "atr", format: "numeric" },
     priceDenominated: true,
+  },
+  {
+    id: "atr_pct",
+    label: "ATR%",
+    shortLabel: "ATR%",
+    placement: "card",
+    fields: ["atr_pct"],
+    sortableFields: ["atr_pct"],
+    series: [
+      {
+        field: "atr_pct",
+        label: "ATR%",
+        color: "#f97316",
+        lineWidth: 2,
+      },
+    ],
+    decimals: 2,
+    suffix: "%",
+    holdingSummary: { label: "ATR%", field: "atr_pct", format: "numeric" },
   },
   {
     id: "adx",
@@ -354,6 +375,10 @@ export function extractMacdValues(values?: Record<string, number | string | null
     macd_signal: getNumericValue(values, "macd_signal"),
     macd_hist: getNumericValue(values, "macd_hist"),
   } : undefined
+}
+
+export function getDescriptorByField(field: string): IndicatorDescriptor | undefined {
+  return INDICATOR_REGISTRY.find((d) => d.fields.includes(field))
 }
 
 export function getSeriesByField(field: string): SeriesDescriptor | undefined {

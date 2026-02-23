@@ -14,6 +14,7 @@ import {
   getNumericValue,
   extractMacdValues,
   getSeriesByField,
+  getDescriptorByField,
   resolveThresholdColor,
   resolveAdxColor,
 } from "@/lib/indicator-registry"
@@ -197,14 +198,15 @@ export function TableRow({
             }
             const val = getNumericValue(indicator?.values, field)
             const series = getSeriesByField(field)
+            const desc = getDescriptorByField(field)
             const colorClass = field === "adx" && val != null && indicator?.values
               ? resolveAdxColor(val, indicator.values)
               : resolveThresholdColor(series?.thresholdColors, val)
-            const decimals = val != null && Math.abs(val) >= 100 ? 0 : 2
+            const decimals = desc?.decimals ?? (val != null && Math.abs(val) >= 100 ? 0 : 2)
             return (
               <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
                 {val != null ? (
-                  <span className={colorClass}>{val.toFixed(decimals)}</span>
+                  <span className={colorClass}>{val.toFixed(decimals)}{desc?.suffix ?? ""}</span>
                 ) : (
                   <span className="text-muted-foreground">&mdash;</span>
                 )}
