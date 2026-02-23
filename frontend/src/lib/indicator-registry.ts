@@ -73,6 +73,8 @@ export interface IndicatorDescriptor {
   priceDenominated?: boolean
   /** Suffix appended after the formatted value (e.g. "%" for ATR%). */
   suffix?: string
+  /** When true, table values use formatCompactNumber (K/M/B) instead of toFixed. */
+  compactFormat?: boolean
 }
 
 /** Narrowed descriptor where holdingSummary is guaranteed present. */
