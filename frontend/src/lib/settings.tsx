@@ -17,6 +17,7 @@ export interface AppSettings {
   group_sort_by: GroupSortBy
   group_sort_dir: SortDir
   group_table_columns: Record<string, boolean>
+  group_table_column_widths: Record<string, number>
   detail_indicator_visibility: Record<string, boolean>
   chart_default_period: string
   chart_type: "candle" | "line"
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   group_sort_by: "name",
   group_sort_dir: "asc",
   group_table_columns: {},
+  group_table_column_widths: {},
   detail_indicator_visibility: defaultVisibility(),
   chart_default_period: "1y",
   chart_type: "candle",
