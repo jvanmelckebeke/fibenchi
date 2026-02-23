@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
+export const STALE_1MIN = 60_000
 export const STALE_5MIN = 5 * 60_000
 export const STALE_24H = 24 * 60 * 60_000
 

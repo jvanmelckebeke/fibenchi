@@ -1,4 +1,4 @@
-export { keys, STALE_5MIN, STALE_24H, useInvalidatingMutation } from "./shared"
+export { keys, STALE_1MIN, STALE_5MIN, STALE_24H, useInvalidatingMutation } from "./shared"
 export { usePortfolioIndex, usePortfolioPerformers } from "./portfolio"
 export { useAssets, useCreateAsset, useLocalSearch, useYahooSearch } from "./assets"
 export { useAssetDetail, useEtfHoldings, useHoldingsIndicators, useRefreshPrices, usePrefetchAssetDetail } from "./prices"
