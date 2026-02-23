@@ -199,6 +199,59 @@ def test_adx_snapshot_derived():
     assert snapshot["values"]["adx_trend"] in ("strong", "weak", "absent", None)
 
 
+# ---------------------------------------------------------------------------
+# ATR% tests (#399)
+# ---------------------------------------------------------------------------
+
+
+def test_atr_pct_in_snapshot():
+    """atr_pct should appear in snapshot values and be positive."""
+    df = _make_price_df(200)
+    indicators = compute_indicators(df)
+    snapshot = build_indicator_snapshot(indicators)
+    assert "values" in snapshot
+    assert "atr_pct" in snapshot["values"]
+    assert snapshot["values"]["atr_pct"] is not None
+    assert snapshot["values"]["atr_pct"] > 0
+
+
+def test_atr_pct_calculation():
+    """atr_pct should equal round(atr / close * 100, 2)."""
+    df = _make_price_df(200)
+    indicators = compute_indicators(df)
+    snapshot = build_indicator_snapshot(indicators)
+    atr_val = snapshot["values"]["atr"]
+    close_val = snapshot["close"]
+    expected = round(atr_val / close_val * 100, 2)
+    assert snapshot["values"]["atr_pct"] == expected
+
+
+def test_atr_pct_none_when_close_zero():
+    """atr_pct should be None when close price is zero (division guard)."""
+    row = pd.Series({"atr": 5.0, "close": 0.0})
+    from app.services.compute.indicators import _atr_snapshot_derived
+    result = _atr_snapshot_derived(row)
+    assert result == {"atr_pct": None}
+
+
+def test_atr_pct_none_when_atr_nan():
+    """atr_pct should be None when ATR is NaN."""
+    row = pd.Series({"atr": float("nan"), "close": 100.0})
+    from app.services.compute.indicators import _atr_snapshot_derived
+    result = _atr_snapshot_derived(row)
+    assert result == {"atr_pct": None}
+
+
+def test_atr_pct_in_compute_indicators():
+    """atr_pct should appear as a per-bar column in compute_indicators output."""
+    df = _make_price_df(100)
+    result = compute_indicators(df)
+    assert "atr_pct" in result.columns
+    valid = result["atr_pct"].dropna()
+    assert len(valid) > 0
+    assert all(v > 0 for v in valid)
+
+
 def test_atr_adx_in_all_output_fields():
     """ATR and ADX fields should be listed in get_all_output_fields."""
     fields = get_all_output_fields()

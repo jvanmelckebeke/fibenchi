@@ -142,7 +142,8 @@ def _df_to_indicator_rows(indicators: pd.DataFrame, start: date) -> list[Indicat
         values: dict[str, float | None] = {}
         for defn in INDICATOR_REGISTRY.values():
             for col in defn.output_fields:
-                values[col] = safe_round(row[col], defn.decimals)
+                decimals = defn.field_decimals.get(col, defn.decimals)
+                values[col] = safe_round(row[col], decimals)
         rows.append(IndicatorResponse(
             date=dt,
             close=round(row["close"], 4),

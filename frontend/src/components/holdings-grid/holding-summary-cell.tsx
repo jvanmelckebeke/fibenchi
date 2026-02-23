@@ -7,16 +7,18 @@ export function HoldingSummaryCell({
   colorMap,
   values,
   close,
+  suffix,
 }: {
   format: "numeric" | "compare_close" | "string_map"
   field: string
   colorMap?: Record<string, string>
   values?: Record<string, number | string | null>
   close: number | null
+  suffix?: string
 }) {
   if (format === "numeric") {
     const val = getNumericValue(values, field)
-    return <IndicatorCell value={val != null ? val.toFixed(0) : null} />
+    return <IndicatorCell value={val != null ? `${val.toFixed(0)}${suffix ?? ""}` : null} />
   }
 
   if (format === "compare_close") {

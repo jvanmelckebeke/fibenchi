@@ -146,6 +146,20 @@ def _bb_snapshot_derived(row: pd.Series) -> dict:
     return {"bb_position": None}
 
 
+def _atr_post_compute(result: pd.DataFrame) -> None:
+    """Compute ATR% (ATR / close × 100) per bar after ATR is computed."""
+    result["atr_pct"] = result["atr"] / result["close"] * 100
+
+
+def _atr_snapshot_derived(row: pd.Series) -> dict:
+    """Derive ATR% (ATR as percentage of close price) from latest row."""
+    atr_val = row.get("atr")
+    close_val = row.get("close")
+    if pd.notna(atr_val) and pd.notna(close_val) and close_val != 0:
+        return {"atr_pct": round(float(atr_val) / float(close_val) * 100, 2)}
+    return {"atr_pct": None}
+
+
 def _adx_snapshot_derived(row: pd.Series) -> dict:
     """Derive ADX trend strength classification from latest row."""
     if pd.notna(row["adx"]):
@@ -171,6 +185,10 @@ class IndicatorDef:
     warmup_periods: int = 0
     snapshot_derived: Callable[[pd.Series], dict] | None = None
     uses_ohlc: bool = False  # When True, func receives the full DataFrame instead of just closes
+    # Per-field decimal overrides (field → decimals). Falls back to `decimals` if absent.
+    field_decimals: dict[str, int] = field(default_factory=dict)
+    # Post-compute callback: receives the result DataFrame and adds derived columns.
+    post_compute: Callable[[pd.DataFrame], None] | None = None
 
 
 INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
@@ -216,10 +234,13 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     "atr": IndicatorDef(
         func=atr,
         params={"period": 14},
-        output_fields=["atr"],
+        output_fields=["atr", "atr_pct"],
         decimals=4,
         warmup_periods=14,
         uses_ohlc=True,
+        snapshot_derived=_atr_snapshot_derived,
+        field_decimals={"atr_pct": 2},
+        post_compute=_atr_post_compute,
     ),
     "adx": IndicatorDef(
         func=adx,
@@ -276,7 +297,8 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     values: dict[str, float | None] = {}
     for defn in INDICATOR_REGISTRY.values():
         for col in defn.output_fields:
-            values[col] = safe_round(latest[col], defn.decimals)
+            decimals = defn.field_decimals.get(col, defn.decimals)
+            values[col] = safe_round(latest[col], decimals)
         if defn.snapshot_derived:
             values.update(defn.snapshot_derived(latest))
 
@@ -308,6 +330,9 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
             # Multi-output indicator (e.g. macd, bollinger_bands, adx)
             for func_key, col_name in defn.result_mapping.items():
                 result[col_name] = output[func_key]
+
+        if defn.post_compute:
+            defn.post_compute(result)
 
     return result
 
