@@ -10,6 +10,7 @@ import { SortableHeader } from "./sortable-header"
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
 import { TableRow } from "./table-row"
 import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden } from "./shared"
+import { useColumnResize } from "./use-column-resize"
 
 
 interface GroupTableProps {
@@ -30,6 +31,7 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
   const { settings, updateSettings } = useSettings()
   const columnSettings = settings.group_table_columns
   const responsiveHidden = useResponsiveHidden()
+  const { getColumnStyle, startResize, resetWidth } = useColumnResize()
 
   const toggleExpand = (symbol: string) => {
     setExpandedSymbols((prev) => toggleSetItem(prev, symbol))
@@ -88,15 +90,47 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
         <thead>
           <tr className="border-b border-border bg-muted/50">
             <th className="w-8" />
-            <SortableHeader label="Symbol" sortKey="name" align="left" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            <SortableHeader
+              label="Symbol" sortKey="name" align="left"
+              sortBy={sortBy} sortDir={sortDir} onSort={onSort}
+              style={getColumnStyle("symbol")}
+              onResizeStart={(e) => startResize("symbol", e)}
+              onResizeReset={(e) => resetWidth("symbol", e)}
+            />
             {isColumnVisible(columnSettings, "name") && (
-              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
+              <th
+                className="relative text-left text-xs font-medium text-muted-foreground px-3 py-2"
+                style={getColumnStyle("name")}
+              >
+                Name
+                <button
+                  type="button"
+                  aria-label="Resize Name column"
+                  tabIndex={-1}
+                  className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/40 transition-colors border-0 bg-transparent p-0"
+                  onPointerDown={(e) => startResize("name", e)}
+                  onDoubleClick={(e) => resetWidth("name", e)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </th>
             )}
             {isColumnVisible(columnSettings, "price") && (
-              <SortableHeader label="Price" sortKey="price" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+              <SortableHeader
+                label="Price" sortKey="price" align="right"
+                sortBy={sortBy} sortDir={sortDir} onSort={onSort}
+                style={getColumnStyle("price")}
+                onResizeStart={(e) => startResize("price", e)}
+                onResizeReset={(e) => resetWidth("price", e)}
+              />
             )}
             {isColumnVisible(columnSettings, "change_pct") && (
-              <SortableHeader label="Change" sortKey="change_pct" align="right" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+              <SortableHeader
+                label="Change" sortKey="change_pct" align="right"
+                sortBy={sortBy} sortDir={sortDir} onSort={onSort}
+                style={getColumnStyle("change_pct")}
+                onResizeStart={(e) => startResize("change_pct", e)}
+                onResizeReset={(e) => resetWidth("change_pct", e)}
+              />
             )}
             {visibleIndicatorFields.map((field) => {
               const series = getSeriesByField(field)
@@ -109,6 +143,9 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onSort={onSort}
+                  style={getColumnStyle(field)}
+                  onResizeStart={(e) => startResize(field, e)}
+                  onResizeReset={(e) => resetWidth(field, e)}
                 />
               )
             })}
