@@ -8,10 +8,11 @@ import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatPrice, changeColor, formatChangePct } from "@/lib/format"
+import { formatPrice, formatCompactPrice, changeColor, formatChangePct } from "@/lib/format"
 import { getCardDescriptors, isIndicatorVisible, type IndicatorDescriptor } from "@/lib/indicator-registry"
 import { IndicatorValue } from "@/components/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
+import { useSettings } from "@/lib/settings"
 
 const CARD_DESCRIPTORS = getCardDescriptors()
 
@@ -65,6 +66,7 @@ export function AssetCard({
   showSparkline,
   indicatorVisibility,
 }: AssetCardProps) {
+  const { settings } = useSettings()
   const enabledCards = CARD_DESCRIPTORS.filter(
     (d) => isIndicatorVisible(indicatorVisibility, d.id),
   )
@@ -87,8 +89,14 @@ export function AssetCard({
                   {type}
                 </Badge>
                 {lastPrice != null ? (
-                  <span ref={priceRef} className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1">
-                    {formatPrice(lastPrice, currency)}
+                  <span
+                    ref={priceRef}
+                    className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1"
+                    title={settings.compact_numbers ? formatPrice(lastPrice, currency) : undefined}
+                  >
+                    {settings.compact_numbers
+                      ? formatCompactPrice(lastPrice, currency)
+                      : formatPrice(lastPrice, currency)}
                   </span>
                 ) : (
                   <Skeleton className="ml-auto h-5 w-16 rounded" />
