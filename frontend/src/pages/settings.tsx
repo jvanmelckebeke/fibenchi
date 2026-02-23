@@ -166,6 +166,12 @@ export function SettingsPage() {
             checked={draft.compact_mode}
             onCheckedChange={(v) => change({ compact_mode: v })}
           />
+          <VisibilityToggle
+            id="asset-type-badge"
+            label="Asset Type Badge"
+            checked={draft.show_asset_type_badge}
+            onCheckedChange={(v) => change({ show_asset_type_badge: v })}
+          />
         </CardContent>
       </Card>
       </div>
