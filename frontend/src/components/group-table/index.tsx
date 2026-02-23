@@ -107,7 +107,7 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
                   type="button"
                   aria-label="Resize Name column"
                   tabIndex={-1}
-                  className="absolute right-0 top-1 bottom-1 w-1 cursor-col-resize bg-border/50 hover:bg-primary/40 transition-colors border-0 p-0"
+                  className="absolute right-0 top-1 bottom-1 w-0.5 cursor-col-resize bg-border/50 hover:bg-primary/40 transition-colors border-0 p-0"
                   onPointerDown={(e) => startResize("name", e)}
                   onDoubleClick={(e) => resetWidth("name", e)}
                   onClick={(e) => e.stopPropagation()}
