@@ -9,7 +9,7 @@ import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatPrice, changeColor, formatChangePct } from "@/lib/format"
+import { formatPrice, formatCompactPrice, changeColor, formatChangePct } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -150,8 +150,14 @@ export function TableRow({
           {isColumnVisible(columnSettings, "price") && (
             <td className={`${py} px-3 text-right tabular-nums`}>
               {displayPrice != null ? (
-                <span ref={priceRef} className={`font-medium rounded px-1 -mx-1 ${staleClass}`}>
-                  {formatPrice(displayPrice, asset.currency)}
+                <span
+                  ref={priceRef}
+                  className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
+                  title={settings.compact_numbers ? formatPrice(displayPrice, asset.currency) : undefined}
+                >
+                  {settings.compact_numbers
+                    ? formatCompactPrice(displayPrice, asset.currency)
+                    : formatPrice(displayPrice, asset.currency)}
                 </span>
               ) : (
                 <Skeleton className="h-4 w-14 ml-auto rounded" />

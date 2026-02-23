@@ -2,7 +2,8 @@ import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
-import { formatPrice, formatChangePct } from "@/lib/format"
+import { formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
+import { useSettings } from "@/lib/settings"
 import { HoldingSummaryCell } from "./holding-summary-cell"
 import { SUMMARY_DESCRIPTORS } from "./types"
 import type { HoldingsGridRow, IndicatorData } from "./types"
@@ -26,6 +27,7 @@ export function HoldingRow({
   linkTarget?: "_blank"
   totalColSpan: number
 }) {
+  const { settings } = useSettings()
   const chg = formatChangePct(indicator?.change_pct ?? null)
 
   return (
@@ -66,8 +68,15 @@ export function HoldingRow({
           </td>
         ) : (
           <>
-            <td className="py-1 px-2 text-right text-xs">
-              {indicator?.close != null ? formatPrice(indicator.close, indicator.currency, 0) : "\u2014"}
+            <td
+              className="py-1 px-2 text-right text-xs"
+              title={settings.compact_numbers && indicator?.close != null ? formatPrice(indicator.close, indicator.currency, 0) : undefined}
+            >
+              {indicator?.close != null
+                ? settings.compact_numbers
+                  ? formatCompactPrice(indicator.close, indicator.currency)
+                  : formatPrice(indicator.close, indicator.currency, 0)
+                : "\u2014"}
             </td>
             <td className={`py-1 px-2 text-right text-xs ${chg.className}`}>
               {chg.text ?? "\u2014"}
