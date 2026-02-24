@@ -18,17 +18,48 @@ logger = logging.getLogger(__name__)
 
 ET = ZoneInfo("America/New_York")
 
-# Session boundaries in Eastern Time
-_REGULAR_OPEN = time(9, 30)
-_REGULAR_CLOSE = time(16, 0)
+# Exchange regular hours by timezone — (open, close) in local time.
+# Used to classify intraday bars as pre/regular/post per exchange.
+_EXCHANGE_HOURS: dict[str, tuple[time, time]] = {
+    "America/New_York": (time(9, 30), time(16, 0)),
+    "America/Chicago": (time(8, 30), time(15, 0)),
+    "America/Toronto": (time(9, 30), time(16, 0)),
+    "America/Sao_Paulo": (time(10, 0), time(17, 0)),
+    "Europe/London": (time(8, 0), time(16, 30)),
+    "Europe/Berlin": (time(9, 0), time(17, 30)),
+    "Europe/Paris": (time(9, 0), time(17, 30)),
+    "Europe/Amsterdam": (time(9, 0), time(17, 30)),
+    "Europe/Zurich": (time(9, 0), time(17, 30)),
+    "Europe/Madrid": (time(9, 0), time(17, 30)),
+    "Europe/Milan": (time(9, 0), time(17, 30)),
+    "Europe/Stockholm": (time(9, 0), time(17, 30)),
+    "Europe/Helsinki": (time(10, 0), time(18, 30)),
+    "Asia/Tokyo": (time(9, 0), time(15, 0)),
+    "Asia/Hong_Kong": (time(9, 30), time(16, 0)),
+    "Asia/Shanghai": (time(9, 30), time(15, 0)),
+    "Asia/Seoul": (time(9, 0), time(15, 30)),
+    "Asia/Kolkata": (time(9, 15), time(15, 30)),
+    "Australia/Sydney": (time(10, 0), time(16, 0)),
+}
 
 
-def _classify_session(ts: datetime) -> str:
-    """Classify a timestamp into pre/regular/post based on ET time."""
-    et_time = ts.astimezone(ET).time()
-    if et_time < _REGULAR_OPEN:
+def _classify_session(ts: datetime, tz_name: str | None = None) -> str:
+    """Classify a timestamp into pre/regular/post based on exchange hours.
+
+    Uses the exchange's timezone and regular trading hours when available,
+    falls back to US Eastern Time for unknown exchanges.
+    """
+    if tz_name and tz_name in _EXCHANGE_HOURS:
+        tz = ZoneInfo(tz_name)
+        local_time = ts.astimezone(tz).time()
+        open_time, close_time = _EXCHANGE_HOURS[tz_name]
+    else:
+        local_time = ts.astimezone(ET).time()
+        open_time, close_time = time(9, 30), time(16, 0)
+
+    if local_time < open_time:
         return "pre"
-    if et_time >= _REGULAR_CLOSE:
+    if local_time >= close_time:
         return "post"
     return "regular"
 
@@ -57,9 +88,10 @@ def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
             if df.empty:
                 continue
 
-            # Resolve currency divisor for subunit conversion
+            # Resolve currency divisor and exchange timezone for session classification
             info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
             _, divisor = resolve_currency(info, sym)
+            tz_name = info.get("exchangeTimezoneName") if isinstance(info, dict) else None
 
             bars = []
             for idx, row in df.iterrows():
@@ -76,7 +108,7 @@ def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
                     "timestamp": dt,
                     "price": round(close_val, 4),
                     "volume": int(row["volume"]) if pd.notna(row.get("volume", None)) else 0,
-                    "session": _classify_session(dt),
+                    "session": _classify_session(dt, tz_name),
                 })
 
             if bars:
@@ -168,11 +200,6 @@ async def get_intraday_bars(
 async def cleanup_old_intraday(db: AsyncSession) -> int:
     """Delete intraday data older than 1 day. Returns rows deleted."""
     today = date.today()
-    # Only clean if tomorrow is a weekday (Mon-Fri)
-    tomorrow = today + timedelta(days=1)
-    if tomorrow.weekday() >= 5:  # Saturday=5, Sunday=6
-        return 0
-
     cutoff = datetime.combine(today - timedelta(days=1), time.min, tzinfo=ET)
     result = await db.execute(
         delete(IntradayPrice).where(IntradayPrice.timestamp < cutoff)

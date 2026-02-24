@@ -2,8 +2,11 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from datetime import date
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
@@ -66,6 +69,9 @@ async def scheduled_symbol_sync():
 
 async def scheduled_intraday_sync():
     """Background job: fetch 1m intraday bars for all grouped assets."""
+    if date.today().weekday() >= 5:
+        return
+
     from app.repositories.asset_repo import AssetRepository
     from app.services.yahoo import batch_fetch_quotes
 
@@ -78,8 +84,11 @@ async def scheduled_intraday_sync():
             symbols = [sym for _, sym in pairs]
             asset_map = {sym: aid for aid, sym in pairs}
 
-            # Check if any market is active before fetching
-            quotes = await batch_fetch_quotes(symbols[:5])  # sample a few
+            # Sample across the list to detect mixed-timezone market activity
+            sample_size = min(10, len(symbols))
+            step = max(1, len(symbols) // sample_size)
+            sample = symbols[::step][:sample_size]
+            quotes = await batch_fetch_quotes(sample)
             market_states = {q.get("market_state") for q in quotes if q.get("market_state")}
             active_states = {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}
             if not market_states & active_states:
@@ -114,8 +123,7 @@ async def lifespan(app: FastAPI):
             id="symbol_directory_sync",
         )
 
-        # Intraday sync every 60 seconds (Mon-Fri)
-        from apscheduler.triggers.interval import IntervalTrigger
+        # Intraday sync every 60 seconds
         scheduler.add_job(
             scheduled_intraday_sync,
             IntervalTrigger(seconds=60),

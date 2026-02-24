@@ -50,13 +50,17 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
           setIntraday((prev) => {
             const next = { ...prev }
             for (const [sym, points] of Object.entries(data)) {
+              if (!points.length) continue
               const existing = next[sym]
-              if (!existing) {
+              if (!existing || !existing.length) {
                 // First push for this symbol — set full data
+                next[sym] = points
+              } else if (points[0].time <= existing[0].time) {
+                // Full refresh (e.g. reconnect or day boundary) — replace
                 next[sym] = points
               } else {
                 // Delta — append new points, dedup by timestamp
-                const lastTime = existing.length > 0 ? existing[existing.length - 1].time : 0
+                const lastTime = existing[existing.length - 1].time
                 const newPoints = points.filter((p) => p.time > lastTime)
                 if (newPoints.length > 0) {
                   next[sym] = [...existing, ...newPoints]
