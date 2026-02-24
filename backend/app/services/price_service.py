@@ -14,7 +14,7 @@ from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceRespo
 from app.services.compute.indicators import INDICATOR_REGISTRY, compute_indicators, safe_round
 from app.services.compute.utils import prices_to_df
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
-from app.services.yahoo import fetch_history
+from app.services.yahoo import batch_fetch_fundamentals, fetch_history
 from app.utils import TTLCache
 
 # In-memory indicator cache: keyed by "SYMBOL:period:last_price_date"
@@ -190,6 +190,12 @@ async def _compute_or_cached_indicators(
         df = await _fetch_ephemeral(symbol, period, warmup=True)
 
     rows = _df_to_indicator_rows(compute_indicators(df), start)
+
+    # Merge fundamental metrics (Forward P/E, PEG, ROE, etc.) into last row
+    fundamentals = await batch_fetch_fundamentals([symbol.upper()])
+    fund = {k: v for k, v in fundamentals.get(symbol.upper(), {}).items() if v is not None}
+    if fund and rows:
+        rows[-1].values.update(fund)
 
     if cache_key:
         _indicator_cache.set_value(cache_key, rows)
