@@ -10,14 +10,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
-import { VisibilityToggle, IndicatorVisibilitySection } from "@/components/visibility-toggle"
+import { VisibilityToggle } from "@/components/visibility-toggle"
+import { IndicatorVisibilityEditor } from "@/components/indicator-visibility-editor"
 import { SymbolSourcesSettings } from "@/components/symbol-sources-settings"
 
 export function SettingsPage() {
   const { settings, updateSettings } = useSettings()
   const [draft, setDraft] = useState<AppSettings>(settings)
 
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(settings)
+  const isDirty = JSON.stringify(draft, (k, v) => k === "_updated_at" ? undefined : v) !==
+    JSON.stringify(settings, (k, v) => k === "_updated_at" ? undefined : v)
 
   const change = (patch: Partial<AppSettings>) => {
     setDraft((prev) => ({ ...prev, ...patch }))
@@ -61,32 +63,6 @@ export function SettingsPage() {
             label="Sparkline Chart"
             checked={draft.group_show_sparkline}
             onCheckedChange={(v) => change({ group_show_sparkline: v })}
-          />
-          <IndicatorVisibilitySection
-            visibility={draft.group_indicator_visibility}
-            idPrefix="grp"
-            onChange={(id, v) =>
-              change({
-                group_indicator_visibility: { ...draft.group_indicator_visibility, [id]: v },
-              })
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Detail Page Chart</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <IndicatorVisibilitySection
-            visibility={draft.detail_indicator_visibility}
-            idPrefix="dtl"
-            onChange={(id, v) =>
-              change({
-                detail_indicator_visibility: { ...draft.detail_indicator_visibility, [id]: v },
-              })
-            }
           />
         </CardContent>
       </Card>
@@ -167,6 +143,12 @@ export function SettingsPage() {
             onCheckedChange={(v) => change({ compact_mode: v })}
           />
           <VisibilityToggle
+            id="compact-numbers"
+            label="Compact Numbers"
+            checked={draft.compact_numbers}
+            onCheckedChange={(v) => change({ compact_numbers: v })}
+          />
+          <VisibilityToggle
             id="asset-type-badge"
             label="Asset Type Badge"
             checked={draft.show_asset_type_badge}
@@ -174,18 +156,45 @@ export function SettingsPage() {
           />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Indicators</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <VisibilityToggle
+            id="indicator-deltas"
+            label="Show Daily Deltas"
+            checked={draft.show_indicator_deltas}
+            onCheckedChange={(v) => change({ show_indicator_deltas: v })}
+          />
+          <IndicatorVisibilityEditor
+            visibility={draft.indicator_visibility}
+            onChange={(vis) => change({ indicator_visibility: vis })}
+          />
+        </CardContent>
+      </Card>
       </div>
 
       <SymbolSourcesSettings />
 
-      <div className="flex items-center justify-end gap-2">
-        {isDirty && (
-          <Button variant="outline" onClick={discard}>
-            Discard
-          </Button>
-        )}
-        <Button onClick={apply} disabled={!isDirty}>
-          Save
+      {/* Spacer so floating bar doesn't overlap content */}
+      {isDirty && <div className="h-16" />}
+
+      {/* Discord-style floating save bar */}
+      <div
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-lg border bg-card px-4 py-3 shadow-lg transition-all duration-200 ${
+          isDirty
+            ? "translate-y-0 opacity-100"
+            : "translate-y-4 opacity-0 pointer-events-none"
+        }`}
+      >
+        <span className="text-sm text-muted-foreground">You have unsaved changes</span>
+        <Button variant="ghost" size="sm" onClick={discard}>
+          Reset
+        </Button>
+        <Button size="sm" onClick={apply}>
+          Save Changes
         </Button>
       </div>
     </div>

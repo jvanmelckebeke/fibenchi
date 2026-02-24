@@ -116,6 +116,11 @@ def adx(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
     return {"adx": adx_series, "plus_di": plus_di, "minus_di": minus_di}
 
 
+def volume_stats(df: pd.DataFrame, period: int = 20) -> dict[str, pd.Series]:
+    """Volume and average volume (SMA of volume)."""
+    return {"volume": df["volume"], "avg_volume": df["volume"].rolling(window=period).mean()}
+
+
 def bb_position(close: float, upper: float, middle: float, lower: float) -> str:
     """Classify where price sits relative to Bollinger Bands."""
     if close > upper:
@@ -146,6 +151,20 @@ def _bb_snapshot_derived(row: pd.Series) -> dict:
     return {"bb_position": None}
 
 
+def _atr_post_compute(result: pd.DataFrame) -> None:
+    """Compute ATR% (ATR / close × 100) per bar after ATR is computed."""
+    result["atr_pct"] = result["atr"] / result["close"] * 100
+
+
+def _atr_snapshot_derived(row: pd.Series) -> dict:
+    """Derive ATR% (ATR as percentage of close price) from latest row."""
+    atr_val = row.get("atr")
+    close_val = row.get("close")
+    if pd.notna(atr_val) and pd.notna(close_val) and close_val != 0:
+        return {"atr_pct": round(float(atr_val) / float(close_val) * 100, 2)}
+    return {"atr_pct": None}
+
+
 def _adx_snapshot_derived(row: pd.Series) -> dict:
     """Derive ADX trend strength classification from latest row."""
     if pd.notna(row["adx"]):
@@ -171,15 +190,20 @@ class IndicatorDef:
     warmup_periods: int = 0
     snapshot_derived: Callable[[pd.Series], dict] | None = None
     uses_ohlc: bool = False  # When True, func receives the full DataFrame instead of just closes
+    # Per-field decimal overrides (field → decimals). Falls back to `decimals` if absent.
+    field_decimals: dict[str, int] = field(default_factory=dict)
+    # Post-compute callback: receives the result DataFrame and adds derived columns.
+    post_compute: Callable[[pd.DataFrame], None] | None = None
 
 
 INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     "rsi": IndicatorDef(
         func=rsi,
         params={"period": 14},
-        output_fields=["rsi"],
+        output_fields=["rsi", "rsi_delta", "rsi_delta_sigma"],
         decimals=2,
         warmup_periods=14,
+        field_decimals={"rsi_delta": 1, "rsi_delta_sigma": 1},
     ),
     "sma_20": IndicatorDef(
         func=sma,
@@ -207,19 +231,30 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     "macd": IndicatorDef(
         func=macd,
         params={"fast": 12, "slow": 26, "signal": 9},
-        output_fields=["macd", "macd_signal", "macd_hist"],
+        output_fields=[
+            "macd", "macd_signal", "macd_hist",
+            "macd_hist_delta", "macd_hist_delta_sigma",
+            "macd_delta", "macd_delta_sigma",
+        ],
         result_mapping={"macd": "macd", "signal": "macd_signal", "histogram": "macd_hist"},
         decimals=4,
         warmup_periods=35,
         snapshot_derived=_macd_snapshot_derived,
+        field_decimals={
+            "macd_hist_delta": 2, "macd_hist_delta_sigma": 1,
+            "macd_delta": 2, "macd_delta_sigma": 1,
+        },
     ),
     "atr": IndicatorDef(
         func=atr,
         params={"period": 14},
-        output_fields=["atr"],
+        output_fields=["atr", "atr_pct"],
         decimals=4,
         warmup_periods=14,
         uses_ohlc=True,
+        snapshot_derived=_atr_snapshot_derived,
+        field_decimals={"atr_pct": 2},
+        post_compute=_atr_post_compute,
     ),
     "adx": IndicatorDef(
         func=adx,
@@ -229,6 +264,15 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         decimals=2,
         warmup_periods=28,
         snapshot_derived=_adx_snapshot_derived,
+        uses_ohlc=True,
+    ),
+    "volume": IndicatorDef(
+        func=volume_stats,
+        params={"period": 20},
+        output_fields=["volume", "avg_volume"],
+        result_mapping={"volume": "volume", "avg_volume": "avg_volume"},
+        decimals=0,
+        warmup_periods=20,
         uses_ohlc=True,
     ),
 }
@@ -276,12 +320,47 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     values: dict[str, float | None] = {}
     for defn in INDICATOR_REGISTRY.values():
         for col in defn.output_fields:
-            values[col] = safe_round(latest[col], defn.decimals)
+            decimals = defn.field_decimals.get(col, defn.decimals)
+            values[col] = safe_round(latest[col], decimals)
         if defn.snapshot_derived:
             values.update(defn.snapshot_derived(latest))
 
     result["values"] = values
     return result
+
+
+_DELTA_FIELDS: list[tuple[str, int]] = [
+    ("rsi", 1),
+    ("macd_hist", 2),
+    ("macd", 2),
+]
+"""(source_field, decimals) for daily delta / outlier computation."""
+
+
+def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
+    """Add daily deltas and outlier sigma flags for selected indicator fields.
+
+    For each target field:
+      - {field}_delta = day-over-day difference
+      - {field}_delta_sigma = |Δ| expressed in rolling σ units, only when
+        the absolute delta exceeds mean + 2σ of the rolling window (else NaN).
+    """
+    for field, _ in _DELTA_FIELDS:
+        if field not in result.columns:
+            continue
+        series = result[field]
+        delta = series.diff()
+        result[f"{field}_delta"] = delta
+
+        abs_delta = delta.abs()
+        rolling_mean = abs_delta.rolling(window=window, min_periods=window).mean()
+        rolling_std = abs_delta.rolling(window=window, min_periods=window).std()
+
+        sigma = (abs_delta - rolling_mean) / rolling_std
+        # Only keep sigma when |Δ| exceeds the 2σ threshold
+        result[f"{field}_delta_sigma"] = sigma.where(
+            abs_delta > rolling_mean + 2 * rolling_std
+        )
 
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -308,6 +387,11 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
             # Multi-output indicator (e.g. macd, bollinger_bands, adx)
             for func_key, col_name in defn.result_mapping.items():
                 result[col_name] = output[func_key]
+
+        if defn.post_compute:
+            defn.post_compute(result)
+
+    _compute_deltas(result)
 
     return result
 

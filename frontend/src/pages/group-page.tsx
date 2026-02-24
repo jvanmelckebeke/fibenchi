@@ -245,7 +245,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               onDelete={() => handleRemove(asset.symbol)}
               onHover={() => prefetch(asset.symbol)}
               showSparkline={settings.group_show_sparkline}
-              indicatorVisibility={settings.group_indicator_visibility}
+              indicatorVisibility={settings.indicator_visibility}
             />
           ))}
         </div>

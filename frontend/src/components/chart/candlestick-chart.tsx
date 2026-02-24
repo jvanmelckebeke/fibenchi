@@ -13,12 +13,14 @@ import {
 } from "./chart-builders"
 import { Legend } from "./chart-legends"
 import { useRegisterChart, useChartHoverValues, useChartData } from "./chart-sync-provider"
-import { getOverlayDescriptors, isIndicatorVisible } from "@/lib/indicator-registry"
+import { getOverlayDescriptors, isVisibleAt, type Placement } from "@/lib/indicator-registry"
 
 interface CandlestickChartProps {
   annotations: Annotation[]
-  /** Per-descriptor visibility (keys = descriptor IDs). Missing keys default to true. */
-  indicatorVisibility?: Record<string, boolean>
+  /** Placement-based visibility matrix. Missing keys fall back to descriptor defaults. */
+  indicatorVisibility?: Record<string, Placement[]>
+  /** Indicator IDs to exclude regardless of visibility settings. */
+  excludeIndicators?: string[]
   chartType?: "candle" | "line"
   height?: number
   /** Whether to hide the time axis (e.g. when sub-charts are stacked below). */
@@ -42,6 +44,7 @@ interface ChartState {
 export function CandlestickChart({
   annotations,
   indicatorVisibility,
+  excludeIndicators,
   chartType = "candle",
   height = 400,
   hideTimeAxis = false,
@@ -61,8 +64,11 @@ export function CandlestickChart({
   const { prices, indicators } = useChartData()
 
   const isVisible = useCallback(
-    (id: string) => isIndicatorVisible(indicatorVisibility, id),
-    [indicatorVisibility],
+    (id: string) => {
+      if (excludeIndicators?.includes(id)) return false
+      return isVisibleAt(indicatorVisibility, id, "detail_chart")
+    },
+    [indicatorVisibility, excludeIndicators],
   )
 
   const enabledOverlayIds = useMemo(() => {

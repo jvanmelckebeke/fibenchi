@@ -7,15 +7,65 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   ILA: "\u20aa",
   ZAR: "R",
   JPY: "\u00a5",
+  KRW: "\u20a9",
   CHF: "CHF\u00a0",
+}
+
+const ZERO_DECIMAL_CURRENCIES = new Set(["KRW", "JPY", "IDR", "HUF", "VND", "CLP", "TWD"])
+
+export function currencyDecimals(currency: string): number {
+  return ZERO_DECIMAL_CURRENCIES.has(currency.toUpperCase()) ? 0 : 2
 }
 
 export function currencySymbol(currency: string): string {
   return CURRENCY_SYMBOLS[currency.toUpperCase()] ?? `${currency}\u00a0`
 }
 
-export function formatPrice(value: number, currency: string, decimals = 2): string {
-  return `${currencySymbol(currency)}${value.toFixed(decimals)}`
+export function formatPrice(value: number, currency: string, decimals?: number): string {
+  return `${currencySymbol(currency)}${value.toFixed(decimals ?? currencyDecimals(currency))}`
+}
+
+export function formatCompactPrice(value: number, currency: string): string {
+  const abs = Math.abs(value)
+  const sym = currencySymbol(currency)
+  let scaled: string
+  if (abs >= 1e9) {
+    scaled = (value / 1e9).toFixed(1)
+    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
+    return `${sym}${scaled}B`
+  }
+  if (abs >= 1e6) {
+    scaled = (value / 1e6).toFixed(1)
+    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
+    return `${sym}${scaled}M`
+  }
+  if (abs >= 1e3) {
+    scaled = (value / 1e3).toFixed(1)
+    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
+    return `${sym}${scaled}K`
+  }
+  return formatPrice(value, currency)
+}
+
+export function formatCompactNumber(value: number): string {
+  const abs = Math.abs(value)
+  let scaled: string
+  if (abs >= 1e9) {
+    scaled = (value / 1e9).toFixed(1)
+    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
+    return `${scaled}B`
+  }
+  if (abs >= 1e6) {
+    scaled = (value / 1e6).toFixed(1)
+    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
+    return `${scaled}M`
+  }
+  if (abs >= 1e3) {
+    scaled = (value / 1e3).toFixed(1)
+    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
+    return `${scaled}K`
+  }
+  return value.toFixed(0)
 }
 
 export function changeColor(pct: number | null | undefined): string {

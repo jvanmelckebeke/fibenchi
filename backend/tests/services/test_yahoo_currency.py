@@ -1,13 +1,12 @@
 """Tests for Yahoo Finance currency detection and OHLCV normalization."""
 
-from unittest.mock import MagicMock, PropertyMock, patch
-
 import pandas as pd
 import pytest
 
 from app.services.yahoo import (
     EXCHANGE_CURRENCY_MAP,
     currency_from_suffix,
+    resolve_currency,
     _normalize_ohlcv_df,
 )
 
@@ -75,6 +74,40 @@ class TestCurrencyFromSuffix:
         for suffix, currency in EXCHANGE_CURRENCY_MAP.items():
             assert len(currency) == 3, f"{suffix} maps to non-ISO code: {currency}"
             assert currency == currency.upper(), f"{suffix} maps to non-uppercase: {currency}"
+
+
+class TestResolveCurrency:
+    """Tests for resolve_currency fallback chain."""
+
+    def test_uses_info_currency_when_present(self):
+        """Primary path: Yahoo returns currency in price info."""
+        display, divisor = resolve_currency({"currency": "KRW"}, "006260.KS")
+        assert display == "KRW"
+        assert divisor == 1
+
+    def test_kospi_falls_back_to_suffix(self):
+        """006260.KS should resolve to KRW even when Yahoo omits currency."""
+        display, divisor = resolve_currency({}, "006260.KS")
+        assert display == "KRW"
+        assert divisor == 1
+
+    def test_kospi_non_dict_info_falls_back_to_suffix(self):
+        """006260.KS should resolve to KRW when Yahoo returns a string error."""
+        display, divisor = resolve_currency("No data found", "006260.KS")
+        assert display == "KRW"
+        assert divisor == 1
+
+    def test_us_stock_defaults_to_usd(self):
+        """US stocks with no suffix and no info currency default to USD."""
+        display, divisor = resolve_currency({}, "AAPL")
+        assert display == "USD"
+        assert divisor == 1
+
+    def test_london_pence_normalized(self):
+        """GBp (pence) should normalize to GBP with divisor 100."""
+        display, divisor = resolve_currency({"currency": "GBp"}, "HSBA.L")
+        assert display == "GBP"
+        assert divisor == 100
 
 
 class TestNormalizeOhlcvDf:

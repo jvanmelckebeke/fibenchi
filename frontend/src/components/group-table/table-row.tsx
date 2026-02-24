@@ -9,11 +9,13 @@ import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatPrice, changeColor, formatChangePct } from "@/lib/format"
+import { formatPrice, formatCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
+  formatDeltaAnnotation,
   getSeriesByField,
+  getDescriptorByField,
   resolveThresholdColor,
   resolveAdxColor,
 } from "@/lib/indicator-registry"
@@ -149,8 +151,14 @@ export function TableRow({
           {isColumnVisible(columnSettings, "price") && (
             <td className={`${py} px-3 text-right tabular-nums`}>
               {displayPrice != null ? (
-                <span ref={priceRef} className={`font-medium rounded px-1 -mx-1 ${staleClass}`}>
-                  {formatPrice(displayPrice, asset.currency)}
+                <span
+                  ref={priceRef}
+                  className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
+                  title={settings.compact_numbers ? formatPrice(displayPrice, asset.currency) : undefined}
+                >
+                  {settings.compact_numbers
+                    ? formatCompactPrice(displayPrice, asset.currency)
+                    : formatPrice(displayPrice, asset.currency)}
                 </span>
               ) : (
                 <Skeleton className="h-4 w-14 ml-auto rounded" />
@@ -169,6 +177,17 @@ export function TableRow({
             </td>
           )}
           {visibleIndicatorFields.map((field) => {
+            // Override stale DB volume with live SSE quote values
+            if ((field === "volume" || field === "avg_volume") && quote?.[field] != null) {
+              const val = quote[field]!
+              const desc = getDescriptorByField(field)
+              const formatted = desc?.compactFormat ? formatCompactNumber(val) : val.toLocaleString()
+              return (
+                <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+                  <span title={val.toLocaleString()}>{formatted}</span>
+                </td>
+              )
+            }
             if (field === "macd") {
               const macdVals = extractMacdValues(indicator?.values)
               const m = macdVals?.macd
@@ -178,6 +197,9 @@ export function TableRow({
               const histColor = h != null ? (h >= 0 ? "text-emerald-400" : "text-red-400") : ""
               const fmt = (v: number | null | undefined) =>
                 v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
+              const histDelta = settings.show_indicator_deltas
+                ? formatDeltaAnnotation("macd_hist", indicator?.values)
+                : null
               return (
                 <td key={field} className={`${py} px-3 text-right text-sm tabular-nums overflow-hidden`}>
                   {hasValues ? (
@@ -188,6 +210,12 @@ export function TableRow({
                       <span>{fmt(s)}</span>
                       <span className="text-muted-foreground">H</span>
                       <span className={histColor}>{fmt(h)}</span>
+                      {histDelta && (
+                        <span className="text-xs">
+                          <span className="text-muted-foreground">{histDelta.delta}</span>
+                          {histDelta.sigma && <span className="text-amber-500 ml-0.5">⚠ {histDelta.sigma}</span>}
+                        </span>
+                      )}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">&mdash;</span>
@@ -197,14 +225,25 @@ export function TableRow({
             }
             const val = getNumericValue(indicator?.values, field)
             const series = getSeriesByField(field)
+            const desc = getDescriptorByField(field)
             const colorClass = field === "adx" && val != null && indicator?.values
               ? resolveAdxColor(val, indicator.values)
               : resolveThresholdColor(series?.thresholdColors, val)
-            const decimals = val != null && Math.abs(val) >= 100 ? 0 : 2
+            const decimals = desc?.decimals ?? (val != null && Math.abs(val) >= 100 ? 0 : 2)
+            const formatted = val != null
+              ? desc?.compactFormat
+                ? formatCompactNumber(val)
+                : `${val.toFixed(decimals)}${desc?.suffix ?? ""}`
+              : null
             return (
               <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
-                {val != null ? (
-                  <span className={colorClass}>{val.toFixed(decimals)}</span>
+                {formatted != null ? (
+                  <span
+                    className={colorClass}
+                    title={desc?.compactFormat && val != null ? val.toLocaleString() : undefined}
+                  >
+                    {formatted}
+                  </span>
                 ) : (
                   <span className="text-muted-foreground">&mdash;</span>
                 )}

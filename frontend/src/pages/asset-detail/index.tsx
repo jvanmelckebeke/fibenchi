@@ -5,6 +5,7 @@ import { ConnectedAnnotations } from "@/components/connected-annotations"
 import { TagInput } from "@/components/tag-input"
 import {
   useAssets,
+  useAssetDetail,
   useAnnotations,
   useCreateAnnotation,
   useDeleteAnnotation,
@@ -12,6 +13,8 @@ import {
   useUpdateThesis,
 } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
+import { useQuotes } from "@/lib/quote-stream"
+import { StatsPanel } from "@/components/stats-panel"
 import { Header } from "./header"
 import { ChartSection } from "./chart-section"
 import { HoldingsSection } from "./holdings-section"
@@ -23,6 +26,9 @@ export function AssetDetailPage() {
   const [period, setPeriod] = useState<string>(settings.chart_default_period)
   const { data: assets } = useAssets()
   const asset = assets?.find((a) => a.symbol === symbol?.toUpperCase())
+  const { data: detail } = useAssetDetail(symbol ?? "", period, { enabled: !!symbol })
+  const quotes = useQuotes()
+  const quote = symbol ? quotes[symbol.toUpperCase()] : undefined
   const isTracked = !!asset
   const isEtf = asset?.type === "etf"
 
@@ -34,10 +40,18 @@ export function AssetDetailPage() {
       <ChartSection
         symbol={symbol}
         period={period}
-        indicatorVisibility={settings.detail_indicator_visibility}
+        indicatorVisibility={settings.indicator_visibility}
         chartType={settings.chart_type}
         currency={asset?.currency}
       />
+      {detail?.indicators && detail.indicators.length > 0 && (
+        <StatsPanel
+          indicators={detail.indicators}
+          indicatorVisibility={settings.indicator_visibility}
+          currency={asset?.currency}
+          quote={quote}
+        />
+      )}
       {isEtf && <HoldingsSection symbol={symbol} />}
       {isTracked && (
         <>

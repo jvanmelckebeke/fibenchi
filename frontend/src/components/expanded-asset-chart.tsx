@@ -5,7 +5,7 @@ import { CandlestickChart } from "@/components/chart/candlestick-chart"
 import { RsiChart } from "@/components/chart/rsi-chart"
 import { MacdChart } from "@/components/chart/macd-chart"
 import { IndicatorCards } from "@/components/chart/indicator-cards"
-import { getCardDescriptors, isIndicatorVisible } from "@/lib/indicator-registry"
+import { getCardDescriptors, isVisibleAt } from "@/lib/indicator-registry"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
@@ -51,7 +51,7 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
 
   const cardDescs = compact ? CARD_DESCRIPTORS_ALL : CARD_DESCRIPTORS_EXCLUSIVE
   const enabledCards = cardDescs.filter(
-    (d) => isIndicatorVisible(settings.detail_indicator_visibility, d.id),
+    (d) => isVisibleAt(settings.indicator_visibility, d.id, "detail_card"),
   )
 
   const compactChartHeight = isWide ? 300 : 200
@@ -90,11 +90,8 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
           <div className="min-w-0 lg:flex-[4]">
             <CandlestickChart
               annotations={annotations ?? []}
-              indicatorVisibility={{
-                ...settings.detail_indicator_visibility,
-                rsi: false,
-                macd: false,
-              }}
+              indicatorVisibility={settings.indicator_visibility}
+              excludeIndicators={["rsi", "macd"]}
               chartType={settings.chart_type}
               height={compactChartHeight}
               roundedClass="rounded-md"
@@ -113,11 +110,8 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
       <div className="space-y-0">
         <CandlestickChart
           annotations={annotations ?? []}
-          indicatorVisibility={{
-            ...settings.detail_indicator_visibility,
-            rsi: false,
-            macd: false,
-          }}
+          indicatorVisibility={settings.indicator_visibility}
+          excludeIndicators={["rsi", "macd"]}
           chartType={settings.chart_type}
           height={250}
           hideTimeAxis

@@ -3,10 +3,11 @@ import { ArrowLeft, ExternalLink, RefreshCw, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PeriodSelector } from "@/components/period-selector"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { buildYahooFinanceUrl, formatPrice, formatChangePct } from "@/lib/format"
+import { buildYahooFinanceUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
 import { useQuotes } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useRefreshPrices, useCreateAsset } from "@/lib/queries"
+import { useSettings } from "@/lib/settings"
 
 export function Header({
   symbol,
@@ -23,6 +24,7 @@ export function Header({
   setPeriod: (p: string) => void
   isTracked: boolean
 }) {
+  const { settings } = useSettings()
   const refresh = useRefreshPrices(symbol)
   const createAsset = useCreateAsset()
   const quotes = useQuotes()
@@ -47,8 +49,14 @@ export function Header({
           {name && <p className="text-sm text-muted-foreground">{name}</p>}
         </div>
         {price != null && (
-          <span ref={priceRef} className="text-xl font-semibold tabular-nums rounded px-1">
-            {formatPrice(price, currency)}
+          <span
+            ref={priceRef}
+            className="text-xl font-semibold tabular-nums rounded px-1"
+            title={settings.compact_numbers ? formatPrice(price, currency) : undefined}
+          >
+            {settings.compact_numbers
+              ? formatCompactPrice(price, currency)
+              : formatPrice(price, currency)}
           </span>
         )}
         {changePct != null && (() => {

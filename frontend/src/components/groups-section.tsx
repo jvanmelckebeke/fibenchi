@@ -108,7 +108,7 @@ function SortableGroupItem({
     <SidebarMenuItem ref={setNodeRef} style={style}>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="flex items-center w-full">
+          <div className="flex items-center w-full rounded-md data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
             {showDragHandle && <DragHandle {...attributes} {...listeners} />}
             <SidebarMenuButton
               asChild

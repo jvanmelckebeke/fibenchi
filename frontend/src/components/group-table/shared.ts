@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { getAllSortableFields, isIndicatorVisible } from "@/lib/indicator-registry"
+import { getAllSortableFields } from "@/lib/indicator-registry"
 
 export const SORTABLE_FIELDS = getAllSortableFields()
 
@@ -12,13 +12,16 @@ export const BASE_COLUMN_DEFS: { key: string; label: string }[] = [
 
 /** Check whether a column is visible. Missing key = visible (opt-out model). */
 export function isColumnVisible(columnSettings: Record<string, boolean>, key: string): boolean {
-  return isIndicatorVisible(columnSettings, key)
+  return columnSettings[key] !== false
 }
 
 /** Minimum viewport width (px) for a column to be auto-shown. */
 const RESPONSIVE_HIDE_BREAKPOINTS: Record<string, number> = {
   adx: 1280,
+  atr_pct: 1280,
+  avg_volume: 1280,
   atr: 1024,
+  volume: 1024,
   macd: 768,
   rsi: 640,
 }
