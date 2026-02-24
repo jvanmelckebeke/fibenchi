@@ -9,7 +9,7 @@ import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice, formatCompactPrice, changeColor, formatChangePct } from "@/lib/format"
-import { getCardDescriptors, isIndicatorVisible, type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { getCardDescriptors, isVisibleAt, type IndicatorDescriptor, type Placement } from "@/lib/indicator-registry"
 import { IndicatorValue } from "@/components/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -30,22 +30,26 @@ export interface AssetCardProps {
   onDelete: () => void
   onHover: () => void
   showSparkline: boolean
-  indicatorVisibility: Record<string, boolean>
+  indicatorVisibility: Record<string, Placement[]>
 }
 
 function MiniIndicatorCard({
   descriptor,
   values,
   currency,
+  expanded,
+  className,
 }: {
   descriptor: IndicatorDescriptor
   values?: Record<string, number | string | null>
   currency: string
+  expanded?: boolean
+  className?: string
 }) {
   return (
-    <div className="rounded bg-muted/50 px-2 py-1">
+    <div className={`rounded bg-muted/50 px-2 py-1 ${expanded ? "text-center" : ""} ${className ?? ""}`}>
       <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
-      <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact />
+      <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact expanded={expanded} />
     </div>
   )
 }
@@ -68,7 +72,7 @@ export function AssetCard({
 }: AssetCardProps) {
   const { settings } = useSettings()
   const enabledCards = CARD_DESCRIPTORS.filter(
-    (d) => isIndicatorVisible(indicatorVisibility, d.id),
+    (d) => isVisibleAt(indicatorVisibility, d.id, "group_card"),
   )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
@@ -123,15 +127,24 @@ export function AssetCard({
             <CardContent className="pt-0 space-y-2">
               {showSparkline && <DeferredSparkline batchData={sparklineData} />}
               {enabledCards.length > 0 && (
-                <div className="grid grid-cols-2 gap-1.5 mt-1">
-                  {enabledCards.map((desc) => (
-                    <MiniIndicatorCard
-                      key={desc.id}
-                      descriptor={desc}
-                      values={indicatorData?.values}
-                      currency={currency}
-                    />
-                  ))}
+                <div
+                  className="gap-1.5 mt-1 grid"
+                  style={{ gridTemplateColumns: enabledCards.length === 1 ? "1fr" : "1fr 1fr" }}
+                >
+                  {enabledCards.map((desc, i) => {
+                    const isLastOdd = enabledCards.length > 1 && enabledCards.length % 2 === 1 && i === enabledCards.length - 1
+                    const isAlone = enabledCards.length === 1
+                    return (
+                      <MiniIndicatorCard
+                        key={desc.id}
+                        descriptor={desc}
+                        values={indicatorData?.values}
+                        currency={currency}
+                        expanded={isAlone || isLastOdd}
+                        className={isLastOdd ? "col-span-2" : undefined}
+                      />
+                    )
+                  })}
                 </div>
               )}
             </CardContent>

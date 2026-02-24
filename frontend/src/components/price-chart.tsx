@@ -4,7 +4,7 @@ import { ChartSyncProvider } from "./chart/chart-sync-provider"
 import { CandlestickChart } from "./chart/candlestick-chart"
 import { SubChart } from "./chart/sub-chart"
 import { IndicatorCards } from "./chart/indicator-cards"
-import { getSubChartDescriptors, getCardDescriptors, isIndicatorVisible } from "@/lib/indicator-registry"
+import { getSubChartDescriptors, getCardDescriptors, isVisibleAt, type Placement } from "@/lib/indicator-registry"
 
 const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()
 const CARD_DESCRIPTORS = getCardDescriptors(true)
@@ -13,8 +13,10 @@ interface PriceChartProps {
   prices: Price[]
   indicators: Indicator[]
   annotations: Annotation[]
-  /** Per-descriptor visibility (keys = descriptor IDs). Missing keys default to true. */
-  indicatorVisibility?: Record<string, boolean>
+  /** Placement-based visibility matrix. Missing keys fall back to descriptor defaults. */
+  indicatorVisibility?: Record<string, Placement[]>
+  /** Indicator IDs to exclude regardless of visibility settings. */
+  excludeIndicators?: string[]
   chartType?: "candle" | "line"
   mainChartHeight?: number
   /** ISO 4217 currency code for formatting price-denominated indicators (e.g. ATR). */
@@ -26,13 +28,17 @@ export function PriceChart({
   indicators,
   annotations,
   indicatorVisibility,
+  excludeIndicators,
   chartType = "candle",
   mainChartHeight = 400,
   currency,
 }: PriceChartProps) {
   const isVisible = useCallback(
-    (id: string) => isIndicatorVisible(indicatorVisibility, id),
-    [indicatorVisibility],
+    (id: string) => {
+      if (excludeIndicators?.includes(id)) return false
+      return isVisibleAt(indicatorVisibility, id, "detail_chart")
+    },
+    [indicatorVisibility, excludeIndicators],
   )
 
   const enabledSubCharts = useMemo(
@@ -41,8 +47,8 @@ export function PriceChart({
   )
 
   const enabledCards = useMemo(
-    () => CARD_DESCRIPTORS.filter((d) => isVisible(d.id)),
-    [isVisible],
+    () => CARD_DESCRIPTORS.filter((d) => isVisibleAt(indicatorVisibility, d.id, "detail_card")),
+    [indicatorVisibility],
   )
 
   const hasSubCharts = enabledSubCharts.length > 0

@@ -1,6 +1,7 @@
 import { PriceChart } from "@/components/price-chart"
 import { ChartSkeleton } from "@/components/chart-skeleton"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
+import type { Placement } from "@/lib/indicator-registry"
 
 export function ChartSection({
   symbol,
@@ -11,7 +12,7 @@ export function ChartSection({
 }: {
   symbol: string
   period: string
-  indicatorVisibility: Record<string, boolean>
+  indicatorVisibility: Record<string, Placement[]>
   chartType: "candle" | "line"
   currency?: string
 }) {

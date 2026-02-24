@@ -11,6 +11,24 @@
 
 export type IndicatorPlacement = "overlay" | "subchart" | "card"
 
+export type IndicatorCategory = "technical" | "volatility" | "fundamentals" | "market_data"
+
+export const CATEGORY_ORDER: IndicatorCategory[] = ["fundamentals", "market_data", "technical", "volatility"]
+export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
+  fundamentals: "Fundamentals",
+  market_data: "Market Data",
+  technical: "Technical",
+  volatility: "Volatility",
+}
+
+/** Where an indicator can appear across the UI. */
+export type Placement =
+  | "group_table"
+  | "group_card"
+  | "detail_chart"
+  | "detail_card"
+  | "detail_stats"
+
 /** Declarative conditional-color rule (pure data, no callbacks). */
 export interface ThresholdColor {
   condition: "lt" | "gt" | "lte" | "gte"
@@ -44,7 +62,13 @@ export interface IndicatorDescriptor {
   id: string
   label: string
   shortLabel: string
+  description: string
+  category: IndicatorCategory
   placement: IndicatorPlacement
+  /** UI locations this indicator can appear in. */
+  capabilities: Placement[]
+  /** UI locations enabled by default (subset of capabilities). */
+  defaults: Placement[]
   /** All value-dict fields produced by this indicator. */
   fields: string[]
   /** Fields that can be used for table sorting. */
@@ -87,18 +111,30 @@ export type IndicatorDescriptorWithSummary = IndicatorDescriptor & {
 // ---------------------------------------------------------------------------
 
 import { INDICATOR_REGISTRY } from "./indicator-descriptors"
+import { currencySymbol, formatCompactNumber } from "./format"
 export { INDICATOR_REGISTRY }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Check whether an indicator is visible in a visibility map (opt-out model: missing = visible). */
-export function isIndicatorVisible(
-  visibilityMap: Record<string, boolean> | undefined,
-  key: string,
+/**
+ * Check whether an indicator is visible at a specific placement.
+ * Missing from map → falls back to the descriptor's defaults.
+ * Checks capabilities to prevent showing at unsupported placements.
+ */
+export function isVisibleAt(
+  visibilityMap: Record<string, Placement[]> | undefined,
+  indicatorId: string,
+  placement: Placement,
 ): boolean {
-  return visibilityMap?.[key] !== false
+  const descriptor = getDescriptorById(indicatorId)
+  if (!descriptor) return false
+  if (!descriptor.capabilities.includes(placement)) return false
+  if (!visibilityMap || !(indicatorId in visibilityMap)) {
+    return descriptor.defaults.includes(placement)
+  }
+  return visibilityMap[indicatorId].includes(placement)
 }
 
 /** Resolve the first matching threshold color class for a value. */
@@ -165,7 +201,7 @@ export function getDescriptorById(id: string): IndicatorDescriptor | undefined {
 }
 
 export function getScannableDescriptors(): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) => d.placement !== "overlay")
+  return INDICATOR_REGISTRY.filter((d) => d.placement !== "overlay" && d.series.length > 0)
 }
 
 export function getHoldingSummaryDescriptors(): IndicatorDescriptorWithSummary[] {
@@ -209,6 +245,39 @@ export function getSeriesByField(field: string): SeriesDescriptor | undefined {
     if (s) return s
   }
   return undefined
+}
+
+/**
+ * Format a single indicator field value with the correct prefix, decimals,
+ * suffix, and color class. Shared by StatsPanel, IndicatorValue, and any
+ * other site that renders a formatted indicator value.
+ */
+export function formatIndicatorField(
+  field: string,
+  descriptor: IndicatorDescriptor,
+  values: Record<string, number | string | null | undefined>,
+  currency?: string,
+): { text: string; colorClass: string } {
+  const val = getNumericValue(values, field)
+  if (val == null) return { text: "--", colorClass: "text-muted-foreground" }
+
+  let text: string
+  if (descriptor.compactFormat) {
+    text = formatCompactNumber(val)
+  } else {
+    const prefix = currency && descriptor.priceDenominated ? currencySymbol(currency) : ""
+    text = `${prefix}${val.toFixed(descriptor.decimals)}${descriptor.suffix ?? ""}`
+  }
+
+  let colorClass: string
+  if (descriptor.id === "adx" && field === "adx") {
+    colorClass = resolveAdxColor(val, values)
+  } else {
+    const series = getSeriesByField(field)
+    colorClass = resolveThresholdColor(series?.thresholdColors, val) || "text-foreground"
+  }
+
+  return { text, colorClass }
 }
 
 /**
