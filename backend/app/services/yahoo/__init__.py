@@ -28,6 +28,10 @@ from app.services.yahoo.holdings import (
     _holdings_cache,
     fetch_etf_holdings,
 )
+from app.services.yahoo.fundamentals import (
+    _batch_fetch_fundamentals_sync,
+    batch_fetch_fundamentals,
+)
 from app.services.yahoo.quotes import (
     batch_fetch_currencies,
     batch_fetch_quotes,
@@ -54,6 +58,9 @@ __all__ = [
     # holdings
     "fetch_etf_holdings",
     "_holdings_cache",
+    # fundamentals
+    "batch_fetch_fundamentals",
+    "_batch_fetch_fundamentals_sync",
     # search
     "search",
 ]

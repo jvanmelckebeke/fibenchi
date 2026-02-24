@@ -7,7 +7,7 @@ from typing import Callable
 
 import pandas as pd
 
-from app.services.yahoo import _batch_fetch_history_sync, batch_fetch_currencies
+from app.services.yahoo import _batch_fetch_history_sync, _batch_fetch_fundamentals_sync, batch_fetch_currencies
 from app.utils import async_threadable
 
 
@@ -424,5 +424,12 @@ def compute_batch_indicator_snapshots(
 
         snapshot = build_indicator_snapshot(compute_indicators(df))
         results.append({"symbol": sym, "currency": currency, **snapshot})
+
+    # Merge fundamental metrics (Forward P/E, PEG, ROE, etc.) from Yahoo
+    fundamentals = _batch_fetch_fundamentals_sync(symbols)
+    for entry in results:
+        fund = {k: v for k, v in fundamentals.get(entry["symbol"], {}).items() if v is not None}
+        if fund:
+            entry.setdefault("values", {}).update(fund)
 
     return results

@@ -11,6 +11,7 @@ from app.repositories.group_repo import GroupRepository
 from app.repositories.price_repo import PriceRepository
 from app.services.compute.indicators import build_indicator_snapshot, compute_indicators
 from app.services.compute.utils import prices_to_df
+from app.services.yahoo import batch_fetch_fundamentals
 from app.utils import TTLCache
 
 # In-memory cache for batch indicator snapshots.
@@ -107,6 +108,14 @@ async def compute_and_cache_indicators(
 
         snapshot = build_indicator_snapshot(compute_indicators(df))
         out[symbol] = snapshot
+
+    # Merge fundamental metrics (Forward P/E, PEG, ROE, etc.) from Yahoo
+    symbols_list = list(id_to_symbol.values())
+    fundamentals = await batch_fetch_fundamentals(symbols_list)
+    for symbol, snapshot in out.items():
+        fund = {k: v for k, v in fundamentals.get(symbol, {}).items() if v is not None}
+        if fund:
+            snapshot.setdefault("values", {}).update(fund)
 
     _indicator_cache.set_value(cache_key, out)
 
