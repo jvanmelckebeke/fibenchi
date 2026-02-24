@@ -123,7 +123,10 @@ export function AssetCard({
             <CardContent className="pt-0 space-y-2">
               {showSparkline && <DeferredSparkline batchData={sparklineData} />}
               {enabledCards.length > 0 && (
-                <div className="grid grid-cols-2 gap-1.5 mt-1">
+                <div
+                  className="gap-1.5 mt-1 grid"
+                  style={{ gridTemplateColumns: enabledCards.length === 1 ? "1fr" : "1fr 1fr" }}
+                >
                   {enabledCards.map((desc) => (
                     <MiniIndicatorCard
                       key={desc.id}

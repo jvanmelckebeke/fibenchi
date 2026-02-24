@@ -1,6 +1,14 @@
 import { useState } from "react"
-import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   INDICATOR_REGISTRY,
   type IndicatorDescriptor,
@@ -16,13 +24,13 @@ const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
   fundamentals: "Fundamentals",
 }
 
-const PLACEMENT_LABELS: Record<Placement, string> = {
-  group_table: "Group table",
-  group_card: "Group card",
-  detail_chart: "Detail chart",
-  detail_card: "Detail card",
-  detail_stats: "Detail stats",
-}
+const PLACEMENT_COLS: { placement: Placement; label: string }[] = [
+  { placement: "group_table", label: "Table" },
+  { placement: "group_card", label: "Card" },
+  { placement: "detail_chart", label: "Chart" },
+  { placement: "detail_card", label: "Detail" },
+  { placement: "detail_stats", label: "Stats" },
+]
 
 interface IndicatorVisibilityEditorProps {
   visibility: Record<string, Placement[]>
@@ -30,7 +38,7 @@ interface IndicatorVisibilityEditorProps {
 }
 
 export function IndicatorVisibilityEditor({ visibility, onChange }: IndicatorVisibilityEditorProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
 
   const grouped = new Map<IndicatorCategory, IndicatorDescriptor[]>()
   for (const desc of INDICATOR_REGISTRY) {
@@ -55,77 +63,84 @@ export function IndicatorVisibilityEditor({ visibility, onChange }: IndicatorVis
     onChange({ ...visibility, [id]: next })
   }
 
-  function resetToDefaults(id: string) {
-    const desc = INDICATOR_REGISTRY.find((d) => d.id === id)
-    if (!desc) return
-    const next = { ...visibility }
-    delete next[id]
-    onChange(next)
+  function resetAll() {
+    onChange({})
   }
 
-  return (
-    <div className="space-y-4">
-      {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
-        <div key={cat}>
-          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            {CATEGORY_LABELS[cat]}
-          </h4>
-          <div className="space-y-1">
-            {grouped.get(cat)!.map((desc) => {
-              const isExpanded = expandedId === desc.id
-              const active = getActivePlacements(desc.id)
-              const enabledCount = active.filter((p) => desc.capabilities.includes(p)).length
+  const hasCustom = Object.keys(visibility).length > 0
 
-              return (
-                <div key={desc.id} className="rounded-md border">
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-muted/50 transition-colors"
-                    onClick={() => setExpandedId(isExpanded ? null : desc.id)}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-medium">{desc.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {enabledCount}/{desc.capabilities.length}
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{isExpanded ? "▾" : "▸"}</span>
-                  </button>
-                  {isExpanded && (
-                    <div className="px-3 pb-3 space-y-2 border-t">
-                      <p className="text-xs text-muted-foreground pt-2">{desc.description}</p>
-                      <div className="grid grid-cols-1 gap-1.5">
-                        {desc.capabilities.map((placement) => (
-                          <label
-                            key={placement}
-                            className="flex items-center justify-between"
-                          >
-                            <span className="text-sm">{PLACEMENT_LABELS[placement]}</span>
-                            <Switch
-                              checked={active.includes(placement)}
-                              onCheckedChange={(v) => togglePlacement(desc.id, placement, v)}
-                            />
-                          </label>
-                        ))}
-                      </div>
-                      {desc.id in visibility && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs h-7"
-                          onClick={() => resetToDefaults(desc.id)}
-                        >
-                          Reset to defaults
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="w-full">
+          Configure Indicator Visibility
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Indicator Visibility</DialogTitle>
+        </DialogHeader>
+
+        {/* Column headers */}
+        <div className="space-y-4">
+          <div className="grid items-center gap-x-2" style={{ gridTemplateColumns: `1fr repeat(${PLACEMENT_COLS.length}, 56px)` }}>
+            <div />
+            {PLACEMENT_COLS.map((col) => (
+              <span key={col.placement} className="text-[11px] text-muted-foreground text-center font-medium">
+                {col.label}
+              </span>
+            ))}
           </div>
+
+          {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
+            <div key={cat}>
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                {CATEGORY_LABELS[cat]}
+              </h4>
+              <div className="space-y-0.5">
+                {grouped.get(cat)!.map((desc) => {
+                  const active = getActivePlacements(desc.id)
+                  return (
+                    <div
+                      key={desc.id}
+                      className="grid items-center gap-x-2 py-1.5 rounded hover:bg-muted/50"
+                      style={{ gridTemplateColumns: `1fr repeat(${PLACEMENT_COLS.length}, 56px)` }}
+                    >
+                      <span className="text-sm font-medium pl-1">{desc.label}</span>
+                      {PLACEMENT_COLS.map((col) => {
+                        const capable = desc.capabilities.includes(col.placement)
+                        const checked = capable && active.includes(col.placement)
+                        return (
+                          <div key={col.placement} className="flex justify-center">
+                            {capable ? (
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) =>
+                                  togglePlacement(desc.id, col.placement, v === true)
+                                }
+                              />
+                            ) : (
+                              <span className="text-muted-foreground/30">—</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+
+        <DialogFooter>
+          {hasCustom && (
+            <Button variant="ghost" size="sm" onClick={resetAll}>
+              Reset all to defaults
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

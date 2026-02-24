@@ -171,14 +171,23 @@ export function SettingsPage() {
 
       <SymbolSourcesSettings />
 
-      <div className="flex items-center justify-end gap-2">
-        {isDirty && (
-          <Button variant="outline" onClick={discard}>
-            Discard
-          </Button>
-        )}
-        <Button onClick={apply} disabled={!isDirty}>
-          Save
+      {/* Spacer so floating bar doesn't overlap content */}
+      {isDirty && <div className="h-16" />}
+
+      {/* Discord-style floating save bar */}
+      <div
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-lg border bg-card px-4 py-3 shadow-lg transition-all duration-200 ${
+          isDirty
+            ? "translate-y-0 opacity-100"
+            : "translate-y-4 opacity-0 pointer-events-none"
+        }`}
+      >
+        <span className="text-sm text-muted-foreground">You have unsaved changes</span>
+        <Button variant="ghost" size="sm" onClick={discard}>
+          Reset
+        </Button>
+        <Button size="sm" onClick={apply}>
+          Save Changes
         </Button>
       </div>
     </div>

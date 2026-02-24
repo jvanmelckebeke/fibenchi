@@ -5,6 +5,7 @@ import {
   getNumericValue,
   resolveThresholdColor,
   resolveAdxColor,
+  getSeriesByField,
   type IndicatorDescriptor,
   type IndicatorCategory,
   type Placement,
@@ -54,7 +55,7 @@ export function StatsPanel({ indicators, indicatorVisibility, currency }: StatsP
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
             {CATEGORY_LABELS[cat]}
           </h3>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {grouped.get(cat)!.map((desc) => (
               <StatRow
                 key={desc.id}
@@ -70,6 +71,34 @@ export function StatsPanel({ indicators, indicatorVisibility, currency }: StatsP
   )
 }
 
+function formatFieldValue(
+  field: string,
+  descriptor: IndicatorDescriptor,
+  values: Record<string, number | string | null>,
+  currency?: string,
+): { text: string; colorClass: string } {
+  const val = getNumericValue(values, field)
+  if (val == null) return { text: "--", colorClass: "text-muted-foreground" }
+
+  let text: string
+  if (descriptor.compactFormat) {
+    text = formatCompactNumber(val)
+  } else {
+    const prefix = currency && descriptor.priceDenominated ? currencySymbol(currency) : ""
+    text = `${prefix}${val.toFixed(descriptor.decimals)}${descriptor.suffix ?? ""}`
+  }
+
+  let colorClass: string
+  if (descriptor.id === "adx" && field === "adx") {
+    colorClass = resolveAdxColor(val, values)
+  } else {
+    const series = getSeriesByField(field)
+    colorClass = resolveThresholdColor(series?.thresholdColors, val) || "text-foreground"
+  }
+
+  return { text, colorClass }
+}
+
 function StatRow({
   descriptor,
   values,
@@ -80,47 +109,46 @@ function StatRow({
   currency?: string
 }) {
   const mainField = descriptor.series[0]?.field ?? descriptor.fields[0]
-  const mainVal = getNumericValue(values, mainField)
+  const main = formatFieldValue(mainField, descriptor, values, currency)
+  const secondaryFields = descriptor.fields.filter((f) => f !== mainField)
 
-  let formatted: string
-  let colorClass = ""
-
-  if (mainVal == null) {
-    formatted = "--"
-    colorClass = "text-muted-foreground"
-  } else {
-    if (descriptor.compactFormat) {
-      formatted = formatCompactNumber(mainVal)
-    } else {
-      const prefix = currency && descriptor.priceDenominated ? currencySymbol(currency) : ""
-      formatted = `${prefix}${mainVal.toFixed(descriptor.decimals)}${descriptor.suffix ?? ""}`
-    }
-    colorClass =
-      descriptor.id === "adx"
-        ? resolveAdxColor(mainVal, values)
-        : resolveThresholdColor(descriptor.series[0]?.thresholdColors, mainVal) || "text-foreground"
+  // Multi-field indicators: show labeled values
+  if (secondaryFields.length > 0) {
+    return (
+      <div className="space-y-0.5">
+        {/* Row 1: label + main value */}
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm font-medium">{descriptor.label}</span>
+          <span className={`text-sm font-semibold tabular-nums ${main.colorClass}`}>{main.text}</span>
+        </div>
+        {/* Row 2: description + secondary values */}
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="text-xs text-muted-foreground">{descriptor.description}</p>
+          <div className="flex items-baseline gap-3 tabular-nums shrink-0">
+            {secondaryFields.map((f) => {
+              const series = getSeriesByField(f)
+              const label = series?.label ?? f.replace(/_/g, " ")
+              const { text, colorClass } = formatFieldValue(f, descriptor, values, currency)
+              return (
+                <span key={f} className="text-xs text-muted-foreground">
+                  {label}: <span className={colorClass}>{text}</span>
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  // For multi-field indicators, show secondary values
-  const secondaryFields = descriptor.fields.slice(1).filter((f) => f !== mainField)
-
+  // Single-field indicators: simple two-row layout
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <div className="flex-1 min-w-0">
+    <div className="space-y-0.5">
+      <div className="flex items-baseline justify-between gap-4">
         <span className="text-sm font-medium">{descriptor.label}</span>
-        <span className="text-xs text-muted-foreground ml-2">{descriptor.description}</span>
+        <span className={`text-sm font-semibold tabular-nums ${main.colorClass}`}>{main.text}</span>
       </div>
-      <div className="flex items-baseline gap-3 tabular-nums shrink-0">
-        {secondaryFields.map((f) => {
-          const v = getNumericValue(values, f)
-          return (
-            <span key={f} className="text-xs text-muted-foreground">
-              {v != null ? (descriptor.compactFormat ? formatCompactNumber(v) : v.toFixed(descriptor.decimals)) : "--"}
-            </span>
-          )
-        })}
-        <span className={`text-sm font-semibold ${colorClass}`}>{formatted}</span>
-      </div>
+      <p className="text-xs text-muted-foreground">{descriptor.description}</p>
     </div>
   )
 }
