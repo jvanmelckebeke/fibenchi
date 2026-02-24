@@ -9,7 +9,7 @@ import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatPrice, formatCompactPrice, changeColor, formatChangePct } from "@/lib/format"
-import { getCardDescriptors, isIndicatorVisible, type IndicatorDescriptor } from "@/lib/indicator-registry"
+import { getCardDescriptors, isVisibleAt, type IndicatorDescriptor, type Placement } from "@/lib/indicator-registry"
 import { IndicatorValue } from "@/components/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -30,7 +30,7 @@ export interface AssetCardProps {
   onDelete: () => void
   onHover: () => void
   showSparkline: boolean
-  indicatorVisibility: Record<string, boolean>
+  indicatorVisibility: Record<string, Placement[]>
 }
 
 function MiniIndicatorCard({
@@ -68,7 +68,7 @@ export function AssetCard({
 }: AssetCardProps) {
   const { settings } = useSettings()
   const enabledCards = CARD_DESCRIPTORS.filter(
-    (d) => isIndicatorVisible(indicatorVisibility, d.id),
+    (d) => isVisibleAt(indicatorVisibility, d.id, "group_card"),
   )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null

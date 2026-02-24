@@ -34,7 +34,7 @@ export function AssetDetailPage() {
       <ChartSection
         symbol={symbol}
         period={period}
-        indicatorVisibility={settings.detail_indicator_visibility}
+        indicatorVisibility={settings.indicator_visibility}
         chartType={settings.chart_type}
         currency={asset?.currency}
       />

@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
+import { useSettings, type AppSettings, type GroupViewMode, GROUP_PLACEMENTS, DETAIL_PLACEMENTS, toggleForContext } from "@/lib/settings"
 import { VisibilityToggle, IndicatorVisibilitySection } from "@/components/visibility-toggle"
 import { SymbolSourcesSettings } from "@/components/symbol-sources-settings"
 
@@ -63,11 +63,12 @@ export function SettingsPage() {
             onCheckedChange={(v) => change({ group_show_sparkline: v })}
           />
           <IndicatorVisibilitySection
-            visibility={draft.group_indicator_visibility}
+            visibility={draft.indicator_visibility}
+            contextPlacements={GROUP_PLACEMENTS}
             idPrefix="grp"
             onChange={(id, v) =>
               change({
-                group_indicator_visibility: { ...draft.group_indicator_visibility, [id]: v },
+                indicator_visibility: toggleForContext(draft.indicator_visibility, id, GROUP_PLACEMENTS, v),
               })
             }
           />
@@ -80,11 +81,12 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <IndicatorVisibilitySection
-            visibility={draft.detail_indicator_visibility}
+            visibility={draft.indicator_visibility}
+            contextPlacements={DETAIL_PLACEMENTS}
             idPrefix="dtl"
             onChange={(id, v) =>
               change({
-                detail_indicator_visibility: { ...draft.detail_indicator_visibility, [id]: v },
+                indicator_visibility: toggleForContext(draft.indicator_visibility, id, DETAIL_PLACEMENTS, v),
               })
             }
           />
