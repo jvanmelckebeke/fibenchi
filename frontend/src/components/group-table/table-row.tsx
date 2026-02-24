@@ -176,6 +176,17 @@ export function TableRow({
             </td>
           )}
           {visibleIndicatorFields.map((field) => {
+            // Override stale DB volume with live SSE quote values
+            if ((field === "volume" || field === "avg_volume") && quote?.[field] != null) {
+              const val = quote[field]!
+              const desc = getDescriptorByField(field)
+              const formatted = desc?.compactFormat ? formatCompactNumber(val) : val.toLocaleString()
+              return (
+                <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+                  <span title={val.toLocaleString()}>{formatted}</span>
+                </td>
+              )
+            }
             if (field === "macd") {
               const macdVals = extractMacdValues(indicator?.values)
               const m = macdVals?.macd

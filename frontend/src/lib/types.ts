@@ -244,6 +244,8 @@ export interface Quote {
   previous_close: number | null
   change: number | null
   change_percent: number | null
+  volume: number | null
+  avg_volume: number | null
   currency: string
   market_state: string | null
 }
