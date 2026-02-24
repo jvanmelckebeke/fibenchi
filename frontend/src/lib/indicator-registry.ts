@@ -11,6 +11,16 @@
 
 export type IndicatorPlacement = "overlay" | "subchart" | "card"
 
+export type IndicatorCategory = "technical" | "volatility" | "fundamentals" | "market_data"
+
+/** Where an indicator can appear across the UI. */
+export type Placement =
+  | "group_table"
+  | "group_card"
+  | "detail_chart"
+  | "detail_card"
+  | "detail_stats"
+
 /** Declarative conditional-color rule (pure data, no callbacks). */
 export interface ThresholdColor {
   condition: "lt" | "gt" | "lte" | "gte"
@@ -44,7 +54,13 @@ export interface IndicatorDescriptor {
   id: string
   label: string
   shortLabel: string
+  description: string
+  category: IndicatorCategory
   placement: IndicatorPlacement
+  /** UI locations this indicator can appear in. */
+  capabilities: Placement[]
+  /** UI locations enabled by default (subset of capabilities). */
+  defaults: Placement[]
   /** All value-dict fields produced by this indicator. */
   fields: string[]
   /** Fields that can be used for table sorting. */
