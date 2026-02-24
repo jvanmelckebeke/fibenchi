@@ -37,15 +37,17 @@ function MiniIndicatorCard({
   descriptor,
   values,
   currency,
+  expanded,
 }: {
   descriptor: IndicatorDescriptor
   values?: Record<string, number | string | null>
   currency: string
+  expanded?: boolean
 }) {
   return (
-    <div className="rounded bg-muted/50 px-2 py-1">
+    <div className={`rounded bg-muted/50 px-2 py-1 ${expanded ? "text-center" : ""}`}>
       <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
-      <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact />
+      <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact expanded={expanded} />
     </div>
   )
 }
@@ -133,6 +135,7 @@ export function AssetCard({
                       descriptor={desc}
                       values={indicatorData?.values}
                       currency={currency}
+                      expanded={enabledCards.length === 1}
                     />
                   ))}
                 </div>

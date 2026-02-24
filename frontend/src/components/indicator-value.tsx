@@ -17,17 +17,22 @@ import { currencySymbol } from "@/lib/format"
  *
  * This component renders **only** the value portion — callers provide their
  * own container, label, and interaction affordances.
+ *
+ * @param compact  - smaller text sizes for card use
+ * @param expanded - when true, uses fuller labels (e.g. "MACD" vs "M")
  */
 export function IndicatorValue({
   descriptor,
   values,
   currency,
   compact,
+  expanded,
 }: {
   descriptor: IndicatorDescriptor
   values?: Record<string, number | string | null | undefined>
   currency?: string
   compact?: boolean
+  expanded?: boolean
 }) {
   const mainSeries = descriptor.series[0]
   const mainVal = getNumericValue(values, mainSeries.field)
@@ -62,7 +67,7 @@ export function IndicatorValue({
 
       {/* ADX: show +DI / -DI below the main value */}
       {descriptor.id === "adx" && (
-        <div className={`flex ${subGap} tabular-nums mt-0.5 ${subSize}`}>
+        <div className={`flex ${expanded ? "justify-center" : ""} ${subGap} tabular-nums mt-0.5 ${subSize}`}>
           <span className="text-emerald-500">
             +DI {getNumericValue(values, "plus_di")?.toFixed(1) ?? "--"}
           </span>
@@ -74,12 +79,12 @@ export function IndicatorValue({
 
       {/* MACD: show line + signal below histogram */}
       {descriptor.id === "macd" && (
-        <div className={`flex ${subGap} tabular-nums mt-0.5 ${subSize}`}>
+        <div className={`flex ${expanded ? "justify-center" : ""} ${subGap} tabular-nums mt-0.5 ${subSize}`}>
           <span className="text-sky-400">
-            <span className="text-muted-foreground">MACD</span> {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
+            <span className="text-muted-foreground">{expanded ? "MACD" : "M"}</span> {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
           </span>
           <span className="text-orange-400">
-            <span className="text-muted-foreground">Sig</span> {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
+            <span className="text-muted-foreground">{expanded ? "Signal" : "S"}</span> {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
           </span>
         </div>
       )}
