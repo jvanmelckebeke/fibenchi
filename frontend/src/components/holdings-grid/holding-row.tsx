@@ -70,12 +70,12 @@ export function HoldingRow({
           <>
             <td
               className="py-1 px-2 text-right text-xs"
-              title={settings.compact_numbers && indicator?.close != null ? formatPrice(indicator.close, indicator.currency, 0) : undefined}
+              title={settings.compact_numbers && indicator?.close != null ? formatPrice(indicator.close, indicator.currency, 0, settings.thousands_separator) : undefined}
             >
               {indicator?.close != null
                 ? settings.compact_numbers
                   ? formatCompactPrice(indicator.close, indicator.currency)
-                  : formatPrice(indicator.close, indicator.currency, 0)
+                  : formatPrice(indicator.close, indicator.currency, 0, settings.thousands_separator)
                 : "\u2014"}
             </td>
             <td className={`py-1 px-2 text-right text-xs ${chg.className}`}>

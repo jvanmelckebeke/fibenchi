@@ -9,3 +9,4 @@ from app.models.user_settings import UserSettings  # noqa: F401
 from app.models.symbol_source import SymbolSource  # noqa: F401
 from app.models.symbol_directory import SymbolDirectory  # noqa: F401
 from app.models.currency import Currency  # noqa: F401
+from app.models.intraday import IntradayPrice  # noqa: F401

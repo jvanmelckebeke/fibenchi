@@ -96,11 +96,11 @@ export function AssetCard({
                   <span
                     ref={priceRef}
                     className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1"
-                    title={settings.compact_numbers ? formatPrice(lastPrice, currency) : undefined}
+                    title={settings.compact_numbers ? formatPrice(lastPrice, currency, undefined, settings.thousands_separator) : undefined}
                   >
                     {settings.compact_numbers
                       ? formatCompactPrice(lastPrice, currency)
-                      : formatPrice(lastPrice, currency)}
+                      : formatPrice(lastPrice, currency, undefined, settings.thousands_separator)}
                   </span>
                 ) : (
                   <Skeleton className="ml-auto h-5 w-16 rounded" />

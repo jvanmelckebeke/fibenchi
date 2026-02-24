@@ -6,7 +6,7 @@ export type AssetTypeFilter = "all" | "stock" | "etf"
 export type GroupSortBy = string
 export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"
-export type GroupViewMode = "card" | "table" | "scanner"
+export type GroupViewMode = "card" | "table" | "scanner" | "live"
 
 export interface AppSettings {
   /** Per-indicator placement visibility matrix. Missing key = use descriptor defaults. */
@@ -28,6 +28,7 @@ export interface AppSettings {
   decimal_places: number
   sync_pseudo_etf_crosshairs: boolean
   show_indicator_deltas: boolean
+  thousands_separator: boolean
   _updated_at?: number
 }
 
@@ -72,6 +73,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   decimal_places: 2,
   sync_pseudo_etf_crosshairs: false,
   show_indicator_deltas: true,
+  thousands_separator: true,
 }
 
 

@@ -1,5 +1,5 @@
 import { useState, useMemo, useTransition } from "react"
-import { ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
+import { Activity, ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,6 +22,7 @@ import { useFilteredSortedAssets } from "@/lib/use-group-filter"
 import { GroupTable } from "@/components/group-table"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 import { ScannerView } from "@/components/scanner-view"
+import { LiveDayView } from "@/components/live-day-view"
 
 const SCANNABLE_DESCRIPTORS = getScannableDescriptors()
 
@@ -131,7 +132,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
                 onChange={setScannerPeriod}
               />
             </>
-          ) : (
+          ) : viewMode === "live" ? null : (
             <>
               {/* Sparkline period */}
               <SegmentedControl
@@ -174,6 +175,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               { value: "card", label: <LayoutGrid className="h-3.5 w-3.5" /> },
               { value: "table", label: <Table className="h-3.5 w-3.5" /> },
               { value: "scanner", label: <ScanLine className="h-3.5 w-3.5" /> },
+              { value: "live", label: <Activity className="h-3.5 w-3.5" /> },
             ]}
             value={settings.group_view_mode}
             onChange={setViewMode}
@@ -204,7 +206,9 @@ export function GroupPage({ groupId }: { groupId: number }) {
       )}
 
       <div className={isPending ? "opacity-70 transition-opacity" : "transition-opacity"}>
-      {viewMode === "scanner" && assets && assets.length > 0 ? (
+      {viewMode === "live" && assets && assets.length > 0 ? (
+        <LiveDayView assets={assets} quotes={quotes} indicators={batchIndicators} />
+      ) : viewMode === "scanner" && assets && assets.length > 0 ? (
         <CrosshairTimeSyncProvider enabled={true}>
           <ScannerView assets={assets} descriptorId={scannerIndicator} period={scannerPeriod} />
         </CrosshairTimeSyncProvider>

@@ -249,3 +249,10 @@ export interface Quote {
   currency: string
   market_state: string | null
 }
+
+export interface IntradayPoint {
+  time: number       // Unix timestamp
+  price: number
+  volume: number
+  session: "pre" | "regular" | "post"
+}
