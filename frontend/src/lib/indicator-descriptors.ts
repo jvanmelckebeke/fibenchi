@@ -231,10 +231,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     defaults: ["group_table", "detail_stats"],
     fields: ["volume", "avg_volume"],
     sortableFields: ["volume", "avg_volume"],
-    series: [
-      { field: "volume", label: "Vol", color: "#64748b" },
-      { field: "avg_volume", label: "Avg Vol", color: "#94a3b8" },
-    ],
+    series: [],
     decimals: 0,
     compactFormat: true,
   },
