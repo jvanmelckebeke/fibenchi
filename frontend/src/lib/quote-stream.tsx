@@ -1,21 +1,26 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 import type { Quote } from "./api"
+import type { IntradayPoint } from "./types"
 
 type QuoteMap = Record<string, Quote>
+type IntradayMap = Record<string, IntradayPoint[]>
 type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "disconnected"
 
 interface QuoteStreamState {
   quotes: QuoteMap
+  intraday: IntradayMap
   status: ConnectionStatus
 }
 
 const QuoteStreamContext = createContext<QuoteStreamState>({
   quotes: {},
+  intraday: {},
   status: "connecting",
 })
 
 export function QuoteStreamProvider({ children }: { children: React.ReactNode }) {
   const [quotes, setQuotes] = useState<QuoteMap>({})
+  const [intraday, setIntraday] = useState<IntradayMap>({})
   const [status, setStatus] = useState<ConnectionStatus>("connecting")
   const esRef = useRef<EventSource | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -36,6 +41,32 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
           backoffMs.current = 1_000 // reset backoff on successful data
         } catch (err) {
           console.error("[QuoteStream] Failed to parse SSE event:", err, "raw:", e.data?.slice(0, 200))
+        }
+      })
+
+      es.addEventListener("intraday", (e) => {
+        try {
+          const data = JSON.parse(e.data) as IntradayMap
+          setIntraday((prev) => {
+            const next = { ...prev }
+            for (const [sym, points] of Object.entries(data)) {
+              const existing = next[sym]
+              if (!existing) {
+                // First push for this symbol — set full data
+                next[sym] = points
+              } else {
+                // Delta — append new points, dedup by timestamp
+                const lastTime = existing.length > 0 ? existing[existing.length - 1].time : 0
+                const newPoints = points.filter((p) => p.time > lastTime)
+                if (newPoints.length > 0) {
+                  next[sym] = [...existing, ...newPoints]
+                }
+              }
+            }
+            return next
+          })
+        } catch (err) {
+          console.error("[QuoteStream] Failed to parse intraday SSE event:", err)
         }
       })
 
@@ -80,7 +111,7 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
   }, [])
 
   return (
-    <QuoteStreamContext.Provider value={{ quotes, status }}>
+    <QuoteStreamContext.Provider value={{ quotes, intraday, status }}>
       {children}
     </QuoteStreamContext.Provider>
   )
@@ -89,6 +120,11 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
 // eslint-disable-next-line react-refresh/only-export-components
 export function useQuotes(): QuoteMap {
   return useContext(QuoteStreamContext).quotes
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useIntraday(): IntradayMap {
+  return useContext(QuoteStreamContext).intraday
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

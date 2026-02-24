@@ -15,6 +15,7 @@ from app.routers import annotations, assets, groups, holdings, portfolio, prices
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
+from app.services.intraday import fetch_and_store_intraday, cleanup_old_intraday
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,15 @@ async def scheduled_refresh():
         except Exception:
             logger.exception("Indicator pre-computation failed (non-fatal)")
 
+    # Clean up old intraday data (keep only last 2 days)
+    async with async_session() as db:
+        try:
+            deleted = await cleanup_old_intraday(db)
+            if deleted:
+                logger.info(f"Cleaned up {deleted} old intraday bars")
+        except Exception:
+            logger.exception("Intraday cleanup failed (non-fatal)")
+
 
 async def scheduled_symbol_sync():
     """Background job: sync all enabled symbol directory sources."""
@@ -52,6 +62,34 @@ async def scheduled_symbol_sync():
             logger.info(f"Symbol sync complete: {len(counts)} sources, {total} symbols")
         except Exception:
             logger.exception("Scheduled symbol sync failed")
+
+
+async def scheduled_intraday_sync():
+    """Background job: fetch 1m intraday bars for all grouped assets."""
+    from app.repositories.asset_repo import AssetRepository
+    from app.services.yahoo import batch_fetch_quotes
+
+    async with async_session() as db:
+        try:
+            pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
+            if not pairs:
+                return
+
+            symbols = [sym for _, sym in pairs]
+            asset_map = {sym: aid for aid, sym in pairs}
+
+            # Check if any market is active before fetching
+            quotes = await batch_fetch_quotes(symbols[:5])  # sample a few
+            market_states = {q.get("market_state") for q in quotes if q.get("market_state")}
+            active_states = {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}
+            if not market_states & active_states:
+                return
+
+            count = await fetch_and_store_intraday(db, symbols, asset_map)
+            if count:
+                logger.info(f"Intraday sync: {count} bars for {len(symbols)} symbols")
+        except Exception:
+            logger.exception("Intraday sync failed")
 
 
 @asynccontextmanager
@@ -74,6 +112,14 @@ async def lifespan(app: FastAPI):
             scheduled_symbol_sync,
             CronTrigger(minute="0", hour="2", day_of_week="sun"),
             id="symbol_directory_sync",
+        )
+
+        # Intraday sync every 60 seconds (Mon-Fri)
+        from apscheduler.triggers.interval import IntervalTrigger
+        scheduler.add_job(
+            scheduled_intraday_sync,
+            IntervalTrigger(seconds=60),
+            id="intraday_sync",
         )
 
         scheduler.start()

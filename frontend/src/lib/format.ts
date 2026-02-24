@@ -21,8 +21,13 @@ export function currencySymbol(currency: string): string {
   return CURRENCY_SYMBOLS[currency.toUpperCase()] ?? `${currency}\u00a0`
 }
 
-export function formatPrice(value: number, currency: string, decimals?: number): string {
-  return `${currencySymbol(currency)}${value.toFixed(decimals ?? currencyDecimals(currency))}`
+export function formatPrice(value: number, currency: string, decimals?: number, groupDigits = false): string {
+  const d = decimals ?? currencyDecimals(currency)
+  const fixed = value.toFixed(d)
+  if (!groupDigits) return `${currencySymbol(currency)}${fixed}`
+  const [int, frac] = fixed.split(".")
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  return `${currencySymbol(currency)}${frac !== undefined ? `${grouped}.${frac}` : grouped}`
 }
 
 export function formatCompactPrice(value: number, currency: string): string {

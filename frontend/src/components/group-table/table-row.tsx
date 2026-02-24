@@ -154,11 +154,11 @@ export function TableRow({
                 <span
                   ref={priceRef}
                   className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
-                  title={settings.compact_numbers ? formatPrice(displayPrice, asset.currency) : undefined}
+                  title={settings.compact_numbers ? formatPrice(displayPrice, asset.currency, undefined, settings.thousands_separator) : undefined}
                 >
                   {settings.compact_numbers
                     ? formatCompactPrice(displayPrice, asset.currency)
-                    : formatPrice(displayPrice, asset.currency)}
+                    : formatPrice(displayPrice, asset.currency, undefined, settings.thousands_separator)}
                 </span>
               ) : (
                 <Skeleton className="h-4 w-14 ml-auto rounded" />

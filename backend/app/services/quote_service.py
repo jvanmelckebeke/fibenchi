@@ -6,6 +6,7 @@ import logging
 
 from app.database import async_session
 from app.repositories.asset_repo import AssetRepository
+from app.services.intraday import get_intraday_bars
 from app.services.yahoo import batch_fetch_quotes
 
 logger = logging.getLogger(__name__)
@@ -24,17 +25,27 @@ async def quote_event_generator():
     After the initial full payload, only symbols whose data changed since the
     last push are included (delta mode).  This dramatically reduces bandwidth
     when most markets are closed or prices are stable.
+
+    Also pushes ``event: intraday`` with 1-minute bars for the live day view.
+    First push sends full day data, subsequent pushes send only new bars (delta).
     """
     last_payload: dict[str, dict] = {}
+    # Track last pushed intraday bar timestamp per symbol
+    last_intraday_ts: dict[str, int] = {}
 
     while True:
         try:
             async with async_session() as db:
-                symbols = await AssetRepository(db).list_in_any_group_symbols()
+                pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
+
+            symbols = [sym for _, sym in pairs]
+            asset_map_id_to_sym = {aid: sym for aid, sym in pairs}
+            asset_ids = [aid for aid, _ in pairs]
 
             if not symbols:
                 yield "event: quotes\ndata: {}\n\n"
                 last_payload = {}
+                last_intraday_ts = {}
                 await asyncio.sleep(60)
                 continue
 
@@ -63,6 +74,36 @@ async def quote_event_generator():
                 yield f"event: quotes\ndata: {json.dumps(delta)}\n\n"
 
             last_payload = full_payload
+
+            # Push intraday bars (full on first push, delta after)
+            active_states = {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}
+            has_active_market = bool(market_states & active_states)
+
+            # Always push intraday on first iteration or when markets are active
+            if has_active_market or not last_intraday_ts:
+                async with async_session() as db:
+                    all_bars = await get_intraday_bars(db, asset_ids, asset_map_id_to_sym)
+
+                if all_bars:
+                    if not last_intraday_ts:
+                        # First push: send full data
+                        intraday_payload = all_bars
+                    else:
+                        # Delta: only new bars since last push
+                        intraday_payload = {}
+                        for sym, bars in all_bars.items():
+                            last_ts = last_intraday_ts.get(sym, 0)
+                            new_bars = [b for b in bars if b["time"] > last_ts]
+                            if new_bars:
+                                intraday_payload[sym] = new_bars
+
+                    if intraday_payload:
+                        yield f"event: intraday\ndata: {json.dumps(intraday_payload)}\n\n"
+
+                    # Update last pushed timestamps
+                    for sym, bars in all_bars.items():
+                        if bars:
+                            last_intraday_ts[sym] = max(b["time"] for b in bars)
 
             # Adapt interval based on market state
             if "REGULAR" in market_states:

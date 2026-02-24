@@ -52,15 +52,17 @@ async def test_stream_emits_full_payload_first():
         patch("app.services.quote_service.AssetRepository") as MockRepo,
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
+        patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL"])
+        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL")])
 
         events = []
         async for event in quote_event_generator():
             events.append(event)
 
-    assert len(events) >= 1
-    data = json.loads(events[0].split("data: ")[1].split("\n")[0])
+    quote_events = [e for e in events if e.startswith("event: quotes")]
+    assert len(quote_events) >= 1
+    data = json.loads(quote_events[0].split("data: ")[1].split("\n")[0])
     assert "AAPL" in data
 
 
@@ -92,16 +94,18 @@ async def test_stream_delta_only_changed():
         patch("app.services.quote_service.AssetRepository") as MockRepo,
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, side_effect=[quote_v1, quote_v2]),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
+        patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL", "MSFT"])
+        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL"), (2, "MSFT")])
 
         events = []
         async for event in quote_event_generator():
             events.append(event)
 
-    assert len(events) == 2
+    quote_events = [e for e in events if e.startswith("event: quotes")]
+    assert len(quote_events) == 2
     # Second event should only contain AAPL (MSFT unchanged)
-    data2 = json.loads(events[1].split("data: ")[1].split("\n")[0])
+    data2 = json.loads(quote_events[1].split("data: ")[1].split("\n")[0])
     assert "AAPL" in data2
     assert "MSFT" not in data2
 
@@ -125,8 +129,9 @@ async def test_stream_adaptive_interval_regular():
         patch("app.services.quote_service.AssetRepository") as MockRepo,
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
+        patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL"])
+        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL")])
         async for _ in quote_event_generator():
             pass
 
@@ -152,8 +157,9 @@ async def test_stream_adaptive_interval_closed():
         patch("app.services.quote_service.AssetRepository") as MockRepo,
         patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
+        patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_symbols = AsyncMock(return_value=["AAPL"])
+        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL")])
         async for _ in quote_event_generator():
             pass
 

@@ -149,6 +149,12 @@ export function SettingsPage() {
             onCheckedChange={(v) => change({ compact_numbers: v })}
           />
           <VisibilityToggle
+            id="thousands-separator"
+            label="Thousands Separator"
+            checked={draft.thousands_separator}
+            onCheckedChange={(v) => change({ thousands_separator: v })}
+          />
+          <VisibilityToggle
             id="asset-type-badge"
             label="Asset Type Badge"
             checked={draft.show_asset_type_badge}

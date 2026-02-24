@@ -52,11 +52,11 @@ export function Header({
           <span
             ref={priceRef}
             className="text-xl font-semibold tabular-nums rounded px-1"
-            title={settings.compact_numbers ? formatPrice(price, currency) : undefined}
+            title={settings.compact_numbers ? formatPrice(price, currency, undefined, settings.thousands_separator) : undefined}
           >
             {settings.compact_numbers
               ? formatCompactPrice(price, currency)
-              : formatPrice(price, currency)}
+              : formatPrice(price, currency, undefined, settings.thousands_separator)}
           </span>
         )}
         {changePct != null && (() => {
