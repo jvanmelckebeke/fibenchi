@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
-import { INDICATOR_REGISTRY, getDescriptorById, type Placement } from "@/lib/indicator-registry"
+import { INDICATOR_REGISTRY, type Placement } from "@/lib/indicator-registry"
 import { api } from "@/lib/api"
 
 export type AssetTypeFilter = "all" | "stock" | "etf"
@@ -72,45 +72,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sync_pseudo_etf_crosshairs: false,
 }
 
-/** Placement families for the two-toggle settings UI. */
-// eslint-disable-next-line react-refresh/only-export-components
-export const GROUP_PLACEMENTS: Placement[] = ["group_table", "group_card"]
-// eslint-disable-next-line react-refresh/only-export-components
-export const DETAIL_PLACEMENTS: Placement[] = ["detail_chart", "detail_card", "detail_stats"]
-
-/** Check if an indicator is enabled for a set of context placements. */
-// eslint-disable-next-line react-refresh/only-export-components
-export function isEnabledForContext(
-  vis: Record<string, Placement[]>,
-  id: string,
-  contextPlacements: Placement[],
-): boolean {
-  const desc = getDescriptorById(id)
-  if (!desc) return false
-  const current = vis[id] ?? desc.defaults
-  return contextPlacements.some((p) => desc.capabilities.includes(p) && current.includes(p))
-}
-
-/** Toggle an indicator on/off for a set of context placements. */
-// eslint-disable-next-line react-refresh/only-export-components
-export function toggleForContext(
-  vis: Record<string, Placement[]>,
-  id: string,
-  contextPlacements: Placement[],
-  enabled: boolean,
-): Record<string, Placement[]> {
-  const desc = getDescriptorById(id)
-  if (!desc) return vis
-  const current = vis[id] ?? [...desc.defaults]
-  let next: Placement[]
-  if (enabled) {
-    const toAdd = contextPlacements.filter((p) => desc.capabilities.includes(p))
-    next = [...new Set([...current, ...toAdd])]
-  } else {
-    next = current.filter((p) => !contextPlacements.includes(p))
-  }
-  return { ...vis, [id]: next }
-}
 
 const STORAGE_KEY = "fibenchi-settings"
 

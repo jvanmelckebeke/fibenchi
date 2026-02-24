@@ -9,8 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useSettings, type AppSettings, type GroupViewMode, GROUP_PLACEMENTS, DETAIL_PLACEMENTS, toggleForContext } from "@/lib/settings"
-import { VisibilityToggle, IndicatorVisibilitySection } from "@/components/visibility-toggle"
+import { useSettings, type AppSettings, type GroupViewMode } from "@/lib/settings"
+import { VisibilityToggle } from "@/components/visibility-toggle"
+import { IndicatorVisibilityEditor } from "@/components/indicator-visibility-editor"
 import { SymbolSourcesSettings } from "@/components/symbol-sources-settings"
 
 export function SettingsPage() {
@@ -61,34 +62,6 @@ export function SettingsPage() {
             label="Sparkline Chart"
             checked={draft.group_show_sparkline}
             onCheckedChange={(v) => change({ group_show_sparkline: v })}
-          />
-          <IndicatorVisibilitySection
-            visibility={draft.indicator_visibility}
-            contextPlacements={GROUP_PLACEMENTS}
-            idPrefix="grp"
-            onChange={(id, v) =>
-              change({
-                indicator_visibility: toggleForContext(draft.indicator_visibility, id, GROUP_PLACEMENTS, v),
-              })
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Detail Page Chart</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <IndicatorVisibilitySection
-            visibility={draft.indicator_visibility}
-            contextPlacements={DETAIL_PLACEMENTS}
-            idPrefix="dtl"
-            onChange={(id, v) =>
-              change({
-                indicator_visibility: toggleForContext(draft.indicator_visibility, id, DETAIL_PLACEMENTS, v),
-              })
-            }
           />
         </CardContent>
       </Card>
@@ -179,6 +152,18 @@ export function SettingsPage() {
             label="Asset Type Badge"
             checked={draft.show_asset_type_badge}
             onCheckedChange={(v) => change({ show_asset_type_badge: v })}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Indicators</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <IndicatorVisibilityEditor
+            visibility={draft.indicator_visibility}
+            onChange={(vis) => change({ indicator_visibility: vis })}
           />
         </CardContent>
       </Card>
