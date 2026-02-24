@@ -38,14 +38,16 @@ function MiniIndicatorCard({
   values,
   currency,
   expanded,
+  className,
 }: {
   descriptor: IndicatorDescriptor
   values?: Record<string, number | string | null>
   currency: string
   expanded?: boolean
+  className?: string
 }) {
   return (
-    <div className={`rounded bg-muted/50 px-2 py-1 ${expanded ? "text-center" : ""}`}>
+    <div className={`rounded bg-muted/50 px-2 py-1 ${expanded ? "text-center" : ""} ${className ?? ""}`}>
       <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
       <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact expanded={expanded} />
     </div>
@@ -129,15 +131,20 @@ export function AssetCard({
                   className="gap-1.5 mt-1 grid"
                   style={{ gridTemplateColumns: enabledCards.length === 1 ? "1fr" : "1fr 1fr" }}
                 >
-                  {enabledCards.map((desc) => (
-                    <MiniIndicatorCard
-                      key={desc.id}
-                      descriptor={desc}
-                      values={indicatorData?.values}
-                      currency={currency}
-                      expanded={enabledCards.length === 1}
-                    />
-                  ))}
+                  {enabledCards.map((desc, i) => {
+                    const isLastOdd = enabledCards.length > 1 && enabledCards.length % 2 === 1 && i === enabledCards.length - 1
+                    const isAlone = enabledCards.length === 1
+                    return (
+                      <MiniIndicatorCard
+                        key={desc.id}
+                        descriptor={desc}
+                        values={indicatorData?.values}
+                        currency={currency}
+                        expanded={isAlone || isLastOdd}
+                        className={isLastOdd ? "col-span-2" : undefined}
+                      />
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
