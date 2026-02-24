@@ -18,7 +18,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     placement: "subchart",
     capabilities: ["group_table", "group_card", "detail_chart", "detail_card", "detail_stats"],
     defaults: ["group_table", "detail_chart"],
-    fields: ["rsi"],
+    fields: ["rsi", "rsi_delta", "rsi_delta_sigma"],
     sortableFields: ["rsi"],
     series: [
       {
@@ -109,7 +109,11 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     placement: "subchart",
     capabilities: ["group_table", "group_card", "detail_chart", "detail_card", "detail_stats"],
     defaults: ["group_table", "detail_chart"],
-    fields: ["macd", "macd_signal", "macd_hist"],
+    fields: [
+      "macd", "macd_signal", "macd_hist",
+      "macd_hist_delta", "macd_hist_delta_sigma",
+      "macd_delta", "macd_delta_sigma",
+    ],
     sortableFields: ["macd"],
     series: [
       {

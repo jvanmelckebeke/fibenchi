@@ -161,7 +161,13 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle>Indicators</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <VisibilityToggle
+            id="indicator-deltas"
+            label="Show Daily Deltas"
+            checked={draft.show_indicator_deltas}
+            onCheckedChange={(v) => change({ show_indicator_deltas: v })}
+          />
           <IndicatorVisibilityEditor
             visibility={draft.indicator_visibility}
             onChange={(vis) => change({ indicator_visibility: vis })}

@@ -27,6 +27,7 @@ export interface AppSettings {
   show_asset_type_badge: boolean
   decimal_places: number
   sync_pseudo_etf_crosshairs: boolean
+  show_indicator_deltas: boolean
   _updated_at?: number
 }
 
@@ -70,6 +71,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   show_asset_type_badge: true,
   decimal_places: 2,
   sync_pseudo_etf_crosshairs: false,
+  show_indicator_deltas: true,
 }
 
 

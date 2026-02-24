@@ -13,6 +13,7 @@ import { formatPrice, formatCompactPrice, formatCompactNumber, changeColor, form
 import {
   getNumericValue,
   extractMacdValues,
+  formatDeltaAnnotation,
   getSeriesByField,
   getDescriptorByField,
   resolveThresholdColor,
@@ -196,6 +197,9 @@ export function TableRow({
               const histColor = h != null ? (h >= 0 ? "text-emerald-400" : "text-red-400") : ""
               const fmt = (v: number | null | undefined) =>
                 v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
+              const histDelta = settings.show_indicator_deltas
+                ? formatDeltaAnnotation("macd_hist", indicator?.values)
+                : null
               return (
                 <td key={field} className={`${py} px-3 text-right text-sm tabular-nums overflow-hidden`}>
                   {hasValues ? (
@@ -206,6 +210,12 @@ export function TableRow({
                       <span>{fmt(s)}</span>
                       <span className="text-muted-foreground">H</span>
                       <span className={histColor}>{fmt(h)}</span>
+                      {histDelta && (
+                        <span className="text-xs">
+                          <span className="text-muted-foreground">{histDelta.delta}</span>
+                          {histDelta.sigma && <span className="text-amber-500 ml-0.5">⚠ {histDelta.sigma}</span>}
+                        </span>
+                      )}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">&mdash;</span>

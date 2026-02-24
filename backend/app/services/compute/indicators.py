@@ -200,9 +200,10 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     "rsi": IndicatorDef(
         func=rsi,
         params={"period": 14},
-        output_fields=["rsi"],
+        output_fields=["rsi", "rsi_delta", "rsi_delta_sigma"],
         decimals=2,
         warmup_periods=14,
+        field_decimals={"rsi_delta": 1, "rsi_delta_sigma": 1},
     ),
     "sma_20": IndicatorDef(
         func=sma,
@@ -230,11 +231,19 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     "macd": IndicatorDef(
         func=macd,
         params={"fast": 12, "slow": 26, "signal": 9},
-        output_fields=["macd", "macd_signal", "macd_hist"],
+        output_fields=[
+            "macd", "macd_signal", "macd_hist",
+            "macd_hist_delta", "macd_hist_delta_sigma",
+            "macd_delta", "macd_delta_sigma",
+        ],
         result_mapping={"macd": "macd", "signal": "macd_signal", "histogram": "macd_hist"},
         decimals=4,
         warmup_periods=35,
         snapshot_derived=_macd_snapshot_derived,
+        field_decimals={
+            "macd_hist_delta": 2, "macd_hist_delta_sigma": 1,
+            "macd_delta": 2, "macd_delta_sigma": 1,
+        },
     ),
     "atr": IndicatorDef(
         func=atr,
@@ -320,6 +329,40 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     return result
 
 
+_DELTA_FIELDS: list[tuple[str, int]] = [
+    ("rsi", 1),
+    ("macd_hist", 2),
+    ("macd", 2),
+]
+"""(source_field, decimals) for daily delta / outlier computation."""
+
+
+def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
+    """Add daily deltas and outlier sigma flags for selected indicator fields.
+
+    For each target field:
+      - {field}_delta = day-over-day difference
+      - {field}_delta_sigma = |Δ| expressed in rolling σ units, only when
+        the absolute delta exceeds mean + 2σ of the rolling window (else NaN).
+    """
+    for field, _ in _DELTA_FIELDS:
+        if field not in result.columns:
+            continue
+        series = result[field]
+        delta = series.diff()
+        result[f"{field}_delta"] = delta
+
+        abs_delta = delta.abs()
+        rolling_mean = abs_delta.rolling(window=window, min_periods=window).mean()
+        rolling_std = abs_delta.rolling(window=window, min_periods=window).std()
+
+        sigma = (abs_delta - rolling_mean) / rolling_std
+        # Only keep sigma when |Δ| exceeds the 2σ threshold
+        result[f"{field}_delta_sigma"] = sigma.where(
+            abs_delta > rolling_mean + 2 * rolling_std
+        )
+
+
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Compute all indicators and return a DataFrame with indicator columns.
 
@@ -347,6 +390,8 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
         if defn.post_compute:
             defn.post_compute(result)
+
+    _compute_deltas(result)
 
     return result
 

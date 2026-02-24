@@ -235,6 +235,40 @@ export function extractMacdValues(values?: Record<string, number | string | null
   } : undefined
 }
 
+/** Fields that carry daily deltas, mapped to the number of decimal places. */
+const DELTA_DECIMALS: Record<string, number> = {
+  rsi: 1,
+  macd_hist: 2,
+  macd: 2,
+}
+
+/**
+ * Format a delta annotation for a given indicator field.
+ *
+ * Reads `{field}_delta` and `{field}_delta_sigma` from the values dict.
+ * Returns `{ delta, sigma }` where delta is the formatted string like "(-1.3)"
+ * and sigma is the formatted sigma string like "2.8σ" (or null if not an outlier).
+ * Returns null entirely if no delta value is available.
+ */
+export function formatDeltaAnnotation(
+  field: string,
+  values: Record<string, number | string | null | undefined> | undefined,
+): { delta: string; sigma: string | null } | null {
+  const decimals = DELTA_DECIMALS[field]
+  if (decimals == null) return null
+
+  const deltaVal = getNumericValue(values, `${field}_delta`)
+  if (deltaVal == null) return null
+
+  const sign = deltaVal >= 0 ? "+" : ""
+  const delta = `(${sign}${deltaVal.toFixed(decimals)})`
+
+  const sigmaVal = getNumericValue(values, `${field}_delta_sigma`)
+  const sigma = sigmaVal != null ? `${sigmaVal.toFixed(1)}σ` : null
+
+  return { delta, sigma }
+}
+
 export function getDescriptorByField(field: string): IndicatorDescriptor | undefined {
   return INDICATOR_REGISTRY.find((d) => d.fields.includes(field))
 }
