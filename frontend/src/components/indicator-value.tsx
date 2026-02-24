@@ -76,10 +76,10 @@ export function IndicatorValue({
       {descriptor.id === "macd" && (
         <div className={`flex ${subGap} tabular-nums mt-0.5 ${subSize}`}>
           <span className="text-sky-400">
-            M {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
+            <span className="text-muted-foreground">MACD</span> {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
           </span>
           <span className="text-orange-400">
-            S {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
+            <span className="text-muted-foreground">Sig</span> {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
           </span>
         </div>
       )}
