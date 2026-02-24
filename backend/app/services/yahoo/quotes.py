@@ -43,6 +43,8 @@ def _parse_price_data(
         prev_close = _sanitize(info.get("regularMarketPreviousClose"))
         change = _sanitize(info.get("regularMarketChange"))
         change_pct = _sanitize(info.get("regularMarketChangePercent"))
+        volume = info.get("regularMarketVolume")
+        avg_volume = info.get("averageDailyVolume10Day")
 
         if price is None and info.get("regularMarketPrice") is not None:
             nan_fields.append(f"{sym}.price")
@@ -58,6 +60,8 @@ def _parse_price_data(
             "previous_close": round(float(prev_close) / divisor, 4) if prev_close is not None else None,
             "change": round(float(change) / divisor, 4) if change is not None else None,
             "change_percent": round(float(change_pct) * 100, 2) if change_pct is not None else None,
+            "volume": int(volume) if volume is not None else None,
+            "avg_volume": int(avg_volume) if avg_volume is not None else None,
             "currency": currency,
             "market_state": info.get("marketState"),
         })

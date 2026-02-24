@@ -13,6 +13,7 @@ import {
   useUpdateThesis,
 } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
+import { useQuotes } from "@/lib/quote-stream"
 import { StatsPanel } from "@/components/stats-panel"
 import { Header } from "./header"
 import { ChartSection } from "./chart-section"
@@ -26,6 +27,8 @@ export function AssetDetailPage() {
   const { data: assets } = useAssets()
   const asset = assets?.find((a) => a.symbol === symbol?.toUpperCase())
   const { data: detail } = useAssetDetail(symbol ?? "", period, { enabled: !!symbol })
+  const quotes = useQuotes()
+  const quote = symbol ? quotes[symbol.toUpperCase()] : undefined
   const isTracked = !!asset
   const isEtf = asset?.type === "etf"
 
@@ -46,6 +49,7 @@ export function AssetDetailPage() {
           indicators={detail.indicators}
           indicatorVisibility={settings.indicator_visibility}
           currency={asset?.currency}
+          quote={quote}
         />
       )}
       {isEtf && <HoldingsSection symbol={symbol} />}

@@ -10,19 +10,24 @@ import {
   type IndicatorCategory,
   type Placement,
 } from "@/lib/indicator-registry"
-import type { Indicator } from "@/lib/api"
+import type { Indicator, Quote } from "@/lib/api"
 
 interface StatsPanelProps {
   indicators: Indicator[]
   indicatorVisibility: Record<string, Placement[]>
   currency?: string
+  quote?: Quote
 }
 
-export function StatsPanel({ indicators, indicatorVisibility, currency }: StatsPanelProps) {
+export function StatsPanel({ indicators, indicatorVisibility, currency, quote }: StatsPanelProps) {
   const latestValues = useMemo(() => {
     if (!indicators.length) return undefined
-    return indicators[indicators.length - 1].values
-  }, [indicators])
+    const values = { ...indicators[indicators.length - 1].values }
+    // Override stale DB volume with live SSE quote values
+    if (quote?.volume != null) values.volume = quote.volume
+    if (quote?.avg_volume != null) values.avg_volume = quote.avg_volume
+    return values
+  }, [indicators, quote])
 
   const grouped = useMemo(() => {
     const visible = INDICATOR_REGISTRY.filter((d) =>
