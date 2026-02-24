@@ -19,6 +19,8 @@ const SESSION_COLORS = {
   post:    { up: "#c4b5fd", down: "#5b21b6" },  // violet-300 / violet-800
 } as const
 
+type SessionKey = keyof typeof SESSION_COLORS
+
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
@@ -27,7 +29,7 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 function getSessionPalette(session: string) {
-  const colors = SESSION_COLORS[session as keyof typeof SESSION_COLORS] ?? SESSION_COLORS.regular
+  const colors = SESSION_COLORS[session as SessionKey] ?? SESSION_COLORS.regular
   return {
     topLineColor: colors.up,
     topFillColor1: hexToRgba(colors.up, 0.20),
@@ -36,6 +38,35 @@ function getSessionPalette(session: string) {
     bottomFillColor1: hexToRgba(colors.down, 0.02),
     bottomFillColor2: hexToRgba(colors.down, 0.20),
   }
+}
+
+interface SessionSegment {
+  session: SessionKey
+  points: IntradayPoint[]
+}
+
+/** Split points into contiguous session segments with overlap at boundaries. */
+function segmentBySession(points: IntradayPoint[]): SessionSegment[] {
+  if (!points.length) return []
+
+  const segments: SessionSegment[] = []
+  let segPoints: IntradayPoint[] = [points[0]]
+  let segSession = (points[0].session ?? "regular") as SessionKey
+
+  for (let i = 1; i < points.length; i++) {
+    const ptSession = (points[i].session ?? "regular") as SessionKey
+    if (ptSession !== segSession) {
+      segments.push({ session: segSession, points: segPoints })
+      // Overlap: previous segment's last point bridges the visual gap
+      segPoints = [points[i - 1], points[i]]
+      segSession = ptSession
+    } else {
+      segPoints.push(points[i])
+    }
+  }
+  segments.push({ session: segSession, points: segPoints })
+
+  return segments
 }
 
 interface LiveDayViewProps {
@@ -82,20 +113,6 @@ const MARKET_STATE_LABELS: Record<string, string> = {
   POSTPOST: "Post-Market",
 }
 
-/** Map Yahoo market_state to session color key */
-function marketStateToSession(state: string): "pre" | "regular" | "post" {
-  switch (state) {
-    case "PRE":
-    case "PREPRE":
-      return "pre"
-    case "POST":
-    case "POSTPOST":
-      return "post"
-    default:
-      return "regular"
-  }
-}
-
 const LiveCard = memo(function LiveCard({
   symbol,
   name,
@@ -114,7 +131,6 @@ const LiveCard = memo(function LiveCard({
   const volume = quote?.volume
   const marketState = quote?.market_state ?? ""
   const marketLabel = MARKET_STATE_LABELS[marketState] ?? marketState
-  const session = marketStateToSession(marketState)
 
   return (
     <Link to={`/asset/${symbol}`} className="block border rounded-lg bg-card overflow-hidden hover:border-primary/50 transition-colors">
@@ -153,7 +169,6 @@ const LiveCard = memo(function LiveCard({
           <IntradayMountainChart
             points={points}
             previousClose={previousClose ?? null}
-            session={session}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
@@ -189,22 +204,20 @@ const LiveCard = memo(function LiveCard({
 interface IntradayMountainChartProps {
   points: IntradayPoint[]
   previousClose: number | null
-  session: "pre" | "regular" | "post"
 }
 
 const IntradayMountainChart = memo(function IntradayMountainChart({
   points,
   previousClose,
-  session,
 }: IntradayMountainChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const seriesRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
+  const seriesListRef = useRef<ReturnType<IChartApi["addSeries"]>[]>([])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currentPriceLineRef = useRef<any>(null)
   const lastLenRef = useRef(0)
   const prevCloseRef = useRef<number | null>(null)
-  const sessionRef = useRef("")
+  const segmentCountRef = useRef(0)
   const theme = useChartTheme()
 
   // Create chart once, recreate on theme change
@@ -245,11 +258,11 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
     })
 
     chartRef.current = chart
-    seriesRef.current = null
+    seriesListRef.current = []
     currentPriceLineRef.current = null
     lastLenRef.current = 0
     prevCloseRef.current = null
-    sessionRef.current = ""
+    segmentCountRef.current = 0
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -263,11 +276,11 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
       resizeObserver.disconnect()
       chart.remove()
       chartRef.current = null
-      seriesRef.current = null
+      seriesListRef.current = []
       currentPriceLineRef.current = null
       lastLenRef.current = 0
       prevCloseRef.current = null
-      sessionRef.current = ""
+      segmentCountRef.current = 0
     }
   }, [theme])
 
@@ -278,76 +291,88 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
 
     // Use first bar price as fallback baseline if no previous close
     const baseline = previousClose ?? points[0].price
+    const segments = segmentBySession(points)
     const lastPoint = points[points.length - 1]
-    const palette = getSessionPalette(session)
     const currentPrice = lastPoint.price
+    const lastSession = (lastPoint.session ?? "regular") as SessionKey
     const direction = currentPrice >= baseline ? "up" : "down"
-    const sessionColors = SESSION_COLORS[session] ?? SESSION_COLORS.regular
+    const sessionColors = SESSION_COLORS[lastSession] ?? SESSION_COLORS.regular
 
-    const lineData = points.map((p) => ({
-      time: p.time as import("lightweight-charts").UTCTimestamp,
-      value: p.price,
-    }))
-
-    const needsRecreate = !seriesRef.current || prevCloseRef.current !== baseline
+    // Recreate all series when segment structure or baseline changes
+    const needsRecreate =
+      seriesListRef.current.length === 0 ||
+      prevCloseRef.current !== baseline ||
+      segments.length !== segmentCountRef.current
 
     if (needsRecreate) {
-      // Remove old series if switching baseline
-      if (seriesRef.current) {
-        chart.removeSeries(seriesRef.current)
-        seriesRef.current = null
-        currentPriceLineRef.current = null
+      // Remove all old series
+      for (const s of seriesListRef.current) {
+        chart.removeSeries(s)
+      }
+      seriesListRef.current = []
+      currentPriceLineRef.current = null
+
+      // Create one BaselineSeries per session segment
+      for (const seg of segments) {
+        const palette = getSessionPalette(seg.session)
+        const series = chart.addSeries(BaselineSeries, {
+          baseValue: { type: "price" as const, price: baseline },
+          ...palette,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        })
+
+        series.setData(
+          seg.points.map((p) => ({
+            time: p.time as import("lightweight-charts").UTCTimestamp,
+            value: p.price,
+          }))
+        )
+        seriesListRef.current.push(series)
       }
 
-      const series = chart.addSeries(BaselineSeries, {
-        baseValue: { type: "price" as const, price: baseline },
-        ...palette,
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-      })
+      // Previous close reference line (dashed, neutral) on first series
+      if (seriesListRef.current.length > 0) {
+        seriesListRef.current[0].createPriceLine({
+          price: baseline,
+          color: theme.text,
+          lineWidth: 1,
+          lineStyle: 2, // dashed
+          axisLabelVisible: true,
+          title: "",
+        })
+      }
 
-      // Previous close reference line (dashed, neutral)
-      series.createPriceLine({
-        price: baseline,
-        color: theme.text,
-        lineWidth: 1,
-        lineStyle: 2, // dashed
-        axisLabelVisible: true,
-        title: "",
-      })
+      // Current price line (solid, session-colored) on last series
+      const lastSeries = seriesListRef.current[seriesListRef.current.length - 1]
+      if (lastSeries) {
+        currentPriceLineRef.current = lastSeries.createPriceLine({
+          price: currentPrice,
+          color: sessionColors[direction],
+          lineWidth: 1,
+          lineStyle: 0, // solid
+          axisLabelVisible: true,
+          title: "",
+        })
+      }
 
-      // Current price line (solid, session-colored)
-      currentPriceLineRef.current = series.createPriceLine({
-        price: currentPrice,
-        color: sessionColors[direction],
-        lineWidth: 1,
-        lineStyle: 0, // solid
-        axisLabelVisible: true,
-        title: "",
-      })
-
-      series.setData(lineData)
-      seriesRef.current = series
       lastLenRef.current = points.length
       prevCloseRef.current = baseline
-      sessionRef.current = session
+      segmentCountRef.current = segments.length
       chart.timeScale().fitContent()
     } else {
-      // Incremental update — append new points
-      if (points.length > lastLenRef.current) {
-        const newPoints = lineData.slice(lastLenRef.current)
-        for (const pt of newPoints) {
-          seriesRef.current!.update(pt)
+      // Incremental update — append new points to last series
+      const lastSeries = seriesListRef.current[seriesListRef.current.length - 1]
+      if (lastSeries && points.length > lastLenRef.current) {
+        for (let i = lastLenRef.current; i < points.length; i++) {
+          lastSeries.update({
+            time: points[i].time as import("lightweight-charts").UTCTimestamp,
+            value: points[i].price,
+          })
         }
         lastLenRef.current = points.length
-      }
-
-      // Update session colors if session changed (e.g. pre → regular)
-      if (session !== sessionRef.current) {
-        seriesRef.current!.applyOptions(palette)
-        sessionRef.current = session
       }
 
       // Update current price line position + color
@@ -358,7 +383,7 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
         })
       }
     }
-  }, [points, previousClose, session, theme])
+  }, [points, previousClose, theme])
 
   return <div ref={containerRef} className="w-full h-full" />
 })
