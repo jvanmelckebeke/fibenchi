@@ -1,25 +1,16 @@
 import { useMemo } from "react"
 import {
   INDICATOR_REGISTRY,
+  CATEGORY_ORDER,
+  CATEGORY_LABELS,
   isVisibleAt,
-  getNumericValue,
-  resolveThresholdColor,
-  resolveAdxColor,
+  formatIndicatorField,
   getSeriesByField,
   type IndicatorDescriptor,
   type IndicatorCategory,
   type Placement,
 } from "@/lib/indicator-registry"
-import { currencySymbol, formatCompactNumber } from "@/lib/format"
 import type { Indicator } from "@/lib/api"
-
-const CATEGORY_ORDER: IndicatorCategory[] = ["fundamentals", "market_data", "technical", "volatility"]
-const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
-  fundamentals: "Fundamentals",
-  market_data: "Market Data",
-  technical: "Technical",
-  volatility: "Volatility",
-}
 
 interface StatsPanelProps {
   indicators: Indicator[]
@@ -71,34 +62,6 @@ export function StatsPanel({ indicators, indicatorVisibility, currency }: StatsP
   )
 }
 
-function formatFieldValue(
-  field: string,
-  descriptor: IndicatorDescriptor,
-  values: Record<string, number | string | null>,
-  currency?: string,
-): { text: string; colorClass: string } {
-  const val = getNumericValue(values, field)
-  if (val == null) return { text: "--", colorClass: "text-muted-foreground" }
-
-  let text: string
-  if (descriptor.compactFormat) {
-    text = formatCompactNumber(val)
-  } else {
-    const prefix = currency && descriptor.priceDenominated ? currencySymbol(currency) : ""
-    text = `${prefix}${val.toFixed(descriptor.decimals)}${descriptor.suffix ?? ""}`
-  }
-
-  let colorClass: string
-  if (descriptor.id === "adx" && field === "adx") {
-    colorClass = resolveAdxColor(val, values)
-  } else {
-    const series = getSeriesByField(field)
-    colorClass = resolveThresholdColor(series?.thresholdColors, val) || "text-foreground"
-  }
-
-  return { text, colorClass }
-}
-
 function StatRow({
   descriptor,
   values,
@@ -109,7 +72,7 @@ function StatRow({
   currency?: string
 }) {
   const mainField = descriptor.series[0]?.field ?? descriptor.fields[0]
-  const main = formatFieldValue(mainField, descriptor, values, currency)
+  const main = formatIndicatorField(mainField, descriptor, values, currency)
   const secondaryFields = descriptor.fields.filter((f) => f !== mainField)
 
   // Multi-field indicators: show labeled values
@@ -128,7 +91,7 @@ function StatRow({
             {secondaryFields.map((f) => {
               const series = getSeriesByField(f)
               const label = series?.label ?? f.replace(/_/g, " ")
-              const { text, colorClass } = formatFieldValue(f, descriptor, values, currency)
+              const { text, colorClass } = formatIndicatorField(f, descriptor, values, currency)
               return (
                 <span key={f} className="text-xs text-muted-foreground">
                   {label}: <span className={colorClass}>{text}</span>

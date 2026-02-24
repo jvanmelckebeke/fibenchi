@@ -16,18 +16,6 @@ import { SubChartLegend } from "./chart-legends"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 
 // ---------------------------------------------------------------------------
-// Card helper text
-// ---------------------------------------------------------------------------
-
-const CARD_HELP: Record<string, string> = {
-  rsi: "Momentum oscillator — below 30 is oversold, above 70 is overbought",
-  macd: "Momentum crossover — positive histogram is bullish, negative is bearish",
-  atr: "Average daily high-to-low range — higher means more volatile",
-  atr_pct: "ATR as % of price — comparable across different price levels",
-  adx: "Trend strength & direction — green is bullish, red is bearish",
-}
-
-// ---------------------------------------------------------------------------
 // Modal chart (standalone, no crosshair sync)
 // ---------------------------------------------------------------------------
 
@@ -152,8 +140,8 @@ export function IndicatorCards({ descriptors, currency, compact }: IndicatorCard
           >
             <div className="flex flex-col gap-0.5">
               <span className={`font-medium ${compact ? "text-xs" : "text-sm"}`}>{desc.shortLabel}</span>
-              {!compact && CARD_HELP[desc.id] && (
-                <span className="text-[11px] leading-tight text-muted-foreground">{CARD_HELP[desc.id]}</span>
+              {!compact && desc.description && (
+                <span className="text-[11px] leading-tight text-muted-foreground">{desc.description}</span>
               )}
             </div>
             <IndicatorValue descriptor={desc} values={values} currency={currency} compact={compact} />
@@ -165,8 +153,8 @@ export function IndicatorCards({ descriptors, currency, compact }: IndicatorCard
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{openDescriptor?.label}</DialogTitle>
-            {openDescriptor && CARD_HELP[openDescriptor.id] && (
-              <p className="text-sm text-muted-foreground">{CARD_HELP[openDescriptor.id]}</p>
+            {openDescriptor?.description && (
+              <p className="text-sm text-muted-foreground">{openDescriptor.description}</p>
             )}
           </DialogHeader>
           {openDescriptor && (

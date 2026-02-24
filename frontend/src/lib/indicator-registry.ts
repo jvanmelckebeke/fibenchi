@@ -13,6 +13,14 @@ export type IndicatorPlacement = "overlay" | "subchart" | "card"
 
 export type IndicatorCategory = "technical" | "volatility" | "fundamentals" | "market_data"
 
+export const CATEGORY_ORDER: IndicatorCategory[] = ["fundamentals", "market_data", "technical", "volatility"]
+export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
+  fundamentals: "Fundamentals",
+  market_data: "Market Data",
+  technical: "Technical",
+  volatility: "Volatility",
+}
+
 /** Where an indicator can appear across the UI. */
 export type Placement =
   | "group_table"
@@ -103,6 +111,7 @@ export type IndicatorDescriptorWithSummary = IndicatorDescriptor & {
 // ---------------------------------------------------------------------------
 
 import { INDICATOR_REGISTRY } from "./indicator-descriptors"
+import { currencySymbol, formatCompactNumber } from "./format"
 export { INDICATOR_REGISTRY }
 
 // ---------------------------------------------------------------------------
@@ -236,6 +245,39 @@ export function getSeriesByField(field: string): SeriesDescriptor | undefined {
     if (s) return s
   }
   return undefined
+}
+
+/**
+ * Format a single indicator field value with the correct prefix, decimals,
+ * suffix, and color class. Shared by StatsPanel, IndicatorValue, and any
+ * other site that renders a formatted indicator value.
+ */
+export function formatIndicatorField(
+  field: string,
+  descriptor: IndicatorDescriptor,
+  values: Record<string, number | string | null | undefined>,
+  currency?: string,
+): { text: string; colorClass: string } {
+  const val = getNumericValue(values, field)
+  if (val == null) return { text: "--", colorClass: "text-muted-foreground" }
+
+  let text: string
+  if (descriptor.compactFormat) {
+    text = formatCompactNumber(val)
+  } else {
+    const prefix = currency && descriptor.priceDenominated ? currencySymbol(currency) : ""
+    text = `${prefix}${val.toFixed(descriptor.decimals)}${descriptor.suffix ?? ""}`
+  }
+
+  let colorClass: string
+  if (descriptor.id === "adx" && field === "adx") {
+    colorClass = resolveAdxColor(val, values)
+  } else {
+    const series = getSeriesByField(field)
+    colorClass = resolveThresholdColor(series?.thresholdColors, val) || "text-foreground"
+  }
+
+  return { text, colorClass }
 }
 
 /**

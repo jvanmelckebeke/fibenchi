@@ -11,18 +11,12 @@ import {
 } from "@/components/ui/dialog"
 import {
   INDICATOR_REGISTRY,
+  CATEGORY_ORDER,
+  CATEGORY_LABELS,
   type IndicatorDescriptor,
   type IndicatorCategory,
   type Placement,
 } from "@/lib/indicator-registry"
-
-const CATEGORY_ORDER: IndicatorCategory[] = ["technical", "volatility", "market_data", "fundamentals"]
-const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
-  technical: "Technical",
-  volatility: "Volatility",
-  market_data: "Market Data",
-  fundamentals: "Fundamentals",
-}
 
 const PLACEMENT_COLS: { placement: Placement; label: string }[] = [
   { placement: "group_table", label: "Table" },

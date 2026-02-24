@@ -1,10 +1,8 @@
 import {
-  resolveThresholdColor,
-  resolveAdxColor,
+  formatIndicatorField,
   getNumericValue,
   type IndicatorDescriptor,
 } from "@/lib/indicator-registry"
-import { currencySymbol } from "@/lib/format"
 
 // ---------------------------------------------------------------------------
 // Shared indicator value display
@@ -34,11 +32,11 @@ export function IndicatorValue({
   compact?: boolean
   expanded?: boolean
 }) {
-  const mainSeries = descriptor.series[0]
-  const mainVal = getNumericValue(values, mainSeries.field)
+  const mainField = descriptor.series[0]?.field ?? descriptor.fields[0]
+  const main = formatIndicatorField(mainField, descriptor, values ?? {}, currency)
   const sizeClass = compact ? "text-sm" : "text-2xl"
 
-  if (mainVal == null) {
+  if (main.text === "--") {
     return (
       <div className="flex flex-col">
         <span className={`${sizeClass} font-semibold tabular-nums text-muted-foreground`}>
@@ -48,21 +46,15 @@ export function IndicatorValue({
     )
   }
 
-  const colorClass =
-    descriptor.id === "adx"
-      ? resolveAdxColor(mainVal, values ?? {})
-      : resolveThresholdColor(mainSeries.thresholdColors, mainVal)
-
   const subSize = compact ? "text-[10px]" : "text-xs"
   const subGap = compact ? "gap-2" : "gap-3"
 
   return (
     <div className="flex flex-col">
       <span
-        className={`${sizeClass} font-semibold tabular-nums ${colorClass || "text-foreground"}`}
+        className={`${sizeClass} font-semibold tabular-nums ${main.colorClass}`}
       >
-        {currency && descriptor.priceDenominated ? currencySymbol(currency) : ""}
-        {mainVal.toFixed(descriptor.decimals)}{descriptor.suffix ?? ""}
+        {main.text}
       </span>
 
       {/* ADX: show +DI / -DI below the main value */}
