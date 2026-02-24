@@ -109,12 +109,23 @@ export { INDICATOR_REGISTRY }
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Check whether an indicator is visible in a visibility map (opt-out model: missing = visible). */
-export function isIndicatorVisible(
-  visibilityMap: Record<string, boolean> | undefined,
-  key: string,
+/**
+ * Check whether an indicator is visible at a specific placement.
+ * Missing from map → falls back to the descriptor's defaults.
+ * Checks capabilities to prevent showing at unsupported placements.
+ */
+export function isVisibleAt(
+  visibilityMap: Record<string, Placement[]> | undefined,
+  indicatorId: string,
+  placement: Placement,
 ): boolean {
-  return visibilityMap?.[key] !== false
+  const descriptor = getDescriptorById(indicatorId)
+  if (!descriptor) return false
+  if (!descriptor.capabilities.includes(placement)) return false
+  if (!visibilityMap || !(indicatorId in visibilityMap)) {
+    return descriptor.defaults.includes(placement)
+  }
+  return visibilityMap[indicatorId].includes(placement)
 }
 
 /** Resolve the first matching threshold color class for a value. */

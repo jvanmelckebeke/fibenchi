@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
-import { INDICATOR_REGISTRY } from "@/lib/indicator-registry"
+import { INDICATOR_REGISTRY, getDescriptorById, type Placement } from "@/lib/indicator-registry"
 import { api } from "@/lib/api"
 
 export type AssetTypeFilter = "all" | "stock" | "etf"
@@ -9,7 +9,8 @@ export type MacdStyle = "classic" | "divergence"
 export type GroupViewMode = "card" | "table" | "scanner"
 
 export interface AppSettings {
-  group_indicator_visibility: Record<string, boolean>
+  /** Per-indicator placement visibility matrix. Missing key = use descriptor defaults. */
+  indicator_visibility: Record<string, Placement[]>
   group_macd_style: MacdStyle
   group_show_sparkline: boolean
   group_view_mode: GroupViewMode
@@ -18,7 +19,6 @@ export interface AppSettings {
   group_sort_dir: SortDir
   group_table_columns: Record<string, boolean>
   group_table_column_widths: Record<string, number>
-  detail_indicator_visibility: Record<string, boolean>
   chart_default_period: string
   chart_type: "candle" | "line"
   theme: "dark" | "light" | "system"
@@ -30,13 +30,30 @@ export interface AppSettings {
   _updated_at?: number
 }
 
-function defaultVisibility(): Record<string, boolean> {
-  return Object.fromEntries(INDICATOR_REGISTRY.map((d) => [d.id, true]))
+/**
+ * Migrate old boolean visibility maps to the new placement-based system.
+ * Only indicators explicitly turned off get entries; the rest fall through to defaults.
+ */
+function migrateOldVisibility(
+  groupVis?: Record<string, boolean>,
+  detailVis?: Record<string, boolean>,
+): Record<string, Placement[]> {
+  const result: Record<string, Placement[]> = {}
+  for (const desc of INDICATOR_REGISTRY) {
+    const groupOff = groupVis?.[desc.id] === false
+    const detailOff = detailVis?.[desc.id] === false
+    if (!groupOff && !detailOff) continue
+    let placements = [...desc.defaults]
+    if (groupOff) placements = placements.filter((p) => !p.startsWith("group_"))
+    if (detailOff) placements = placements.filter((p) => !p.startsWith("detail_"))
+    result[desc.id] = placements
+  }
+  return result
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_SETTINGS: AppSettings = {
-  group_indicator_visibility: defaultVisibility(),
+  indicator_visibility: {},
   group_macd_style: "divergence",
   group_show_sparkline: true,
   group_view_mode: "card",
@@ -45,7 +62,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   group_sort_dir: "asc",
   group_table_columns: {},
   group_table_column_widths: {},
-  detail_indicator_visibility: defaultVisibility(),
   chart_default_period: "1y",
   chart_type: "candle",
   theme: "system",
@@ -56,13 +72,65 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sync_pseudo_etf_crosshairs: false,
 }
 
+/** Placement families for the two-toggle settings UI. */
+// eslint-disable-next-line react-refresh/only-export-components
+export const GROUP_PLACEMENTS: Placement[] = ["group_table", "group_card"]
+// eslint-disable-next-line react-refresh/only-export-components
+export const DETAIL_PLACEMENTS: Placement[] = ["detail_chart", "detail_card", "detail_stats"]
+
+/** Check if an indicator is enabled for a set of context placements. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function isEnabledForContext(
+  vis: Record<string, Placement[]>,
+  id: string,
+  contextPlacements: Placement[],
+): boolean {
+  const desc = getDescriptorById(id)
+  if (!desc) return false
+  const current = vis[id] ?? desc.defaults
+  return contextPlacements.some((p) => desc.capabilities.includes(p) && current.includes(p))
+}
+
+/** Toggle an indicator on/off for a set of context placements. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function toggleForContext(
+  vis: Record<string, Placement[]>,
+  id: string,
+  contextPlacements: Placement[],
+  enabled: boolean,
+): Record<string, Placement[]> {
+  const desc = getDescriptorById(id)
+  if (!desc) return vis
+  const current = vis[id] ?? [...desc.defaults]
+  let next: Placement[]
+  if (enabled) {
+    const toAdd = contextPlacements.filter((p) => desc.capabilities.includes(p))
+    next = [...new Set([...current, ...toAdd])]
+  } else {
+    next = current.filter((p) => !contextPlacements.includes(p))
+  }
+  return { ...vis, [id]: next }
+}
+
 const STORAGE_KEY = "fibenchi-settings"
 
 function loadFromStorage(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+      const parsed = JSON.parse(raw)
+      // Migrate old boolean visibility maps to new placement-based system
+      if ("group_indicator_visibility" in parsed || "detail_indicator_visibility" in parsed) {
+        parsed.indicator_visibility = migrateOldVisibility(
+          parsed.group_indicator_visibility,
+          parsed.detail_indicator_visibility,
+        )
+        delete parsed.group_indicator_visibility
+        delete parsed.detail_indicator_visibility
+        // Persist migrated settings
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...parsed }))
+      }
+      return { ...DEFAULT_SETTINGS, ...parsed }
     }
   } catch {
     // ignore corrupt storage
