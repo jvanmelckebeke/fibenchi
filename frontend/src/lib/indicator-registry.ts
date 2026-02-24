@@ -192,7 +192,7 @@ export function getDescriptorById(id: string): IndicatorDescriptor | undefined {
 }
 
 export function getScannableDescriptors(): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) => d.placement !== "overlay")
+  return INDICATOR_REGISTRY.filter((d) => d.placement !== "overlay" && d.series.length > 0)
 }
 
 export function getHoldingSummaryDescriptors(): IndicatorDescriptorWithSummary[] {
