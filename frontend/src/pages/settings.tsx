@@ -18,7 +18,8 @@ export function SettingsPage() {
   const { settings, updateSettings } = useSettings()
   const [draft, setDraft] = useState<AppSettings>(settings)
 
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(settings)
+  const isDirty = JSON.stringify(draft, (k, v) => k === "_updated_at" ? undefined : v) !==
+    JSON.stringify(settings, (k, v) => k === "_updated_at" ? undefined : v)
 
   const change = (patch: Partial<AppSettings>) => {
     setDraft((prev) => ({ ...prev, ...patch }))
