@@ -124,6 +124,16 @@ def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
                     ts = ts.tz_localize("America/New_York")
                 dt = ts.to_pydatetime()
 
+                # Yahoo's chart API returns synthetic "current price" echo
+                # bars at non-minute-boundary timestamps (e.g. 10:03:43
+                # instead of 10:03:00) with volume=0.  These pollute the
+                # DB and can get mis-classified when the timezone context
+                # differs between fetch cycles, causing wrong session
+                # colors on European stocks.  All real 1m candles land on
+                # exact minute boundaries, so drop the rest.
+                if int(dt.timestamp()) % 60 != 0:
+                    continue
+
                 close_val = float(row["close"])
                 if divisor != 1:
                     close_val = close_val / divisor
