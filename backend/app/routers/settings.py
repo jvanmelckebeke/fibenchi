@@ -22,4 +22,5 @@ async def update_settings(body: SettingsUpdate, db: AsyncSession = Depends(get_d
     """Replace the user settings object. The `data` field is a free-form JSON
     object storing preferences like `group_show_rsi`, `compact_mode`, etc.
     """
-    return await settings_service.update_settings(db, body.data)
+    data_dict = body.data.model_dump(exclude_none=True)
+    return await settings_service.update_settings(db, data_dict)
