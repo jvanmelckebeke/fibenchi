@@ -30,3 +30,19 @@ async def test_put_overwrites(client):
     await client.put("/api/settings", json={"data": {"theme": "light", "extra": 1}})
     resp = await client.get("/api/settings")
     assert resp.json()["data"] == {"theme": "light", "extra": 1}
+
+
+async def test_put_rejects_invalid_theme(client):
+    resp = await client.put("/api/settings", json={"data": {"theme": "neon"}})
+    assert resp.status_code == 422
+
+
+async def test_put_rejects_invalid_chart_type(client):
+    resp = await client.put("/api/settings", json={"data": {"chart_type": "bar"}})
+    assert resp.status_code == 422
+
+
+async def test_put_accepts_unknown_keys(client):
+    resp = await client.put("/api/settings", json={"data": {"future_setting": True}})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["future_setting"] is True
