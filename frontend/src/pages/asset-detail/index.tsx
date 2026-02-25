@@ -15,7 +15,7 @@ import {
 import { useSettings } from "@/lib/settings"
 import { useQuotes } from "@/lib/quote-stream"
 import { StatsPanel } from "@/components/stats-panel"
-import { Header } from "./header"
+import { Header, type ChartMode } from "./header"
 import { ChartSection } from "./chart-section"
 import { HoldingsSection } from "./holdings-section"
 
@@ -24,9 +24,10 @@ export function AssetDetailPage() {
   const { symbol } = useParams<{ symbol: string }>()
   const { settings } = useSettings()
   const [period, setPeriod] = useState<string>(settings.chart_default_period)
+  const [mode, setMode] = useState<ChartMode>("historical")
   const { data: assets } = useAssets()
   const asset = assets?.find((a) => a.symbol === symbol?.toUpperCase())
-  const { data: detail } = useAssetDetail(symbol ?? "", period, { enabled: !!symbol })
+  const { data: detail } = useAssetDetail(symbol ?? "", period, { enabled: !!symbol && mode !== "live" })
   const quotes = useQuotes()
   const quote = symbol ? quotes[symbol.toUpperCase()] : undefined
   const isTracked = !!asset
@@ -36,15 +37,16 @@ export function AssetDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isTracked={isTracked} />
+      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isTracked={isTracked} mode={mode} setMode={setMode} />
       <ChartSection
         symbol={symbol}
         period={period}
         indicatorVisibility={settings.indicator_visibility}
         chartType={settings.chart_type}
         currency={asset?.currency}
+        mode={mode}
       />
-      {detail?.indicators && detail.indicators.length > 0 && (
+      {mode === "historical" && detail?.indicators && detail.indicators.length > 0 && (
         <StatsPanel
           indicators={detail.indicators}
           indicatorVisibility={settings.indicator_visibility}

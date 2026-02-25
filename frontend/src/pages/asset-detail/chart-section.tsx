@@ -1,9 +1,63 @@
 import { PriceChart } from "@/components/price-chart"
 import { ChartSkeleton } from "@/components/chart-skeleton"
+import { IntradayChart } from "@/components/intraday-chart"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
+import { useIntraday, useQuotes } from "@/lib/quote-stream"
 import type { Placement } from "@/lib/indicator-registry"
+import type { ChartMode } from "./header"
 
 export function ChartSection({
+  symbol,
+  period,
+  indicatorVisibility,
+  chartType,
+  currency,
+  mode,
+}: {
+  symbol: string
+  period: string
+  indicatorVisibility: Record<string, Placement[]>
+  chartType: "candle" | "line"
+  currency?: string
+  mode: ChartMode
+}) {
+  if (mode === "live") {
+    return <LiveChartSection symbol={symbol} />
+  }
+  return (
+    <HistoricalChartSection
+      symbol={symbol}
+      period={period}
+      indicatorVisibility={indicatorVisibility}
+      chartType={chartType}
+      currency={currency}
+    />
+  )
+}
+
+function LiveChartSection({ symbol }: { symbol: string }) {
+  const intraday = useIntraday()
+  const quotes = useQuotes()
+  const points = intraday[symbol.toUpperCase()]
+  const quote = quotes[symbol.toUpperCase()]
+  const previousClose = quote?.previous_close ?? null
+
+  if (!points || points.length === 0) {
+    return <ChartSkeleton height={520} />
+  }
+
+  return (
+    <div className="h-[520px] rounded-md border border-border/50 overflow-hidden">
+      <IntradayChart
+        points={points}
+        previousClose={previousClose}
+        interactive
+      />
+    </div>
+  )
+}
+
+function HistoricalChartSection({
   symbol,
   period,
   indicatorVisibility,
