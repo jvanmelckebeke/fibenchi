@@ -6,15 +6,15 @@ from app.schemas.asset import AssetResponse
 
 
 class GroupCreate(BaseModel):
-    name: str = Field(description="Unique group name")
-    description: str | None = Field(default=None, description="Optional group description")
-    icon: str | None = Field(default=None, description="Lucide icon name (e.g. 'briefcase', 'globe')")
+    name: str = Field(max_length=100, description="Unique group name")
+    description: str | None = Field(default=None, max_length=500, description="Optional group description")
+    icon: str | None = Field(default=None, max_length=50, description="Lucide icon name (e.g. 'briefcase', 'globe')")
 
 
 class GroupUpdate(BaseModel):
-    name: str | None = Field(default=None, description="New group name")
-    description: str | None = Field(default=None, description="New description")
-    icon: str | None = Field(default=None, description="Lucide icon name")
+    name: str | None = Field(default=None, max_length=100, description="New group name")
+    description: str | None = Field(default=None, max_length=500, description="New description")
+    icon: str | None = Field(default=None, max_length=50, description="Lucide icon name")
 
 
 class GroupReorder(BaseModel):

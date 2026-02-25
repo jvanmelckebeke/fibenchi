@@ -7,15 +7,15 @@ from app.schemas.price import IndicatorSnapshotBase
 
 
 class PseudoETFCreate(BaseModel):
-    name: str = Field(description="Unique basket name")
-    description: str | None = Field(default=None, description="Optional description")
+    name: str = Field(max_length=120, description="Unique basket name")
+    description: str | None = Field(default=None, max_length=500, description="Optional description")
     base_date: datetime.date = Field(description="Start date for performance indexing")
     base_value: float = Field(default=100.0, description="Starting index value (default 100)")
 
 
 class PseudoETFUpdate(BaseModel):
-    name: str | None = Field(default=None, description="New name")
-    description: str | None = Field(default=None, description="New description")
+    name: str | None = Field(default=None, max_length=120, description="New name")
+    description: str | None = Field(default=None, max_length=500, description="New description")
     base_date: datetime.date | None = Field(default=None, description="New base date")
 
 
