@@ -2,7 +2,7 @@ import { memo } from "react"
 import { Link } from "react-router-dom"
 import type { Quote } from "@/lib/api"
 import type { Asset, IntradayPoint, IndicatorSummary } from "@/lib/types"
-import { useIntraday } from "@/lib/quote-stream"
+import { useIntraday, useQuoteStatus } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 import { formatPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
@@ -64,6 +64,7 @@ const LiveCard = memo(function LiveCard({
   indicatorData,
 }: LiveCardProps) {
   const { settings } = useSettings()
+  const quoteStatus = useQuoteStatus()
   const [priceRef, pctRef] = usePriceFlash(quote?.price ?? null)
 
   const price = quote?.price
@@ -112,6 +113,8 @@ const LiveCard = memo(function LiveCard({
             points={points}
             previousClose={previousClose ?? null}
           />
+        ) : quoteStatus !== "connected" ? (
+          <div className="h-full w-full animate-pulse bg-muted/40" />
         ) : (
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
             No intraday data
