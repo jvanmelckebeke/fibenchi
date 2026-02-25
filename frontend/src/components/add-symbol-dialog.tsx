@@ -1,5 +1,4 @@
 import { useState, useRef } from "react"
-import { useNavigate } from "react-router-dom"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,20 +9,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchResultsList } from "@/components/search-results-list"
-import { useCreateAsset, useAddAssetsToGroup } from "@/lib/queries"
-import { useTrackedSymbols } from "@/hooks/use-tracked-symbols"
+import { useCreateAsset, useAddAssetsToGroup, useGroups } from "@/lib/queries"
 import { useTwoPhaseSearch } from "@/hooks/use-two-phase-search"
 
-export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number; isDefaultGroup?: boolean }) {
-  const navigate = useNavigate()
+export function AddSymbolDialog({ groupId }: { groupId?: number }) {
   const createAsset = useCreateAsset()
   const addAssetsToGroup = useAddAssetsToGroup()
-  const trackedSymbols = useTrackedSymbols()
+  const { data: groups } = useGroups()
   const [symbol, setSymbol] = useState("")
   const trimmedQuery = symbol.trim()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [targetGroupId, setTargetGroupId] = useState<number | undefined>(groupId)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const { localResults, yahooLoading, allResults } = useTwoPhaseSearch(trimmedQuery)
@@ -31,8 +30,12 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
   const hasResults = allResults.length > 0
   const showDropdown = showSuggestions && (hasResults || yahooLoading) && trimmedQuery
 
+  // Non-default groups that can be targeted
+  const selectableGroups = groups?.filter((g) => !g.is_default)
+
   const closeDialog = () => {
     setSymbol("")
+    setTargetGroupId(groupId)
     setDialogOpen(false)
   }
 
@@ -43,9 +46,10 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
       { symbol: s },
       {
         onSuccess: (asset) => {
-          if (groupId && !isDefaultGroup) {
+          const gid = targetGroupId
+          if (gid && selectableGroups?.some((g) => g.id === gid)) {
             addAssetsToGroup.mutate(
-              { groupId, assetIds: [asset.id] },
+              { groupId: gid, assetIds: [asset.id] },
               { onSuccess: closeDialog },
             )
           } else {
@@ -57,7 +61,7 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
   }
 
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); setShowSuggestions(false); createAsset.reset() } }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); setShowSuggestions(false); setTargetGroupId(groupId); createAsset.reset() } }}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" />
@@ -88,13 +92,8 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
                   yahooLoading={yahooLoading}
                   allResults={allResults}
                   onSelect={(r) => {
-                    if (trackedSymbols.has(r.symbol)) {
-                      setDialogOpen(false)
-                      navigate(`/asset/${r.symbol}`)
-                    } else {
-                      setSymbol(r.symbol)
-                      setShowSuggestions(false)
-                    }
+                    setSymbol(r.symbol)
+                    setShowSuggestions(false)
                   }}
                   rowClassName="px-3 py-2"
                 />
@@ -106,6 +105,26 @@ export function AddSymbolDialog({ groupId, isDefaultGroup }: { groupId?: number;
               </div>
             )}
           </div>
+          {selectableGroups && selectableGroups.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground shrink-0">Add to</span>
+              <Select
+                value={targetGroupId?.toString() ?? ""}
+                onValueChange={(v) => setTargetGroupId(Number(v))}
+              >
+                <SelectTrigger size="sm" className="text-xs h-7">
+                  <SelectValue placeholder="Select group" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectableGroups.map((g) => (
+                    <SelectItem key={g.id} value={g.id.toString()}>
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {createAsset.isError && (
             <p className="text-sm text-destructive">{createAsset.error.message}</p>
           )}
