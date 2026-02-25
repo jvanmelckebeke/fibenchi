@@ -36,6 +36,7 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
   const closeDialog = () => {
     setSymbol("")
     setTargetGroupId(groupId)
+    createAsset.reset()
     setDialogOpen(false)
   }
 

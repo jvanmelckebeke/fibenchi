@@ -38,6 +38,7 @@ export function Header({
   const quote = quotes[symbol.toUpperCase()]
   const price = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
+  const changeFmt = changePct != null ? formatChangePct(changePct) : null
   const [priceRef, pctRef] = usePriceFlash(price)
 
   return (
@@ -66,17 +67,14 @@ export function Header({
               : formatPrice(price, currency, undefined, settings.thousands_separator)}
           </span>
         )}
-        {changePct != null && (() => {
-          const chg = formatChangePct(changePct)
-          return (
-            <span
-              ref={pctRef}
-              className={`text-sm font-medium tabular-nums rounded px-1 ${chg.className}`}
-            >
-              {chg.text}
-            </span>
-          )
-        })()}
+        {changeFmt && (
+          <span
+            ref={pctRef}
+            className={`text-sm font-medium tabular-nums rounded px-1 ${changeFmt.className}`}
+          >
+            {changeFmt.text}
+          </span>
+        )}
         <a
           href={buildYahooFinanceUrl(symbol)}
           target="_blank"

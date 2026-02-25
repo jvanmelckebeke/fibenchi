@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -11,9 +13,9 @@ class SymbolSourceCreate(BaseModel):
 
 
 class SymbolSourceUpdate(BaseModel):
-    enabled: Optional[bool] = None
-    config: Optional[dict[str, Any]] = None
-    name: Optional[str] = None
+    enabled: bool | None = None
+    config: dict[str, Any] | None = None
+    name: str | None = None
 
 
 class SymbolSourceResponse(BaseModel):
@@ -22,7 +24,7 @@ class SymbolSourceResponse(BaseModel):
     provider_type: str
     enabled: bool
     config: dict[str, Any]
-    last_synced_at: Optional[datetime] = None
+    last_synced_at: datetime | None = None
     symbol_count: int
     created_at: datetime
 

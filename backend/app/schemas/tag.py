@@ -1,11 +1,9 @@
 import datetime
-import re
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas._validators import validate_hex_color
 from app.schemas.asset import AssetResponse
-
-_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 class TagCreate(BaseModel):
@@ -14,10 +12,8 @@ class TagCreate(BaseModel):
 
     @field_validator("color")
     @classmethod
-    def validate_hex_color(cls, v: str) -> str:
-        if not _HEX_COLOR_RE.match(v):
-            raise ValueError("color must be a valid hex code (e.g. '#3b82f6')")
-        return v
+    def _validate_hex_color(cls, v: str) -> str:
+        return validate_hex_color(v)
 
 
 class TagUpdate(BaseModel):
@@ -26,9 +22,9 @@ class TagUpdate(BaseModel):
 
     @field_validator("color")
     @classmethod
-    def validate_hex_color(cls, v: str | None) -> str | None:
-        if v is not None and not _HEX_COLOR_RE.match(v):
-            raise ValueError("color must be a valid hex code (e.g. '#3b82f6')")
+    def _validate_hex_color(cls, v: str | None) -> str | None:
+        if v is not None:
+            return validate_hex_color(v)
         return v
 
 
