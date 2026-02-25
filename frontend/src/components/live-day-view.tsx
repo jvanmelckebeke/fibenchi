@@ -113,6 +113,11 @@ const LiveCard = memo(function LiveCard({
             points={points}
             previousClose={previousClose ?? null}
           />
+        ) : quoteStatus === "disconnected" ? (
+          <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
+            <div className="h-2 w-2 rounded-full bg-destructive/70" />
+            <span className="text-xs">Disconnected</span>
+          </div>
         ) : quoteStatus !== "connected" ? (
           <div className="h-full w-full animate-pulse bg-muted/40" />
         ) : (
