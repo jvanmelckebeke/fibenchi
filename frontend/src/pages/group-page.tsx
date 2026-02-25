@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { SegmentedControl } from "@/components/ui/segmented-control"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/add-symbol-dialog"
 import { AssetCard } from "@/components/asset-card"
@@ -110,14 +111,18 @@ export function GroupPage({ groupId }: { groupId: number }) {
           {viewMode === "scanner" ? (
             <>
               {/* Indicator selector */}
-              <SegmentedControl
-                options={SCANNABLE_DESCRIPTORS.map((d) => ({
-                  value: d.id,
-                  label: d.shortLabel,
-                }))}
-                value={scannerIndicator}
-                onChange={setScannerIndicator}
-              />
+              <Select value={scannerIndicator} onValueChange={setScannerIndicator}>
+                <SelectTrigger size="sm" className="text-xs h-7">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCANNABLE_DESCRIPTORS.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.shortLabel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {/* Period selector */}
               <SegmentedControl
                 options={[
