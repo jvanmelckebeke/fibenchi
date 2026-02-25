@@ -194,7 +194,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
             />
           )}
         </div>
-        <AddSymbolDialog groupId={groupId} isDefaultGroup={isDefaultGroup} />
+        <AddSymbolDialog groupId={groupId} />
       </div>
 
       {groupLoading && <p className="text-muted-foreground">Loading...</p>}
