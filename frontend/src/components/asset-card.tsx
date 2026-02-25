@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react"
 import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -27,8 +28,8 @@ export interface AssetCardProps {
   quote?: Quote
   sparklineData?: SparklinePoint[]
   indicatorData?: IndicatorSummary
-  onDelete: () => void
-  onHover: () => void
+  onDelete: (symbol: string) => void
+  onHover: (symbol: string) => void
   showSparkline: boolean
   indicatorVisibility: Record<string, Placement[]>
 }
@@ -54,7 +55,7 @@ function MiniIndicatorCard({
   )
 }
 
-export function AssetCard({
+export const AssetCard = memo(function AssetCard({
   groupId,
   assetId,
   symbol,
@@ -71,8 +72,9 @@ export function AssetCard({
   indicatorVisibility,
 }: AssetCardProps) {
   const { settings } = useSettings()
-  const enabledCards = CARD_DESCRIPTORS.filter(
-    (d) => isVisibleAt(indicatorVisibility, d.id, "group_card"),
+  const enabledCards = useMemo(
+    () => CARD_DESCRIPTORS.filter((d) => isVisibleAt(indicatorVisibility, d.id, "group_card")),
+    [indicatorVisibility],
   )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
@@ -83,7 +85,7 @@ export function AssetCard({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <Card className="group relative hover:border-primary/50 data-[state=open]:border-primary/50 transition-colors" onMouseEnter={onHover}>
+        <Card className="group relative hover:border-primary/50 data-[state=open]:border-primary/50 transition-colors" onMouseEnter={() => onHover(symbol)}>
           <Link to={`/asset/${symbol}`}>
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
@@ -155,8 +157,8 @@ export function AssetCard({
         groupId={groupId}
         assetId={assetId}
         symbol={symbol}
-        onRemove={onDelete}
+        onRemove={() => onDelete(symbol)}
       />
     </ContextMenu>
   )
-}
+})

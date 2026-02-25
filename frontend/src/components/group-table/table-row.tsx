@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -54,7 +54,7 @@ function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: str
   )
 }
 
-export function TableRow({
+export const TableRow = memo(function TableRow({
   groupId,
   asset,
   quote,
@@ -73,9 +73,9 @@ export function TableRow({
   quote?: Quote
   indicator?: IndicatorSummary
   expanded: boolean
-  onToggle: () => void
-  onDelete: () => void
-  onHover: () => void
+  onToggle: (symbol: string) => void
+  onDelete: (symbol: string) => void
+  onHover: (symbol: string) => void
   compactMode: boolean
   columnSettings: Record<string, boolean>
   visibleIndicatorFields: string[]
@@ -102,13 +102,17 @@ export function TableRow({
   const py = compactMode ? "py-1.5" : "py-2.5"
   const staleClass = showStale ? "stale-price" : ""
 
+  const handleToggle = useCallback(() => onToggle(asset.symbol), [onToggle, asset.symbol])
+  const handleDelete = useCallback(() => onDelete(asset.symbol), [onDelete, asset.symbol])
+  const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <tr
           className="border-b border-border hover:bg-muted/30 data-[state=open]:bg-muted/30 cursor-pointer group transition-colors"
-          onClick={onToggle}
-          onMouseEnter={onHover}
+          onClick={handleToggle}
+          onMouseEnter={handleHover}
         >
           <td className={`${py} pl-2`}>
             {expanded ? (
@@ -256,7 +260,7 @@ export function TableRow({
         groupId={groupId}
         assetId={asset.id}
         symbol={asset.symbol}
-        onRemove={onDelete}
+        onRemove={handleDelete}
       />
       {expanded && (
         <tr>
@@ -269,4 +273,4 @@ export function TableRow({
       )}
     </ContextMenu>
   )
-}
+})
