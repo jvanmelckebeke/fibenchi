@@ -7,8 +7,8 @@ from app.services.currency_service import lookup as currency_lookup
 
 
 class AssetCreate(BaseModel):
-    symbol: str = Field(description="Ticker symbol (e.g. AAPL, VOO). Validated against Yahoo Finance.")
-    name: str | None = Field(default=None, description="Display name. Auto-detected from Yahoo Finance if omitted.")
+    symbol: str = Field(max_length=20, description="Ticker symbol (e.g. AAPL, VOO). Validated against Yahoo Finance.")
+    name: str | None = Field(default=None, max_length=200, description="Display name. Auto-detected from Yahoo Finance if omitted.")
     type: AssetType = Field(default=AssetType.STOCK, description="Asset type: stock or etf. Auto-detected if name is omitted.")
     add_to_default_group: bool = Field(default=True, description="If true, add to the default group after creation. Set false for pseudo-ETF constituents.")
 

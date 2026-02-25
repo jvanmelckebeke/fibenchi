@@ -7,8 +7,8 @@ from app.schemas._validators import validate_hex_color
 
 class AnnotationCreate(BaseModel):
     date: datetime.date = Field(description="Date the annotation refers to (shown as a marker on the chart)")
-    title: str = Field(description="Short annotation title")
-    body: str | None = Field(default=None, description="Optional extended body text (Markdown supported)")
+    title: str = Field(max_length=200, description="Short annotation title")
+    body: str | None = Field(default=None, max_length=10_000, description="Optional extended body text (Markdown supported)")
     color: str = Field(default="#3b82f6", description="Marker colour as a hex code")
 
     @field_validator("color")

@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class ThesisUpdate(BaseModel):
-    content: str = Field(description="Investment thesis text (Markdown supported)")
+    content: str = Field(max_length=50_000, description="Investment thesis text (Markdown supported)")
 
 
 class ThesisResponse(BaseModel):
