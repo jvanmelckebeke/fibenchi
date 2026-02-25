@@ -1,9 +1,8 @@
 import datetime
-import re
 
 from pydantic import BaseModel, Field, field_validator
 
-_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+from app.schemas._validators import validate_hex_color
 
 
 class AnnotationCreate(BaseModel):
@@ -14,10 +13,8 @@ class AnnotationCreate(BaseModel):
 
     @field_validator("color")
     @classmethod
-    def validate_hex_color(cls, v: str) -> str:
-        if not _HEX_COLOR_RE.match(v):
-            raise ValueError("color must be a valid hex code (e.g. '#3b82f6')")
-        return v
+    def _validate_hex_color(cls, v: str) -> str:
+        return validate_hex_color(v)
 
 
 class AnnotationResponse(BaseModel):

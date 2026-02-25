@@ -1,6 +1,10 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.database import async_session, get_db
 from app.models.symbol_source import SymbolSource
@@ -90,8 +94,7 @@ async def trigger_sync(
             try:
                 await sync_source(sid, session)
             except Exception:
-                import logging
-                logging.getLogger(__name__).exception("Background sync failed for source %d", sid)
+                logger.exception("Background sync failed for source %d", sid)
 
     background_tasks.add_task(_run_sync, source_id)
 

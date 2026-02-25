@@ -329,12 +329,14 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     return result
 
 
-_DELTA_FIELDS: list[tuple[str, int]] = [
-    ("rsi", 1),
-    ("macd_hist", 2),
-    ("macd", 2),
-]
-"""(source_field, decimals) for daily delta / outlier computation."""
+def _get_delta_fields() -> list[str]:
+    """Return indicator fields that have corresponding *_delta output fields in the registry."""
+    delta_fields: list[str] = []
+    for defn in INDICATOR_REGISTRY.values():
+        for col in defn.output_fields:
+            if f"{col}_delta" in defn.output_fields:
+                delta_fields.append(col)
+    return delta_fields
 
 
 def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
@@ -345,7 +347,7 @@ def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
       - {field}_delta_sigma = |Δ| expressed in rolling σ units, only when
         the absolute delta exceeds mean + 2σ of the rolling window (else NaN).
     """
-    for field, _ in _DELTA_FIELDS:
+    for field in _get_delta_fields():
         if field not in result.columns:
             continue
         series = result[field]

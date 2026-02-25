@@ -6,10 +6,13 @@ import asyncio
 import threading
 import time
 from functools import wraps
-from typing import Hashable, TypeVar
+from typing import Awaitable, Callable, ParamSpec, TypeVar
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 
-def async_threadable(fn):
+def async_threadable(fn: Callable[_P, _R]) -> Callable[_P, Awaitable[_R]]:
     """Decorator that wraps a sync function to run in a thread via asyncio.to_thread.
 
     The decorated function becomes async. Callers simply ``await func(...)``
@@ -17,13 +20,10 @@ def async_threadable(fn):
     """
 
     @wraps(fn)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         return await asyncio.to_thread(fn, *args, **kwargs)
 
-    return wrapper
-
-K = TypeVar("K", bound=Hashable)
-V = TypeVar("V")
+    return wrapper  # type: ignore[return-value]
 
 
 class TTLCache:
