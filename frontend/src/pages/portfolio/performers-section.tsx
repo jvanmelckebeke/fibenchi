@@ -27,22 +27,26 @@ export function PerformersSection({
   if (!performers?.length) return null
 
   const top5 = performers.slice(0, 5)
-  const bottom5 = [...performers].reverse().slice(0, 5)
+  const bottom5 = performers.length > 5
+    ? [...performers].reverse().slice(0, 5)
+    : []
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className={`grid grid-cols-1 ${bottom5.length > 0 ? "lg:grid-cols-2" : ""} gap-6`}>
       <PerformersList
         title="Top Performers"
         icon={<TrendingUp className="h-4 w-4 text-emerald-500" />}
         assets={top5}
         period={period}
       />
-      <PerformersList
-        title="Bottom Performers"
-        icon={<TrendingDown className="h-4 w-4 text-red-500" />}
-        assets={bottom5}
-        period={period}
-      />
+      {bottom5.length > 0 && (
+        <PerformersList
+          title="Bottom Performers"
+          icon={<TrendingDown className="h-4 w-4 text-red-500" />}
+          assets={bottom5}
+          period={period}
+        />
+      )}
     </div>
   )
 }

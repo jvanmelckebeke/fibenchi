@@ -182,7 +182,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               { value: "scanner", label: <ScanLine className="h-3.5 w-3.5" /> },
               { value: "live", label: <Activity className="h-3.5 w-3.5" /> },
             ]}
-            value={settings.group_view_mode}
+            value={viewMode}
             onChange={setViewMode}
           />
           {allTags && allTags.length > 0 && (

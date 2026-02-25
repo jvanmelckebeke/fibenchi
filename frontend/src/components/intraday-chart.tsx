@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo } from "react"
+import { useEffect, useRef, useState, memo } from "react"
 import { createChart, type IChartApi, ColorType, BaselineSeries, CrosshairMode } from "lightweight-charts"
 import type { IntradayPoint } from "@/lib/types"
 import { useChartTheme } from "@/lib/chart-utils"
@@ -91,6 +91,8 @@ export const IntradayChart = memo(function IntradayChart({
   const prevCloseRef = useRef<number | null>(null)
   const segmentCountRef = useRef(0)
   const firstTimeRef = useRef<number>(0)
+  const chartVersionRef = useRef(0)
+  const [chartVersion, setChartVersion] = useState(0)
   const theme = useChartTheme()
 
   // Create chart once, recreate on theme change
@@ -136,6 +138,9 @@ export const IntradayChart = memo(function IntradayChart({
     prevCloseRef.current = null
     segmentCountRef.current = 0
     firstTimeRef.current = 0
+    // Bump version so the data effect re-runs even if points haven't changed
+    chartVersionRef.current += 1
+    setChartVersion(chartVersionRef.current)
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -287,7 +292,7 @@ export const IntradayChart = memo(function IntradayChart({
         })
       }
     }
-  }, [points, previousClose, theme, interactive])
+  }, [points, previousClose, theme, interactive, chartVersion])
 
   return <div ref={containerRef} className="w-full h-full" />
 })

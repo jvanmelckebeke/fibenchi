@@ -25,9 +25,13 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
   const esRef = useRef<EventSource | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const backoffMs = useRef(1_000)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
+    mountedRef.current = true
+
     function connect() {
+      if (!mountedRef.current) return
       const es = new EventSource("/api/quotes/stream")
       esRef.current = es
 
@@ -108,6 +112,7 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
     connect()
 
     return () => {
+      mountedRef.current = false
       esRef.current?.close()
       esRef.current = null
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
