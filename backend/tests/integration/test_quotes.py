@@ -6,6 +6,7 @@ import json
 import pytest
 from unittest.mock import patch
 
+from app.services.quote_service import _reset_asset_list_cache
 from tests.conftest import TestSession
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -95,6 +96,7 @@ async def test_get_quotes_uppercase_normalization(client):
 
 async def test_stream_quotes_no_tracked(client):
     """SSE stream emits empty payload when no assets are tracked."""
+    _reset_asset_list_cache()
     with (
         patch("app.services.quote_service.async_session", TestSession),
         patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
@@ -112,6 +114,7 @@ async def test_stream_quotes_emits_event(client):
     """SSE stream emits quote data for tracked assets."""
     await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
 
+    _reset_asset_list_cache()
     with (
         patch("app.services.quote_service.async_session", TestSession),
         patch("app.services.quote_service.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]),
@@ -129,6 +132,7 @@ async def test_stream_quotes_emits_event(client):
 
 async def test_stream_quotes_cache_headers(client):
     """SSE stream sets correct cache-control and buffering headers."""
+    _reset_asset_list_cache()
     with (
         patch("app.services.quote_service.async_session", TestSession),
         patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
@@ -144,6 +148,7 @@ async def test_stream_quotes_multiple_symbols(client):
     await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
     await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft", "type": "stock"})
 
+    _reset_asset_list_cache()
     with (
         patch("app.services.quote_service.async_session", TestSession),
         patch("app.services.quote_service.batch_fetch_quotes", return_value=_MOCK_QUOTES),

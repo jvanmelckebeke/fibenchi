@@ -90,7 +90,10 @@ def _calc_static(
     n = len(asset_ids)
     allocation_per_asset = base_value / n
     first_prices = pivot.iloc[0]
+    # Guard against zero-price assets (delisted, data quality issues) to avoid inf
+    first_prices = first_prices.replace(0, float("nan"))
     shares = allocation_per_asset / first_prices
+    shares = shares.fillna(0)
 
     results = []
     prev_month = None
@@ -101,7 +104,8 @@ def _calc_static(
         if prev_month is not None and current_date.month in QUARTER_MONTHS and current_date.month != prev_month:
             total_value = float((shares * prices).sum())
             allocation_per_asset = total_value / n
-            shares = allocation_per_asset / prices
+            safe_prices = prices.replace(0, float("nan"))
+            shares = (allocation_per_asset / safe_prices).fillna(0)
 
         portfolio_value = float((shares * prices).sum())
         point: dict = {"date": current_date, "value": round(portfolio_value, 4)}
@@ -154,8 +158,8 @@ def _calc_dynamic(
             n_active = len(active)
             allocation = portfolio_value / n_active
             # Re-allocate across ALL active assets (existing + new)
-            active_prices = prices.reindex(list(active))
-            shares = allocation / active_prices
+            active_prices = prices.reindex(list(active)).replace(0, float("nan"))
+            shares = (allocation / active_prices).fillna(0)
 
         if not active:
             continue
@@ -165,7 +169,8 @@ def _calc_dynamic(
             n_active = len(active)
             portfolio_value = float((shares * prices.reindex(list(active))).sum())
             allocation = portfolio_value / n_active
-            shares = allocation / prices.reindex(list(active))
+            safe_prices = prices.reindex(list(active)).replace(0, float("nan"))
+            shares = (allocation / safe_prices).fillna(0)
 
         portfolio_value = float((shares * prices.reindex(list(active))).sum())
         point: dict = {"date": current_date, "value": round(portfolio_value, 4)}

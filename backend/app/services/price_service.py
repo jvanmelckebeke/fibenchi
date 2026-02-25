@@ -176,6 +176,8 @@ async def _compute_or_cached_indicators(
 
     if asset:
         prices = await _ensure_prices(db, asset, period)
+        if not prices:
+            return [], None
         last_date = prices[-1].date
 
         cache_key = f"{symbol}:{period}:{last_date}"

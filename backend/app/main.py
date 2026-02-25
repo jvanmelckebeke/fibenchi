@@ -84,10 +84,12 @@ async def scheduled_intraday_sync():
             symbols = [sym for _, sym in pairs]
             asset_map = {sym: aid for aid, sym in pairs}
 
-            # Sample across the list to detect mixed-timezone market activity
-            sample_size = min(10, len(symbols))
-            step = max(1, len(symbols) // sample_size)
-            sample = symbols[::step][:sample_size]
+            # Sample across the list to detect market activity.
+            # Use a shuffled sample to avoid always picking the same symbols,
+            # which could miss active markets in different timezones.
+            import random
+            sample_size = min(15, len(symbols))
+            sample = random.sample(symbols, sample_size)
             quotes = await batch_fetch_quotes(sample)
             market_states = {q.get("market_state") for q in quotes if q.get("market_state")}
             active_states = {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}

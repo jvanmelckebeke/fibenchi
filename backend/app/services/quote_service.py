@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import time as _time
 
 from app.database import async_session
 from app.repositories.asset_repo import AssetRepository
@@ -10,6 +11,16 @@ from app.services.intraday import get_intraday_bars
 from app.services.yahoo import batch_fetch_quotes
 
 logger = logging.getLogger(__name__)
+
+# Cache asset list to avoid opening a DB session every SSE iteration
+_asset_list_cache: tuple[float, list[tuple[int, str]]] = (0.0, [])
+_ASSET_LIST_TTL = 30  # seconds
+
+
+def _reset_asset_list_cache() -> None:
+    """Reset the asset list cache (useful for testing)."""
+    global _asset_list_cache
+    _asset_list_cache = (0.0, [])
 
 
 async def get_quotes(symbols: str) -> list[dict]:
@@ -35,8 +46,14 @@ async def quote_event_generator():
 
     while True:
         try:
-            async with async_session() as db:
-                pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
+            global _asset_list_cache
+            now = _time.monotonic()
+            if now - _asset_list_cache[0] > _ASSET_LIST_TTL:
+                async with async_session() as db:
+                    pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
+                _asset_list_cache = (now, pairs)
+            else:
+                pairs = _asset_list_cache[1]
 
             symbols = [sym for _, sym in pairs]
             asset_map_id_to_sym = {aid: sym for aid, sym in pairs}
