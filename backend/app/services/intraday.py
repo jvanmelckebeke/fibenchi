@@ -147,7 +147,8 @@ def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
 
             if bars:
                 result[sym] = bars
-        except (KeyError, TypeError):
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to parse intraday data for %s: %s", sym, exc)
             continue
 
     return result
