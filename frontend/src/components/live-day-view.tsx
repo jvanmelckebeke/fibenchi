@@ -331,6 +331,20 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
+          autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } | null }) => {
+            const res = original()
+            if (!res?.priceRange) return res
+            const { minValue, maxValue } = res.priceRange
+            const range = maxValue - minValue || Math.abs(baseline) * 0.01 || 1
+            const padding = range * 0.15
+            return {
+              ...res,
+              priceRange: {
+                minValue: Math.min(minValue, baseline - padding),
+                maxValue: Math.max(maxValue, baseline + padding),
+              },
+            }
+          },
         })
 
         series.setData(
