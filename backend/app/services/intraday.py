@@ -29,11 +29,19 @@ _EXCHANGE_HOURS: dict[str, tuple[time, time]] = {
     "Europe/Berlin": (time(9, 0), time(17, 30)),
     "Europe/Paris": (time(9, 0), time(17, 30)),
     "Europe/Amsterdam": (time(9, 0), time(17, 30)),
+    "Europe/Brussels": (time(9, 0), time(17, 30)),
     "Europe/Zurich": (time(9, 0), time(17, 30)),
     "Europe/Madrid": (time(9, 0), time(17, 30)),
     "Europe/Milan": (time(9, 0), time(17, 30)),
+    "Europe/Lisbon": (time(8, 0), time(16, 30)),
+    "Europe/Dublin": (time(8, 0), time(16, 30)),
+    "Europe/Copenhagen": (time(9, 0), time(17, 0)),
+    "Europe/Oslo": (time(9, 0), time(16, 30)),
     "Europe/Stockholm": (time(9, 0), time(17, 30)),
     "Europe/Helsinki": (time(10, 0), time(18, 30)),
+    "Europe/Warsaw": (time(9, 0), time(17, 0)),
+    "Europe/Athens": (time(10, 0), time(17, 20)),
+    "Europe/Istanbul": (time(10, 0), time(18, 0)),
     "Asia/Tokyo": (time(9, 0), time(15, 0)),
     "Asia/Hong_Kong": (time(9, 30), time(16, 0)),
     "Asia/Shanghai": (time(9, 30), time(15, 0)),
@@ -66,13 +74,22 @@ def _classify_session(ts: datetime, tz_name: str | None = None) -> str:
 
 @async_threadable
 def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
-    """Fetch 1-minute intraday bars from Yahoo Finance (blocking)."""
+    """Fetch 1-minute intraday bars from Yahoo Finance (blocking).
+
+    Uses ``includePrePost=true`` so pre-market and post-market bars are
+    included — without it Yahoo only returns the previous regular session.
+    """
     if not symbols:
         return {}
 
     ticker = Ticker(symbols)
     price_data = ticker.price
-    hist = ticker.history(period="1d", interval="1m")
+
+    # yahooquery's history() doesn't expose includePrePost, so call the
+    # internal chart endpoint directly with the flag enabled.
+    params = {"range": "1d", "interval": "1m", "includePrePost": "true"}
+    data = ticker._get_data("chart", params)
+    hist = ticker._historical_data_to_dataframe(data, params, adj_timezone=True)
 
     if isinstance(hist, dict) or hist.empty:
         return {}
@@ -92,6 +109,13 @@ def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
             info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
             _, divisor = resolve_currency(info, sym)
             tz_name = info.get("exchangeTimezoneName") if isinstance(info, dict) else None
+
+            # Fall back to timezone from the first timestamp when Yahoo
+            # doesn't provide exchangeTimezoneName (e.g. Copenhagen).
+            if not tz_name and len(df) > 0:
+                first_ts = pd.Timestamp(df.index[0])
+                if first_ts.tzinfo is not None:
+                    tz_name = str(first_ts.tzinfo)
 
             bars = []
             for idx, row in df.iterrows():
@@ -124,7 +148,12 @@ async def fetch_and_store_intraday(
     symbols: list[str],
     asset_map: dict[str, int],
 ) -> int:
-    """Fetch 1m intraday bars and upsert into the database. Returns row count."""
+    """Fetch 1m intraday bars and upsert into the database. Returns row count.
+
+    Before upserting, deletes bars older than the oldest bar in the fresh
+    fetch so the DB only contains the current "1-day" window per asset.
+    This prevents stale data from previous sessions mixing with today's data.
+    """
     data = await _fetch_intraday_sync(symbols)
 
     total = 0
@@ -132,6 +161,15 @@ async def fetch_and_store_intraday(
         asset_id = asset_map.get(sym)
         if not asset_id or not bars:
             continue
+
+        # Remove bars from previous sessions that Yahoo no longer returns
+        oldest_ts = min(bar["timestamp"] for bar in bars)
+        await db.execute(
+            delete(IntradayPrice).where(
+                IntradayPrice.asset_id == asset_id,
+                IntradayPrice.timestamp < oldest_ts,
+            )
+        )
 
         rows = [
             {
