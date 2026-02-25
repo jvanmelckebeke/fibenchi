@@ -1,4 +1,4 @@
-import { useState, useMemo, useTransition } from "react"
+import { useCallback, useState, useMemo, useTransition } from "react"
 import { Activity, ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
@@ -83,10 +83,10 @@ export function GroupPage({ groupId }: { groupId: number }) {
     }
   }
 
-  const handleRemove = (symbol: string) => {
+  const handleRemove = useCallback((symbol: string) => {
     const asset = allAssets?.find((a) => a.symbol === symbol)
     if (asset) removeFromGroup.mutate({ groupId, assetId: asset.id })
-  }
+  }, [allAssets, removeFromGroup, groupId])
 
   const toggleTag = (id: number) =>
     setSelectedTags((prev) =>
@@ -251,8 +251,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
               quote={quotes[asset.symbol]}
               sparklineData={batchSparklines?.[asset.symbol]}
               indicatorData={batchIndicators?.[asset.symbol]}
-              onDelete={() => handleRemove(asset.symbol)}
-              onHover={() => prefetch(asset.symbol)}
+              onDelete={handleRemove}
+              onHover={prefetch}
               showSparkline={settings.group_show_sparkline}
               indicatorVisibility={settings.indicator_visibility}
             />

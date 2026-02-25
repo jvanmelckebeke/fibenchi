@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { ChevronsUpDown, ChevronsDownUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
@@ -6,6 +6,8 @@ import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { getSeriesByField } from "@/lib/indicator-registry"
 import { toggleSetItem } from "@/lib/utils"
 import { useSettings } from "@/lib/settings"
+const noop = () => {}
+
 import { SortableHeader } from "./sortable-header"
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
 import { TableRow } from "./table-row"
@@ -33,9 +35,9 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
   const responsiveHidden = useResponsiveHidden()
   const { getColumnStyle, startResize, resetWidth } = useColumnResize()
 
-  const toggleExpand = (symbol: string) => {
+  const toggleExpand = useCallback((symbol: string) => {
     setExpandedSymbols((prev) => toggleSetItem(prev, symbol))
-  }
+  }, [])
 
   const toggleColumn = (key: string) => {
     const current = isColumnVisible(columnSettings, key)
@@ -160,9 +162,9 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
               quote={quotes[asset.symbol]}
               indicator={indicators?.[asset.symbol]}
               expanded={expandedSymbols.has(asset.symbol)}
-              onToggle={() => toggleExpand(asset.symbol)}
-              onDelete={() => onDelete(asset.symbol)}
-              onHover={() => onHover?.(asset.symbol)}
+              onToggle={toggleExpand}
+              onDelete={onDelete}
+              onHover={onHover ?? noop}
               compactMode={compactMode}
               columnSettings={columnSettings}
               visibleIndicatorFields={visibleIndicatorFields}
