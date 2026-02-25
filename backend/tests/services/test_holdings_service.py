@@ -75,11 +75,12 @@ async def test_get_holdings_raises_404_when_no_holdings_data(mock_get_asset, moc
     assert exc_info.value.status_code == 404
 
 
+@patch("app.services.holdings_service.merge_fundamentals_into_batch")
 @patch("app.services.holdings_service.compute_batch_indicator_snapshots", new_callable=AsyncMock)
 @patch("app.services.holdings_service.fetch_etf_holdings", new_callable=AsyncMock)
 @patch("app.services.holdings_service.get_asset", new_callable=AsyncMock)
 async def test_get_holdings_indicators_returns_snapshots(
-    mock_get_asset, mock_fetch, mock_compute
+    mock_get_asset, mock_fetch, mock_compute, mock_merge_fund
 ):
     db = AsyncMock()
     mock_get_asset.return_value = _make_etf_asset("SPY")

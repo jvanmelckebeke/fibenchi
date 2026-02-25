@@ -79,8 +79,9 @@ class TestGetPerformance:
 
 
 class TestGetConstituentIndicators:
+    @patch("app.routers.pseudo_etf_analysis.merge_fundamentals_into_batch")
     @patch("app.routers.pseudo_etf_analysis.compute_batch_indicator_snapshots", new_callable=AsyncMock)
-    async def test_returns_indicator_data(self, mock_compute, client, db):
+    async def test_returns_indicator_data(self, mock_compute, mock_merge, client, db):
         etf = await _seed_pseudo_etf(db)
         mock_compute.return_value = [
             {"symbol": "AAPL", "currency": "USD", "values": {"rsi": 55.0}},
@@ -98,8 +99,9 @@ class TestGetConstituentIndicators:
         resp = await client.get("/api/pseudo-etfs/999/constituents/indicators")
         assert resp.status_code == 404
 
+    @patch("app.routers.pseudo_etf_analysis.merge_fundamentals_into_batch")
     @patch("app.routers.pseudo_etf_analysis.compute_batch_indicator_snapshots", new_callable=AsyncMock)
-    async def test_empty_constituents(self, mock_compute, client, db):
+    async def test_empty_constituents(self, mock_compute, mock_merge, client, db):
         etf = PseudoETF(
             name="Empty ETF 2",
             base_date=date.today() - timedelta(days=30),
@@ -112,8 +114,9 @@ class TestGetConstituentIndicators:
         assert resp.status_code == 200
         assert resp.json() == []
 
+    @patch("app.routers.pseudo_etf_analysis.merge_fundamentals_into_batch")
     @patch("app.routers.pseudo_etf_analysis.compute_batch_indicator_snapshots", new_callable=AsyncMock)
-    async def test_includes_weight_and_name(self, mock_compute, client, db):
+    async def test_includes_weight_and_name(self, mock_compute, _mock_merge, client, db):
         etf = await _seed_pseudo_etf(db)
         mock_compute.return_value = [
             {"symbol": "AAPL", "currency": "USD", "values": {"rsi": 55.0}},

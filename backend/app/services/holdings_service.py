@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.compute.indicators import compute_batch_indicator_snapshots
 from app.services.entity_lookups import get_asset
+from app.services.fundamentals_cache import merge_fundamentals_into_batch
 from app.services.yahoo import fetch_etf_holdings
 
 
@@ -33,4 +34,6 @@ async def get_holdings_indicators(db: AsyncSession, symbol: str) -> list[dict]:
     if not holding_symbols:
         return []
 
-    return await compute_batch_indicator_snapshots(holding_symbols)
+    results = await compute_batch_indicator_snapshots(holding_symbols)
+    merge_fundamentals_into_batch(results)
+    return results

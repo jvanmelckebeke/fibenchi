@@ -6,6 +6,7 @@ from app.services.entity_lookups import get_pseudo_etf
 from app.schemas.pseudo_etf import PerformanceBreakdownPoint, ConstituentIndicatorResponse
 from app.services.compute.pseudo_etf import calculate_performance
 from app.services.compute.indicators import compute_batch_indicator_snapshots
+from app.services.fundamentals_cache import merge_fundamentals_into_batch
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
 
@@ -48,6 +49,7 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
     symbol_to_name = {a.symbol: a.name for a in etf.constituents}
 
     snapshots = await compute_batch_indicator_snapshots(symbols)
+    merge_fundamentals_into_batch(snapshots)
     return [
         ConstituentIndicatorResponse(
             **s,

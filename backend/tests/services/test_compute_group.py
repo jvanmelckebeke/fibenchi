@@ -35,6 +35,16 @@ def _make_price(asset_id: int, d: date, close: float):
     return p
 
 
+def _mock_merge_fundamentals(fund_data: dict):
+    """Create a mock merge_fundamentals_from_cache that injects fund_data."""
+    def _merge(symbols, target, values_key="values"):
+        for sym in symbols:
+            data = fund_data.get(sym)
+            if data and sym in target:
+                target[sym].setdefault(values_key, {}).update(data)
+    return _merge
+
+
 class TestGetBatchSparklines:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
@@ -78,7 +88,7 @@ class TestGetBatchSparklines:
 
 
 class TestComputeAndCacheIndicators:
-    @patch("app.services.compute.group.batch_fetch_fundamentals", new_callable=AsyncMock)
+    @patch("app.services.compute.group.merge_fundamentals_from_cache")
     @patch("app.services.compute.group.build_indicator_snapshot")
     @patch("app.services.compute.group.compute_indicators")
     @patch("app.services.compute.group.prices_to_df")
@@ -86,7 +96,7 @@ class TestComputeAndCacheIndicators:
     @patch("app.services.compute.group.AssetRepository")
     async def test_computes_snapshots(
         self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
-        mock_compute_ind, mock_build_snap, mock_fetch_fund, db,
+        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
     ):
         _indicator_cache._data.clear()
 
@@ -101,21 +111,22 @@ class TestComputeAndCacheIndicators:
         mock_prices_to_df.return_value = MagicMock()
         mock_compute_ind.return_value = MagicMock()
         mock_build_snap.return_value = {"values": {"rsi": 55.0}}
-        mock_fetch_fund.return_value = {"AAPL": {"forward_pe": 28.5}}
+        mock_merge_fund.side_effect = _mock_merge_fundamentals({"AAPL": {"forward_pe": 28.5}})
 
         result = await compute_and_cache_indicators(db, group_id=1)
 
         assert "AAPL" in result
         assert result["AAPL"]["values"]["rsi"] == 55.0
         assert result["AAPL"]["values"]["forward_pe"] == 28.5
+        mock_merge_fund.assert_called_once()
 
         _indicator_cache._data.clear()
 
-    @patch("app.services.compute.group.batch_fetch_fundamentals", new_callable=AsyncMock)
+    @patch("app.services.compute.group.merge_fundamentals_from_cache")
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_skips_assets_with_too_few_prices(
-        self, mock_asset_repo_cls, mock_price_repo_cls, mock_fetch_fund, db,
+        self, mock_asset_repo_cls, mock_price_repo_cls, mock_merge_fund, db,
     ):
         _indicator_cache._data.clear()
 
@@ -126,7 +137,6 @@ class TestComputeAndCacheIndicators:
         prices = [_make_price(1, date.today() - timedelta(days=i), 50.0) for i in range(10)]
         mock_price_repo_cls.return_value.list_by_assets_since = AsyncMock(return_value=prices)
         mock_price_repo_cls.return_value.get_latest_date = AsyncMock(return_value=date.today())
-        mock_fetch_fund.return_value = {}
 
         result = await compute_and_cache_indicators(db, group_id=1)
 
@@ -142,7 +152,7 @@ class TestComputeAndCacheIndicators:
         result = await compute_and_cache_indicators(db, group_id=1)
         assert result == {}
 
-    @patch("app.services.compute.group.batch_fetch_fundamentals", new_callable=AsyncMock)
+    @patch("app.services.compute.group.merge_fundamentals_from_cache")
     @patch("app.services.compute.group.build_indicator_snapshot")
     @patch("app.services.compute.group.compute_indicators")
     @patch("app.services.compute.group.prices_to_df")
@@ -150,7 +160,7 @@ class TestComputeAndCacheIndicators:
     @patch("app.services.compute.group.AssetRepository")
     async def test_cache_hit_skips_computation(
         self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
-        mock_compute_ind, mock_build_snap, mock_fetch_fund, db,
+        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
     ):
         _indicator_cache._data.clear()
 
@@ -165,7 +175,6 @@ class TestComputeAndCacheIndicators:
         mock_prices_to_df.return_value = MagicMock()
         mock_compute_ind.return_value = MagicMock()
         mock_build_snap.return_value = {"values": {"rsi": 55.0}}
-        mock_fetch_fund.return_value = {}
 
         # First call populates cache
         await compute_and_cache_indicators(db, group_id=1)
