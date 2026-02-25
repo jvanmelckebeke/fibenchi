@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, Navigate } from "react-router-dom"
 import { ArrowLeft, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,6 +31,7 @@ import {
 export function PseudoEtfDetailPage() {
   const { id } = useParams<{ id: string }>()
   const etfId = Number(id)
+  const validId = !!id && !isNaN(etfId)
   const { data: etf } = usePseudoEtf(etfId)
   const { data: performance, isLoading } = usePseudoEtfPerformance(etfId)
 
@@ -55,6 +56,7 @@ export function PseudoEtfDetailPage() {
     return map
   }, [sortedSymbols])
 
+  if (!validId) return <Navigate to="/pseudo-etfs" replace />
   if (!etf) return null
 
   return (

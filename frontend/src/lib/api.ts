@@ -132,7 +132,6 @@ export const api = {
     delete: (symbol: string, id: number) =>
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
   },
-  search: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
   searchLocal: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=local`),
   searchYahoo: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=yahoo`),
   settings: {
