@@ -218,6 +218,7 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
   const lastLenRef = useRef(0)
   const prevCloseRef = useRef<number | null>(null)
   const segmentCountRef = useRef(0)
+  const firstTimeRef = useRef<number>(0)
   const theme = useChartTheme()
 
   // Create chart once, recreate on theme change
@@ -263,6 +264,7 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
     lastLenRef.current = 0
     prevCloseRef.current = null
     segmentCountRef.current = 0
+    firstTimeRef.current = 0
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -281,6 +283,7 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
       lastLenRef.current = 0
       prevCloseRef.current = null
       segmentCountRef.current = 0
+      firstTimeRef.current = 0
     }
   }, [theme])
 
@@ -298,11 +301,17 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
     const direction = currentPrice >= baseline ? "up" : "down"
     const sessionColors = SESSION_COLORS[lastSession] ?? SESSION_COLORS.regular
 
-    // Recreate all series when segment structure or baseline changes
+    // Recreate all series when segment structure, baseline, or underlying data changes.
+    // After SSE reconnect the points array is fully replaced — detect via first
+    // timestamp or length shrinking so we don't feed stale indices to update().
+    const dataReplaced =
+      points[0]?.time !== firstTimeRef.current ||
+      points.length < lastLenRef.current
     const needsRecreate =
       seriesListRef.current.length === 0 ||
       prevCloseRef.current !== baseline ||
-      segments.length !== segmentCountRef.current
+      segments.length !== segmentCountRef.current ||
+      dataReplaced
 
     if (needsRecreate) {
       // Remove all old series
@@ -361,18 +370,28 @@ const IntradayMountainChart = memo(function IntradayMountainChart({
       lastLenRef.current = points.length
       prevCloseRef.current = baseline
       segmentCountRef.current = segments.length
+      firstTimeRef.current = points[0]?.time ?? 0
       chart.timeScale().fitContent()
     } else {
       // Incremental update — append new points to last series
       const lastSeries = seriesListRef.current[seriesListRef.current.length - 1]
       if (lastSeries && points.length > lastLenRef.current) {
-        for (let i = lastLenRef.current; i < points.length; i++) {
-          lastSeries.update({
-            time: points[i].time as import("lightweight-charts").UTCTimestamp,
-            value: points[i].price,
-          })
+        try {
+          for (let i = lastLenRef.current; i < points.length; i++) {
+            lastSeries.update({
+              time: points[i].time as import("lightweight-charts").UTCTimestamp,
+              value: points[i].price,
+            })
+          }
+          lastLenRef.current = points.length
+        } catch {
+          // Time conflict after data replacement — force full recreate
+          for (const s of seriesListRef.current) chart.removeSeries(s)
+          seriesListRef.current = []
+          lastLenRef.current = 0
+          segmentCountRef.current = 0
+          firstTimeRef.current = 0
         }
-        lastLenRef.current = points.length
       }
 
       // Update current price line position + color
