@@ -22,7 +22,6 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
   const trimmedQuery = symbol.trim()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [targetGroupId, setTargetGroupId] = useState<number | undefined>(groupId)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const { localResults, yahooLoading, allResults } = useTwoPhaseSearch(trimmedQuery)
@@ -33,9 +32,17 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
   // Non-default groups that can be targeted
   const selectableGroups = groups?.filter((g) => !g.is_default)
 
+  // Resolve targetGroupId: if groupId is a default group (not in selectableGroups),
+  // fall back to the first selectable group so the dropdown doesn't show a stale placeholder.
+  const resolveTargetGroup = (gid: number | undefined) => {
+    if (gid && selectableGroups?.some((g) => g.id === gid)) return gid
+    return selectableGroups?.[0]?.id
+  }
+  const [targetGroupId, setTargetGroupId] = useState<number | undefined>(groupId)
+
   const closeDialog = () => {
     setSymbol("")
-    setTargetGroupId(groupId)
+    setTargetGroupId(resolveTargetGroup(groupId))
     createAsset.reset()
     setDialogOpen(false)
   }
@@ -47,8 +54,8 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
       { symbol: s },
       {
         onSuccess: (asset) => {
-          const gid = targetGroupId
-          if (gid && selectableGroups?.some((g) => g.id === gid)) {
+          const gid = resolveTargetGroup(targetGroupId)
+          if (gid) {
             addAssetsToGroup.mutate(
               { groupId: gid, assetIds: [asset.id] },
               { onSuccess: closeDialog },
@@ -62,7 +69,7 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
   }
 
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); setShowSuggestions(false); setTargetGroupId(groupId); createAsset.reset() } }}>
+    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); setShowSuggestions(false); setTargetGroupId(resolveTargetGroup(groupId)); createAsset.reset() } }}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" />
@@ -110,10 +117,10 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground shrink-0">Add to</span>
               <Select
-                value={targetGroupId?.toString() ?? ""}
+                value={resolveTargetGroup(targetGroupId)?.toString() ?? ""}
                 onValueChange={(v) => setTargetGroupId(Number(v))}
               >
-                <SelectTrigger size="sm" className="text-xs h-7">
+                <SelectTrigger className="text-xs h-7">
                   <SelectValue placeholder="Select group" />
                 </SelectTrigger>
                 <SelectContent>

@@ -112,7 +112,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
             <>
               {/* Indicator selector */}
               <Select value={scannerIndicator} onValueChange={setScannerIndicator}>
-                <SelectTrigger size="sm" className="text-xs h-7">
+                <SelectTrigger className="text-xs h-7">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
