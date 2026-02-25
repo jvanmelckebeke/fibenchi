@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PeriodSelector } from "@/components/period-selector"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { buildYahooFinanceUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
-import { useQuotes } from "@/lib/quote-stream"
+import { useQuote } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useRefreshPrices, useCreateAsset } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
@@ -34,8 +34,7 @@ export function Header({
   const { settings } = useSettings()
   const refresh = useRefreshPrices(symbol)
   const createAsset = useCreateAsset()
-  const quotes = useQuotes()
-  const quote = quotes[symbol.toUpperCase()]
+  const quote = useQuote(symbol.toUpperCase())
   const price = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
   const changeFmt = changePct != null ? formatChangePct(changePct) : null

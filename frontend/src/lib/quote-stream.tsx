@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import type { Quote } from "./api"
 import type { IntradayPoint } from "./types"
 
@@ -6,20 +6,85 @@ type QuoteMap = Record<string, Quote>
 type IntradayMap = Record<string, IntradayPoint[]>
 type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "disconnected"
 
+// ---------------------------------------------------------------------------
+// Per-symbol subscription store (avoids full-map re-renders)
+// ---------------------------------------------------------------------------
+
+type Listener = () => void
+
+/** Ref-based store that tracks per-symbol subscribers and only notifies
+ *  listeners whose symbol actually changed in the latest SSE tick. */
+class QuoteStore {
+  private _quotes: QuoteMap = {}
+  private _listeners = new Map<string, Set<Listener>>()
+  private _globalListeners = new Set<Listener>()
+
+  getQuotes(): QuoteMap {
+    return this._quotes
+  }
+
+  getQuote(symbol: string): Quote | undefined {
+    return this._quotes[symbol]
+  }
+
+  /** Merge incoming delta and notify only affected subscribers. */
+  merge(delta: QuoteMap) {
+    const changedSymbols = Object.keys(delta)
+    if (changedSymbols.length === 0) return
+
+    this._quotes = { ...this._quotes, ...delta }
+
+    // Notify per-symbol listeners for changed symbols only
+    for (const sym of changedSymbols) {
+      const listeners = this._listeners.get(sym)
+      if (listeners) {
+        for (const cb of listeners) cb()
+      }
+    }
+    // Notify global listeners (useQuotes consumers)
+    for (const cb of this._globalListeners) cb()
+  }
+
+  subscribeSymbol(symbol: string, listener: Listener): () => void {
+    let set = this._listeners.get(symbol)
+    if (!set) {
+      set = new Set()
+      this._listeners.set(symbol, set)
+    }
+    set.add(listener)
+    return () => {
+      set!.delete(listener)
+      if (set!.size === 0) this._listeners.delete(symbol)
+    }
+  }
+
+  subscribeAll(listener: Listener): () => void {
+    this._globalListeners.add(listener)
+    return () => {
+      this._globalListeners.delete(listener)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
+
 interface QuoteStreamState {
-  quotes: QuoteMap
+  store: QuoteStore
   intraday: IntradayMap
   status: ConnectionStatus
 }
 
+const defaultStore = new QuoteStore()
 const QuoteStreamContext = createContext<QuoteStreamState>({
-  quotes: {},
+  store: defaultStore,
   intraday: {},
   status: "connecting",
 })
 
 export function QuoteStreamProvider({ children }: { children: React.ReactNode }) {
-  const [quotes, setQuotes] = useState<QuoteMap>({})
+  const [storeRef] = useState(() => new QuoteStore())
   const [intraday, setIntraday] = useState<IntradayMap>({})
   const [status, setStatus] = useState<ConnectionStatus>("connecting")
   const esRef = useRef<EventSource | null>(null)
@@ -40,7 +105,7 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
           const data = JSON.parse(e.data) as QuoteMap
           const count = Object.keys(data).length
           if (count === 0) return
-          setQuotes((prev) => ({ ...prev, ...data }))
+          storeRef.merge(data)
           setStatus("connected")
           backoffMs.current = 1_000 // reset backoff on successful data
         } catch (err) {
@@ -117,18 +182,39 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
       esRef.current = null
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
     }
-  }, [])
+  }, [storeRef])
 
   return (
-    <QuoteStreamContext.Provider value={{ quotes, intraday, status }}>
+    <QuoteStreamContext.Provider value={{ store: storeRef, intraday, status }}>
       {children}
     </QuoteStreamContext.Provider>
   )
 }
 
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+/** Return the full quote map. Re-renders on every SSE tick.
+ *  Prefer `useQuote(symbol)` when only one symbol is needed. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useQuotes(): QuoteMap {
-  return useContext(QuoteStreamContext).quotes
+  const { store } = useContext(QuoteStreamContext)
+  const subscribe = useCallback((cb: Listener) => store.subscribeAll(cb), [store])
+  const getSnapshot = useCallback(() => store.getQuotes(), [store])
+  return useSyncExternalStore(subscribe, getSnapshot)
+}
+
+/** Return a single symbol's quote. Only re-renders when that symbol changes. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useQuote(symbol: string): Quote | undefined {
+  const { store } = useContext(QuoteStreamContext)
+  const subscribe = useCallback(
+    (cb: Listener) => store.subscribeSymbol(symbol, cb),
+    [store, symbol],
+  )
+  const getSnapshot = useCallback(() => store.getQuote(symbol), [store, symbol])
+  return useSyncExternalStore(subscribe, getSnapshot)
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
