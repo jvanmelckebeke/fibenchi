@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { ArrowLeft, ExternalLink, RefreshCw, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PeriodSelector } from "@/components/period-selector"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { buildYahooFinanceUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
@@ -9,6 +10,8 @@ import { usePriceFlash } from "@/lib/use-price-flash"
 import { useRefreshPrices, useCreateAsset } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
+export type ChartMode = "live" | "historical"
+
 export function Header({
   symbol,
   name,
@@ -16,6 +19,8 @@ export function Header({
   period,
   setPeriod,
   isTracked,
+  mode,
+  setMode,
 }: {
   symbol: string
   name?: string
@@ -23,6 +28,8 @@ export function Header({
   period: string
   setPeriod: (p: string) => void
   isTracked: boolean
+  mode: ChartMode
+  setMode: (m: ChartMode) => void
 }) {
   const { settings } = useSettings()
   const refresh = useRefreshPrices(symbol)
@@ -93,17 +100,27 @@ export function Header({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <PeriodSelector value={period} onChange={setPeriod} />
-        {isTracked && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refresh.mutate(period)}
-            disabled={refresh.isPending}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as ChartMode)}>
+          <TabsList>
+            <TabsTrigger value="live">Live</TabsTrigger>
+            <TabsTrigger value="historical">Historical</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {mode === "historical" && (
+          <>
+            <PeriodSelector value={period} onChange={setPeriod} />
+            {isTracked && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refresh.mutate(period)}
+                disabled={refresh.isPending}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            )}
+          </>
         )}
       </div>
     </div>
