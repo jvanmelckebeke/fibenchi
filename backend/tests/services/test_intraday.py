@@ -267,6 +267,33 @@ class TestFetchIntradaySync:
 
         assert result["VOD.L"][0]["price"] == 85.0
 
+    def test_filters_synthetic_non_minute_boundary_bars(self):
+        """Yahoo echo bars at non-minute-boundary timestamps are dropped."""
+        ts_list = [
+            datetime(2026, 2, 25, 10, 0, 0, tzinfo=CPH),   # real: on minute
+            datetime(2026, 2, 25, 10, 3, 43, tzinfo=CPH),   # synthetic: 43s offset
+            datetime(2026, 2, 25, 10, 5, 0, tzinfo=CPH),    # real: on minute
+        ]
+        hist = _make_hist_df("P911.DE", ts_list, [41.0, 41.75, 42.0])
+
+        price_data = {"P911.DE": {
+            "currency": "EUR",
+            "exchangeTimezoneName": "Europe/Berlin",
+        }}
+
+        mock_ticker = MagicMock()
+        mock_ticker.price = price_data
+        mock_ticker._get_data.return_value = {}
+        mock_ticker._historical_data_to_dataframe.return_value = hist
+
+        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
+            result = _fetch_intraday_sync_inner(["P911.DE"])
+
+        assert "P911.DE" in result
+        assert len(result["P911.DE"]) == 2  # synthetic bar dropped
+        prices = [bar["price"] for bar in result["P911.DE"]]
+        assert prices == [41.0, 42.0]
+
     def test_skips_symbol_on_key_error(self):
         """Symbols missing from the DataFrame are silently skipped."""
         hist = _make_hist_df("AAPL", [datetime(2026, 2, 25, 10, 0, tzinfo=ET)], [180.0])
