@@ -9,6 +9,7 @@ from app.services.compute.indicators import (
     adx,
     atr,
     build_indicator_snapshot,
+    choppiness_index,
     compute_indicators,
     get_all_output_fields,
     macd,
@@ -259,3 +260,68 @@ def test_atr_adx_in_all_output_fields():
     assert "adx" in fields
     assert "plus_di" in fields
     assert "minus_di" in fields
+
+
+# ---------------------------------------------------------------------------
+# Choppiness Index tests (#482)
+# ---------------------------------------------------------------------------
+
+
+def test_chop_range():
+    """Choppiness Index values should be between 0 and 100."""
+    df = _make_price_df(200)
+    result = choppiness_index(df)
+    valid = result.dropna()
+    assert len(valid) > 0
+    assert all(0 <= v <= 100 for v in valid), "CHOP values out of 0-100 range"
+
+
+def test_chop_length():
+    """Choppiness Index output should have same length as input."""
+    df = _make_price_df(100)
+    result = choppiness_index(df)
+    assert len(result) == 100
+
+
+def test_chop_warmup_nans():
+    """Choppiness Index should have NaN values during the warmup period."""
+    df = _make_price_df(30)
+    result = choppiness_index(df, period=14)
+    assert pd.isna(result.iloc[0])
+
+
+def test_chop_in_compute_indicators():
+    """Choppiness Index should appear in compute_indicators output."""
+    df = _make_price_df(100)
+    result = compute_indicators(df)
+    assert "chop" in result.columns
+    valid = result["chop"].dropna()
+    assert len(valid) > 0
+    assert all(0 <= v <= 100 for v in valid)
+
+
+def test_chop_high_for_ranging_market():
+    """CHOP should be high for a sideways/ranging market."""
+    n = 200
+    dates = pd.date_range("2024-01-01", periods=n, freq="B")
+    # Ranging market: oscillate between 100 and 102
+    prices = [100.0 + (i % 4) * 0.5 for i in range(n)]
+    df = pd.DataFrame({
+        "open": [p - 0.3 for p in prices],
+        "high": [p + 0.5 for p in prices],
+        "low": [p - 0.5 for p in prices],
+        "close": prices,
+    }, index=dates)
+    result = choppiness_index(df)
+    last_valid = result.dropna().iloc[-1]
+    assert last_valid > 50, f"CHOP should be >50 for ranging market, got {last_valid}"
+
+
+def test_chop_snapshot_derived():
+    """Choppiness snapshot should classify market regime."""
+    df = _make_price_df(200)
+    indicators = compute_indicators(df)
+    snapshot = build_indicator_snapshot(indicators)
+    assert "values" in snapshot
+    assert "chop_state" in snapshot["values"]
+    assert snapshot["values"]["chop_state"] in ("choppy", "trending", "neutral", None)

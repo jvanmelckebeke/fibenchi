@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
+import numpy as np
 import pandas as pd
 
 from app.services.price_providers import get_price_provider
@@ -115,6 +116,23 @@ def adx(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
     return {"adx": adx_series, "plus_di": plus_di, "minus_di": minus_di}
 
 
+def choppiness_index(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """Choppiness Index — measures whether the market is trending or ranging.
+
+    CHOP = 100 × LOG10(SUM(TR, period) / (HH(period) - LL(period))) / LOG10(period)
+
+    Values 0-100: >61 = choppy/ranging, <38 = trending. Direction-agnostic.
+    """
+    tr = _true_range(df)
+    tr_sum = tr.rolling(window=period).sum()
+    hh = df["high"].rolling(window=period).max()
+    ll = df["low"].rolling(window=period).min()
+    hl_range = hh - ll
+    # Avoid log(0) / division by zero — replace zero ranges with NaN
+    hl_range = hl_range.replace(0, float("nan"))
+    return 100 * np.log10(tr_sum / hl_range) / np.log10(period)
+
+
 def volume_stats(df: pd.DataFrame, period: int = 20) -> dict[str, pd.Series]:
     """Volume and average volume (SMA of volume)."""
     return {"volume": df["volume"], "avg_volume": df["volume"].rolling(window=period).mean()}
@@ -175,6 +193,19 @@ def _adx_snapshot_derived(row: pd.Series) -> dict:
         else:
             return {"adx_trend": "absent"}
     return {"adx_trend": None}
+
+
+def _chop_snapshot_derived(row: pd.Series) -> dict:
+    """Derive choppiness state from latest row."""
+    if pd.notna(row.get("chop")):
+        val = row["chop"]
+        if val > 61:
+            return {"chop_state": "choppy"}
+        elif val < 38:
+            return {"chop_state": "trending"}
+        else:
+            return {"chop_state": "neutral"}
+    return {"chop_state": None}
 
 
 @dataclass(frozen=True)
@@ -273,6 +304,15 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         decimals=0,
         warmup_periods=20,
         uses_ohlc=True,
+    ),
+    "chop": IndicatorDef(
+        func=choppiness_index,
+        params={"period": 14},
+        output_fields=["chop"],
+        decimals=1,
+        warmup_periods=14,
+        uses_ohlc=True,
+        snapshot_derived=_chop_snapshot_derived,
     ),
 }
 

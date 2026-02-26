@@ -240,6 +240,46 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     compactFormat: true,
   },
 
+  {
+    id: "chop",
+    label: "Choppiness (14)",
+    shortLabel: "CHOP",
+    description: "Market regime indicator (0–100). Above 61 = choppy/ranging, below 38 = trending.",
+    category: "volatility",
+    placement: "subchart",
+    capabilities: ["group_table", "group_card", "detail_chart", "detail_card", "detail_stats"],
+    defaults: ["detail_chart"],
+    fields: ["chop"],
+    sortableFields: ["chop"],
+    series: [
+      {
+        field: "chop",
+        label: "CHOP",
+        color: "#a78bfa",
+        lineWidth: 2,
+        thresholdColors: [
+          { condition: "gt", value: 61, className: "text-red-500" },
+          { condition: "lt", value: 38, className: "text-emerald-500" },
+        ],
+      },
+    ],
+    decimals: 1,
+    chartConfig: {
+      lines: [
+        { value: 61, color: "rgba(239, 68, 68, 0.4)" },
+        { value: 38, color: "rgba(34, 197, 94, 0.4)" },
+      ],
+      range: { min: 0, max: 100 },
+    },
+    holdingSummary: {
+      label: "CHOP",
+      field: "chop_state",
+      format: "string_map",
+      colorMap: { choppy: "text-red-500", trending: "text-emerald-500", neutral: "text-zinc-400" },
+    },
+    cardEligible: true,
+  },
+
   // ── Fundamentals ──────────────────────────────────────────────────────
 
   {
