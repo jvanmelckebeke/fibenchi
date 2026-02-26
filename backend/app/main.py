@@ -18,6 +18,7 @@ from app.routers import annotations, assets, groups, holdings, portfolio, prices
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
+from app.services.price_providers import init_price_provider
 from app.services.fundamentals_cache import warm_fundamentals_cache
 from app.services.intraday import fetch_and_store_intraday, cleanup_old_intraday
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
@@ -83,7 +84,7 @@ async def scheduled_intraday_sync():
         return
 
     from app.repositories.asset_repo import AssetRepository
-    from app.services.yahoo import batch_fetch_quotes
+    from app.services.price_providers import get_price_provider
 
     async with async_session() as db:
         try:
@@ -100,7 +101,7 @@ async def scheduled_intraday_sync():
             import random
             sample_size = min(15, len(symbols))
             sample = random.sample(symbols, sample_size)
-            quotes = await batch_fetch_quotes(sample)
+            quotes = await get_price_provider().batch_fetch_quotes(sample)
             market_states = {q.get("market_state") for q in quotes if q.get("market_state")}
             active_states = {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}
             if not market_states & active_states:
@@ -115,6 +116,9 @@ async def scheduled_intraday_sync():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize the price data provider (Yahoo, IBKR, etc.)
+    init_price_provider()
+
     # Load currency lookup cache from DB
     async with async_session() as db:
         await load_currency_cache(db)

@@ -40,6 +40,15 @@ def _make_price_history(asset_id: int = 1, n_days: int = 100, base_price: float 
     return prices
 
 
+def _mock_provider(**overrides):
+    """Create a mock PriceProvider with async method stubs."""
+    provider = MagicMock()
+    provider.fetch_history = AsyncMock(
+        return_value=overrides.get("fetch_history", pd.DataFrame())
+    )
+    return provider
+
+
 def test_display_start_calculates_correct_date():
     result = _display_start("3mo")
     expected = date.today() - timedelta(days=90)
@@ -54,7 +63,8 @@ def test_display_start_unknown_period_defaults_90():
 
 async def test_fetch_ephemeral_raises_404_on_empty():
     empty_df = pd.DataFrame()
-    with patch("app.services.price_service.fetch_history", new_callable=AsyncMock, return_value=empty_df):
+    mock_prov = _mock_provider(fetch_history=empty_df)
+    with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
         from fastapi import HTTPException
         with pytest.raises(HTTPException) as exc_info:
             await _fetch_ephemeral("XXXX", "3mo")
@@ -62,7 +72,9 @@ async def test_fetch_ephemeral_raises_404_on_empty():
 
 
 async def test_fetch_ephemeral_raises_404_on_error():
-    with patch("app.services.price_service.fetch_history", new_callable=AsyncMock, side_effect=ValueError("No data")):
+    mock_prov = MagicMock()
+    mock_prov.fetch_history = AsyncMock(side_effect=ValueError("No data"))
+    with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
         from fastapi import HTTPException
         with pytest.raises(HTTPException) as exc_info:
             await _fetch_ephemeral("XXXX", "3mo")

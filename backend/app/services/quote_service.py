@@ -8,7 +8,7 @@ import time as _time
 from app.database import async_session
 from app.repositories.asset_repo import AssetRepository
 from app.services.intraday import get_intraday_bars
-from app.services.yahoo import batch_fetch_quotes
+from app.services.price_providers import get_price_provider
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ async def get_quotes(symbols: str) -> list[dict]:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
-    return await batch_fetch_quotes(symbol_list)
+    return await get_price_provider().batch_fetch_quotes(symbol_list)
 
 
 async def quote_event_generator():
@@ -66,7 +66,7 @@ async def quote_event_generator():
                 await asyncio.sleep(60)
                 continue
 
-            quotes = await batch_fetch_quotes(symbols)
+            quotes = await get_price_provider().batch_fetch_quotes(symbols)
 
             # Build keyed payload
             full_payload: dict[str, dict] = {}

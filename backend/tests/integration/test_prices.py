@@ -38,17 +38,23 @@ async def test_get_prices_respects_period_boundary(client, db):
 
 
 async def test_get_prices_ephemeral_symbol(client):
-    """Untracked symbol fetches from Yahoo without persisting."""
+    """Untracked symbol fetches from provider without persisting."""
+    from unittest.mock import MagicMock
     mock_df = make_yahoo_df()
-    with patch("app.services.price_service.fetch_history", return_value=mock_df):
+    mock_prov = MagicMock()
+    mock_prov.fetch_history = AsyncMock(return_value=mock_df)
+    with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
         resp = await client.get("/api/assets/UNKNOWN/prices?period=3mo")
     assert resp.status_code == 200
     assert len(resp.json()) > 0
 
 
 async def test_get_prices_unknown_404(client):
-    """Symbol that fails Yahoo fetch returns 404."""
-    with patch("app.services.price_service.fetch_history", side_effect=ValueError("No data")):
+    """Symbol that fails provider fetch returns 404."""
+    from unittest.mock import MagicMock
+    mock_prov = MagicMock()
+    mock_prov.fetch_history = AsyncMock(side_effect=ValueError("No data"))
+    with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
         resp = await client.get("/api/assets/XXXX/prices")
     assert resp.status_code == 404
 
@@ -72,8 +78,11 @@ async def test_get_indicators_fields(client, db):
 
 async def test_get_indicators_ephemeral(client):
     """Indicators for non-DB symbol uses ephemeral fetch with warmup."""
+    from unittest.mock import MagicMock
     mock_df = make_yahoo_df(n_days=120)
-    with patch("app.services.price_service.fetch_history", return_value=mock_df):
+    mock_prov = MagicMock()
+    mock_prov.fetch_history = AsyncMock(return_value=mock_df)
+    with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
         resp = await client.get("/api/assets/UNKNOWN/indicators?period=3mo")
     assert resp.status_code == 200
     assert len(resp.json()) > 0

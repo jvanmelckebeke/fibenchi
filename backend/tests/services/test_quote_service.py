@@ -4,24 +4,36 @@ import asyncio
 import json
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.quote_service import get_quotes, quote_event_generator
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
+def _mock_provider(quotes_return=None, quotes_side_effect=None):
+    """Create a mock PriceProvider with async batch_fetch_quotes stub."""
+    provider = MagicMock()
+    if quotes_side_effect is not None:
+        provider.batch_fetch_quotes = AsyncMock(side_effect=quotes_side_effect)
+    else:
+        provider.batch_fetch_quotes = AsyncMock(return_value=quotes_return or [])
+    return provider
+
+
 async def test_get_quotes_parses_symbols():
     mock_quotes = [{"symbol": "AAPL", "price": 185.50}]
-    with patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes):
+    mock_prov = _mock_provider(quotes_return=mock_quotes)
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
         result = await get_quotes("AAPL,MSFT")
     assert result == mock_quotes
 
 
 async def test_get_quotes_uppercase_normalization():
-    with patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=[]) as mock:
+    mock_prov = _mock_provider(quotes_return=[])
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
         await get_quotes("aapl, msft")
-    mock.assert_awaited_once_with(["AAPL", "MSFT"])
+    mock_prov.batch_fetch_quotes.assert_awaited_once_with(["AAPL", "MSFT"])
 
 
 async def test_get_quotes_empty_returns_empty():
@@ -47,10 +59,12 @@ async def test_stream_emits_full_payload_first():
     mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
     mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
 
+    mock_prov = _mock_provider(quotes_return=mock_quotes)
+
     with (
         patch("app.services.quote_service.async_session", return_value=mock_session_ctx),
         patch("app.services.quote_service.AssetRepository") as MockRepo,
-        patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
+        patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
@@ -89,10 +103,12 @@ async def test_stream_delta_only_changed():
     mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
     mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
 
+    mock_prov = _mock_provider(quotes_side_effect=[quote_v1, quote_v2])
+
     with (
         patch("app.services.quote_service.async_session", return_value=mock_session_ctx),
         patch("app.services.quote_service.AssetRepository") as MockRepo,
-        patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, side_effect=[quote_v1, quote_v2]),
+        patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
@@ -124,10 +140,12 @@ async def test_stream_adaptive_interval_regular():
     mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
     mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
 
+    mock_prov = _mock_provider(quotes_return=mock_quotes)
+
     with (
         patch("app.services.quote_service.async_session", return_value=mock_session_ctx),
         patch("app.services.quote_service.AssetRepository") as MockRepo,
-        patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
+        patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
@@ -152,10 +170,12 @@ async def test_stream_adaptive_interval_closed():
     mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
     mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
 
+    mock_prov = _mock_provider(quotes_return=mock_quotes)
+
     with (
         patch("app.services.quote_service.async_session", return_value=mock_session_ctx),
         patch("app.services.quote_service.AssetRepository") as MockRepo,
-        patch("app.services.quote_service.batch_fetch_quotes", new_callable=AsyncMock, return_value=mock_quotes),
+        patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
