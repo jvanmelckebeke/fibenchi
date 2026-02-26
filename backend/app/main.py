@@ -14,7 +14,7 @@ from starlette.responses import FileResponse
 from app.config import settings as app_settings
 
 from app.database import async_session, engine
-from app.routers import annotations, assets, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
+from app.routers import annotations, assets, data, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
@@ -187,6 +187,15 @@ app = FastAPI(
             "description": "Manage tracked stocks and ETFs. Assets are identified by ticker symbol and auto-validated against Yahoo Finance.",
         },
         {
+            "name": "data",
+            "description": (
+                "General-purpose batch data query for external tooling. Fetch quotes, indicator "
+                "snapshots, prices, and/or technical indicators for multiple tickers in a single "
+                "request. Works for any ticker — tracked assets use cached DB data, untracked "
+                "symbols are fetched ephemerally from the price provider."
+            ),
+        },
+        {
             "name": "prices",
             "description": "OHLCV price data and technical indicators (RSI, SMA 20/50, Bollinger Bands, MACD) for individual assets. Supports both persisted (grouped) and ephemeral (ungrouped) price fetching.",
         },
@@ -239,6 +248,7 @@ app = FastAPI(
 )
 
 app.include_router(assets.router)
+app.include_router(data.router)
 app.include_router(groups.router)
 app.include_router(tags.router)
 app.include_router(tags.asset_tag_router)
