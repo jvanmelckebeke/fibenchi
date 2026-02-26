@@ -241,40 +241,62 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
   },
 
   {
+    id: "nefi",
+    label: "NEFI (13)",
+    shortLabel: "NEFI",
+    description: "Normalized Force Index — EFI ÷ avg volume. Short (20d) vs long (200d) crossover shows momentum shifts.",
+    category: "technical",
+    placement: "subchart",
+    capabilities: ["group_table", "group_card", "detail_chart", "detail_card", "detail_stats"],
+    defaults: ["detail_chart"],
+    fields: ["nefi_short", "nefi_long"],
+    sortableFields: ["nefi_short"],
+    series: [
+      { field: "nefi_short", label: "NEFI Short", color: "#38bdf8", lineWidth: 2 },
+      { field: "nefi_long", label: "NEFI Long", color: "#f59e0b", lineWidth: 2 },
+    ],
+    decimals: 2,
+    chartConfig: {
+      lines: [{ value: 0, color: "rgba(161, 161, 170, 0.3)" }],
+    },
+    holdingSummary: {
+      label: "NEFI",
+      field: "nefi_signal",
+      format: "string_map",
+      colorMap: { bullish: "text-emerald-500", bearish: "text-red-500" },
+    },
+    cardEligible: true,
+    snapField: "nefi_short",
+  },
+  {
     id: "cmf",
     label: "CMF (20)",
     shortLabel: "CMF",
     description: "Volume-weighted buying/selling pressure (-1 to +1). Positive = accumulation, negative = distribution.",
     category: "technical",
-    placement: "subchart",
-    capabilities: ["group_table", "group_card", "detail_chart", "detail_card", "detail_stats"],
-    defaults: ["detail_chart"],
+    placement: "card",
+    capabilities: ["group_table", "group_card", "detail_card", "detail_stats"],
+    defaults: ["group_table", "detail_card"],
     fields: ["cmf"],
     sortableFields: ["cmf"],
     series: [
       {
         field: "cmf",
         label: "CMF",
-        color: "",
-        type: "histogram",
+        color: "#22c55e",
         thresholdColors: [
           { condition: "gte", value: 0, className: "text-emerald-500" },
           { condition: "lt", value: 0, className: "text-red-500" },
         ],
-        histogramColors: { positive: "rgba(34, 197, 94, 0.6)", negative: "rgba(239, 68, 68, 0.6)" },
       },
     ],
     decimals: 3,
-    chartConfig: {
-      lines: [{ value: 0, color: "rgba(161, 161, 170, 0.3)" }],
-    },
     holdingSummary: {
       label: "CMF",
       field: "cmf_signal",
       format: "string_map",
       colorMap: { buying: "text-emerald-500", selling: "text-red-500" },
     },
-    cardEligible: true,
   },
   {
     id: "chop",
@@ -282,9 +304,9 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     shortLabel: "CHOP",
     description: "Market regime indicator (0–100). Above 61 = choppy/ranging, below 38 = trending.",
     category: "volatility",
-    placement: "subchart",
-    capabilities: ["group_table", "group_card", "detail_chart", "detail_card", "detail_stats"],
-    defaults: ["detail_chart"],
+    placement: "card",
+    capabilities: ["group_table", "group_card", "detail_card", "detail_stats"],
+    defaults: ["group_table", "detail_card"],
     fields: ["chop"],
     sortableFields: ["chop"],
     series: [
@@ -292,7 +314,6 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
         field: "chop",
         label: "CHOP",
         color: "#a78bfa",
-        lineWidth: 2,
         thresholdColors: [
           { condition: "gt", value: 61, className: "text-red-500" },
           { condition: "lt", value: 38, className: "text-emerald-500" },
@@ -300,20 +321,12 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
       },
     ],
     decimals: 1,
-    chartConfig: {
-      lines: [
-        { value: 61, color: "rgba(239, 68, 68, 0.4)" },
-        { value: 38, color: "rgba(34, 197, 94, 0.4)" },
-      ],
-      range: { min: 0, max: 100 },
-    },
     holdingSummary: {
       label: "CHOP",
       field: "chop_state",
       format: "string_map",
       colorMap: { choppy: "text-red-500", trending: "text-emerald-500", neutral: "text-zinc-400" },
     },
-    cardEligible: true,
   },
 
   // ── Fundamentals ──────────────────────────────────────────────────────

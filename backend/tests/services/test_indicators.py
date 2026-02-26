@@ -14,6 +14,7 @@ from app.services.compute.indicators import (
     compute_indicators,
     get_all_output_fields,
     macd,
+    normalized_force_index,
     rsi,
     sma,
 )
@@ -390,3 +391,77 @@ def test_cmf_snapshot_derived():
     assert "values" in snapshot
     assert "cmf_signal" in snapshot["values"]
     assert snapshot["values"]["cmf_signal"] in ("buying", "selling", None)
+
+
+# ---------------------------------------------------------------------------
+# Normalized Elder's Force Index (NEFI) tests (#484)
+# ---------------------------------------------------------------------------
+
+
+def test_nefi_keys():
+    """NEFI should return nefi_short and nefi_long."""
+    df = _make_price_df(300)
+    result = normalized_force_index(df)
+    assert "nefi_short" in result
+    assert "nefi_long" in result
+
+
+def test_nefi_length():
+    """NEFI output should have same length as input."""
+    df = _make_price_df(300)
+    result = normalized_force_index(df)
+    assert len(result["nefi_short"]) == 300
+    assert len(result["nefi_long"]) == 300
+
+
+def test_nefi_in_compute_indicators():
+    """NEFI fields should appear in compute_indicators output."""
+    df = _make_price_df(300)
+    result = compute_indicators(df)
+    assert "nefi_short" in result.columns
+    assert "nefi_long" in result.columns
+
+
+def test_nefi_scales_with_price_not_volume():
+    """NEFI should be comparable across assets with different volume levels.
+
+    Two assets with identical price moves but 10× different volume
+    should produce similar short NEFI values (since volume cancels out).
+    """
+    n = 100
+    dates = pd.date_range("2024-01-01", periods=n, freq="B")
+    prices = [100.0 + i * 0.5 for i in range(n)]
+
+    # Asset A: low volume
+    df_a = pd.DataFrame({
+        "open": [p - 0.3 for p in prices],
+        "high": [p + 0.5 for p in prices],
+        "low": [p - 0.5 for p in prices],
+        "close": prices,
+        "volume": [100_000] * n,
+    }, index=dates)
+
+    # Asset B: 10× higher volume, same prices
+    df_b = pd.DataFrame({
+        "open": [p - 0.3 for p in prices],
+        "high": [p + 0.5 for p in prices],
+        "low": [p - 0.5 for p in prices],
+        "close": prices,
+        "volume": [1_000_000] * n,
+    }, index=dates)
+
+    nefi_a = normalized_force_index(df_a)["nefi_short"].dropna().iloc[-1]
+    nefi_b = normalized_force_index(df_b)["nefi_short"].dropna().iloc[-1]
+
+    # Should be approximately equal (volume normalizes out)
+    assert abs(nefi_a - nefi_b) < 0.01, f"NEFI should normalize volume: A={nefi_a}, B={nefi_b}"
+
+
+def test_nefi_snapshot_crossover_signal():
+    """NEFI snapshot should classify bullish/bearish based on short vs long crossover."""
+    df = _make_price_df(300)
+    indicators = compute_indicators(df)
+    snapshot = build_indicator_snapshot(indicators)
+    assert "values" in snapshot
+    assert "nefi_signal" in snapshot["values"]
+    assert snapshot["values"]["nefi_signal"] in ("bullish", "bearish", None)

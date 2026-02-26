@@ -9,6 +9,7 @@ import {
   HistogramSeries,
 } from "lightweight-charts"
 import type { Price, Indicator, Annotation } from "@/lib/api"
+import { formatCompactNumber } from "@/lib/format"
 import { baseChartOptions } from "@/lib/chart-utils"
 import { BandFillPrimitive } from "./bollinger-band-fill"
 import {
@@ -124,6 +125,9 @@ export function createSubChart(
         autoScale: false,
         scaleMargins: { top: 0.05, bottom: 0.05 },
       },
+    }),
+    ...(descriptor.compactFormat && {
+      localization: { priceFormatter: formatCompactNumber },
     }),
   })
 
