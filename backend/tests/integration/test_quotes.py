@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.services.quote_service import _reset_asset_list_cache
 from tests.conftest import TestSession
@@ -43,12 +43,23 @@ def _parse_sse_events(body: str) -> list[dict]:
     return events
 
 
+def _mock_provider(quotes_return=None, quotes_side_effect=None):
+    """Create a mock PriceProvider with batch_fetch_quotes stub."""
+    provider = MagicMock()
+    if quotes_side_effect is not None:
+        provider.batch_fetch_quotes = AsyncMock(side_effect=quotes_side_effect)
+    else:
+        provider.batch_fetch_quotes = AsyncMock(return_value=quotes_return or [])
+    return provider
+
+
 # ── REST endpoint tests ──────────────────────────────────────────────
 
 
 async def test_get_quotes_returns_data(client):
     """GET /api/quotes returns quote data for requested symbols."""
-    with patch("app.services.quote_service.batch_fetch_quotes", return_value=_MOCK_QUOTES):
+    mock_prov = _mock_provider(quotes_return=_MOCK_QUOTES)
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
         resp = await client.get("/api/quotes", params={"symbols": "AAPL,MSFT"})
 
     assert resp.status_code == 200
@@ -61,7 +72,8 @@ async def test_get_quotes_returns_data(client):
 
 async def test_get_quotes_empty_symbols(client):
     """GET /api/quotes with empty symbols returns empty list."""
-    with patch("app.services.quote_service.batch_fetch_quotes", return_value=[]):
+    mock_prov = _mock_provider(quotes_return=[])
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
         resp = await client.get("/api/quotes", params={"symbols": ""})
 
     assert resp.status_code == 200
@@ -70,7 +82,8 @@ async def test_get_quotes_empty_symbols(client):
 
 async def test_get_quotes_single_symbol(client):
     """GET /api/quotes works with a single symbol."""
-    with patch("app.services.quote_service.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]):
+    mock_prov = _mock_provider(quotes_return=[_MOCK_QUOTES[0]])
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
         resp = await client.get("/api/quotes", params={"symbols": "AAPL"})
 
     assert resp.status_code == 200
@@ -83,10 +96,11 @@ async def test_get_quotes_single_symbol(client):
 
 async def test_get_quotes_uppercase_normalization(client):
     """Symbols are normalized to uppercase before fetching."""
-    with patch("app.services.quote_service.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]) as mock:
+    mock_prov = _mock_provider(quotes_return=[_MOCK_QUOTES[0]])
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
         await client.get("/api/quotes", params={"symbols": "aapl"})
 
-    mock.assert_called_once_with(["AAPL"])
+    mock_prov.batch_fetch_quotes.assert_awaited_once_with(["AAPL"])
 
 
 # ── SSE stream tests ─────────────────────────────────────────────────
@@ -115,9 +129,10 @@ async def test_stream_quotes_emits_event(client):
     await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
 
     _reset_asset_list_cache()
+    mock_prov = _mock_provider(quotes_return=[_MOCK_QUOTES[0]])
     with (
         patch("app.services.quote_service.async_session", TestSession),
-        patch("app.services.quote_service.batch_fetch_quotes", return_value=[_MOCK_QUOTES[0]]),
+        patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
     ):
         resp = await client.get("/api/quotes/stream")
@@ -149,9 +164,10 @@ async def test_stream_quotes_multiple_symbols(client):
     await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft", "type": "stock"})
 
     _reset_asset_list_cache()
+    mock_prov = _mock_provider(quotes_return=_MOCK_QUOTES)
     with (
         patch("app.services.quote_service.async_session", TestSession),
-        patch("app.services.quote_service.batch_fetch_quotes", return_value=_MOCK_QUOTES),
+        patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=asyncio.CancelledError()),
     ):
         resp = await client.get("/api/quotes/stream")

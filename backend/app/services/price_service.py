@@ -14,8 +14,8 @@ from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceRespo
 from app.services.compute.indicators import INDICATOR_REGISTRY, compute_indicators, safe_round
 from app.services.compute.utils import prices_to_df
 from app.services.fundamentals_cache import merge_fundamentals_into_rows
+from app.services.price_providers import get_price_provider
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
-from app.services.yahoo import fetch_history
 from app.utils import TTLCache
 
 # In-memory indicator cache: keyed by "SYMBOL:period:last_price_date"
@@ -57,7 +57,8 @@ async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd
         days += WARMUP_DAYS
     start_date = date.today() - timedelta(days=days)
     try:
-        df = await fetch_history(symbol.upper(), start=start_date, end=date.today())
+        provider = get_price_provider()
+        df = await provider.fetch_history(symbol.upper(), start=start_date, end=date.today())
     except (ValueError, KeyError):
         raise HTTPException(404, f"No price data available for {symbol}")
 

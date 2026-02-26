@@ -1,7 +1,7 @@
 """Tests for the holdings router (ETF holdings + holding indicators)."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.services.compute.indicators import bb_position
 from tests.helpers import make_price_df
@@ -49,10 +49,13 @@ async def test_holdings_indicators_success(client):
         "MSFT": make_price_df(100, 400.0),
     }
 
+    mock_prov = MagicMock()
+    mock_prov.batch_fetch_history = AsyncMock(return_value=histories)
+    mock_prov.batch_fetch_currencies = AsyncMock(return_value={"AAPL": "USD", "MSFT": "USD"})
+
     with (
         patch("app.services.holdings_service.fetch_etf_holdings", return_value=_MOCK_HOLDINGS),
-        patch("app.services.compute.indicators._batch_fetch_history_sync", return_value=histories),
-        patch("app.services.compute.indicators.batch_fetch_currencies", return_value={"AAPL": "USD", "MSFT": "USD"}),
+        patch("app.services.compute.indicators.get_price_provider", return_value=mock_prov),
     ):
         resp = await client.get("/api/assets/SPY/holdings/indicators")
 

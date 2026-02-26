@@ -7,6 +7,7 @@ from app.main import app
 from app.models.currency import Currency
 from app.models.group import Group
 from app.services.currency_service import load_cache as load_currency_cache
+from app.services.price_providers import init_price_provider
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -43,6 +44,8 @@ async def setup_db():
     # Populate in-memory currency cache
     async with TestSession() as session:
         await load_currency_cache(session)
+    # Initialize price provider singleton (mirrors main.py lifespan)
+    init_price_provider()
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

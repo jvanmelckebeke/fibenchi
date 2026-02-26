@@ -7,8 +7,7 @@ from typing import Callable
 
 import pandas as pd
 
-from app.services.yahoo import _batch_fetch_history_sync, batch_fetch_currencies
-from app.utils import async_threadable
+from app.services.price_providers import get_price_provider
 
 
 def safe_round(value, decimals: int = 2) -> float | None:
@@ -398,14 +397,13 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-@async_threadable
-def compute_batch_indicator_snapshots(
+async def compute_batch_indicator_snapshots(
     symbols: list[str],
 ) -> list[dict]:
     """Compute indicator snapshots for multiple symbols in batch.
 
-    Fetches ~3 months of history and currencies via Yahoo Finance, then
-    computes indicators and builds snapshots for each symbol.
+    Fetches ~3 months of history and currencies via the configured price
+    provider, then computes indicators and builds snapshots for each symbol.
 
     Returns a list of dicts (one per symbol) with keys:
     symbol, currency, and all build_indicator_snapshot fields.
@@ -413,8 +411,9 @@ def compute_batch_indicator_snapshots(
     if not symbols:
         return []
 
-    histories = _batch_fetch_history_sync(symbols, period="3mo")
-    currencies = batch_fetch_currencies(symbols)
+    provider = get_price_provider()
+    histories = await provider.batch_fetch_history(symbols, period="3mo")
+    currencies = await provider.batch_fetch_currencies(symbols)
 
     results = []
     for sym in symbols:
