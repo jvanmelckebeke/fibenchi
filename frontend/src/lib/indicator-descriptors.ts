@@ -241,6 +241,42 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
   },
 
   {
+    id: "cmf",
+    label: "CMF (20)",
+    shortLabel: "CMF",
+    description: "Volume-weighted buying/selling pressure (-1 to +1). Positive = accumulation, negative = distribution.",
+    category: "technical",
+    placement: "subchart",
+    capabilities: ["group_table", "group_card", "detail_chart", "detail_card", "detail_stats"],
+    defaults: ["detail_chart"],
+    fields: ["cmf"],
+    sortableFields: ["cmf"],
+    series: [
+      {
+        field: "cmf",
+        label: "CMF",
+        color: "",
+        type: "histogram",
+        thresholdColors: [
+          { condition: "gte", value: 0, className: "text-emerald-500" },
+          { condition: "lt", value: 0, className: "text-red-500" },
+        ],
+        histogramColors: { positive: "rgba(34, 197, 94, 0.6)", negative: "rgba(239, 68, 68, 0.6)" },
+      },
+    ],
+    decimals: 3,
+    chartConfig: {
+      lines: [{ value: 0, color: "rgba(161, 161, 170, 0.3)" }],
+    },
+    holdingSummary: {
+      label: "CMF",
+      field: "cmf_signal",
+      format: "string_map",
+      colorMap: { buying: "text-emerald-500", selling: "text-red-500" },
+    },
+    cardEligible: true,
+  },
+  {
     id: "chop",
     label: "Choppiness (14)",
     shortLabel: "CHOP",

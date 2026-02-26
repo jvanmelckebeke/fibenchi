@@ -9,6 +9,7 @@ from app.services.compute.indicators import (
     adx,
     atr,
     build_indicator_snapshot,
+    chaikin_money_flow,
     choppiness_index,
     compute_indicators,
     get_all_output_fields,
@@ -325,3 +326,67 @@ def test_chop_snapshot_derived():
     assert "values" in snapshot
     assert "chop_state" in snapshot["values"]
     assert snapshot["values"]["chop_state"] in ("choppy", "trending", "neutral", None)
+
+
+# ---------------------------------------------------------------------------
+# Chaikin Money Flow tests (#483)
+# ---------------------------------------------------------------------------
+
+
+def test_cmf_range():
+    """CMF values should be between -1 and +1."""
+    df = _make_price_df(200)
+    result = chaikin_money_flow(df)
+    valid = result.dropna()
+    assert len(valid) > 0
+    assert all(-1 <= v <= 1 for v in valid), "CMF values out of -1 to +1 range"
+
+
+def test_cmf_length():
+    """CMF output should have same length as input."""
+    df = _make_price_df(100)
+    result = chaikin_money_flow(df)
+    assert len(result) == 100
+
+
+def test_cmf_warmup_nans():
+    """CMF should have NaN values during the warmup period."""
+    df = _make_price_df(30)
+    result = chaikin_money_flow(df, period=20)
+    assert pd.isna(result.iloc[0])
+
+
+def test_cmf_in_compute_indicators():
+    """CMF should appear in compute_indicators output."""
+    df = _make_price_df(100)
+    result = compute_indicators(df)
+    assert "cmf" in result.columns
+    valid = result["cmf"].dropna()
+    assert len(valid) > 0
+    assert all(-1 <= v <= 1 for v in valid)
+
+
+def test_cmf_positive_for_closes_near_high():
+    """CMF should be positive when closes are consistently near highs."""
+    n = 100
+    dates = pd.date_range("2024-01-01", periods=n, freq="B")
+    df = pd.DataFrame({
+        "open": [100.0] * n,
+        "high": [105.0] * n,
+        "low": [95.0] * n,
+        "close": [104.0] * n,  # Close near high → positive MF multiplier
+        "volume": [1_000_000] * n,
+    }, index=dates)
+    result = chaikin_money_flow(df)
+    last_valid = result.dropna().iloc[-1]
+    assert last_valid > 0, f"CMF should be positive for closes near highs, got {last_valid}"
+
+
+def test_cmf_snapshot_derived():
+    """CMF snapshot should classify buying/selling pressure."""
+    df = _make_price_df(200)
+    indicators = compute_indicators(df)
+    snapshot = build_indicator_snapshot(indicators)
+    assert "values" in snapshot
+    assert "cmf_signal" in snapshot["values"]
+    assert snapshot["values"]["cmf_signal"] in ("buying", "selling", None)

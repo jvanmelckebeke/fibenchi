@@ -133,6 +133,23 @@ def choppiness_index(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return 100 * np.log10(tr_sum / hl_range) / np.log10(period)
 
 
+def chaikin_money_flow(df: pd.DataFrame, period: int = 20) -> pd.Series:
+    """Chaikin Money Flow — volume-weighted buying/selling pressure.
+
+    MF_Multiplier = ((Close - Low) - (High - Close)) / (High - Low)
+    MF_Volume = MF_Multiplier × Volume
+    CMF(period) = SUM(MF_Volume, period) / SUM(Volume, period)
+
+    Ranges -1 to +1. Positive = buying pressure, negative = selling pressure.
+    """
+    hl_range = df["high"] - df["low"]
+    # Avoid division by zero for doji bars (high == low)
+    hl_range = hl_range.replace(0, float("nan"))
+    mf_multiplier = ((df["close"] - df["low"]) - (df["high"] - df["close"])) / hl_range
+    mf_volume = mf_multiplier * df["volume"]
+    return mf_volume.rolling(window=period).sum() / df["volume"].rolling(window=period).sum()
+
+
 def volume_stats(df: pd.DataFrame, period: int = 20) -> dict[str, pd.Series]:
     """Volume and average volume (SMA of volume)."""
     return {"volume": df["volume"], "avg_volume": df["volume"].rolling(window=period).mean()}
@@ -193,6 +210,13 @@ def _adx_snapshot_derived(row: pd.Series) -> dict:
         else:
             return {"adx_trend": "absent"}
     return {"adx_trend": None}
+
+
+def _cmf_snapshot_derived(row: pd.Series) -> dict:
+    """Derive CMF signal from latest row."""
+    if pd.notna(row.get("cmf")):
+        return {"cmf_signal": "buying" if row["cmf"] > 0 else "selling"}
+    return {"cmf_signal": None}
 
 
 def _chop_snapshot_derived(row: pd.Series) -> dict:
@@ -304,6 +328,15 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         decimals=0,
         warmup_periods=20,
         uses_ohlc=True,
+    ),
+    "cmf": IndicatorDef(
+        func=chaikin_money_flow,
+        params={"period": 20},
+        output_fields=["cmf"],
+        decimals=3,
+        warmup_periods=20,
+        uses_ohlc=True,
+        snapshot_derived=_cmf_snapshot_derived,
     ),
     "chop": IndicatorDef(
         func=choppiness_index,
