@@ -165,6 +165,7 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
 
           const delay = backoffMs.current
           console.warn(`[QuoteStream] Connection closed. Reconnecting in ${delay}ms...`)
+          if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
           reconnectTimer.current = setTimeout(() => {
             backoffMs.current = Math.min(backoffMs.current * 2, 30_000)
             setStatus("reconnecting")
