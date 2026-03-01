@@ -39,6 +39,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
   const [isPending, startTransition] = useTransition()
+  // settings.group_view_mode = immediate (drives SegmentedControl highlight)
+  // viewMode = deferred via useTransition (drives content rendering)
   const [deferredViewMode, setDeferredViewMode] = useState(settings.group_view_mode)
   const viewMode = deferredViewMode
   const setViewMode = (v: GroupViewMode) => {
@@ -182,7 +184,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               { value: "scanner", label: <ScanLine className="h-3.5 w-3.5" /> },
               { value: "live", label: <Activity className="h-3.5 w-3.5" /> },
             ]}
-            value={viewMode}
+            value={settings.group_view_mode}
             onChange={setViewMode}
           />
           {allTags && allTags.length > 0 && (
