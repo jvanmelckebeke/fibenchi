@@ -36,7 +36,7 @@ export function AssetDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isTracked={isTracked} mode={mode} setMode={setMode} />
+      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} period={period} setPeriod={setPeriod} isTracked={isTracked} assetId={asset?.id} mode={mode} setMode={setMode} />
       <ChartSection
         symbol={symbol}
         period={period}
