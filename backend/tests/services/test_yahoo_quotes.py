@@ -13,9 +13,6 @@ from app.services.yahoo.quotes import (
     batch_fetch_quotes,
 )
 
-pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
 class TestSanitize:
     def test_none_returns_none(self):
         assert _sanitize(None) is None
@@ -166,12 +163,14 @@ class TestHasInvalidCrumb:
 
 
 class TestBatchFetchQuotes:
+    @pytest.mark.asyncio(loop_scope="function")
     @patch("app.services.yahoo.quotes.Ticker")
     async def test_empty_symbols(self, mock_ticker_cls):
         result = await batch_fetch_quotes([])
         assert result == []
         mock_ticker_cls.assert_not_called()
 
+    @pytest.mark.asyncio(loop_scope="function")
     @patch("app.services.yahoo.quotes.Ticker")
     async def test_retries_on_invalid_crumb(self, mock_ticker_cls):
         bad = {"AAPL": "Invalid Crumb"}

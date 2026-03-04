@@ -32,6 +32,22 @@ _SEED_CURRENCIES = [
 
 
 @pytest.fixture(autouse=True)
+def mock_yahoo_validate(monkeypatch):
+    """Prevent real Yahoo Finance calls during tests."""
+
+    async def fake_validate(symbol):
+        return {
+            "symbol": symbol.upper(),
+            "name": f"{symbol.upper()} Inc.",
+            "type": "EQUITY",
+            "currency": "USD",
+            "currency_code": "USD",
+        }
+
+    monkeypatch.setattr("app.services.asset_service.validate_symbol", fake_validate)
+
+
+@pytest.fixture(autouse=True)
 async def setup_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
