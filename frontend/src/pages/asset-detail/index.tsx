@@ -17,6 +17,7 @@ import { useQuote } from "@/lib/quote-stream"
 import { StatsPanel } from "@/components/stats-panel"
 import { Header, type ChartMode } from "./header"
 import { ChartSection } from "./chart-section"
+import { EarningsCountdown } from "@/components/earnings-countdown"
 import { HoldingsSection } from "./holdings-section"
 
 
@@ -53,6 +54,7 @@ export function AssetDetailPage() {
           quote={quote}
         />
       )}
+      {!isEtf && <EarningsCountdown symbol={symbol} />}
       {isEtf && <HoldingsSection symbol={symbol} />}
       {isTracked && (
         <>

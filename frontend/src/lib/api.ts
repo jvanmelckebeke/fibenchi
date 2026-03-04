@@ -6,6 +6,7 @@ import type {
   AssetDetail,
   AssetPerformance,
   ConstituentIndicator,
+  EarningsInfo,
   EtfHoldings,
   Group,
   GroupCreate,
@@ -81,6 +82,8 @@ export const api = {
       request<EtfHoldings>(`/assets/${symbol}/holdings`),
     holdingsIndicators: (symbol: string) =>
       request<HoldingIndicator[]>(`/assets/${symbol}/holdings/indicators`),
+    earnings: (symbol: string) =>
+      request<EarningsInfo>(`/assets/${symbol}/earnings`),
   },
   tags: {
     list: () => request<Tag[]>("/tags"),

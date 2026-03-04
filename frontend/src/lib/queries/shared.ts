@@ -41,6 +41,7 @@ export const keys = {
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
   symbolSearchLocal: (q: string) => ["symbol-search-local", q] as const,
   symbolSearchYahoo: (q: string) => ["symbol-search-yahoo", q] as const,
+  earnings: (symbol: string) => ["earnings", symbol] as const,
   symbolSources: ["symbol-sources"] as const,
   symbolSourceProviders: ["symbol-source-providers"] as const,
 }
