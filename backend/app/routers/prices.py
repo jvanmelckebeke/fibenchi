@@ -4,8 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import PeriodType
 from app.database import get_db
 from app.services.entity_lookups import find_asset, get_asset
+from app.schemas.earnings import EarningsResponse
 from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse, RefreshResponse
 from app.services import price_service
+from app.services.earnings_cache import get_earnings
 
 router = APIRouter(prefix="/api/assets/{symbol}", tags=["prices"])
 
@@ -51,6 +53,13 @@ async def get_detail(symbol: str, period: PeriodType = Query("3mo"), db: AsyncSe
     """
     asset = await find_asset(symbol, db)
     return await price_service.get_detail(db, asset, symbol, period)
+
+
+@router.get("/earnings", response_model=EarningsResponse, summary="Get next earnings date")
+async def get_earnings_date(symbol: str):
+    """Return the next earnings date for a symbol (stocks only)."""
+    result = await get_earnings(symbol)
+    return EarningsResponse(**result) if result else EarningsResponse()
 
 
 @router.post("/refresh", response_model=RefreshResponse, status_code=200, summary="Force-refresh prices from Yahoo Finance")

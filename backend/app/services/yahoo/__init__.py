@@ -36,6 +36,7 @@ from app.services.yahoo.quotes import (
     batch_fetch_currencies,
     batch_fetch_quotes,
 )
+from app.services.yahoo.earnings import fetch_earnings_date
 from app.services.yahoo.search import search
 from app.services.yahoo.validation import validate_symbol
 
@@ -61,6 +62,8 @@ __all__ = [
     # fundamentals
     "batch_fetch_fundamentals",
     "_batch_fetch_fundamentals_sync",
+    # earnings
+    "fetch_earnings_date",
     # search
     "search",
 ]

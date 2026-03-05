@@ -256,3 +256,9 @@ export interface IntradayPoint {
   volume: number
   session: "pre" | "regular" | "post"
 }
+
+export interface EarningsInfo {
+  earnings_date: string | null
+  is_estimate: boolean
+  last_reported_date: string | null
+}

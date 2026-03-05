@@ -2,6 +2,7 @@ export { keys, STALE_1MIN, STALE_5MIN, STALE_24H, useInvalidatingMutation } from
 export { usePortfolioIndex, usePortfolioPerformers } from "./portfolio"
 export { useAssets, useCreateAsset, useLocalSearch, useYahooSearch } from "./assets"
 export { useAssetDetail, useEtfHoldings, useHoldingsIndicators, useRefreshPrices, usePrefetchAssetDetail } from "./prices"
+export { useEarnings } from "./earnings"
 export { useTags, useCreateTag, useAttachTag, useDetachTag } from "./tags"
 export { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useReorderGroups, useAddAssetsToGroup, useRemoveAssetFromGroup, useGroup, useGroupSparklines, useGroupIndicators } from "./groups"
 export { useThesis, useUpdateThesis, useAnnotations, useCreateAnnotation, useDeleteAnnotation } from "./notes"
