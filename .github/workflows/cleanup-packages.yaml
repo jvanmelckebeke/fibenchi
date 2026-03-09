@@ -10,28 +10,15 @@ permissions:
   packages: write
 
 jobs:
-  cleanup-untagged:
-    name: Delete untagged container versions
+  cleanup-old-sha-tags:
+    name: Delete old SHA-tagged container versions
     runs-on: ubuntu-latest
     steps:
-      - name: Delete all untagged versions
+      - name: Delete old SHA versions (keep latest and dev)
         uses: actions/delete-package-versions@v5
         with:
           package-name: fibenchi
           package-type: container
           owner: jvanmelckebeke
-          delete-only-untagged-versions: "true"
-          min-versions-to-keep: 0
-
-  cleanup-old-tagged:
-    name: Delete old tagged container versions
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete old versions (keep latest and dev)
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: fibenchi
-          package-type: container
-          owner: jvanmelckebeke
-          min-versions-to-keep: 10
+          min-versions-to-keep: 5
           ignore-versions: "^(latest|dev)$"
