@@ -109,8 +109,12 @@ class PriceRepository:
 
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+        ohlc_cols = ["open", "high", "low", "close"]
         rows = []
         for idx, row in df.iterrows():
+            if row[ohlc_cols].isna().any():
+                continue
+
             dt = idx.date() if hasattr(idx, "date") else idx
             if not isinstance(dt, date):
                 dt = pd.Timestamp(dt).date()

@@ -121,9 +121,10 @@ async def _ensure_warmup_prices(
 
 
 def _df_to_price_rows(df: pd.DataFrame, start: date) -> list[PriceResponse]:
+    ohlc_cols = ["open", "high", "low", "close"]
     rows = []
     for dt, row in df.iterrows():
-        if dt < start:
+        if dt < start or row[ohlc_cols].isna().any():
             continue
         rows.append(PriceResponse(
             date=dt,

@@ -89,15 +89,29 @@ def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
     # internal chart endpoint directly with the flag enabled.
     params = {"range": "1d", "interval": "1m", "includePrePost": "true"}
     data = ticker._get_data("chart", params)
+
+    # Log per-symbol errors Yahoo returned before converting to DataFrame
+    if isinstance(data, dict):
+        for sym in symbols:
+            sym_data = data.get(sym)
+            if isinstance(sym_data, str):
+                logger.debug("Yahoo intraday error for %s: %s", sym, sym_data)
+
     hist = ticker._historical_data_to_dataframe(data, params, adj_timezone=True)
 
     if isinstance(hist, dict) or hist.empty:
         return {}
 
     result: dict[str, list[dict]] = {}
+    # Symbols present in the DataFrame (level 0 of MultiIndex)
+    available = set(hist.index.get_level_values(0).unique()) if isinstance(hist.index, pd.MultiIndex) else None
+
     for sym in symbols:
         try:
-            if isinstance(hist.index, pd.MultiIndex):
+            if available is not None:
+                if sym not in available:
+                    logger.debug("No intraday data returned by Yahoo for %s", sym)
+                    continue
                 df = hist.loc[sym].copy()
             else:
                 df = hist.copy()
