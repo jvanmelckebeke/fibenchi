@@ -6,12 +6,14 @@ import {
   type IndicatorDescriptor,
   type SeriesDescriptor,
 } from "@/lib/indicator-registry"
+import { formatCompactNumber } from "@/lib/format"
 
 export interface LegendValues {
   o?: number
   h?: number
   l?: number
   c?: number
+  vol?: number
   indicators: Record<string, number | undefined>
 }
 
@@ -72,6 +74,9 @@ export function Legend({ values, latest }: { values: LegendValues | null; latest
           <span className="text-muted-foreground">H <span className={changeColor}>{v.h.toFixed(2)}</span></span>
           <span className="text-muted-foreground">L <span className={changeColor}>{v.l.toFixed(2)}</span></span>
           <span className="text-muted-foreground">C <span className={changeColor}>{v.c.toFixed(2)}</span></span>
+          {v.vol != null && (
+            <span className="text-muted-foreground">V <span className={changeColor}>{formatCompactNumber(v.vol)}</span></span>
+          )}
         </>
       )}
       {overlays.map((desc) => (

@@ -187,6 +187,40 @@ function createSeriesFromDescriptor(
   })
 }
 
+// ---- Volume overlay (TradingView-style bars at chart bottom) ----
+
+/** Add a volume histogram series pinned to the bottom ~20% of the main chart. */
+export function createVolumeSeries(chart: IChartApi): Series {
+  return chart.addSeries(HistogramSeries, {
+    priceScaleId: "volume",
+    priceLineVisible: false,
+    lastValueVisible: false,
+  })
+}
+
+/** Configure the volume price scale (call after chart creation). */
+export function configureVolumeScale(chart: IChartApi): void {
+  chart.priceScale("volume").applyOptions({
+    scaleMargins: { top: 0.8, bottom: 0 },
+    visible: false,
+  })
+}
+
+/** Set volume histogram data, colored by candle direction. Clears data when disabled. */
+export function setVolumeData(series: Series, prices: Price[], enabled: boolean): void {
+  if (!enabled) {
+    series.setData([])
+    return
+  }
+  series.setData(
+    prices.map((p) => ({
+      time: p.date,
+      value: p.volume,
+      color: p.close >= p.open ? "rgba(34, 197, 94, 0.35)" : "rgba(239, 68, 68, 0.35)",
+    })),
+  )
+}
+
 // ---- Data setting functions ----
 
 /** Set price data on the main series. */

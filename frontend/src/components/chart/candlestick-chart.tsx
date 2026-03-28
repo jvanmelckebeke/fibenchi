@@ -5,8 +5,11 @@ import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import {
   createMainChart,
   createOverlays,
+  createVolumeSeries,
+  configureVolumeScale,
   setMainSeriesData,
   setAllOverlayData,
+  setVolumeData,
   addAnnotationMarkers,
   type OverlayState,
   type MarkersHandle,
@@ -39,6 +42,7 @@ interface ChartState {
   mainChart: IChartApi
   mainSeries: ReturnType<IChartApi["addSeries"]>
   overlays: OverlayState
+  volumeSeries: ReturnType<IChartApi["addSeries"]>
 }
 
 export function CandlestickChart({
@@ -85,9 +89,11 @@ export function CandlestickChart({
 
     const { chart, series } = createMainChart(containerRef.current, chartType, height, hideTimeAxis)
     const overlays = createOverlays(chart)
+    const volumeSeries = createVolumeSeries(chart)
+    configureVolumeScale(chart)
 
     chartRef.current = chart
-    chartStateRef.current = { mainChart: chart, mainSeries: series, overlays }
+    chartStateRef.current = { mainChart: chart, mainSeries: series, overlays, volumeSeries }
 
     onChartReady?.(chart)
 
@@ -112,6 +118,7 @@ export function CandlestickChart({
 
     setMainSeriesData(state.mainSeries, prices, chartType)
     setAllOverlayData(state.overlays, indicators, enabledOverlayIds)
+    setVolumeData(state.volumeSeries, prices, isVisible("volume"))
 
     try {
       markersRef.current?.detach()
@@ -121,7 +128,7 @@ export function CandlestickChart({
     markersRef.current = addAnnotationMarkers(state.mainSeries, annotations)
 
     state.mainChart.timeScale().fitContent()
-  }, [prices, indicators, annotations, enabledOverlayIds, chartType, height])
+  }, [prices, indicators, annotations, enabledOverlayIds, isVisible, chartType, height])
 
   const resetView = useCallback(() => {
     chartRef.current?.timeScale().fitContent()
