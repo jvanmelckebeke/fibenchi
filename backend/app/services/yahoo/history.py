@@ -1,6 +1,6 @@
 """Yahoo Finance OHLCV history fetching."""
 
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 from yahooquery import Ticker
@@ -14,6 +14,22 @@ PERIOD_MAP = {
     "1y": "1y", "2y": "2y", "5y": "5y",
     "ytd": "ytd", "max": "max",
 }
+
+
+def _normalize_date_index(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure the DataFrame index contains only ``datetime.date`` objects.
+
+    Yahoo sometimes appends an intraday row (timezone-aware ``datetime``)
+    to otherwise ``date``-indexed daily data, producing a mixed-type object
+    index that breaks downstream comparisons.  This normalises every entry
+    to a plain ``date``.
+    """
+    name = df.index.name
+    if isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.Index(df.index.date, name=name)
+    elif df.index.dtype == object and len(df) and isinstance(df.index[-1], datetime):
+        df.index = pd.Index([d.date() if isinstance(d, datetime) else d for d in df.index], name=name)
+    return df
 
 
 @async_threadable
@@ -48,6 +64,7 @@ def fetch_history(
     _, divisor = resolve_currency(price_info, symbol)
     df = _normalize_ohlcv_df(df, divisor)
 
+    df = _normalize_date_index(df)
     return df
 
 
@@ -76,6 +93,7 @@ def _batch_fetch_history_sync(symbols: list[str], period: str = "1y") -> dict[st
                 info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
                 _, divisor = resolve_currency(info, sym)
                 df = _normalize_ohlcv_df(df, divisor)
+                df = _normalize_date_index(df)
                 result[sym] = df
         except KeyError:
             continue

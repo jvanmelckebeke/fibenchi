@@ -126,6 +126,30 @@ class TestFetchHistory:
         assert result.index.name == "date"
 
     @patch("app.services.yahoo.history.Ticker")
+    async def test_normalizes_mixed_date_datetime_index(self, mock_ticker_cls):
+        """Yahoo can append a tz-aware datetime row for intraday data to daily date index."""
+        import pytz
+        from datetime import datetime as dt
+
+        daily_dates = [date(2026, 4, 2), date(2026, 4, 3)]
+        intraday = dt(2026, 4, 6, 9, 0, tzinfo=pytz.timezone("Asia/Seoul"))
+        index = pd.Index(daily_dates + [intraday], name="date")
+        df = pd.DataFrame(
+            {"open": [100, 101, 102], "high": [101, 102, 103], "low": [99, 100, 101],
+             "close": [100.5, 101.5, 102.5], "volume": [1_000_000] * 3},
+            index=index,
+        )
+        ticker = MagicMock()
+        ticker.history.return_value = df
+        ticker.price = {"TEST.KS": {"currency": "KRW"}}
+        mock_ticker_cls.return_value = ticker
+
+        result = await fetch_history("TEST.KS")
+        assert all(type(v) is date for v in result.index), (
+            f"Expected all date, got {set(type(v) for v in result.index)}"
+        )
+
+    @patch("app.services.yahoo.history.Ticker")
     async def test_applies_currency_divisor(self, mock_ticker_cls):
         """GBp prices should be divided by 100."""
         df = pd.DataFrame(
