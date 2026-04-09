@@ -87,6 +87,10 @@ export function formatChangePct(v: number | null): { text: string | null; classN
   }
 }
 
+export function buildYahooQuoteUrl(symbol: string): string {
+  return `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`
+}
+
 /**
  * Build a Yahoo Finance advanced chart URL with pre-configured indicators.
  * Config includes: candlestick + volume, Bollinger Bands (20,2), RSI (14), MACD (12,26,9), 1Y daily.

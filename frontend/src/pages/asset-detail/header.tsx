@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PeriodSelector } from "@/components/period-selector"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { resolveIcon } from "@/lib/icon-utils"
-import { buildYahooFinanceUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
+import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
 import { useQuote } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useRefreshPrices, useCreateAsset, useGroups, useAddAssetsToGroup } from "@/lib/queries"
@@ -86,7 +86,7 @@ export function Header({
           </span>
         )}
         <a
-          href={buildYahooFinanceUrl(symbol)}
+          href={settings.yahoo_link_mode === "quote" ? buildYahooQuoteUrl(symbol) : buildYahooFinanceUrl(symbol)}
           target="_blank"
           rel="noopener noreferrer"
           title="View on Yahoo Finance"
