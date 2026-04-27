@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/add-symbol-dialog"
 import { AssetCard } from "@/components/asset-card"
 import { TagFilterPopover } from "@/components/tag-filter-popover"
-import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail } from "@/lib/queries"
+import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail, usePrefetchOtherGroups } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode, type SortDir } from "@/lib/settings"
@@ -54,6 +54,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod)
   const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
+  usePrefetchOtherGroups(groupId, sparklinePeriod)
 
   const typeFilter = settings.group_type_filter
   const sortBy = settings.group_sort_by
