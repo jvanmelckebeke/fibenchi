@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.services.compute.indicators import bb_position
+from app.services.yahoo import yahoo_client
 from tests.helpers import make_price_df
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -54,7 +55,7 @@ async def test_holdings_indicators_success(client):
     mock_prov.batch_fetch_currencies = AsyncMock(return_value={"AAPL": "USD", "MSFT": "USD"})
 
     with (
-        patch("app.services.holdings_service.fetch_etf_holdings", return_value=_MOCK_HOLDINGS),
+        patch.object(yahoo_client, "holdings", AsyncMock(return_value=_MOCK_HOLDINGS)),
         patch("app.services.compute.indicators.get_price_provider", return_value=mock_prov),
     ):
         resp = await client.get("/api/assets/SPY/holdings/indicators")
@@ -96,7 +97,7 @@ async def test_holdings_indicators_no_data(client):
     """Holdings indicators endpoint returns 404 when no holdings found."""
     await client.post("/api/assets", json={"symbol": "SPY", "name": "SPDR S&P 500", "type": "etf"})
 
-    with patch("app.services.holdings_service.fetch_etf_holdings", return_value=None):
+    with patch.object(yahoo_client, "holdings", AsyncMock(return_value=None)):
         resp = await client.get("/api/assets/SPY/holdings/indicators")
 
     assert resp.status_code == 404
