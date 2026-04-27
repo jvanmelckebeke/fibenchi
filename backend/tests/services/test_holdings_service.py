@@ -34,18 +34,18 @@ def _sample_holdings():
     }
 
 
-@patch("app.services.holdings_service.fetch_etf_holdings", new_callable=AsyncMock)
+@patch("app.services.holdings_service.yahoo_client")
 @patch("app.services.holdings_service.get_asset", new_callable=AsyncMock)
 async def test_get_holdings_returns_data_for_valid_etf(mock_get_asset, mock_fetch):
     db = AsyncMock()
     mock_get_asset.return_value = _make_etf_asset("SPY")
     holdings = _sample_holdings()
-    mock_fetch.return_value = holdings
+    mock_fetch.holdings = AsyncMock(); mock_fetch.holdings.return_value = holdings
 
     result = await get_holdings(db, "SPY")
 
     mock_get_asset.assert_awaited_once_with("SPY", db)
-    mock_fetch.assert_awaited_once_with("SPY")
+    mock_fetch.holdings.assert_awaited_once_with("SPY")
     assert result == holdings
 
 
@@ -61,12 +61,12 @@ async def test_get_holdings_raises_400_for_non_etf(mock_get_asset):
     assert exc_info.value.status_code == 400
 
 
-@patch("app.services.holdings_service.fetch_etf_holdings", new_callable=AsyncMock)
+@patch("app.services.holdings_service.yahoo_client")
 @patch("app.services.holdings_service.get_asset", new_callable=AsyncMock)
 async def test_get_holdings_raises_404_when_no_holdings_data(mock_get_asset, mock_fetch):
     db = AsyncMock()
     mock_get_asset.return_value = _make_etf_asset("SPY")
-    mock_fetch.return_value = None
+    mock_fetch.holdings = AsyncMock(); mock_fetch.holdings.return_value = None
 
     from fastapi import HTTPException
 
@@ -77,14 +77,14 @@ async def test_get_holdings_raises_404_when_no_holdings_data(mock_get_asset, moc
 
 @patch("app.services.holdings_service.merge_fundamentals_into_batch")
 @patch("app.services.holdings_service.compute_batch_indicator_snapshots", new_callable=AsyncMock)
-@patch("app.services.holdings_service.fetch_etf_holdings", new_callable=AsyncMock)
+@patch("app.services.holdings_service.yahoo_client")
 @patch("app.services.holdings_service.get_asset", new_callable=AsyncMock)
 async def test_get_holdings_indicators_returns_snapshots(
     mock_get_asset, mock_fetch, mock_compute, mock_merge_fund
 ):
     db = AsyncMock()
     mock_get_asset.return_value = _make_etf_asset("SPY")
-    mock_fetch.return_value = _sample_holdings()
+    mock_fetch.holdings = AsyncMock(); mock_fetch.holdings.return_value = _sample_holdings()
     snapshots = [
         {"symbol": "AAPL", "currency": "USD", "close": 180.0, "change_pct": 1.0, "values": {"rsi": 55.0}},
         {"symbol": "MSFT", "currency": "USD", "close": 400.0, "change_pct": 0.5, "values": {"rsi": 60.0}},
@@ -97,14 +97,14 @@ async def test_get_holdings_indicators_returns_snapshots(
     assert result == snapshots
 
 
-@patch("app.services.holdings_service.fetch_etf_holdings", new_callable=AsyncMock)
+@patch("app.services.holdings_service.yahoo_client")
 @patch("app.services.holdings_service.get_asset", new_callable=AsyncMock)
 async def test_get_holdings_indicators_returns_empty_when_no_holding_symbols(
     mock_get_asset, mock_fetch
 ):
     db = AsyncMock()
     mock_get_asset.return_value = _make_etf_asset("SPY")
-    mock_fetch.return_value = {
+    mock_fetch.holdings = AsyncMock(); mock_fetch.holdings.return_value = {
         "top_holdings": [{"symbol": "", "name": "Unknown", "weight": 0.01}],
         "sector_weightings": {},
     }

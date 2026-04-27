@@ -4,11 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.yahoo.holdings import (
-    _fetch_etf_holdings_uncached,
-    _holdings_cache,
-    fetch_etf_holdings,
-)
+from app.services.yahoo import yahoo_client
+from app.services.yahoo.client import _parse_holdings
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -29,14 +26,11 @@ _MOCK_FUND_INFO = {
 }
 
 
-class TestFetchEtfHoldingsUncached:
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_returns_holdings_and_sectors(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"SPY": _MOCK_FUND_INFO}
-        mock_ticker_cls.return_value = ticker
+class TestParseHoldings:
+    """``_parse_holdings`` is a pure function — no Yahoo I/O involved."""
 
-        result = _fetch_etf_holdings_uncached("SPY")
+    def test_returns_holdings_and_sectors(self):
+        result = _parse_holdings(_MOCK_FUND_INFO)
 
         assert result is not None
         assert len(result["top_holdings"]) == 3
@@ -44,118 +38,92 @@ class TestFetchEtfHoldingsUncached:
         assert result["top_holdings"][0]["percent"] == 7.2
         assert result["top_holdings"][1]["name"] == "Microsoft Corp."
 
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_sector_names_are_mapped(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"SPY": _MOCK_FUND_INFO}
-        mock_ticker_cls.return_value = ticker
-
-        result = _fetch_etf_holdings_uncached("SPY")
+    def test_sector_names_are_mapped(self):
+        result = _parse_holdings(_MOCK_FUND_INFO)
         sector_names = [s["sector"] for s in result["sector_weightings"]]
-
         assert "Technology" in sector_names
         assert "Healthcare" in sector_names
         assert "Financial Services" in sector_names
 
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_sectors_sorted_descending(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"SPY": _MOCK_FUND_INFO}
-        mock_ticker_cls.return_value = ticker
-
-        result = _fetch_etf_holdings_uncached("SPY")
+    def test_sectors_sorted_descending(self):
+        result = _parse_holdings(_MOCK_FUND_INFO)
         pcts = [s["percent"] for s in result["sector_weightings"]]
         assert pcts == sorted(pcts, reverse=True)
 
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_zero_weight_sectors_excluded(self, mock_ticker_cls):
+    def test_zero_weight_sectors_excluded(self):
         info = {"holdings": [], "sectorWeightings": [{"energy": 0.0}, {"technology": 0.15}]}
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"SPY": info}
-        mock_ticker_cls.return_value = ticker
-
-        result = _fetch_etf_holdings_uncached("SPY")
+        result = _parse_holdings(info)
         assert len(result["sector_weightings"]) == 1
         assert result["sector_weightings"][0]["sector"] == "Technology"
 
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_total_percent_calculated(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"SPY": _MOCK_FUND_INFO}
-        mock_ticker_cls.return_value = ticker
-
-        result = _fetch_etf_holdings_uncached("SPY")
+    def test_total_percent_calculated(self):
+        result = _parse_holdings(_MOCK_FUND_INFO)
         expected = round(7.2 + 6.5 + 3.5, 2)
         assert result["total_percent"] == expected
 
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_returns_none_for_non_etf(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"AAPL": None}
-        mock_ticker_cls.return_value = ticker
+    def test_returns_none_for_empty_info(self):
+        assert _parse_holdings({}) is None
 
-        result = _fetch_etf_holdings_uncached("AAPL")
-        assert result is None
-
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_returns_none_for_string_error(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"AAPL": "No fundamentals data found"}
-        mock_ticker_cls.return_value = ticker
-
-        result = _fetch_etf_holdings_uncached("AAPL")
-        assert result is None
-
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_handles_unknown_sector_key(self, mock_ticker_cls):
+    def test_handles_unknown_sector_key(self):
         info = {"holdings": [], "sectorWeightings": [{"unknown_sector": 0.05}]}
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"XYZ": info}
-        mock_ticker_cls.return_value = ticker
-
-        result = _fetch_etf_holdings_uncached("XYZ")
+        result = _parse_holdings(info)
         assert result["sector_weightings"][0]["sector"] == "unknown_sector"
 
-    @patch("app.services.yahoo.holdings.Ticker")
-    def test_handles_empty_holdings_list(self, mock_ticker_cls):
+    def test_handles_empty_holdings_list(self):
         info = {"holdings": [], "sectorWeightings": []}
-        ticker = MagicMock()
-        ticker.fund_holding_info = {"SPY": info}
-        mock_ticker_cls.return_value = ticker
-
-        result = _fetch_etf_holdings_uncached("SPY")
+        result = _parse_holdings(info)
         assert result["top_holdings"] == []
         assert result["total_percent"] == 0.0
 
 
-class TestFetchEtfHoldingsCaching:
-    @patch("app.services.yahoo.holdings.Ticker")
+class TestHoldings:
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_returns_none_for_non_etf(self, mock_ticker_cls):
+        yahoo_client._holdings_cache.clear()
+        ticker = MagicMock()
+        ticker.fund_holding_info = {"AAPL": None}
+        mock_ticker_cls.return_value = ticker
+
+        result = await yahoo_client.holdings("AAPL")
+        assert result is None
+
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_returns_none_for_string_error(self, mock_ticker_cls):
+        yahoo_client._holdings_cache.clear()
+        ticker = MagicMock()
+        ticker.fund_holding_info = {"AAPL": "No fundamentals data found"}
+        mock_ticker_cls.return_value = ticker
+
+        result = await yahoo_client.holdings("AAPL")
+        assert result is None
+
+    @patch("app.services.yahoo.client.Ticker")
     async def test_caches_result(self, mock_ticker_cls):
-        _holdings_cache._data.clear()
+        yahoo_client._holdings_cache.clear()
 
         ticker = MagicMock()
         ticker.fund_holding_info = {"SPY": _MOCK_FUND_INFO}
         mock_ticker_cls.return_value = ticker
 
-        result1 = await fetch_etf_holdings("SPY")
-        result2 = await fetch_etf_holdings("SPY")
+        result1 = await yahoo_client.holdings("SPY")
+        result2 = await yahoo_client.holdings("SPY")
 
-        # Only one Ticker instantiation due to cache hit
+        # Only one Ticker instantiation due to cache hit.
         assert mock_ticker_cls.call_count == 1
         assert result1 == result2
 
-        _holdings_cache._data.clear()
+        yahoo_client._holdings_cache.clear()
 
-    @patch("app.services.yahoo.holdings.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_uppercase_cache_key(self, mock_ticker_cls):
-        _holdings_cache._data.clear()
+        yahoo_client._holdings_cache.clear()
 
         ticker = MagicMock()
         ticker.fund_holding_info = {"spy": _MOCK_FUND_INFO}
         mock_ticker_cls.return_value = ticker
 
-        await fetch_etf_holdings("spy")
-        # Cache key should be uppercase
-        assert _holdings_cache.get_value("SPY") is not None
+        await yahoo_client.holdings("spy")
+        # Cache key is normalised to uppercase
+        assert yahoo_client._holdings_cache.get_value("SPY") is not None
 
-        _holdings_cache._data.clear()
+        yahoo_client._holdings_cache.clear()

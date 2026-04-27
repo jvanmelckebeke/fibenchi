@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.yahoo.earnings import (
-    _extract_last_reported_date,
-    _fetch_earnings_date_sync,
+from app.services.yahoo import yahoo_client
+from app.services.yahoo.client import (
+    _last_reported_date as _extract_last_reported_date,
     _parse_earnings_date,
 )
 
@@ -58,7 +58,7 @@ class TestExtractLastReportedDate:
 
 
 class TestFetchEarningsDate:
-    @patch("app.services.yahoo.earnings.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_confirmed_date_with_reported(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.calendar_events = {
@@ -80,13 +80,13 @@ class TestFetchEarningsDate:
         }
         mock_ticker_cls.return_value = ticker
 
-        result = _fetch_earnings_date_sync("AAPL")
+        result = yahoo_client._earnings_sync("AAPL")
         assert result is not None
         assert result["earnings_date"] == datetime.date(2026, 4, 30)
         assert result["is_estimate"] is False
         assert result["last_reported_date"] == datetime.date.fromtimestamp(1772141075)
 
-    @patch("app.services.yahoo.earnings.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_estimated_date(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.calendar_events = {
@@ -100,29 +100,29 @@ class TestFetchEarningsDate:
         ticker.earnings = {"TSLA": {}}
         mock_ticker_cls.return_value = ticker
 
-        result = _fetch_earnings_date_sync("TSLA")
+        result = yahoo_client._earnings_sync("TSLA")
         assert result is not None
         assert result["earnings_date"] == datetime.date(2026, 7, 15)
         assert result["is_estimate"] is True
         assert result["last_reported_date"] is None
 
-    @patch("app.services.yahoo.earnings.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_no_data_returns_none(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.calendar_events = {"AAPL": "No data found"}
         mock_ticker_cls.return_value = ticker
 
-        assert _fetch_earnings_date_sync("AAPL") is None
+        assert yahoo_client._earnings_sync("AAPL") is None
 
-    @patch("app.services.yahoo.earnings.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_string_error_returns_none(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.calendar_events = "No fundamentals data found"
         mock_ticker_cls.return_value = ticker
 
-        assert _fetch_earnings_date_sync("AAPL") is None
+        assert yahoo_client._earnings_sync("AAPL") is None
 
-    @patch("app.services.yahoo.earnings.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_empty_earnings_list_returns_none(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.calendar_events = {
@@ -134,9 +134,9 @@ class TestFetchEarningsDate:
         }
         mock_ticker_cls.return_value = ticker
 
-        assert _fetch_earnings_date_sync("AAPL") is None
+        assert yahoo_client._earnings_sync("AAPL") is None
 
-    @patch("app.services.yahoo.earnings.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_earnings_history_error_still_returns_next_date(self, mock_ticker_cls):
         """If ticker.earnings raises, we still get the next date."""
         ticker = MagicMock()
@@ -151,7 +151,7 @@ class TestFetchEarningsDate:
         ticker.earnings = "No data found"  # string error
         mock_ticker_cls.return_value = ticker
 
-        result = _fetch_earnings_date_sync("AAPL")
+        result = yahoo_client._earnings_sync("AAPL")
         assert result is not None
         assert result["earnings_date"] == datetime.date(2026, 4, 30)
         assert result["last_reported_date"] is None

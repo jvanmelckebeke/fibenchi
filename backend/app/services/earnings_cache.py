@@ -6,7 +6,7 @@ doesn't hit Yahoo Finance on every load.
 
 import logging
 
-from app.services.yahoo.earnings import fetch_earnings_date
+from app.services.yahoo import yahoo_client
 from app.utils import TTLCache
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ async def get_earnings(symbol: str) -> dict[str, object] | None:
     if cached is not None:
         return cached
 
-    result = await fetch_earnings_date(upper)
+    result = await yahoo_client.earnings(upper)
     if result is not None:
         _earnings_cache.set_value(upper, result)
     return result

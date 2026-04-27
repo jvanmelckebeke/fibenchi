@@ -19,7 +19,6 @@ from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
 from app.services.price_providers import init_price_provider
-from app.services.fundamentals_cache import warm_fundamentals_cache
 from app.services.intraday import fetch_and_store_intraday, cleanup_old_intraday
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
@@ -39,16 +38,7 @@ async def scheduled_refresh():
             logger.exception("Scheduled refresh failed")
             return
 
-    # Pre-warm fundamentals cache (slow Yahoo fetch) before indicator computation
-    async with async_session() as db:
-        try:
-            from app.repositories.asset_repo import AssetRepository
-            symbols = await AssetRepository(db).list_in_any_group_symbols()
-            await warm_fundamentals_cache(symbols)
-        except Exception:
-            logger.exception("Fundamentals cache warming failed (non-fatal)")
-
-    # Pre-compute indicator snapshots so the first group page request is instant
+    # Pre-compute indicator snapshots so the first group page request is instant.
     async with async_session() as db:
         try:
             indicators = await compute_and_cache_indicators(db)

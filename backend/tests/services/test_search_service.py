@@ -52,9 +52,9 @@ def test_parse_yahoo_results_empty():
 
 
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
-@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+@patch("app.services.search_service.yahoo_client")
 async def test_search_queries_yahoo_when_db_empty(mock_yahoo, mock_upsert, db):
-    mock_yahoo.return_value = _yahoo_response(
+    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(
         _equity("AAPL", "Apple Inc."),
         _etf("SPY", "SPDR S&P 500"),
     )
@@ -62,22 +62,22 @@ async def test_search_queries_yahoo_when_db_empty(mock_yahoo, mock_upsert, db):
     result = await search_symbols("apple", db)
 
     assert len(result) == 2
-    mock_yahoo.assert_awaited_once_with("apple", first_quote=False)
+    mock_yahoo.search.assert_awaited_once_with("apple", first_quote=False)
     mock_upsert.assert_awaited_once()
 
 
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
-@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+@patch("app.services.search_service.yahoo_client")
 async def test_search_strips_and_lowercases_query(mock_yahoo, mock_upsert, db):
-    mock_yahoo.return_value = _yahoo_response(_equity("AAPL", "Apple"))
+    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(_equity("AAPL", "Apple"))
 
     await search_symbols("  AAPL  ", db)
 
-    mock_yahoo.assert_awaited_once_with("aapl", first_quote=False)
+    mock_yahoo.search.assert_awaited_once_with("aapl", first_quote=False)
 
 
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
-@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+@patch("app.services.search_service.yahoo_client")
 async def test_search_returns_local_when_enough_results(mock_yahoo, mock_upsert, db):
     # Seed 8+ symbols into the DB
     for i in range(10):
@@ -87,32 +87,32 @@ async def test_search_returns_local_when_enough_results(mock_yahoo, mock_upsert,
     result = await search_symbols("aapl", db)
 
     assert len(result) >= 8
-    mock_yahoo.assert_not_awaited()  # Should not call Yahoo when local has enough
+    mock_yahoo.search.assert_not_called()  # Should not call Yahoo when local has enough
 
 
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
-@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+@patch("app.services.search_service.yahoo_client")
 async def test_search_falls_back_to_yahoo_when_few_local(mock_yahoo, mock_upsert, db):
     # Seed only 2 symbols
     db.add(SymbolDirectory(symbol="AAPL", name="Apple Inc.", exchange="NYSE", type="stock"))
     db.add(SymbolDirectory(symbol="AAPLX", name="Apple Extra", exchange="NYSE", type="stock"))
     await db.commit()
 
-    mock_yahoo.return_value = _yahoo_response(
+    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(
         _equity("AAPL", "Apple Inc."),
         _equity("AAPL2", "Apple 2"),
     )
 
     result = await search_symbols("aapl", db)
 
-    mock_yahoo.assert_awaited_once()
+    mock_yahoo.search.assert_awaited_once()
     assert len(result) == 2  # Yahoo results take priority
 
 
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
-@patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+@patch("app.services.search_service.yahoo_client")
 async def test_search_returns_empty_when_no_matches(mock_yahoo, mock_upsert, db):
-    mock_yahoo.return_value = _yahoo_response(
+    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(
         _mutual_fund("VFINX", "Vanguard 500"),
     )
 

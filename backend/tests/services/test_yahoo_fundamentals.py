@@ -5,12 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.yahoo.fundamentals import (
-    FUNDAMENTAL_FIELDS,
-    _batch_fetch_fundamentals_sync,
-    _safe_float,
-    batch_fetch_fundamentals,
-)
+from app.services.yahoo import yahoo_client
+from app.services.yahoo.client import FUNDAMENTAL_FIELDS, _safe_float
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -66,11 +62,11 @@ class TestFundamentalFields:
 
 
 class TestBatchFetchFundamentalsSync:
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_empty_symbols(self, mock_ticker_cls):
-        assert _batch_fetch_fundamentals_sync([]) == {}
+        assert yahoo_client._fundamentals_sync([]) == {}
 
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_returns_all_fields(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.key_stats = {
@@ -81,7 +77,7 @@ class TestBatchFetchFundamentalsSync:
         }
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_fundamentals_sync(["AAPL"])
+        result = yahoo_client._fundamentals_sync(["AAPL"])
 
         assert "AAPL" in result
         data = result["AAPL"]
@@ -91,20 +87,20 @@ class TestBatchFetchFundamentalsSync:
         assert data["ev_ebitda"] == 22.3
         assert data["revenue_growth"] == 8.9
 
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_missing_fields_are_none(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.key_stats = {"AAPL": {"forwardPE": 28.5}}
         ticker.financial_data = {"AAPL": {}}
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_fundamentals_sync(["AAPL"])
+        result = yahoo_client._fundamentals_sync(["AAPL"])
         data = result["AAPL"]
         assert data["forward_pe"] == 28.5
         assert data["roe"] is None
         assert data["revenue_growth"] is None
 
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_string_error_for_symbol(self, mock_ticker_cls):
         """Yahoo returns string errors for symbols with no data."""
         ticker = MagicMock()
@@ -112,22 +108,22 @@ class TestBatchFetchFundamentalsSync:
         ticker.financial_data = {"AAPL": "No fundamentals data found"}
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_fundamentals_sync(["AAPL"])
+        result = yahoo_client._fundamentals_sync(["AAPL"])
         data = result["AAPL"]
         assert all(v is None for v in data.values())
 
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_nan_values_filtered(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.key_stats = {"AAPL": {"forwardPE": float("nan"), "pegRatio": float("inf")}}
         ticker.financial_data = {"AAPL": {}}
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_fundamentals_sync(["AAPL"])
+        result = yahoo_client._fundamentals_sync(["AAPL"])
         assert result["AAPL"]["forward_pe"] is None
         assert result["AAPL"]["peg_ratio"] is None
 
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     def test_multiple_symbols(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.key_stats = {
@@ -140,24 +136,24 @@ class TestBatchFetchFundamentalsSync:
         }
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_fundamentals_sync(["AAPL", "MSFT"])
+        result = yahoo_client._fundamentals_sync(["AAPL", "MSFT"])
         assert len(result) == 2
         assert result["MSFT"]["roe"] == 38.0
         assert result["MSFT"]["revenue_growth"] == 15.0
 
 
 class TestBatchFetchFundamentalsAsync:
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_async_wrapper(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.key_stats = {"AAPL": {"forwardPE": 28.5}}
         ticker.financial_data = {"AAPL": {"returnOnEquity": 0.15}}
         mock_ticker_cls.return_value = ticker
 
-        result = await batch_fetch_fundamentals(["AAPL"])
+        result = await yahoo_client.fundamentals(["AAPL"])
         assert result["AAPL"]["forward_pe"] == 28.5
 
-    @patch("app.services.yahoo.fundamentals.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_empty_returns_empty(self, mock_ticker_cls):
-        result = await batch_fetch_fundamentals([])
+        result = await yahoo_client.fundamentals([])
         assert result == {}

@@ -10,18 +10,14 @@ import pytest
 from app.services.intraday import (
     _EXCHANGE_HOURS,
     _classify_session,
-    _fetch_intraday_sync,
     fetch_and_store_intraday,
 )
+from app.services.yahoo import yahoo_client
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 ET = ZoneInfo("America/New_York")
 CPH = ZoneInfo("Europe/Copenhagen")
-
-# Access the unwrapped sync function for direct unit testing
-# (the @async_threadable decorator preserves __wrapped__)
-_fetch_intraday_sync_inner = _fetch_intraday_sync.__wrapped__
 
 
 # ---------- _classify_session ----------
@@ -122,7 +118,10 @@ class TestExchangeHours:
             assert open_t < close_t, f"{tz} open >= close"
 
 
-# ---------- _fetch_intraday_sync ----------
+# ---------- YahooClient.intraday ----------
+#
+# The Yahoo fetch lives on the client now. It returns divisor-normalised
+# bars carrying ``tz_name`` so the intraday module can classify sessions.
 
 
 def _make_hist_df(sym: str, timestamps: list[datetime], prices: list[float]) -> pd.DataFrame:
@@ -142,12 +141,7 @@ def _make_hist_df(sym: str, timestamps: list[datetime], prices: list[float]) -> 
     return pd.DataFrame(data, index=mi)
 
 
-class TestFetchIntradaySync:
-    """Tests for _fetch_intraday_sync — timezone extraction and includePrePost.
-
-    Uses __wrapped__ to call the underlying sync function directly.
-    """
-
+class TestClientIntraday:
     def test_extracts_timezone_from_timestamps(self):
         """When Yahoo returns exchangeTimezoneName=None, tz is extracted from bar timestamps."""
         ts_list = [
@@ -167,64 +161,13 @@ class TestFetchIntradaySync:
         mock_ticker._get_data.return_value = {}
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
-        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
-            result = _fetch_intraday_sync_inner(["NKT.CO"])
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            result = yahoo_client._intraday_sync(["NKT.CO"])
 
         assert "NKT.CO" in result
-        sessions = {bar["session"] for bar in result["NKT.CO"]}
-        # All bars 9:00-11:00 CET are within Copenhagen regular hours
-        assert sessions == {"regular"}
-
-    def test_us_premarket_bars_classified_as_pre(self):
-        """Premarket bars for US stocks should be classified as 'pre'."""
-        ts_list = [
-            datetime(2026, 2, 25, 4, 0, tzinfo=ET),
-            datetime(2026, 2, 25, 5, 0, tzinfo=ET),
-            datetime(2026, 2, 25, 7, 0, tzinfo=ET),
-        ]
-        hist = _make_hist_df("KTOS", ts_list, [30.0, 30.5, 31.0])
-
-        price_data = {"KTOS": {
-            "currency": "USD",
-            "exchangeTimezoneName": "America/New_York",
-        }}
-
-        mock_ticker = MagicMock()
-        mock_ticker.price = price_data
-        mock_ticker._get_data.return_value = {}
-        mock_ticker._historical_data_to_dataframe.return_value = hist
-
-        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
-            result = _fetch_intraday_sync_inner(["KTOS"])
-
-        assert "KTOS" in result
-        sessions = {bar["session"] for bar in result["KTOS"]}
-        assert sessions == {"pre"}
-
-    def test_mixed_sessions_us(self):
-        """Bars spanning pre → regular → post get different session labels."""
-        ts_list = [
-            datetime(2026, 2, 25, 8, 0, tzinfo=ET),   # pre
-            datetime(2026, 2, 25, 10, 0, tzinfo=ET),  # regular
-            datetime(2026, 2, 25, 17, 0, tzinfo=ET),  # post
-        ]
-        hist = _make_hist_df("AAPL", ts_list, [180.0, 181.0, 180.5])
-
-        price_data = {"AAPL": {
-            "currency": "USD",
-            "exchangeTimezoneName": "America/New_York",
-        }}
-
-        mock_ticker = MagicMock()
-        mock_ticker.price = price_data
-        mock_ticker._get_data.return_value = {}
-        mock_ticker._historical_data_to_dataframe.return_value = hist
-
-        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
-            result = _fetch_intraday_sync_inner(["AAPL"])
-
-        sessions = [bar["session"] for bar in result["AAPL"]]
-        assert sessions == ["pre", "regular", "post"]
+        # Each bar carries tz_name so the caller can classify sessions later.
+        tz_names = {bar["tz_name"] for bar in result["NKT.CO"]}
+        assert all(tz and "Copenhagen" in tz for tz in tz_names)
 
     def test_calls_get_data_with_include_prepost(self):
         """Verify the Yahoo API call includes includePrePost=true."""
@@ -235,8 +178,8 @@ class TestFetchIntradaySync:
         mock_ticker._get_data.return_value = {}
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
-        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
-            _fetch_intraday_sync_inner(["KTOS"])
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            yahoo_client._intraday_sync(["KTOS"])
 
         mock_ticker._get_data.assert_called_once_with(
             "chart",
@@ -244,7 +187,7 @@ class TestFetchIntradaySync:
         )
 
     def test_empty_symbols_returns_empty(self):
-        assert _fetch_intraday_sync_inner([]) == {}
+        assert yahoo_client._intraday_sync([]) == {}
 
     def test_applies_currency_divisor(self):
         """Subunit currencies (e.g. GBp) should divide prices."""
@@ -261,16 +204,16 @@ class TestFetchIntradaySync:
         mock_ticker._get_data.return_value = {}
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
-        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
-            with patch("app.services.intraday.resolve_currency", return_value=("GBP", 100)):
-                result = _fetch_intraday_sync_inner(["VOD.L"])
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            with patch("app.services.yahoo.client.resolve_currency", return_value=("GBP", 100)):
+                result = yahoo_client._intraday_sync(["VOD.L"])
 
         assert result["VOD.L"][0]["price"] == 85.0
 
     def test_filters_synthetic_non_minute_boundary_bars(self):
         """Yahoo echo bars at non-minute-boundary timestamps are dropped."""
         ts_list = [
-            datetime(2026, 2, 25, 10, 0, 0, tzinfo=CPH),   # real: on minute
+            datetime(2026, 2, 25, 10, 0, 0, tzinfo=CPH),    # real: on minute
             datetime(2026, 2, 25, 10, 3, 43, tzinfo=CPH),   # synthetic: 43s offset
             datetime(2026, 2, 25, 10, 5, 0, tzinfo=CPH),    # real: on minute
         ]
@@ -286,8 +229,8 @@ class TestFetchIntradaySync:
         mock_ticker._get_data.return_value = {}
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
-        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
-            result = _fetch_intraday_sync_inner(["P911.DE"])
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            result = yahoo_client._intraday_sync(["P911.DE"])
 
         assert "P911.DE" in result
         assert len(result["P911.DE"]) == 2  # synthetic bar dropped
@@ -303,14 +246,17 @@ class TestFetchIntradaySync:
         mock_ticker._get_data.return_value = {}
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
-        with patch("app.services.intraday.Ticker", return_value=mock_ticker):
-            result = _fetch_intraday_sync_inner(["AAPL", "MISSING"])
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            result = yahoo_client._intraday_sync(["AAPL", "MISSING"])
 
         assert "AAPL" in result
         assert "MISSING" not in result
 
 
 # ---------- fetch_and_store_intraday ----------
+#
+# This integration adds session classification (which depends on
+# per-exchange trading hours) on top of the client's raw bars.
 
 
 class TestFetchAndStoreIntraday:
@@ -319,13 +265,13 @@ class TestFetchAndStoreIntraday:
     async def test_deletes_stale_bars_before_upsert(self):
         """Bars older than the oldest fresh bar should be deleted."""
         fresh_bars = [
-            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "session": "regular"},
-            {"timestamp": datetime(2026, 2, 25, 10, 0, tzinfo=ET), "price": 31.0, "volume": 200, "session": "regular"},
+            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "tz_name": "America/New_York"},
+            {"timestamp": datetime(2026, 2, 25, 10, 0, tzinfo=ET), "price": 31.0, "volume": 200, "tz_name": "America/New_York"},
         ]
 
         mock_db = AsyncMock()
 
-        with patch("app.services.intraday._fetch_intraday_sync", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}):
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}):
             count = await fetch_and_store_intraday(mock_db, ["KTOS"], {"KTOS": 1})
 
         assert count == 2
@@ -341,7 +287,7 @@ class TestFetchAndStoreIntraday:
     async def test_no_data_returns_zero(self):
         mock_db = AsyncMock()
 
-        with patch("app.services.intraday._fetch_intraday_sync", new_callable=AsyncMock, return_value={}):
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={}):
             count = await fetch_and_store_intraday(mock_db, ["KTOS"], {"KTOS": 1})
 
         assert count == 0
@@ -350,11 +296,11 @@ class TestFetchAndStoreIntraday:
     async def test_skips_unknown_symbols(self):
         """Bars for symbols not in asset_map are skipped."""
         fresh_bars = [
-            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "session": "regular"},
+            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "tz_name": "America/New_York"},
         ]
         mock_db = AsyncMock()
 
-        with patch("app.services.intraday._fetch_intraday_sync", new_callable=AsyncMock, return_value={"UNKNOWN": fresh_bars}):
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"UNKNOWN": fresh_bars}):
             count = await fetch_and_store_intraday(mock_db, ["UNKNOWN"], {"KTOS": 1})
 
         assert count == 0

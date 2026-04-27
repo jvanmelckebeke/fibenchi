@@ -9,7 +9,7 @@ merged from cache when available.
 import asyncio
 import logging
 
-from app.services.yahoo import batch_fetch_fundamentals
+from app.services.yahoo import yahoo_client
 from app.utils import TTLCache
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ async def warm_fundamentals_cache(symbols: list[str]) -> None:
     if not symbols:
         return
     try:
-        data = await batch_fetch_fundamentals(symbols)
+        data = await yahoo_client.fundamentals(symbols)
         for sym, metrics in data.items():
             clean = {k: v for k, v in metrics.items() if v is not None}
             if clean:
@@ -73,7 +73,7 @@ def _schedule_background_fetch(symbols: list[str]) -> None:
 
     async def _fetch():
         try:
-            data = await batch_fetch_fundamentals(to_fetch)
+            data = await yahoo_client.fundamentals(to_fetch)
             for sym, metrics in data.items():
                 clean = {k: v for k, v in metrics.items() if v is not None}
                 if clean:

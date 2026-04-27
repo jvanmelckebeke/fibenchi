@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.compute.indicators import compute_batch_indicator_snapshots
 from app.services.entity_lookups import get_asset
 from app.services.fundamentals_cache import merge_fundamentals_into_batch
-from app.services.yahoo import fetch_etf_holdings
+from app.services.yahoo import yahoo_client
 
 
 async def get_holdings(db: AsyncSession, symbol: str) -> dict:
@@ -14,7 +14,7 @@ async def get_holdings(db: AsyncSession, symbol: str) -> dict:
     asset = await get_asset(symbol, db)
     if asset.type.value != "etf":
         raise HTTPException(400, f"{symbol} is not an ETF")
-    data = await fetch_etf_holdings(symbol)
+    data = await yahoo_client.holdings(symbol)
     if not data:
         raise HTTPException(404, f"No holdings data for {symbol}")
     return data
@@ -26,7 +26,7 @@ async def get_holdings_indicators(db: AsyncSession, symbol: str) -> list[dict]:
     if asset.type.value != "etf":
         raise HTTPException(400, f"{symbol} is not an ETF")
 
-    data = await fetch_etf_holdings(symbol)
+    data = await yahoo_client.holdings(symbol)
     if not data:
         raise HTTPException(404, f"No holdings data for {symbol}")
 

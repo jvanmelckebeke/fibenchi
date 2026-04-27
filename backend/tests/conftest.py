@@ -33,7 +33,15 @@ _SEED_CURRENCIES = [
 
 @pytest.fixture(autouse=True)
 def mock_yahoo_validate(monkeypatch):
-    """Prevent real Yahoo Finance calls during tests."""
+    """Prevent real Yahoo Finance calls during tests.
+
+    Rebinds the ``yahoo_client`` name in ``asset_service`` to a mock with
+    a deterministic ``validate`` response. Other modules keep their own
+    reference to the real singleton, so tests that exercise
+    ``yahoo_client`` directly (e.g. ``test_yahoo_validation.py``) are
+    unaffected.
+    """
+    from unittest.mock import AsyncMock, MagicMock
 
     async def fake_validate(symbol):
         return {
@@ -44,7 +52,27 @@ def mock_yahoo_validate(monkeypatch):
             "currency_code": "USD",
         }
 
-    monkeypatch.setattr("app.services.asset_service.validate_symbol", fake_validate)
+    mock = MagicMock()
+    mock.validate = AsyncMock(side_effect=fake_validate)
+    monkeypatch.setattr("app.services.asset_service.yahoo_client", mock)
+
+
+@pytest.fixture(autouse=True)
+def reset_yahoo_throttle():
+    """Disable inter-call spacing and clear breaker state between tests.
+
+    The production throttle paces calls by 1s and trips the circuit
+    breaker on Invalid Crumb. Both behaviours would slow the suite (and
+    leak state across tests), so we run all tests with ``min_interval=0``
+    and reset on entry.
+    """
+    from app.services.yahoo.rate_limit import yahoo_throttle
+    original_min_interval = yahoo_throttle._min_interval
+    yahoo_throttle._min_interval = 0.0
+    yahoo_throttle.reset()
+    yield
+    yahoo_throttle._min_interval = original_min_interval
+    yahoo_throttle.reset()
 
 
 @pytest.fixture(autouse=True)
