@@ -12,8 +12,8 @@ period mapping) are re-exported here for convenience since they have no
 Yahoo I/O concerns.
 """
 
+from app.services.yahoo._parsers import PERIOD_MAP
 from app.services.yahoo.client import (
-    PERIOD_MAP,
     YahooClient,
     yahoo_client,
 )

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.services.yahoo import yahoo_client
-from app.services.yahoo.client import _parse_holdings
+from app.services.yahoo._parsers import parse_holdings as _parse_holdings
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 

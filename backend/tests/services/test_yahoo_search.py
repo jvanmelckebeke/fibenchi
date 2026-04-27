@@ -10,7 +10,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 class TestSearch:
-    @patch("app.services.yahoo.client._yq_search")
+    @patch("app.services.yahoo._search._yq_search")
     async def test_delegates_to_yahooquery(self, mock_search):
         mock_search.return_value = {"quotes": [{"symbol": "AAPL"}]}
 
@@ -19,7 +19,7 @@ class TestSearch:
         mock_search.assert_called_once_with("AAPL")
         assert result == {"quotes": [{"symbol": "AAPL"}]}
 
-    @patch("app.services.yahoo.client._yq_search")
+    @patch("app.services.yahoo._search._yq_search")
     async def test_passes_kwargs(self, mock_search):
         mock_search.return_value = {"quotes": []}
 
@@ -27,7 +27,7 @@ class TestSearch:
 
         mock_search.assert_called_once_with("AAPL", first_quote=False)
 
-    @patch("app.services.yahoo.client._yq_search")
+    @patch("app.services.yahoo._search._yq_search")
     async def test_returns_empty_on_no_results(self, mock_search):
         mock_search.return_value = {"quotes": []}
 

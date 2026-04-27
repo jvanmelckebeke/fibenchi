@@ -26,41 +26,41 @@ CPH = ZoneInfo("Europe/Copenhagen")
 class TestClassifySession:
     """Session classification logic for pre/regular/post."""
 
-    def test_us_premarket(self):
+    async def test_us_premarket(self):
         ts = datetime(2026, 2, 25, 7, 0, tzinfo=ET)
         assert _classify_session(ts, "America/New_York") == "pre"
 
-    def test_us_regular(self):
+    async def test_us_regular(self):
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=ET)
         assert _classify_session(ts, "America/New_York") == "regular"
 
-    def test_us_regular_at_open(self):
+    async def test_us_regular_at_open(self):
         ts = datetime(2026, 2, 25, 9, 30, tzinfo=ET)
         assert _classify_session(ts, "America/New_York") == "regular"
 
-    def test_us_post_at_close(self):
+    async def test_us_post_at_close(self):
         ts = datetime(2026, 2, 25, 16, 0, tzinfo=ET)
         assert _classify_session(ts, "America/New_York") == "post"
 
-    def test_us_postmarket(self):
+    async def test_us_postmarket(self):
         ts = datetime(2026, 2, 25, 18, 0, tzinfo=ET)
         assert _classify_session(ts, "America/New_York") == "post"
 
-    def test_copenhagen_regular(self):
+    async def test_copenhagen_regular(self):
         """NKT.CO: 10:00 CET is regular Copenhagen hours (9:00-17:00)."""
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
         assert _classify_session(ts, "Europe/Copenhagen") == "regular"
 
-    def test_copenhagen_pre(self):
+    async def test_copenhagen_pre(self):
         """NKT.CO: 8:30 CET is before Copenhagen open (9:00)."""
         ts = datetime(2026, 2, 25, 8, 30, tzinfo=CPH)
         assert _classify_session(ts, "Europe/Copenhagen") == "pre"
 
-    def test_copenhagen_post(self):
+    async def test_copenhagen_post(self):
         ts = datetime(2026, 2, 25, 17, 0, tzinfo=CPH)
         assert _classify_session(ts, "Europe/Copenhagen") == "post"
 
-    def test_copenhagen_fallback_to_et_misclassifies(self):
+    async def test_copenhagen_fallback_to_et_misclassifies(self):
         """Without timezone info, 10:00 CET falls back to ET (4:00 AM) → 'pre'.
 
         This documents the bug that the tz_name extraction fixes.
@@ -68,15 +68,15 @@ class TestClassifySession:
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
         assert _classify_session(ts, None) == "pre"  # wrong! should be regular
 
-    def test_unknown_timezone_falls_back_to_et(self):
+    async def test_unknown_timezone_falls_back_to_et(self):
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=ET)
         assert _classify_session(ts, "Unknown/Timezone") == "regular"
 
-    def test_london_regular(self):
+    async def test_london_regular(self):
         ts = datetime(2026, 2, 25, 12, 0, tzinfo=ZoneInfo("Europe/London"))
         assert _classify_session(ts, "Europe/London") == "regular"
 
-    def test_london_pre(self):
+    async def test_london_pre(self):
         ts = datetime(2026, 2, 25, 7, 30, tzinfo=ZoneInfo("Europe/London"))
         assert _classify_session(ts, "Europe/London") == "pre"
 
@@ -97,7 +97,7 @@ class TestExchangeHours:
         "Europe/Athens",
         "Europe/Istanbul",
     ])
-    def test_newly_added_timezones_present(self, tz):
+    async def test_newly_added_timezones_present(self, tz):
         assert tz in _EXCHANGE_HOURS
 
     @pytest.mark.parametrize("tz", [
@@ -108,10 +108,10 @@ class TestExchangeHours:
         "Asia/Tokyo",
         "Australia/Sydney",
     ])
-    def test_core_timezones_present(self, tz):
+    async def test_core_timezones_present(self, tz):
         assert tz in _EXCHANGE_HOURS
 
-    def test_hours_are_time_tuples(self):
+    async def test_hours_are_time_tuples(self):
         for tz, (open_t, close_t) in _EXCHANGE_HOURS.items():
             assert isinstance(open_t, time), f"{tz} open is not a time"
             assert isinstance(close_t, time), f"{tz} close is not a time"
@@ -142,7 +142,7 @@ def _make_hist_df(sym: str, timestamps: list[datetime], prices: list[float]) -> 
 
 
 class TestClientIntraday:
-    def test_extracts_timezone_from_timestamps(self):
+    async def test_extracts_timezone_from_timestamps(self):
         """When Yahoo returns exchangeTimezoneName=None, tz is extracted from bar timestamps."""
         ts_list = [
             datetime(2026, 2, 25, 9, 0, tzinfo=CPH),
@@ -162,14 +162,14 @@ class TestClientIntraday:
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
         with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
-            result = yahoo_client._intraday_sync(["NKT.CO"])
+            result = await yahoo_client.intraday(["NKT.CO"])
 
         assert "NKT.CO" in result
         # Each bar carries tz_name so the caller can classify sessions later.
         tz_names = {bar["tz_name"] for bar in result["NKT.CO"]}
         assert all(tz and "Copenhagen" in tz for tz in tz_names)
 
-    def test_calls_get_data_with_include_prepost(self):
+    async def test_calls_get_data_with_include_prepost(self):
         """Verify the Yahoo API call includes includePrePost=true."""
         hist = _make_hist_df("KTOS", [], [])
 
@@ -179,17 +179,17 @@ class TestClientIntraday:
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
         with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
-            yahoo_client._intraday_sync(["KTOS"])
+            await yahoo_client.intraday(["KTOS"])
 
         mock_ticker._get_data.assert_called_once_with(
             "chart",
             {"range": "1d", "interval": "1m", "includePrePost": "true"},
         )
 
-    def test_empty_symbols_returns_empty(self):
-        assert yahoo_client._intraday_sync([]) == {}
+    async def test_empty_symbols_returns_empty(self):
+        assert await yahoo_client.intraday([]) == {}
 
-    def test_applies_currency_divisor(self):
+    async def test_applies_currency_divisor(self):
         """Subunit currencies (e.g. GBp) should divide prices."""
         ts_list = [datetime(2026, 2, 25, 10, 0, tzinfo=ZoneInfo("Europe/London"))]
         hist = _make_hist_df("VOD.L", ts_list, [8500.0])
@@ -205,12 +205,12 @@ class TestClientIntraday:
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
         with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
-            with patch("app.services.yahoo.client.resolve_currency", return_value=("GBP", 100)):
-                result = yahoo_client._intraday_sync(["VOD.L"])
+            with patch("app.services.yahoo._intraday.resolve_currency", return_value=("GBP", 100)):
+                result = await yahoo_client.intraday(["VOD.L"])
 
         assert result["VOD.L"][0]["price"] == 85.0
 
-    def test_filters_synthetic_non_minute_boundary_bars(self):
+    async def test_filters_synthetic_non_minute_boundary_bars(self):
         """Yahoo echo bars at non-minute-boundary timestamps are dropped."""
         ts_list = [
             datetime(2026, 2, 25, 10, 0, 0, tzinfo=CPH),    # real: on minute
@@ -230,14 +230,14 @@ class TestClientIntraday:
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
         with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
-            result = yahoo_client._intraday_sync(["P911.DE"])
+            result = await yahoo_client.intraday(["P911.DE"])
 
         assert "P911.DE" in result
         assert len(result["P911.DE"]) == 2  # synthetic bar dropped
         prices = [bar["price"] for bar in result["P911.DE"]]
         assert prices == [41.0, 42.0]
 
-    def test_skips_symbol_on_key_error(self):
+    async def test_skips_symbol_on_key_error(self):
         """Symbols missing from the DataFrame are silently skipped."""
         hist = _make_hist_df("AAPL", [datetime(2026, 2, 25, 10, 0, tzinfo=ET)], [180.0])
 
@@ -247,7 +247,7 @@ class TestClientIntraday:
         mock_ticker._historical_data_to_dataframe.return_value = hist
 
         with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
-            result = yahoo_client._intraday_sync(["AAPL", "MISSING"])
+            result = await yahoo_client.intraday(["AAPL", "MISSING"])
 
         assert "AAPL" in result
         assert "MISSING" not in result

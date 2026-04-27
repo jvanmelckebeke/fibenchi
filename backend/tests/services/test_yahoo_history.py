@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from app.services.yahoo import yahoo_client
-from app.services.yahoo.client import PERIOD_MAP
+from app.services.yahoo._parsers import PERIOD_MAP
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
