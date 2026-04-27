@@ -19,10 +19,11 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
     """Add a new asset by ticker symbol. The symbol is validated against Yahoo Finance
     which also auto-detects the asset name, type (stock/etf), and currency.
 
-    By default the asset is added to the default group. Set `add_to_default_group=false`
-    to create the asset record without group membership (e.g. for pseudo-ETF constituents).
+    The asset is created without group membership. Use
+    ``POST /api/groups/{id}/assets`` afterwards to attach it to the Watchlist
+    or any other group.
     """
-    return await asset_service.create_asset(db, data.symbol, data.name, data.type, data.add_to_default_group)
+    return await asset_service.create_asset(db, data.symbol, data.name, data.type)
 
 
 @router.delete("/{symbol}", status_code=204, summary="Remove an asset from the default group")
