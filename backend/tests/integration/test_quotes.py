@@ -126,7 +126,10 @@ async def test_stream_quotes_no_tracked(client):
 
 async def test_stream_quotes_emits_event(client):
     """SSE stream emits quote data for tracked assets."""
-    await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
+    a = (await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})).json()
+    groups = (await client.get("/api/groups")).json()
+    watchlist_id = next(g["id"] for g in groups if g["is_default"])
+    await client.post(f"/api/groups/{watchlist_id}/assets", json={"asset_ids": [a["id"]]})
 
     _reset_asset_list_cache()
     mock_prov = _mock_provider(quotes_return=[_MOCK_QUOTES[0]])
@@ -160,8 +163,11 @@ async def test_stream_quotes_cache_headers(client):
 
 async def test_stream_quotes_multiple_symbols(client):
     """SSE stream includes all tracked symbols in first event."""
-    await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
-    await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft", "type": "stock"})
+    a1 = (await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})).json()
+    a2 = (await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft", "type": "stock"})).json()
+    groups = (await client.get("/api/groups")).json()
+    watchlist_id = next(g["id"] for g in groups if g["is_default"])
+    await client.post(f"/api/groups/{watchlist_id}/assets", json={"asset_ids": [a1["id"], a2["id"]]})
 
     _reset_asset_list_cache()
     mock_prov = _mock_provider(quotes_return=_MOCK_QUOTES)

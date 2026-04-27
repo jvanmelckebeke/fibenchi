@@ -50,11 +50,13 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
   const handleAdd = () => {
     const s = symbol.trim().toUpperCase()
     if (!s) return
+    // If no non-default group is selected, fall back to the default Watchlist
+    // group so the asset always lands somewhere.
+    const gid = resolveTargetGroup(targetGroupId) ?? groups?.find((g) => g.is_default)?.id
     createAsset.mutate(
       { symbol: s },
       {
         onSuccess: (asset) => {
-          const gid = resolveTargetGroup(targetGroupId)
           if (gid) {
             addAssetsToGroup.mutate(
               { groupId: gid, assetIds: [asset.id] },

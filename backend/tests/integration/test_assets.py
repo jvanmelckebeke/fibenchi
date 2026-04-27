@@ -93,11 +93,23 @@ async def test_delete_nonexistent_asset(client):
 
 
 async def test_list_assets_returns_created(client):
+    """``GET /api/assets`` returns assets that belong to at least one group.
+
+    ``POST /api/assets`` no longer auto-attaches to the Watchlist, so the
+    test must explicitly add each asset to a group.
+    """
     mock_aapl = {"symbol": "AAPL", "name": "Apple", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     mock_msft = {"symbol": "MSFT", "name": "Microsoft", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     with patch("app.services.asset_service.validate_symbol", side_effect=[mock_aapl, mock_msft]):
-        await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
-        await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft"})
+        a1 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+        a2 = await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft"})
+
+    groups = (await client.get("/api/groups")).json()
+    watchlist_id = next(g["id"] for g in groups if g["is_default"])
+    await client.post(
+        f"/api/groups/{watchlist_id}/assets",
+        json={"asset_ids": [a1.json()["id"], a2.json()["id"]]},
+    )
 
     resp = await client.get("/api/assets")
     assert resp.status_code == 200

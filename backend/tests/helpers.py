@@ -10,10 +10,28 @@ from app.models import Asset, AssetType, PriceHistory
 from app.repositories.group_repo import GroupRepository
 
 
-async def create_asset_via_api(client, symbol: str, name: str, **kwargs) -> dict:
-    """Create an asset through the HTTP API and return the JSON response."""
+async def create_asset_via_api(
+    client, symbol: str, name: str, attach_to_watchlist: bool = True, **kwargs
+) -> dict:
+    """Create an asset through the HTTP API and return the JSON response.
+
+    ``POST /api/assets`` no longer attaches to any group. By default this
+    helper also adds the new asset to the seeded Watchlist group so it
+    appears in ``GET /api/assets`` listings (the historical behaviour most
+    integration tests depend on). Pass ``attach_to_watchlist=False`` for
+    tests that want a group-less asset.
+    """
     resp = await client.post("/api/assets", json={"symbol": symbol, "name": name, **kwargs})
-    return resp.json()
+    asset = resp.json()
+    if attach_to_watchlist and resp.status_code == 201:
+        groups = (await client.get("/api/groups")).json()
+        watchlist_id = next((g["id"] for g in groups if g["is_default"]), None)
+        if watchlist_id is not None:
+            await client.post(
+                f"/api/groups/{watchlist_id}/assets",
+                json={"asset_ids": [asset["id"]]},
+            )
+    return asset
 
 
 async def seed_asset_with_prices(
