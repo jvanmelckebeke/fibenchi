@@ -36,6 +36,3 @@ examples/
 
 # Misc
 *.log
-
-# Local dev seed (real portfolio data — see dev_seed_groups.example.json)
-backend/scripts/dev_seed_groups.json
