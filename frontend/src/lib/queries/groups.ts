@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api, type Group, type GroupCreate, type GroupUpdate } from "../api"
 import { keys, STALE_5MIN, useInvalidatingMutation } from "./shared"
@@ -98,4 +99,40 @@ export function useGroupIndicators(id: number) {
     enabled: !!id,
     staleTime: STALE_5MIN,
   })
+}
+
+/** Prefetch the metadata, sparklines and indicators for every group except
+ * ``activeGroupId`` so switching groups feels instant. The active group's
+ * data is already being fetched by the page that called this hook. */
+export function usePrefetchOtherGroups(activeGroupId: number, sparklinePeriod = "3mo") {
+  const qc = useQueryClient()
+  const { data: groups } = useGroups()
+
+  useEffect(() => {
+    if (!groups) return
+    const others = groups.filter((g) => g.id !== activeGroupId)
+    if (others.length === 0) return
+
+    // Wait for the active group to render before stealing bandwidth.
+    const handle = window.setTimeout(() => {
+      for (const g of others) {
+        qc.prefetchQuery({
+          queryKey: keys.group(g.id),
+          queryFn: () => api.groups.get(g.id),
+          staleTime: STALE_5MIN,
+        })
+        qc.prefetchQuery({
+          queryKey: keys.groupSparklines(g.id, sparklinePeriod),
+          queryFn: () => api.groups.sparklines(g.id, sparklinePeriod),
+          staleTime: STALE_5MIN,
+        })
+        qc.prefetchQuery({
+          queryKey: keys.groupIndicators(g.id),
+          queryFn: () => api.groups.indicators(g.id),
+          staleTime: STALE_5MIN,
+        })
+      }
+    }, 1500)
+    return () => window.clearTimeout(handle)
+  }, [groups, activeGroupId, sparklinePeriod, qc])
 }
