@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,6 +27,35 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 
 
+async def warm_all_group_caches() -> int:
+    """Pre-compute indicator snapshots for every group so the first request
+    on any group page hits a warm cache. Returns the number of groups warmed.
+
+    Each group is warmed in its own DB session so a slow group doesn't hold
+    a connection longer than necessary. Failures on one group are logged
+    and do not stop subsequent groups.
+    """
+    from app.repositories.group_repo import GroupRepository
+
+    async with async_session() as db:
+        try:
+            groups = await GroupRepository(db).list_all()
+        except Exception:
+            logger.exception("Failed to load groups for cache warming")
+            return 0
+
+    warmed = 0
+    for group in groups:
+        async with async_session() as db:
+            try:
+                snapshot = await compute_and_cache_indicators(db, group_id=group.id)
+                if snapshot:
+                    warmed += 1
+            except Exception:
+                logger.exception(f"Cache warm failed for group {group.id} ({group.name})")
+    return warmed
+
+
 async def scheduled_refresh():
     """Background job: refresh all asset prices, then warm indicator cache."""
     logger.info("Running scheduled price refresh...")
@@ -38,13 +68,12 @@ async def scheduled_refresh():
             logger.exception("Scheduled refresh failed")
             return
 
-    # Pre-compute indicator snapshots so the first group page request is instant.
-    async with async_session() as db:
-        try:
-            indicators = await compute_and_cache_indicators(db)
-            logger.info(f"Pre-computed indicators for {len(indicators)} assets")
-        except Exception:
-            logger.exception("Indicator pre-computation failed (non-fatal)")
+    try:
+        warmed = await warm_all_group_caches()
+        if warmed:
+            logger.info(f"Pre-computed indicator caches for {warmed} groups")
+    except Exception:
+        logger.exception("Indicator pre-computation failed (non-fatal)")
 
     # Clean up old intraday data (keep only last 2 days)
     async with async_session() as db:
@@ -54,6 +83,23 @@ async def scheduled_refresh():
                 logger.info(f"Cleaned up {deleted} old intraday bars")
         except Exception:
             logger.exception("Intraday cleanup failed (non-fatal)")
+
+
+async def _startup_warmup() -> None:
+    """Pre-compute indicator caches at startup.
+
+    Runs as a background task so the API is reachable immediately while
+    the cache builds. Fundamentals lazy-fetch via
+    :func:`merge_fundamentals_from_cache` so we don't burst at Yahoo at
+    boot.
+    """
+    logger.info("Starting background cache warmup...")
+    try:
+        warmed = await warm_all_group_caches()
+        if warmed:
+            logger.info(f"Startup warmup complete: {warmed} groups cached")
+    except Exception:
+        logger.exception("Startup indicator warmup failed (non-fatal)")
 
 
 async def scheduled_symbol_sync():
@@ -139,8 +185,13 @@ async def lifespan(app: FastAPI):
         scheduler.start()
         logger.info(f"Scheduler started with cron: {app_settings.refresh_cron}")
 
+    # Kick off cache warmup in the background — API is reachable immediately,
+    # cache builds in parallel so the first group hit is warm.
+    warmup_task = asyncio.create_task(_startup_warmup())
+
     yield
 
+    warmup_task.cancel()
     scheduler.shutdown(wait=False)
     await engine.dispose()
 
