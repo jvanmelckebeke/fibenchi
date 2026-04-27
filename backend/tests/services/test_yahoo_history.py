@@ -6,11 +6,8 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from app.services.yahoo.history import (
-    PERIOD_MAP,
-    _batch_fetch_history_sync,
-    fetch_history,
-)
+from app.services.yahoo import yahoo_client
+from app.services.yahoo._parsers import PERIOD_MAP
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -54,7 +51,7 @@ def _make_multi_index_df(symbols: list[str], n: int = 5, base: float = 100.0) ->
 class TestFetchHistory:
     """Tests for the single-symbol fetch_history function."""
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_returns_dataframe_with_period(self, mock_ticker_cls):
         df = _make_ohlcv_df()
         ticker = MagicMock()
@@ -62,13 +59,13 @@ class TestFetchHistory:
         ticker.price = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
-        result = await fetch_history("AAPL", period="3mo")
+        result = await yahoo_client.history("AAPL", period="3mo")
 
         assert isinstance(result, pd.DataFrame)
         assert list(result.columns) == ["open", "high", "low", "close", "volume"]
         ticker.history.assert_called_once_with(period="3mo", interval="1d")
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_uses_start_end_when_provided(self, mock_ticker_cls):
         df = _make_ohlcv_df()
         ticker = MagicMock()
@@ -77,31 +74,31 @@ class TestFetchHistory:
         mock_ticker_cls.return_value = ticker
 
         s, e = date(2025, 1, 1), date(2025, 3, 1)
-        await fetch_history("AAPL", start=s, end=e)
+        await yahoo_client.history("AAPL", start=s, end=e)
 
         ticker.history.assert_called_once_with(
             start="2025-01-01", end="2025-03-01", interval="1d"
         )
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_raises_on_empty_dataframe(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.history.return_value = pd.DataFrame()
         mock_ticker_cls.return_value = ticker
 
         with pytest.raises(ValueError, match="No data found"):
-            await fetch_history("INVALID")
+            await yahoo_client.history("INVALID")
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_raises_on_dict_response(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.history.return_value = {"INVALID": "No data found"}
         mock_ticker_cls.return_value = ticker
 
         with pytest.raises(ValueError, match="No data found"):
-            await fetch_history("INVALID")
+            await yahoo_client.history("INVALID")
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_handles_multi_index(self, mock_ticker_cls):
         """Yahoo sometimes returns MultiIndex even for single symbols."""
         dates = pd.bdate_range(end=date.today(), periods=3)
@@ -122,10 +119,10 @@ class TestFetchHistory:
         ticker.price = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
-        result = await fetch_history("AAPL")
+        result = await yahoo_client.history("AAPL")
         assert result.index.name == "date"
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_normalizes_mixed_date_datetime_index(self, mock_ticker_cls):
         """Yahoo can append a tz-aware datetime row for intraday data to daily date index."""
         import pytz
@@ -144,12 +141,12 @@ class TestFetchHistory:
         ticker.price = {"TEST.KS": {"currency": "KRW"}}
         mock_ticker_cls.return_value = ticker
 
-        result = await fetch_history("TEST.KS")
+        result = await yahoo_client.history("TEST.KS")
         assert all(type(v) is date for v in result.index), (
             f"Expected all date, got {set(type(v) for v in result.index)}"
         )
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_applies_currency_divisor(self, mock_ticker_cls):
         """GBp prices should be divided by 100."""
         df = pd.DataFrame(
@@ -167,10 +164,10 @@ class TestFetchHistory:
         ticker.price = {"HSBA.L": {"currency": "GBp"}}
         mock_ticker_cls.return_value = ticker
 
-        result = await fetch_history("HSBA.L")
+        result = await yahoo_client.history("HSBA.L")
         assert result["close"].iloc[0] == 150.50
 
-    @patch("app.services.yahoo.history.Ticker")
+    @patch("app.services.yahoo.client.Ticker")
     async def test_normalizes_period_alias(self, mock_ticker_cls):
         """'1w' should map to '5d'."""
         df = _make_ohlcv_df()
@@ -179,7 +176,7 @@ class TestFetchHistory:
         ticker.price = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
-        await fetch_history("AAPL", period="1w")
+        await yahoo_client.history("AAPL", period="1w")
         ticker.history.assert_called_once_with(period="5d", interval="1d")
 
 
@@ -192,31 +189,31 @@ class TestPeriodMap:
         assert PERIOD_MAP["1w"] == "5d"
 
 
-class TestBatchFetchHistorySync:
-    @patch("app.services.yahoo.history.Ticker")
-    def test_empty_symbols_returns_empty(self, mock_ticker_cls):
-        assert _batch_fetch_history_sync([]) == {}
+class TestBatchHistory:
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_empty_symbols_returns_empty(self, mock_ticker_cls):
+        assert await yahoo_client.batch_history([]) == {}
 
-    @patch("app.services.yahoo.history.Ticker")
-    def test_empty_history_returns_empty(self, mock_ticker_cls):
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_empty_history_returns_empty(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.history.return_value = pd.DataFrame()
         ticker.price = {}
         mock_ticker_cls.return_value = ticker
 
-        assert _batch_fetch_history_sync(["AAPL"]) == {}
+        assert await yahoo_client.batch_history(["AAPL"]) == {}
 
-    @patch("app.services.yahoo.history.Ticker")
-    def test_dict_history_returns_empty(self, mock_ticker_cls):
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_dict_history_returns_empty(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.history.return_value = {"error": "no data"}
         ticker.price = {}
         mock_ticker_cls.return_value = ticker
 
-        assert _batch_fetch_history_sync(["AAPL"]) == {}
+        assert await yahoo_client.batch_history(["AAPL"]) == {}
 
-    @patch("app.services.yahoo.history.Ticker")
-    def test_returns_dataframes_per_symbol(self, mock_ticker_cls):
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_returns_dataframes_per_symbol(self, mock_ticker_cls):
         df = _make_multi_index_df(["AAPL", "MSFT"], n=5)
         ticker = MagicMock()
         ticker.history.return_value = df
@@ -226,13 +223,13 @@ class TestBatchFetchHistorySync:
         }
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_history_sync(["AAPL", "MSFT"])
+        result = await yahoo_client.batch_history(["AAPL", "MSFT"])
         assert "AAPL" in result
         assert "MSFT" in result
         assert len(result["AAPL"]) == 5
 
-    @patch("app.services.yahoo.history.Ticker")
-    def test_skips_symbol_with_too_few_rows(self, mock_ticker_cls):
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_skips_symbol_with_too_few_rows(self, mock_ticker_cls):
         """Symbols with < 2 rows are skipped."""
         dates = pd.bdate_range(end=date.today(), periods=1)
         df = pd.DataFrame(
@@ -244,11 +241,11 @@ class TestBatchFetchHistorySync:
         ticker.price = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_history_sync(["AAPL"])
+        result = await yahoo_client.batch_history(["AAPL"])
         assert result == {}
 
-    @patch("app.services.yahoo.history.Ticker")
-    def test_skips_missing_symbol_keyerror(self, mock_ticker_cls):
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_skips_missing_symbol_keyerror(self, mock_ticker_cls):
         """Gracefully skip symbols that raise KeyError on .loc."""
         dates = pd.bdate_range(end=date.today(), periods=3)
         df = pd.DataFrame(
@@ -263,12 +260,12 @@ class TestBatchFetchHistorySync:
         ticker.price = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_history_sync(["AAPL", "MISSING"])
+        result = await yahoo_client.batch_history(["AAPL", "MISSING"])
         assert "AAPL" in result
         assert "MISSING" not in result
 
-    @patch("app.services.yahoo.history.Ticker")
-    def test_applies_currency_normalization(self, mock_ticker_cls):
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_applies_currency_normalization(self, mock_ticker_cls):
         """GBp prices in batch should be divided by 100."""
         dates = pd.bdate_range(end=date.today(), periods=3)
         df = pd.DataFrame(
@@ -284,6 +281,6 @@ class TestBatchFetchHistorySync:
         ticker.price = {"HSBA.L": {"currency": "GBp"}}
         mock_ticker_cls.return_value = ticker
 
-        result = _batch_fetch_history_sync(["HSBA.L"])
+        result = await yahoo_client.batch_history(["HSBA.L"])
         assert "HSBA.L" in result
         assert result["HSBA.L"]["close"].iloc[0] == 150.50

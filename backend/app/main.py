@@ -20,7 +20,6 @@ from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
 from app.services.price_providers import init_price_provider
-from app.services.fundamentals_cache import warm_fundamentals_cache
 from app.services.intraday import fetch_and_store_intraday, cleanup_old_intraday
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
@@ -57,16 +56,6 @@ async def warm_all_group_caches() -> int:
     return warmed
 
 
-async def _warm_fundamentals() -> None:
-    async with async_session() as db:
-        try:
-            from app.repositories.asset_repo import AssetRepository
-            symbols = await AssetRepository(db).list_in_any_group_symbols()
-            await warm_fundamentals_cache(symbols)
-        except Exception:
-            logger.exception("Fundamentals cache warming failed (non-fatal)")
-
-
 async def scheduled_refresh():
     """Background job: refresh all asset prices, then warm indicator cache."""
     logger.info("Running scheduled price refresh...")
@@ -78,8 +67,6 @@ async def scheduled_refresh():
         except Exception:
             logger.exception("Scheduled refresh failed")
             return
-
-    await _warm_fundamentals()
 
     try:
         warmed = await warm_all_group_caches()
@@ -99,14 +86,14 @@ async def scheduled_refresh():
 
 
 async def _startup_warmup() -> None:
-    """Run fundamentals + indicator cache warming at startup.
+    """Pre-compute indicator caches at startup.
 
-    Runs as a background task so the API is reachable immediately while the
-    cache builds. Without this, every group page is cold until the cron
-    fires (default: 23:00).
+    Runs as a background task so the API is reachable immediately while
+    the cache builds. Fundamentals lazy-fetch via
+    :func:`merge_fundamentals_from_cache` so we don't burst at Yahoo at
+    boot.
     """
     logger.info("Starting background cache warmup...")
-    await _warm_fundamentals()
     try:
         warmed = await warm_all_group_caches()
         if warmed:

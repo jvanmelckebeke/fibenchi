@@ -1,18 +1,15 @@
 """Integration tests for the annotations router."""
 
-from unittest.mock import patch
-
 import pytest
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
-_MOCK_VALIDATE = {"symbol": "AAPL", "name": "Apple", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
-
-
 async def _create_asset(client):
-    with patch("app.services.asset_service.validate_symbol", return_value=_MOCK_VALIDATE):
-        resp = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
+    """Create an AAPL asset. The conftest's autouse ``mock_yahoo_validate``
+    fixture provides a deterministic Yahoo response without any extra
+    plumbing here."""
+    resp = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple", "type": "stock"})
     assert resp.status_code == 201
     return resp.json()
 

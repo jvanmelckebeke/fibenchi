@@ -1,21 +1,22 @@
-"""Yahoo Finance price provider — thin wrapper around existing yahoo/ functions."""
+"""Yahoo Finance price provider — facade over :data:`yahoo_client`.
 
-import asyncio
+The throttle, circuit breaker, and per-endpoint caches all live in
+:class:`~app.services.yahoo.client.YahooClient`. This class only exists
+so the abstract :class:`PriceProvider` interface stays decoupled from
+Yahoo specifics — a future provider (Finnhub, Polygon) implements
+``PriceProvider`` directly without inheriting Yahoo's resilience quirks.
+"""
+
 from datetime import date
 
 import pandas as pd
 
 from app.services.price_providers.base import PriceProvider
-from app.services.yahoo import (
-    batch_fetch_history as _batch_fetch_history,
-    batch_fetch_quotes as _batch_fetch_quotes,
-    fetch_history as _fetch_history,
-)
-from app.services.yahoo.quotes import batch_fetch_currencies as _batch_fetch_currencies_sync
+from app.services.yahoo import yahoo_client
 
 
 class YahooPriceProvider(PriceProvider):
-    """Delegates all price operations to the existing yahoo/ service package."""
+    """Thin facade — every method delegates to ``yahoo_client``."""
 
     async def fetch_history(
         self,
@@ -25,17 +26,17 @@ class YahooPriceProvider(PriceProvider):
         start: date | None = None,
         end: date | None = None,
     ) -> pd.DataFrame:
-        return await _fetch_history(
+        return await yahoo_client.history(
             symbol, period=period, interval=interval, start=start, end=end,
         )
 
     async def batch_fetch_history(
-        self, symbols: list[str], period: str = "1y"
+        self, symbols: list[str], period: str = "1y",
     ) -> dict[str, pd.DataFrame]:
-        return await _batch_fetch_history(symbols, period=period)
+        return await yahoo_client.batch_history(symbols, period=period)
 
     async def batch_fetch_quotes(self, symbols: list[str]) -> list[dict]:
-        return await _batch_fetch_quotes(symbols)
+        return await yahoo_client.quotes(symbols)
 
     async def batch_fetch_currencies(self, symbols: list[str]) -> dict[str, str]:
-        return await asyncio.to_thread(_batch_fetch_currencies_sync, symbols)
+        return await yahoo_client.currencies(symbols)

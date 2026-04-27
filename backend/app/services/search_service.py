@@ -6,7 +6,7 @@ from sqlalchemy import or_, select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.symbol_directory import SymbolDirectory
-from app.services.yahoo import search as yahoo_search
+from app.services.yahoo import yahoo_client
 
 _MIN_LOCAL_RESULTS = 8
 
@@ -102,7 +102,7 @@ async def search_symbols(query: str, db: AsyncSession) -> list[dict]:
         return local_results
 
     # Fall back to Yahoo Finance
-    raw = await yahoo_search(q_lower, first_quote=False)
+    raw = await yahoo_client.search(q_lower, first_quote=False)
     yahoo_results = _parse_yahoo_results(raw.get("quotes", []))
 
     # Persist Yahoo results to the directory (fire-and-forget on error)
@@ -131,7 +131,7 @@ async def search_yahoo(query: str, db: AsyncSession) -> list[dict]:
     local_symbols = {r["symbol"] for r in local_results}
 
     # Query Yahoo
-    raw = await yahoo_search(q_lower, first_quote=False)
+    raw = await yahoo_client.search(q_lower, first_quote=False)
     yahoo_results = _parse_yahoo_results(raw.get("quotes", []))
 
     # Filter out duplicates already in local DB

@@ -6,7 +6,7 @@ from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
 from app.services.currency_service import ensure_currency
 from app.services.entity_lookups import get_asset
-from app.services.yahoo import validate_symbol
+from app.services.yahoo import currency_from_suffix, yahoo_client
 
 
 async def list_assets(db: AsyncSession):
@@ -29,11 +29,10 @@ async def create_asset(
     if existing:
         return existing
 
-    info = await validate_symbol(symbol)
+    info = await yahoo_client.validate(symbol)
     if not info:
         if not name:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
-        from app.services.yahoo import currency_from_suffix
         currency = currency_from_suffix(symbol) or "USD"
     else:
         currency = info.get("currency_code") or info.get("currency", "USD")

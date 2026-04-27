@@ -50,9 +50,9 @@ class TestSearchSymbols:
         data = resp.json()
         assert any(d["symbol"] == "AAPL" for d in data)
 
-    @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+    @patch("app.services.search_service.yahoo_client")
     async def test_yahoo_source(self, mock_yahoo, client, db):
-        mock_yahoo.return_value = {"quotes": [
+        mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = {"quotes": [
             {"symbol": "TSLA", "shortname": "Tesla Inc.", "exchDisp": "NASDAQ", "quoteType": "EQUITY"},
         ]}
         resp = await client.get("/api/search", params={"q": "tesla", "source": "yahoo"})
@@ -62,7 +62,7 @@ class TestSearchSymbols:
         assert data[0]["symbol"] == "TSLA"
         assert data[0]["type"] == "stock"
 
-    @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+    @patch("app.services.search_service.yahoo_client")
     async def test_all_source_uses_local_first(self, mock_yahoo, client, db):
         await _seed_symbols(db)
         # With 8 local results for "a", should not call Yahoo
@@ -70,10 +70,10 @@ class TestSearchSymbols:
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
-    @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+    @patch("app.services.search_service.yahoo_client")
     async def test_all_source_falls_back_to_yahoo(self, mock_yahoo, client, db):
         """With fewer than 8 local results, should query Yahoo."""
-        mock_yahoo.return_value = {"quotes": [
+        mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = {"quotes": [
             {"symbol": "XYZQ", "shortname": "XYZ Corp", "exchDisp": "NYSE", "quoteType": "EQUITY"},
         ]}
         resp = await client.get("/api/search", params={"q": "xyzq", "source": "all"})
@@ -81,9 +81,9 @@ class TestSearchSymbols:
         data = resp.json()
         assert any(d["symbol"] == "XYZQ" for d in data)
 
-    @patch("app.services.search_service.yahoo_search", new_callable=AsyncMock)
+    @patch("app.services.search_service.yahoo_client")
     async def test_yahoo_filters_non_equity_etf(self, mock_yahoo, client):
-        mock_yahoo.return_value = {"quotes": [
+        mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = {"quotes": [
             {"symbol": "BTCUSD", "shortname": "Bitcoin", "exchDisp": "CCC", "quoteType": "CRYPTOCURRENCY"},
             {"symbol": "AAPL", "shortname": "Apple", "exchDisp": "NASDAQ", "quoteType": "EQUITY"},
         ]}
