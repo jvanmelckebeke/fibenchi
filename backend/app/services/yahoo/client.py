@@ -16,6 +16,8 @@ across every operation in one shot.
 """
 
 import logging
+import threading
+import time
 from typing import Any, Callable, TypeVar
 
 from yahooquery import Ticker
@@ -38,14 +40,22 @@ from app.utils import TTLCache
 
 logger = logging.getLogger(__name__)
 
-# Quote response cache TTL — tuned to the SSE stream's market-hours
-# interval (15s) so callers asking for the same set within the window
-# share one upstream call.
-QUOTE_CACHE_TTL = 12.0
+# Quote response cache TTL — slightly longer than the SSE stream's
+# market-hours interval (15s) so back-to-back ticks for the same symbol
+# set hit the cache instead of going upstream. 12s was too tight: the
+# SSE generator's 15s sleep meant cache misses on every tick.
+QUOTE_CACHE_TTL = 16.0
 
 # Holdings change at most quarterly, so a long TTL is safe and saves
 # many Yahoo round trips.
 HOLDINGS_CACHE_TTL = 86_400  # 24h
+
+# How long to keep one ``Ticker`` (and its underlying ``curl_cffi`` session,
+# crumb, and consent cookies) alive before forcing a fresh one. Reusing the
+# session lets every ``_call`` after the first skip the consent + crumb
+# bootstrap (~2 HTTP calls saved per call). Refreshing periodically rotates
+# the random browser fingerprint and renews the crumb before Yahoo expires it.
+SESSION_TTL = 600.0  # 10 min
 
 _T = TypeVar("_T")
 
@@ -72,17 +82,46 @@ class YahooClient(
         throttle: YahooThrottle | None = None,
         quote_cache_ttl: float = QUOTE_CACHE_TTL,
         holdings_cache_ttl: float = HOLDINGS_CACHE_TTL,
+        session_ttl: float = SESSION_TTL,
     ):
         self._throttle = throttle or _shared_throttle
         self._quote_cache = TTLCache(default_ttl=quote_cache_ttl, thread_safe=True)
         self._holdings_cache = TTLCache(
             default_ttl=holdings_cache_ttl, max_size=100, thread_safe=True,
         )
+        self._session_ttl = session_ttl
+        self._session_lock = threading.Lock()
+        self._cached_ticker: Any | None = None
+        self._session_created_at: float = 0.0
 
     def _ticker(self, symbols: list[str] | str) -> Any:
-        """Single ``Ticker`` instantiation point. Tests patch
-        ``app.services.yahoo.client.Ticker`` to mock the upstream library."""
-        return Ticker(symbols)
+        """Return a ``Ticker`` for ``symbols``, reusing the underlying
+        session/crumb across calls.
+
+        Yahoo's auth handshake (consent + crumb) costs 2-3 HTTP requests.
+        Holding one ``Ticker`` and mutating its ``symbols`` property lets
+        every subsequent ``_call`` skip that overhead. The session is
+        refreshed every :data:`SESSION_TTL` seconds (rotates the random
+        browser fingerprint and renews the crumb before Yahoo expires
+        it) and on demand via :meth:`_invalidate_session` (e.g. when a
+        ``CrumbRejected`` indicates the crumb has gone stale).
+        """
+        with self._session_lock:
+            now = time.monotonic()
+            expired = now - self._session_created_at > self._session_ttl
+            if self._cached_ticker is None or expired:
+                self._cached_ticker = Ticker(symbols)
+                self._session_created_at = now
+            else:
+                self._cached_ticker.symbols = symbols
+            return self._cached_ticker
+
+    def _invalidate_session(self) -> None:
+        """Drop the cached ``Ticker`` so the next ``_ticker()`` call
+        builds a fresh session, crumb, and browser fingerprint."""
+        with self._session_lock:
+            self._cached_ticker = None
+            self._session_created_at = 0.0
 
     def _call(
         self,
@@ -108,6 +147,7 @@ class YahooClient(
             try:
                 result = fetch()
             except CrumbRejected:
+                self._invalidate_session()
                 if attempt < retries:
                     logger.warning(
                         "Yahoo crumb rejected — retry %d/%d with fresh session",

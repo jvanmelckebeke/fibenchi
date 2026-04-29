@@ -56,7 +56,7 @@ class TestFetchHistory:
         df = _make_ohlcv_df()
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"AAPL": {"currency": "USD"}}
+        ticker.quotes = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.history("AAPL", period="3mo")
@@ -70,7 +70,7 @@ class TestFetchHistory:
         df = _make_ohlcv_df()
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"AAPL": {"currency": "USD"}}
+        ticker.quotes = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
         s, e = date(2025, 1, 1), date(2025, 3, 1)
@@ -116,7 +116,7 @@ class TestFetchHistory:
         )
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"AAPL": {"currency": "USD"}}
+        ticker.quotes = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.history("AAPL")
@@ -138,7 +138,7 @@ class TestFetchHistory:
         )
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"TEST.KS": {"currency": "KRW"}}
+        ticker.quotes = {"TEST.KS": {"currency": "KRW"}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.history("TEST.KS")
@@ -161,7 +161,7 @@ class TestFetchHistory:
         )
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"HSBA.L": {"currency": "GBp"}}
+        ticker.quotes = {"HSBA.L": {"currency": "GBp"}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.history("HSBA.L")
@@ -173,7 +173,7 @@ class TestFetchHistory:
         df = _make_ohlcv_df()
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"AAPL": {"currency": "USD"}}
+        ticker.quotes = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
         await yahoo_client.history("AAPL", period="1w")
@@ -198,7 +198,7 @@ class TestBatchHistory:
     async def test_empty_history_returns_empty(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.history.return_value = pd.DataFrame()
-        ticker.price = {}
+        ticker.quotes = {}
         mock_ticker_cls.return_value = ticker
 
         assert await yahoo_client.batch_history(["AAPL"]) == {}
@@ -207,7 +207,7 @@ class TestBatchHistory:
     async def test_dict_history_returns_empty(self, mock_ticker_cls):
         ticker = MagicMock()
         ticker.history.return_value = {"error": "no data"}
-        ticker.price = {}
+        ticker.quotes = {}
         mock_ticker_cls.return_value = ticker
 
         assert await yahoo_client.batch_history(["AAPL"]) == {}
@@ -217,7 +217,7 @@ class TestBatchHistory:
         df = _make_multi_index_df(["AAPL", "MSFT"], n=5)
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {
+        ticker.quotes = {
             "AAPL": {"currency": "USD"},
             "MSFT": {"currency": "USD"},
         }
@@ -238,7 +238,7 @@ class TestBatchHistory:
         )
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"AAPL": {"currency": "USD"}}
+        ticker.quotes = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.batch_history(["AAPL"])
@@ -257,7 +257,7 @@ class TestBatchHistory:
         )
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"AAPL": {"currency": "USD"}}
+        ticker.quotes = {"AAPL": {"currency": "USD"}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.batch_history(["AAPL", "MISSING"])
@@ -278,7 +278,7 @@ class TestBatchHistory:
         )
         ticker = MagicMock()
         ticker.history.return_value = df
-        ticker.price = {"HSBA.L": {"currency": "GBp"}}
+        ticker.quotes = {"HSBA.L": {"currency": "GBp"}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.batch_history(["HSBA.L"])
