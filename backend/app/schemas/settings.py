@@ -17,7 +17,7 @@ class AppSettingsData(BaseModel):
     group_macd_style: Literal["classic", "divergence"] | None = None
     group_show_sparkline: bool | None = None
     group_view_mode: Literal["card", "table", "scanner", "live"] | None = None
-    group_type_filter: Literal["all", "stock", "etf"] | None = None
+    group_type_filter: Literal["all", "stock", "etf", "index"] | None = None
     group_sort_by: str | None = None
     group_sort_dir: Literal["asc", "desc"] | None = None
     group_table_columns: dict[str, bool] | None = None

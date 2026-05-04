@@ -107,6 +107,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               { value: "all", label: "All" },
               { value: "stock", label: "Stocks" },
               { value: "etf", label: "ETFs" },
+              { value: "index", label: "Indices" },
             ]}
             value={typeFilter}
             onChange={setTypeFilter}
