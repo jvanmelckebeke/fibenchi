@@ -65,14 +65,21 @@ def reset_yahoo_throttle():
     breaker on Invalid Crumb. Both behaviours would slow the suite (and
     leak state across tests), so we run all tests with ``min_interval=0``
     and reset on entry.
+
+    Also drops the client's cached ``Ticker`` so each test sees its own
+    ``@patch("app.services.yahoo.client.Ticker")`` instead of a mock
+    leaked from a prior test.
     """
+    from app.services.yahoo import yahoo_client
     from app.services.yahoo.rate_limit import yahoo_throttle
     original_min_interval = yahoo_throttle._min_interval
     yahoo_throttle._min_interval = 0.0
     yahoo_throttle.reset()
+    yahoo_client._invalidate_session()
     yield
     yahoo_throttle._min_interval = original_min_interval
     yahoo_throttle.reset()
+    yahoo_client._invalidate_session()
 
 
 @pytest.fixture(autouse=True)

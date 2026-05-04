@@ -47,7 +47,8 @@ class _HistoryMixin(_YahooBase):
             if isinstance(df.index, pd.MultiIndex):
                 df = df.reset_index().set_index("date")
 
-            price_info = ticker.price.get(symbol, {}) if isinstance(ticker.price, dict) else {}
+            quote_data = ticker.quotes
+            price_info = quote_data.get(symbol, {}) if isinstance(quote_data, dict) else {}
             info = price_info if isinstance(price_info, dict) else {}
             _, divisor = resolve_currency(info, symbol)
             df = _normalize_ohlcv_df(df, divisor)
@@ -71,7 +72,9 @@ class _HistoryMixin(_YahooBase):
 
         def _fetch() -> dict[str, pd.DataFrame]:
             ticker = self._ticker(symbols)
-            price_data = ticker.price
+            # ``quotes`` is one batched HTTP call regardless of N, vs.
+            # ``price`` which fans out per symbol via quoteSummary.
+            price_data = ticker.quotes
             normalized = PERIOD_MAP.get(period.lower(), period)
             hist = ticker.history(period=normalized, interval="1d")
 

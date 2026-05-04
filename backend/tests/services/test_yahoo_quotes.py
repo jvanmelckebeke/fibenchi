@@ -179,9 +179,9 @@ class TestQuotes:
         }}
 
         ticker1 = MagicMock()
-        ticker1.price = bad
+        ticker1.quotes = bad
         ticker2 = MagicMock()
-        ticker2.price = good
+        ticker2.quotes = good
         mock_ticker_cls.side_effect = [ticker1, ticker2]
 
         result = await yahoo_client.quotes(["AAPL"])
@@ -201,7 +201,7 @@ class TestCurrencies:
     @patch("app.services.yahoo.client.Ticker")
     async def test_returns_currency_map(self, mock_ticker_cls):
         ticker = MagicMock()
-        ticker.price = {
+        ticker.quotes = {
             "AAPL": {"currency": "USD"},
             "HSBA.L": {"currency": "GBp"},
         }
@@ -215,7 +215,7 @@ class TestCurrencies:
     @patch("app.services.yahoo.client.Ticker")
     async def test_non_dict_price_data(self, mock_ticker_cls):
         ticker = MagicMock()
-        ticker.price = "error"
+        ticker.quotes = "error"
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.currencies(["AAPL"])

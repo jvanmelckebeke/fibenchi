@@ -30,7 +30,10 @@ class _QuotesMixin(_YahooBase):
 
         def _fetch() -> list[dict]:
             ticker = self._ticker(symbols)
-            data = ticker.price
+            # ``quotes`` hits the batched ``/v7/finance/quote?symbols=…``
+            # endpoint (one HTTP call for all symbols), unlike ``price``
+            # which fans out via per-symbol quoteSummary requests.
+            data = ticker.quotes
             check_crumb(data)
             return parse_quotes(symbols, data if isinstance(data, dict) else {})
 
@@ -53,7 +56,7 @@ class _QuotesMixin(_YahooBase):
 
         def _fetch() -> dict[str, str]:
             ticker = self._ticker(symbols)
-            data = ticker.price
+            data = ticker.quotes
             check_crumb(data)
             out: dict[str, str] = {}
             for sym in symbols:
