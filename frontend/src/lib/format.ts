@@ -1,3 +1,5 @@
+import type { AssetType } from "@/lib/types"
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
   EUR: "\u20ac",
@@ -9,6 +11,18 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   JPY: "\u00a5",
   KRW: "\u20a9",
   CHF: "CHF\u00a0",
+}
+
+const YIELD_INDICES = new Set(["^TYX", "^TNX", "^FVX", "^IRX"])
+
+export interface AssetFormatHints {
+  type: AssetType
+  symbol: string
+  currency: string
+}
+
+function isYieldIndex(symbol: string): boolean {
+  return YIELD_INDICES.has(symbol.toUpperCase())
 }
 
 const ZERO_DECIMAL_CURRENCIES = new Set(["KRW", "JPY", "IDR", "HUF", "VND", "CLP", "TWD"])
@@ -28,6 +42,21 @@ export function formatPrice(value: number, currency: string, decimals?: number, 
   const [int, frac] = fixed.split(".")
   const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
   return `${currencySymbol(currency)}${frac !== undefined ? `${grouped}.${frac}` : grouped}`
+}
+
+export function formatAssetPrice(
+  value: number,
+  asset: AssetFormatHints,
+  decimals?: number,
+  groupDigits = false,
+): string {
+  if (asset.type !== "index") return formatPrice(value, asset.currency, decimals, groupDigits)
+  const d = decimals ?? 2
+  const fixed = value.toFixed(d)
+  const [int, frac] = fixed.split(".")
+  const grouped = groupDigits ? int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : int
+  const body = frac !== undefined ? `${grouped}.${frac}` : grouped
+  return isYieldIndex(asset.symbol) ? `${body}%` : body
 }
 
 export function formatCompactPrice(value: number, currency: string): string {
@@ -50,6 +79,11 @@ export function formatCompactPrice(value: number, currency: string): string {
     return `${sym}${scaled}K`
   }
   return formatPrice(value, currency)
+}
+
+export function formatAssetCompactPrice(value: number, asset: AssetFormatHints): string {
+  if (asset.type !== "index") return formatCompactPrice(value, asset.currency)
+  return formatAssetPrice(value, asset, 2)
 }
 
 export function formatCompactNumber(value: number): string {

@@ -148,6 +148,25 @@ async def test_create_asset_detects_etf_type(MockAssetRepo, mock_validate, _mock
 @patch(_ensure_patch, new_callable=AsyncMock)
 @patch("app.services.asset_service.yahoo_client")
 @patch("app.services.asset_service.AssetRepository")
+async def test_create_asset_detects_index_type(MockAssetRepo, mock_validate, _mock_ensure):
+    db = AsyncMock()
+    mock_repo = MockAssetRepo.return_value
+    mock_repo.find_by_symbol = AsyncMock(return_value=None)
+    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {
+        "symbol": "^TYX", "name": "Treasury Yield 30 Years", "type": "INDEX", "currency": "USD", "currency_code": "USD",
+    }
+    new_asset = _make_asset(symbol="^TYX", type=AssetType.INDEX)
+    mock_repo.create = AsyncMock(return_value=new_asset)
+
+    await create_asset(db, symbol="^TYX", name=None, asset_type=AssetType.STOCK)
+
+    call_kwargs = mock_repo.create.call_args[1]
+    assert call_kwargs["type"] == AssetType.INDEX
+
+
+@patch(_ensure_patch, new_callable=AsyncMock)
+@patch("app.services.asset_service.yahoo_client")
+@patch("app.services.asset_service.AssetRepository")
 async def test_create_asset_krw_currency_from_yahoo(MockAssetRepo, mock_validate, _mock_ensure):
     """Regression test for #213: KRW-denominated assets should detect currency correctly."""
     db = AsyncMock()

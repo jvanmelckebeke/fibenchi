@@ -40,6 +40,8 @@ async def create_asset(
             name = info["name"]
         if info["type"] == "ETF":
             asset_type = AssetType.ETF
+        elif info["type"] == "INDEX":
+            asset_type = AssetType.INDEX
 
     await ensure_currency(db, currency)
     return await repo.create(

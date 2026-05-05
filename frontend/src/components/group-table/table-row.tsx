@@ -9,7 +9,7 @@ import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatPrice, formatCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
+import { formatAssetPrice, formatAssetCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -158,11 +158,11 @@ export const TableRow = memo(function TableRow({
                 <span
                   ref={priceRef}
                   className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
-                  title={settings.compact_numbers ? formatPrice(displayPrice, asset.currency, undefined, settings.thousands_separator) : undefined}
+                  title={settings.compact_numbers ? formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator) : undefined}
                 >
                   {settings.compact_numbers
-                    ? formatCompactPrice(displayPrice, asset.currency)
-                    : formatPrice(displayPrice, asset.currency, undefined, settings.thousands_separator)}
+                    ? formatAssetCompactPrice(displayPrice, asset)
+                    : formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator)}
                 </span>
               ) : (
                 <Skeleton className="h-4 w-14 ml-auto rounded" />

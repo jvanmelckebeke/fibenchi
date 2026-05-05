@@ -4,6 +4,7 @@ import { IntradayChart } from "@/components/intraday-chart"
 import { useAssetDetail, useAnnotations } from "@/lib/queries"
 import { useIntraday, useQuote } from "@/lib/quote-stream"
 import type { Placement } from "@/lib/indicator-registry"
+import type { AssetType } from "@/lib/api"
 import type { ChartMode } from "./header"
 
 export function ChartSection({
@@ -12,6 +13,7 @@ export function ChartSection({
   indicatorVisibility,
   chartType,
   currency,
+  assetType,
   mode,
 }: {
   symbol: string
@@ -19,6 +21,7 @@ export function ChartSection({
   indicatorVisibility: Record<string, Placement[]>
   chartType: "candle" | "line"
   currency?: string
+  assetType?: AssetType
   mode: ChartMode
 }) {
   if (mode === "live") {
@@ -31,6 +34,7 @@ export function ChartSection({
       indicatorVisibility={indicatorVisibility}
       chartType={chartType}
       currency={currency}
+      assetType={assetType}
     />
   )
 }
@@ -63,12 +67,14 @@ function HistoricalChartSection({
   indicatorVisibility,
   chartType,
   currency,
+  assetType,
 }: {
   symbol: string
   period: string
   indicatorVisibility: Record<string, Placement[]>
   chartType: "candle" | "line"
   currency?: string
+  assetType?: AssetType
 }) {
   const { data: detail, isLoading: detailLoading, isFetching: detailFetching } = useAssetDetail(symbol, period)
   const prices = detail?.prices
@@ -101,6 +107,7 @@ function HistoricalChartSection({
         indicatorVisibility={indicatorVisibility}
         chartType={chartType}
         currency={currency}
+        assetType={assetType}
       />
     </div>
   )

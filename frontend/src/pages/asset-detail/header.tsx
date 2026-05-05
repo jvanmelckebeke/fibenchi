@@ -11,7 +11,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PeriodSelector } from "@/components/period-selector"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { resolveIcon } from "@/lib/icon-utils"
-import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
+import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatAssetPrice, formatAssetCompactPrice, formatChangePct } from "@/lib/format"
+import type { AssetType } from "@/lib/api"
 import { useQuote } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useRefreshPrices, useCreateAsset, useGroups, useAddAssetsToGroup } from "@/lib/queries"
@@ -23,6 +24,7 @@ export function Header({
   symbol,
   name,
   currency,
+  type,
   period,
   setPeriod,
   isTracked,
@@ -33,6 +35,7 @@ export function Header({
   symbol: string
   name?: string
   currency: string
+  type: AssetType
   period: string
   setPeriod: (p: string) => void
   isTracked: boolean
@@ -70,11 +73,11 @@ export function Header({
           <span
             ref={priceRef}
             className="text-xl font-semibold tabular-nums rounded px-1"
-            title={settings.compact_numbers ? formatPrice(price, currency, undefined, settings.thousands_separator) : undefined}
+            title={settings.compact_numbers ? formatAssetPrice(price, { type, symbol, currency }, undefined, settings.thousands_separator) : undefined}
           >
             {settings.compact_numbers
-              ? formatCompactPrice(price, currency)
-              : formatPrice(price, currency, undefined, settings.thousands_separator)}
+              ? formatAssetCompactPrice(price, { type, symbol, currency })
+              : formatAssetPrice(price, { type, symbol, currency }, undefined, settings.thousands_separator)}
           </span>
         )}
         {changeFmt && (

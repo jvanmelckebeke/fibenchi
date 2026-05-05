@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import { INDICATOR_REGISTRY, type Placement } from "@/lib/indicator-registry"
 import { api } from "@/lib/api"
 
-export type AssetTypeFilter = "all" | "stock" | "etf"
+export type AssetTypeFilter = "all" | "stock" | "etf" | "index"
 export type GroupSortBy = string
 export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"

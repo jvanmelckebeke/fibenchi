@@ -10,6 +10,7 @@ from app.database import Base
 class AssetType(str, enum.Enum):
     STOCK = "stock"
     ETF = "etf"
+    INDEX = "index"
 
 
 class Asset(Base):

@@ -1,6 +1,6 @@
 // TypeScript types matching backend Pydantic schemas
 
-export type AssetType = "stock" | "etf"
+export type AssetType = "stock" | "etf" | "index"
 
 export interface TagBrief {
   id: number
