@@ -6,6 +6,7 @@ import type {
   AssetDetail,
   AssetPerformance,
   ConstituentIndicator,
+  EarningsInfo,
   EtfHoldings,
   Group,
   GroupCreate,
@@ -55,7 +56,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => res.statusText)
     throw new Error(`${res.status}: ${text}`)
   }
-  if (res.status === 204) return undefined as T
+  if (res.status === 204) return undefined as unknown as T
   return res.json()
 }
 
@@ -81,6 +82,8 @@ export const api = {
       request<EtfHoldings>(`/assets/${symbol}/holdings`),
     holdingsIndicators: (symbol: string) =>
       request<HoldingIndicator[]>(`/assets/${symbol}/holdings/indicators`),
+    earnings: (symbol: string) =>
+      request<EarningsInfo>(`/assets/${symbol}/earnings`),
   },
   tags: {
     list: () => request<Tag[]>("/tags"),

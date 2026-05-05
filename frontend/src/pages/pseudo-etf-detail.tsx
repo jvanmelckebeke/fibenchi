@@ -31,7 +31,11 @@ import {
 export function PseudoEtfDetailPage() {
   const { id } = useParams<{ id: string }>()
   const etfId = Number(id)
-  const validId = !!id && !isNaN(etfId)
+  if (!id || isNaN(etfId)) return <Navigate to="/pseudo-etfs" replace />
+  return <PseudoEtfDetailContent etfId={etfId} />
+}
+
+function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
   const { data: etf } = usePseudoEtf(etfId)
   const { data: performance, isLoading } = usePseudoEtfPerformance(etfId)
 
@@ -56,7 +60,6 @@ export function PseudoEtfDetailPage() {
     return map
   }, [sortedSymbols])
 
-  if (!validId) return <Navigate to="/pseudo-etfs" replace />
   if (!etf) return null
 
   return (

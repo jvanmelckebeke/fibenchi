@@ -6,12 +6,14 @@ import {
   type IndicatorDescriptor,
   type SeriesDescriptor,
 } from "@/lib/indicator-registry"
+import { formatCompactNumber } from "@/lib/format"
 
 export interface LegendValues {
   o?: number
   h?: number
   l?: number
   c?: number
+  vol?: number
   indicators: Record<string, number | undefined>
 }
 
@@ -51,9 +53,14 @@ function OverlayEntry({ descriptor, v }: { descriptor: IndicatorDescriptor; v: L
   )
 }
 
+function hasOHLC(v: LegendValues): v is LegendValues & { o: number; h: number; l: number; c: number } {
+  return v.o != null && v.h != null && v.l != null && v.c != null
+}
+
 export function Legend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
   const v = values ?? latest
-  const changeColor = v.c !== undefined && v.o !== undefined
+  const ohlc = hasOHLC(v)
+  const changeColor = ohlc
     ? v.c >= v.o ? "text-emerald-500" : "text-red-500"
     : ""
 
@@ -61,12 +68,15 @@ export function Legend({ values, latest }: { values: LegendValues | null; latest
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
-      {v.o !== undefined && v.h !== undefined && v.l !== undefined && v.c !== undefined && (
+      {ohlc && (
         <>
           <span className="text-muted-foreground">O <span className={changeColor}>{v.o.toFixed(2)}</span></span>
           <span className="text-muted-foreground">H <span className={changeColor}>{v.h.toFixed(2)}</span></span>
           <span className="text-muted-foreground">L <span className={changeColor}>{v.l.toFixed(2)}</span></span>
           <span className="text-muted-foreground">C <span className={changeColor}>{v.c.toFixed(2)}</span></span>
+          {v.vol != null && (
+            <span className="text-muted-foreground">V <span className={changeColor}>{formatCompactNumber(v.vol)}</span></span>
+          )}
         </>
       )}
       {overlays.map((desc) => (

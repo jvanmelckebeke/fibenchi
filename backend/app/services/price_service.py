@@ -1,6 +1,6 @@
 """Price and indicator business logic — ensures data, caching, ephemeral fetch."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,8 +65,15 @@ async def _fetch_ephemeral(symbol: str, period: str, warmup: bool = False) -> pd
     if df.empty:
         raise HTTPException(404, f"No price data available for {symbol}")
 
-    if hasattr(df.index, "date"):
-        df.index = df.index.date
+    # Normalise index to plain date objects — Yahoo (and mocked providers)
+    # may return DatetimeIndex or mixed date/datetime indexes.
+    if isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.Index(df.index.date, name=df.index.name)
+    elif df.index.dtype == object and len(df) and isinstance(df.index[-1], datetime):
+        df.index = pd.Index(
+            [d.date() if isinstance(d, datetime) else d for d in df.index],
+            name=df.index.name,
+        )
 
     return df
 
@@ -121,9 +128,10 @@ async def _ensure_warmup_prices(
 
 
 def _df_to_price_rows(df: pd.DataFrame, start: date) -> list[PriceResponse]:
+    ohlc_cols = ["open", "high", "low", "close"]
     rows = []
     for dt, row in df.iterrows():
-        if dt < start:
+        if dt < start or row[ohlc_cols].isna().any():
             continue
         rows.append(PriceResponse(
             date=dt,

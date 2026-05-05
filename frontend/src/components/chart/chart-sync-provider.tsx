@@ -58,7 +58,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
 
   // Lookup maps for fast crosshair snapping
   const closeByTime = useRef(new Map<string, number>())
-  const ohlcByTime = useRef(new Map<string, { o: number; h: number; l: number; c: number }>())
+  const ohlcByTime = useRef(new Map<string, { o: number; h: number; l: number; c: number; vol: number }>())
   const indicatorsByTime = useRef(new Map<string, Record<string, number>>())
 
   // Registry of charts participating in sync
@@ -80,7 +80,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
 
     for (const p of prices) {
       closeByTime.current.set(p.date, p.close)
-      ohlcByTime.current.set(p.date, { o: p.open, h: p.high, l: p.low, c: p.close })
+      ohlcByTime.current.set(p.date, { o: p.open, h: p.high, l: p.low, c: p.close, vol: p.volume })
     }
     indicatorsByTime.current = buildIndicatorTimeMap(indicators)
   }, [prices, indicators])
@@ -93,6 +93,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
       h: ohlc?.h,
       l: ohlc?.l,
       c: ohlc?.c,
+      vol: ohlc?.vol,
       indicators: indVals,
     }
   }, [])
@@ -164,6 +165,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
       h: lastPrice.high,
       l: lastPrice.low,
       c: lastPrice.close,
+      vol: lastPrice.volume,
       indicators: indicatorValues,
     }
   }, [prices, indicators])

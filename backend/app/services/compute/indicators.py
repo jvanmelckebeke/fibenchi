@@ -5,14 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
+import numpy as np
 import pandas as pd
 
 from app.services.price_providers import get_price_provider
 
 
 def safe_round(value, decimals: int = 2) -> float | None:
-    """Round a value if it is not NaN/None, otherwise return None."""
-    if pd.notna(value):
+    """Round a value if it is finite, otherwise return None."""
+    if pd.notna(value) and np.isfinite(value):
         return round(value, decimals)
     return None
 
@@ -115,6 +116,76 @@ def adx(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
     return {"adx": adx_series, "plus_di": plus_di, "minus_di": minus_di}
 
 
+def choppiness_index(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """Choppiness Index — measures whether the market is trending or ranging.
+
+    CHOP = 100 × LOG10(SUM(TR, period) / (HH(period) - LL(period))) / LOG10(period)
+
+    Values 0-100: >61 = choppy/ranging, <38 = trending. Direction-agnostic.
+    """
+    tr = _true_range(df)
+    tr_sum = tr.rolling(window=period).sum()
+    hh = df["high"].rolling(window=period).max()
+    ll = df["low"].rolling(window=period).min()
+    hl_range = hh - ll
+    # Avoid log(0) / division by zero — replace zero ranges with NaN
+    hl_range = hl_range.replace(0, float("nan"))
+    return 100 * np.log10(tr_sum / hl_range) / np.log10(period)
+
+
+def normalized_force_index(
+    df: pd.DataFrame, ema_period: int = 13, short_vol: int = 20, long_vol: int = 200,
+) -> dict[str, pd.Series]:
+    """Normalized Elder's Force Index — EFI divided by average volume.
+
+    Short NEFI = EMA(13) of EFI / SMA(Volume, 20)  — responsive, entry timing
+    Long NEFI  = EMA(13) of EFI / SMA(Volume, 200) — smooth, trend confirmation
+
+    Normalizes force to price-change scale so values are comparable across
+    assets regardless of their absolute volume levels.
+    """
+    efi = (df["close"] - df["close"].shift(1)) * df["volume"]
+
+    avg_vol_short = df["volume"].rolling(window=short_vol).mean().replace(0, float("nan"))
+    avg_vol_long = df["volume"].rolling(window=long_vol).mean().replace(0, float("nan"))
+
+    nefi_short = ema(efi / avg_vol_short, ema_period)
+    nefi_long = ema(efi / avg_vol_long, ema_period)
+
+    return {"nefi_short": nefi_short, "nefi_long": nefi_long}
+
+
+def chaikin_money_flow(df: pd.DataFrame, period: int = 20) -> pd.Series:
+    """Chaikin Money Flow — volume-weighted buying/selling pressure.
+
+    MF_Multiplier = ((Close - Low) - (High - Close)) / (High - Low)
+    MF_Volume = MF_Multiplier × Volume
+    CMF(period) = SUM(MF_Volume, period) / SUM(Volume, period)
+
+    Ranges -1 to +1. Positive = buying pressure, negative = selling pressure.
+    """
+    hl_range = df["high"] - df["low"]
+    # Avoid division by zero for doji bars (high == low)
+    hl_range = hl_range.replace(0, float("nan"))
+    mf_multiplier = ((df["close"] - df["low"]) - (df["high"] - df["close"])) / hl_range
+    mf_volume = mf_multiplier * df["volume"]
+    return mf_volume.rolling(window=period).sum() / df["volume"].rolling(window=period).sum()
+
+
+def force_index(df: pd.DataFrame, ema_period: int = 13) -> dict[str, pd.Series]:
+    """Elder's Force Index — per-bar price-volume conviction.
+
+    Raw: (Close - Previous Close) × Volume
+    Smoothed: 13-period EMA of raw Force Index
+
+    Positive = bullish force, negative = bearish force.
+    Big move + low force = suspect; big move + high force = conviction.
+    """
+    raw = (df["close"] - df["close"].shift(1)) * df["volume"]
+    smoothed = ema(raw, ema_period)
+    return {"force_raw": raw, "force_ema": smoothed}
+
+
 def volume_stats(df: pd.DataFrame, period: int = 20) -> dict[str, pd.Series]:
     """Volume and average volume (SMA of volume)."""
     return {"volume": df["volume"], "avg_volume": df["volume"].rolling(window=period).mean()}
@@ -175,6 +246,35 @@ def _adx_snapshot_derived(row: pd.Series) -> dict:
         else:
             return {"adx_trend": "absent"}
     return {"adx_trend": None}
+
+
+def _nefi_snapshot_derived(row: pd.Series) -> dict:
+    """Derive NEFI signal from short/long crossover."""
+    short = row.get("nefi_short")
+    long_ = row.get("nefi_long")
+    if pd.notna(short) and pd.notna(long_):
+        return {"nefi_signal": "bullish" if short > long_ else "bearish"}
+    return {"nefi_signal": None}
+
+
+def _cmf_snapshot_derived(row: pd.Series) -> dict:
+    """Derive CMF signal from latest row."""
+    if pd.notna(row.get("cmf")):
+        return {"cmf_signal": "buying" if row["cmf"] > 0 else "selling"}
+    return {"cmf_signal": None}
+
+
+def _chop_snapshot_derived(row: pd.Series) -> dict:
+    """Derive choppiness state from latest row."""
+    if pd.notna(row.get("chop")):
+        val = row["chop"]
+        if val > 61:
+            return {"chop_state": "choppy"}
+        elif val < 38:
+            return {"chop_state": "trending"}
+        else:
+            return {"chop_state": "neutral"}
+    return {"chop_state": None}
 
 
 @dataclass(frozen=True)
@@ -273,6 +373,34 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         decimals=0,
         warmup_periods=20,
         uses_ohlc=True,
+    ),
+    "nefi": IndicatorDef(
+        func=normalized_force_index,
+        params={"ema_period": 13, "short_vol": 20, "long_vol": 200},
+        output_fields=["nefi_short", "nefi_long"],
+        result_mapping={"nefi_short": "nefi_short", "nefi_long": "nefi_long"},
+        decimals=2,
+        warmup_periods=200,
+        uses_ohlc=True,
+        snapshot_derived=_nefi_snapshot_derived,
+    ),
+    "cmf": IndicatorDef(
+        func=chaikin_money_flow,
+        params={"period": 20},
+        output_fields=["cmf"],
+        decimals=3,
+        warmup_periods=20,
+        uses_ohlc=True,
+        snapshot_derived=_cmf_snapshot_derived,
+    ),
+    "chop": IndicatorDef(
+        func=choppiness_index,
+        params={"period": 14},
+        output_fields=["chop"],
+        decimals=1,
+        warmup_periods=14,
+        uses_ohlc=True,
+        snapshot_derived=_chop_snapshot_derived,
     ),
 }
 

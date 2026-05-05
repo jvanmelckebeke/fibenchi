@@ -40,7 +40,6 @@ export interface AssetCreate {
   symbol: string
   name?: string
   type?: AssetType
-  add_to_default_group?: boolean
 }
 
 export interface SymbolSearchResult {
@@ -255,4 +254,10 @@ export interface IntradayPoint {
   price: number
   volume: number
   session: "pre" | "regular" | "post"
+}
+
+export interface EarningsInfo {
+  earnings_date: string | null
+  is_estimate: boolean
+  last_reported_date: string | null
 }

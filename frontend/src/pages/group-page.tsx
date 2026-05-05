@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/add-symbol-dialog"
 import { AssetCard } from "@/components/asset-card"
 import { TagFilterPopover } from "@/components/tag-filter-popover"
-import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail } from "@/lib/queries"
+import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail, usePrefetchOtherGroups } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode, type SortDir } from "@/lib/settings"
@@ -39,6 +39,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
   const [isPending, startTransition] = useTransition()
+  // settings.group_view_mode = immediate (drives SegmentedControl highlight)
+  // viewMode = deferred via useTransition (drives content rendering)
   const [deferredViewMode, setDeferredViewMode] = useState(settings.group_view_mode)
   const viewMode = deferredViewMode
   const setViewMode = (v: GroupViewMode) => {
@@ -52,6 +54,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod)
   const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
+  usePrefetchOtherGroups(groupId, sparklinePeriod)
 
   const typeFilter = settings.group_type_filter
   const sortBy = settings.group_sort_by
@@ -182,7 +185,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               { value: "scanner", label: <ScanLine className="h-3.5 w-3.5" /> },
               { value: "live", label: <Activity className="h-3.5 w-3.5" /> },
             ]}
-            value={viewMode}
+            value={settings.group_view_mode}
             onChange={setViewMode}
           />
           {allTags && allTags.length > 0 && (

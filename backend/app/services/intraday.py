@@ -4,15 +4,12 @@ import logging
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-import pandas as pd
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from yahooquery import Ticker
 
 from app.models.intraday import IntradayPrice
-from app.services.yahoo.currency import resolve_currency
-from app.utils import async_threadable
+from app.services.yahoo import yahoo_client
 
 logger = logging.getLogger(__name__)
 
@@ -72,88 +69,6 @@ def _classify_session(ts: datetime, tz_name: str | None = None) -> str:
     return "regular"
 
 
-@async_threadable
-def _fetch_intraday_sync(symbols: list[str]) -> dict[str, list[dict]]:
-    """Fetch 1-minute intraday bars from Yahoo Finance (blocking).
-
-    Uses ``includePrePost=true`` so pre-market and post-market bars are
-    included — without it Yahoo only returns the previous regular session.
-    """
-    if not symbols:
-        return {}
-
-    ticker = Ticker(symbols)
-    price_data = ticker.price
-
-    # yahooquery's history() doesn't expose includePrePost, so call the
-    # internal chart endpoint directly with the flag enabled.
-    params = {"range": "1d", "interval": "1m", "includePrePost": "true"}
-    data = ticker._get_data("chart", params)
-    hist = ticker._historical_data_to_dataframe(data, params, adj_timezone=True)
-
-    if isinstance(hist, dict) or hist.empty:
-        return {}
-
-    result: dict[str, list[dict]] = {}
-    for sym in symbols:
-        try:
-            if isinstance(hist.index, pd.MultiIndex):
-                df = hist.loc[sym].copy()
-            else:
-                df = hist.copy()
-
-            if df.empty:
-                continue
-
-            # Resolve currency divisor and exchange timezone for session classification
-            info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
-            _, divisor = resolve_currency(info, sym)
-            tz_name = info.get("exchangeTimezoneName") if isinstance(info, dict) else None
-
-            # Fall back to timezone from the first timestamp when Yahoo
-            # doesn't provide exchangeTimezoneName (e.g. Copenhagen).
-            if not tz_name and len(df) > 0:
-                first_ts = pd.Timestamp(df.index[0])
-                if first_ts.tzinfo is not None:
-                    tz_name = str(first_ts.tzinfo)
-
-            bars = []
-            for idx, row in df.iterrows():
-                ts = pd.Timestamp(idx)
-                if ts.tzinfo is None:
-                    ts = ts.tz_localize("America/New_York")
-                dt = ts.to_pydatetime()
-
-                # Yahoo's chart API returns synthetic "current price" echo
-                # bars at non-minute-boundary timestamps (e.g. 10:03:43
-                # instead of 10:03:00) with volume=0.  These pollute the
-                # DB and can get mis-classified when the timezone context
-                # differs between fetch cycles, causing wrong session
-                # colors on European stocks.  All real 1m candles land on
-                # exact minute boundaries, so drop the rest.
-                if int(dt.timestamp()) % 60 != 0:
-                    continue
-
-                close_val = float(row["close"])
-                if divisor != 1:
-                    close_val = close_val / divisor
-
-                bars.append({
-                    "timestamp": dt,
-                    "price": round(close_val, 4),
-                    "volume": int(row["volume"]) if pd.notna(row.get("volume", None)) else 0,
-                    "session": _classify_session(dt, tz_name),
-                })
-
-            if bars:
-                result[sym] = bars
-        except (KeyError, TypeError) as exc:
-            logger.warning("Failed to parse intraday data for %s: %s", sym, exc)
-            continue
-
-    return result
-
-
 async def fetch_and_store_intraday(
     db: AsyncSession,
     symbols: list[str],
@@ -164,11 +79,19 @@ async def fetch_and_store_intraday(
     Before upserting, deletes bars older than the oldest bar in the fresh
     fetch so the DB only contains the current "1-day" window per asset.
     This prevents stale data from previous sessions mixing with today's data.
+
+    The Yahoo fetch + currency normalisation happens in
+    :meth:`YahooClient.intraday`; this function adds session classification
+    (which depends on per-exchange trading hours) and persists.
     """
-    data = await _fetch_intraday_sync(symbols)
+    raw = await yahoo_client.intraday(symbols)
 
     total = 0
-    for sym, bars in data.items():
+    for sym, raw_bars in raw.items():
+        bars = [
+            {**b, "session": _classify_session(b["timestamp"], b.get("tz_name"))}
+            for b in raw_bars
+        ]
         asset_id = asset_map.get(sym)
         if not asset_id or not bars:
             continue

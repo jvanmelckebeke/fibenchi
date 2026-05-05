@@ -1,13 +1,20 @@
 import { Link } from "react-router-dom"
-import { ArrowLeft, ExternalLink, RefreshCw, Plus } from "lucide-react"
+import { ArrowLeft, ExternalLink, RefreshCw, Plus, FolderPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PeriodSelector } from "@/components/period-selector"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { buildYahooFinanceUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
+import { resolveIcon } from "@/lib/icon-utils"
+import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
 import { useQuote } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
-import { useRefreshPrices, useCreateAsset } from "@/lib/queries"
+import { useRefreshPrices, useCreateAsset, useGroups, useAddAssetsToGroup } from "@/lib/queries"
 import { useSettings } from "@/lib/settings"
 
 export type ChartMode = "live" | "historical"
@@ -19,6 +26,7 @@ export function Header({
   period,
   setPeriod,
   isTracked,
+  assetId,
   mode,
   setMode,
 }: {
@@ -28,12 +36,15 @@ export function Header({
   period: string
   setPeriod: (p: string) => void
   isTracked: boolean
+  assetId?: number
   mode: ChartMode
   setMode: (m: ChartMode) => void
 }) {
   const { settings } = useSettings()
   const refresh = useRefreshPrices(symbol)
   const createAsset = useCreateAsset()
+  const { data: groups } = useGroups()
+  const addToGroup = useAddAssetsToGroup()
   const quote = useQuote(symbol.toUpperCase())
   const price = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
@@ -75,7 +86,7 @@ export function Header({
           </span>
         )}
         <a
-          href={buildYahooFinanceUrl(symbol)}
+          href={settings.yahoo_link_mode === "quote" ? buildYahooQuoteUrl(symbol) : buildYahooFinanceUrl(symbol)}
           target="_blank"
           rel="noopener noreferrer"
           title="View on Yahoo Finance"
@@ -95,6 +106,36 @@ export function Header({
             {createAsset.isPending ? "Adding..." : "Track"}
           </Button>
         )}
+        {isTracked && assetId != null && groups && (() => {
+          const availableGroups = groups.filter(
+            (g) => !g.is_default && !g.assets.some((a) => a.id === assetId),
+          )
+          if (availableGroups.length === 0) return null
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FolderPlus className="h-3.5 w-3.5 mr-1.5" />
+                  Add to Group
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {availableGroups.map((g) => {
+                  const Icon = resolveIcon(g.icon)
+                  return (
+                    <DropdownMenuItem
+                      key={g.id}
+                      onClick={() => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] })}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {g.name}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        })()}
       </div>
       <div className="flex items-center gap-2">
         <Tabs value={mode} onValueChange={(v) => setMode(v as ChartMode)}>

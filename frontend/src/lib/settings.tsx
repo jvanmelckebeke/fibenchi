@@ -7,6 +7,7 @@ export type GroupSortBy = string
 export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"
 export type GroupViewMode = "card" | "table" | "scanner" | "live"
+export type YahooLinkMode = "chart" | "quote"
 
 export interface AppSettings {
   /** Per-indicator placement visibility matrix. Missing key = use descriptor defaults. */
@@ -29,6 +30,7 @@ export interface AppSettings {
   sync_pseudo_etf_crosshairs: boolean
   show_indicator_deltas: boolean
   thousands_separator: boolean
+  yahoo_link_mode: YahooLinkMode
   _updated_at?: number
 }
 
@@ -74,6 +76,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sync_pseudo_etf_crosshairs: false,
   show_indicator_deltas: true,
   thousands_separator: true,
+  yahoo_link_mode: "chart",
 }
 
 

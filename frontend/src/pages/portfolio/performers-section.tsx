@@ -27,7 +27,7 @@ export function PerformersSection({
   if (!performers?.length) return null
 
   const top5 = performers.slice(0, 5)
-  const bottom5 = performers.length > 5
+  const bottom5 = performers.length >= 10
     ? [...performers].reverse().slice(0, 5)
     : []
 
