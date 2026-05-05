@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Copy, Trash2 } from "lucide-react"
+import { ArrowRightLeft, Copy, Pencil, Trash2 } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import {
   ContextMenuContent,
@@ -14,6 +14,7 @@ interface AssetContextMenuContentProps {
   groupId: number
   assetId: number
   symbol: string
+  onEdit: () => void
   onRemove: () => void
 }
 
@@ -21,6 +22,7 @@ export function AssetContextMenuContent({
   groupId,
   assetId,
   symbol,
+  onEdit,
   onRemove,
 }: AssetContextMenuContentProps) {
   const { data: groups } = useGroups()
@@ -92,6 +94,11 @@ export function AssetContextMenuContent({
           <ContextMenuSeparator />
         </>
       )}
+      <ContextMenuItem onClick={onEdit}>
+        <Pencil className="h-4 w-4" />
+        Edit asset…
+      </ContextMenuItem>
+      <ContextMenuSeparator />
       <ContextMenuItem variant="destructive" onClick={onRemove}>
         <Trash2 className="h-4 w-4" />
         Remove from group

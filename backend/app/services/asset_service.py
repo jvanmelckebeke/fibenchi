@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AssetType
+from app.models import Asset, AssetType
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
 from app.services.currency_service import ensure_currency
@@ -47,6 +47,34 @@ async def create_asset(
     return await repo.create(
         symbol=symbol, name=name, type=asset_type, currency=currency,
     )
+
+
+async def update_asset(
+    db: AsyncSession,
+    asset_id: int,
+    name: str | None = None,
+    asset_type: AssetType | None = None,
+    currency: str | None = None,
+):
+    """Apply partial updates to an asset row (name, type, currency).
+
+    Lets users reclassify a ticker after the fact (e.g. flip an index that
+    was auto-detected as a stock to ``AssetType.INDEX``) and override the
+    Yahoo-derived currency. None-valued fields are left untouched.
+    """
+    asset = await db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(404, f"Asset {asset_id} not found")
+
+    if name is not None:
+        asset.name = name
+    if asset_type is not None:
+        asset.type = asset_type
+    if currency is not None:
+        await ensure_currency(db, currency)
+        asset.currency = currency
+
+    return await AssetRepository(db).save(asset)
 
 
 async def delete_asset(db: AsyncSession, symbol: str):

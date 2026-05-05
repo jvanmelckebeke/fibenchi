@@ -42,6 +42,12 @@ export interface AssetCreate {
   type?: AssetType
 }
 
+export interface AssetUpdate {
+  name?: string
+  type?: AssetType
+  currency?: string
+}
+
 export interface SymbolSearchResult {
   symbol: string
   name: string

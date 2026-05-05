@@ -12,6 +12,12 @@ class AssetCreate(BaseModel):
     type: AssetType = Field(default=AssetType.STOCK, description="Asset type: stock or etf. Auto-detected if name is omitted.")
 
 
+class AssetUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=200, description="New display name.")
+    type: AssetType | None = Field(default=None, description="Override asset type (stock/etf/index).")
+    currency: str | None = Field(default=None, max_length=10, description="Override currency code (e.g. 'USD', 'EUR').")
+
+
 class TagBrief(BaseModel):
     id: int = Field(description="Tag ID")
     name: str = Field(description="Tag label (e.g. 'tech', 'growth')")

@@ -1,10 +1,11 @@
-import { memo, useMemo } from "react"
+import { memo, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { AssetContextMenuContent } from "@/components/asset-context-menu"
+import { EditAssetDialog } from "@/components/edit-asset-dialog"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
@@ -81,6 +82,7 @@ export const AssetCard = memo(function AssetCard({
   const changeCls = changeColor(changePct)
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
+  const [editOpen, setEditOpen] = useState(false)
 
   return (
     <ContextMenu>
@@ -157,7 +159,13 @@ export const AssetCard = memo(function AssetCard({
         groupId={groupId}
         assetId={assetId}
         symbol={symbol}
+        onEdit={() => setEditOpen(true)}
         onRemove={() => onDelete(symbol)}
+      />
+      <EditAssetDialog
+        asset={{ id: assetId, symbol, name, type, currency, tags, created_at: "" }}
+        open={editOpen}
+        onOpenChange={setEditOpen}
       />
     </ContextMenu>
   )
