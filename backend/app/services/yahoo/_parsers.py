@@ -110,7 +110,10 @@ def parse_quote_row(sym: str, info: dict) -> dict:
         "price": round(float(price) / divisor, 4) if price is not None else None,
         "previous_close": round(float(prev_close) / divisor, 4) if prev_close is not None else None,
         "change": round(float(change) / divisor, 4) if change is not None else None,
-        "change_percent": round(float(change_pct) * 100, 2) if change_pct is not None else None,
+        # ``ticker.quotes`` (/v7/finance/quote) returns this already in
+        # percent units (10.53 = 10.53%), unlike ``ticker.price`` which
+        # returned a decimal (0.1053). No ×100 needed.
+        "change_percent": round(float(change_pct), 2) if change_pct is not None else None,
         "volume": int(volume) if volume is not None else None,
         "avg_volume": int(avg_volume) if avg_volume is not None else None,
         "currency": currency,

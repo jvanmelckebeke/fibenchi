@@ -40,7 +40,8 @@ class TestParseQuotes:
                 "regularMarketPrice": 185.50,
                 "regularMarketPreviousClose": 184.00,
                 "regularMarketChange": 1.50,
-                "regularMarketChangePercent": 0.0082,
+                # /v7/finance/quote returns this in percent units, not decimal.
+                "regularMarketChangePercent": 0.82,
                 "regularMarketVolume": 50_000_000,
                 "averageDailyVolume10Day": 55_000_000,
                 "marketState": "REGULAR",
@@ -102,7 +103,7 @@ class TestParseQuotes:
                 "regularMarketPrice": 6500.0,
                 "regularMarketPreviousClose": 6400.0,
                 "regularMarketChange": 100.0,
-                "regularMarketChangePercent": 0.015625,
+                "regularMarketChangePercent": 1.5625,
                 "regularMarketVolume": 10_000_000,
                 "averageDailyVolume10Day": None,
                 "marketState": "REGULAR",
@@ -120,13 +121,13 @@ class TestParseQuotes:
             "AAPL": {
                 "currency": "USD", "regularMarketPrice": 185.0,
                 "regularMarketPreviousClose": 184.0, "regularMarketChange": 1.0,
-                "regularMarketChangePercent": 0.005, "regularMarketVolume": 50_000_000,
+                "regularMarketChangePercent": 0.5, "regularMarketVolume": 50_000_000,
                 "averageDailyVolume10Day": None, "marketState": "REGULAR",
             },
             "MSFT": {
                 "currency": "USD", "regularMarketPrice": 420.0,
                 "regularMarketPreviousClose": 418.0, "regularMarketChange": 2.0,
-                "regularMarketChangePercent": 0.005, "regularMarketVolume": 30_000_000,
+                "regularMarketChangePercent": 0.5, "regularMarketVolume": 30_000_000,
                 "averageDailyVolume10Day": None, "marketState": "REGULAR",
             },
         }
@@ -174,7 +175,7 @@ class TestQuotes:
         good = {"AAPL": {
             "currency": "USD", "regularMarketPrice": 185.0,
             "regularMarketPreviousClose": 184.0, "regularMarketChange": 1.0,
-            "regularMarketChangePercent": 0.005, "regularMarketVolume": 50_000_000,
+            "regularMarketChangePercent": 0.5, "regularMarketVolume": 50_000_000,
             "averageDailyVolume10Day": None, "marketState": "REGULAR",
         }}
 
