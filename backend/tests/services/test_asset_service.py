@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.models import AssetType
-from app.services.asset_service import create_asset, delete_asset, list_assets
+from app.services.asset_service import create_asset, delete_asset, list_assets, update_asset
 from tests.helpers import make_model_asset as _make_asset
 
 # Patch ensure_currency globally for all tests in this module since
@@ -223,6 +223,49 @@ async def test_create_asset_with_name_yahoo_fails_uses_suffix(MockAssetRepo, moc
 
     call_kwargs = mock_repo.create.call_args[1]
     assert call_kwargs["currency"] == "KRW"  # from suffix fallback
+
+
+@patch("app.services.asset_service.AssetRepository")
+async def test_update_asset_partial_fields_left_untouched(MockAssetRepo):
+    """Only fields explicitly provided are mutated; the rest stay as they were."""
+    db = AsyncMock()
+    asset = _make_asset(name="Old Name", type=AssetType.STOCK, currency="USD")
+    db.get = AsyncMock(return_value=asset)
+    mock_repo = MockAssetRepo.return_value
+    mock_repo.save = AsyncMock(return_value=asset)
+
+    await update_asset(db, asset_id=1, asset_type=AssetType.INDEX)
+
+    assert asset.type == AssetType.INDEX
+    assert asset.name == "Old Name"
+    assert asset.currency == "USD"
+    mock_repo.save.assert_awaited_once_with(asset)
+
+
+@patch(_ensure_patch, new_callable=AsyncMock)
+@patch("app.services.asset_service.AssetRepository")
+async def test_update_asset_currency_ensures_registration(MockAssetRepo, mock_ensure):
+    """Updating the currency must register it via ensure_currency before assigning."""
+    db = AsyncMock()
+    asset = _make_asset(currency="USD")
+    db.get = AsyncMock(return_value=asset)
+    mock_repo = MockAssetRepo.return_value
+    mock_repo.save = AsyncMock(return_value=asset)
+
+    await update_asset(db, asset_id=1, currency="EUR")
+
+    mock_ensure.assert_awaited_once_with(db, "EUR")
+    assert asset.currency == "EUR"
+
+
+async def test_update_asset_missing_raises_404():
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=None)
+
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        await update_asset(db, asset_id=999, name="x")
+    assert exc_info.value.status_code == 404
 
 
 @patch("app.services.asset_service.GroupRepository")

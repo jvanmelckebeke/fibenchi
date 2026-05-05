@@ -4,6 +4,7 @@ import type {
   Asset,
   AssetCreate,
   AssetDetail,
+  AssetUpdate,
   AssetPerformance,
   ConstituentIndicator,
   EarningsInfo,
@@ -72,6 +73,8 @@ export const api = {
     list: () => request<Asset[]>("/assets"),
     create: (data: AssetCreate) =>
       request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: AssetUpdate) =>
+      request<Asset>(`/assets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
   prices: {
     detail: (symbol: string, period?: string) =>
