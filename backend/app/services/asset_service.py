@@ -10,7 +10,7 @@ from app.services.yahoo import currency_from_suffix, yahoo_client
 
 
 async def list_assets(db: AsyncSession):
-    return await AssetRepository(db).list_in_any_group()
+    return await AssetRepository(db).list_all()
 
 
 async def create_asset(
