@@ -284,3 +284,25 @@ async def test_delete_asset_removes_from_default_group(MockAssetRepo, MockGroupR
 
     assert asset not in default_group.assets
     mock_group_repo.save.assert_awaited_once()
+
+
+@patch("app.services.asset_service.GroupRepository")
+@patch("app.services.asset_service.AssetRepository")
+async def test_delete_asset_raises_when_no_default_group(MockAssetRepo, MockGroupRepo):
+    """Regression for #507: silently no-op'ing when no group has is_default=true
+    is the worst-case UX. Surface it as 500 instead so the misconfig is loud."""
+    from fastapi import HTTPException
+
+    db = AsyncMock()
+    asset = _make_asset()
+
+    mock_group_repo = MockGroupRepo.return_value
+    mock_group_repo.get_default = AsyncMock(return_value=None)
+    mock_group_repo.save = AsyncMock()
+
+    with patch("app.services.asset_service.get_asset", new_callable=AsyncMock, return_value=asset):
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_asset(db, "AAPL")
+
+    assert exc_info.value.status_code == 500
+    mock_group_repo.save.assert_not_called()

@@ -59,7 +59,7 @@ Two long-lived branches: `main` (production, `fibenchi:latest`) and `dev` (stagi
 
 ### Backend Layout
 
-- `models/` — SQLAlchemy declarative models with `Mapped[]` type hints. Asset has a `type` enum (stock/etf) and `watchlisted` bool.
+- `models/` — SQLAlchemy declarative models with `Mapped[]` type hints. Asset has a `type` enum (stock/etf/index). Group has an `is_default` bool — exactly one row should carry it (the seeded "Watchlist" group); migration 0014 repairs drift.
 - `schemas/` — Pydantic v2 request/response models with `from_attributes` config. All router endpoints use `response_model` for typed OpenAPI schemas.
 - `routers/` — FastAPI routers, all prefixed under `/api`. Dependency-injected `AsyncSession` via `get_db()`. Period params use `PeriodType = Literal["1mo","3mo","6mo","1y","2y","5y"]` with `Query()` for automatic 422 validation.
 - `services/yahoo.py` — Yahoo Finance integration via `yahooquery`. Fetches OHLCV history, validates symbols, detects asset types, fetches ETF holdings.
@@ -124,11 +124,11 @@ On startup (`main.py` lifespan):
 
 ## Key Patterns
 
-- **Watchlist decoupling:** Deleting an asset sets `watchlisted=false` instead of removing the row. This preserves pseudo-ETF constituent relationships. Dashboard filters by `watchlisted=true`.
+- **Default-group soft delete:** The `Watchlist` group (flagged `is_default=true`, seeded by migration 0004) acts as the default container. `DELETE /api/assets/{symbol}` removes the asset from this default group only — the row and any other group memberships are preserved (so pseudo-ETF constituent relationships remain intact). If no default group exists, the endpoint raises HTTP 500; migration 0014 self-heals drifted instances.
 - **Pseudo-ETFs:** User-created baskets with equal-weight allocation, quarterly rebalancing (months 1,4,7,10), separate thesis/annotations tables.
 - **Generic components:** `ThesisEditor` and `AnnotationsList` accept data + callbacks as props, reused across asset detail and pseudo-ETF detail pages.
 - **Price warmup:** Indicator endpoint fetches `WARMUP_DAYS` extra calendar days before the display period to warm up SMA50/Bollinger Bands. Derived from `max_warmup_periods * 2.3`.
-- **SSE quote stream:** Backend pushes watchlisted quotes via SSE with adaptive intervals (15s during market hours, 60s pre/post, 300s closed). Frontend reconnects with exponential backoff (1s→30s) on disconnect.
+- **SSE quote stream:** Backend pushes quotes for assets in any group via SSE (`AssetRepository.list_in_any_group_id_symbol_pairs`) with adaptive intervals (15s during market hours, 60s pre/post, 300s closed). Frontend reconnects with exponential backoff (1s→30s) on disconnect.
 - **Stale price animation:** Group table falls back to DB-cached indicator prices when no live SSE quote is available. During market hours, stale values show a pulsing opacity animation (`.stale-price` CSS class). Suppressed when `market_state` is `CLOSED` or `POSTMARKET`.
 - **Price flash:** `usePriceFlash` hook triggers green/red background fade animation (1.8s) on price tick changes, using a reflow trick to restart CSS animations on repeated same-direction ticks.
 - **SPA fallback:** In production, the root `Dockerfile` copies the built SPA into `static/`. `main.py` mounts it and serves `index.html` for all non-API, non-asset routes. In dev, this directory doesn't exist so the mount is skipped.

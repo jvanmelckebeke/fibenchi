@@ -86,6 +86,11 @@ async def delete_asset(db: AsyncSession, symbol: str):
     asset = await get_asset(symbol, db)
     group_repo = GroupRepository(db)
     default_group = await group_repo.get_default()
-    if default_group:
-        default_group.assets = [a for a in default_group.assets if a.id != asset.id]
-        await group_repo.save(default_group)
+    if default_group is None:
+        raise HTTPException(
+            500,
+            "No default group is configured. Set is_default=true on exactly one "
+            "group (typically 'Watchlist'). Migration 0014 repairs this on deploy.",
+        )
+    default_group.assets = [a for a in default_group.assets if a.id != asset.id]
+    await group_repo.save(default_group)
