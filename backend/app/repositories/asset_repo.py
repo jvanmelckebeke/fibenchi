@@ -58,7 +58,7 @@ class AssetRepository:
         return list(result.all())
 
     async def list_all(self) -> list[Asset]:
-        result = await self.db.execute(select(Asset))
+        result = await self.db.execute(select(Asset).order_by(Asset.symbol))
         return list(result.scalars().all())
 
     async def get_by_ids(self, ids: list[int]) -> list[Asset]:

@@ -28,12 +28,12 @@ async def test_list_assets_delegates_to_repo(MockRepo):
     db = AsyncMock()
     mock_repo = MockRepo.return_value
     expected = [_make_asset()]
-    mock_repo.list_in_any_group = AsyncMock(return_value=expected)
+    mock_repo.list_all = AsyncMock(return_value=expected)
 
     result = await list_assets(db)
 
     MockRepo.assert_called_once_with(db)
-    mock_repo.list_in_any_group.assert_awaited_once()
+    mock_repo.list_all.assert_awaited_once()
     assert result == expected
 
 

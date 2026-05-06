@@ -101,6 +101,9 @@ async def test_create_duplicate_asset_returns_existing(client):
 
 
 async def test_delete_asset(client):
+    """``DELETE /api/assets/{symbol}`` is a soft-delete: the row is preserved
+    so pseudo-ETF constituent relationships stay intact. The asset remains
+    visible in the listing — only group membership is removed."""
     mock_info = {"symbol": "AAPL", "name": "Apple", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     with _mock_validate(return_value=mock_info):
         await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
@@ -108,7 +111,7 @@ async def test_delete_asset(client):
     assert resp.status_code == 204
 
     resp = await client.get("/api/assets")
-    assert resp.json() == []
+    assert [a["symbol"] for a in resp.json()] == ["AAPL"]
 
 
 async def test_delete_nonexistent_asset(client):
@@ -117,25 +120,28 @@ async def test_delete_nonexistent_asset(client):
 
 
 async def test_list_assets_returns_created(client):
-    """``GET /api/assets`` returns assets that belong to at least one group.
-
-    ``POST /api/assets`` no longer auto-attaches to the Watchlist, so the
-    test must explicitly add each asset to a group.
-    """
+    """``GET /api/assets`` returns every asset, ordered by symbol —
+    including orphans not yet attached to any group."""
     mock_aapl = {"symbol": "AAPL", "name": "Apple", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     mock_msft = {"symbol": "MSFT", "name": "Microsoft", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     with _mock_validate(side_effect=[mock_aapl, mock_msft]):
-        a1 = await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
-        a2 = await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft"})
-
-    groups = (await client.get("/api/groups")).json()
-    watchlist_id = next(g["id"] for g in groups if g["is_default"])
-    await client.post(
-        f"/api/groups/{watchlist_id}/assets",
-        json={"asset_ids": [a1.json()["id"], a2.json()["id"]]},
-    )
+        await client.post("/api/assets", json={"symbol": "AAPL", "name": "Apple"})
+        await client.post("/api/assets", json={"symbol": "MSFT", "name": "Microsoft"})
 
     resp = await client.get("/api/assets")
     assert resp.status_code == 200
     symbols = [a["symbol"] for a in resp.json()]
     assert symbols == ["AAPL", "MSFT"]
+
+
+async def test_list_assets_includes_orphans(client):
+    """Regression for #507: a freshly POSTed asset must appear in GET /api/assets
+    even before it has been attached to any group."""
+    mock_info = {"symbol": "OKLO", "name": "Oklo", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        await client.post("/api/assets", json={"symbol": "OKLO", "name": "Oklo"})
+
+    resp = await client.get("/api/assets")
+    assert resp.status_code == 200
+    symbols = [a["symbol"] for a in resp.json()]
+    assert "OKLO" in symbols

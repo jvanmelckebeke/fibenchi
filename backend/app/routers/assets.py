@@ -8,9 +8,14 @@ from app.services import asset_service
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
 
-@router.get("", response_model=list[AssetResponse], summary="List grouped assets")
+@router.get("", response_model=list[AssetResponse], summary="List all assets")
 async def list_assets(db: AsyncSession = Depends(get_db)):
-    """Return all assets that belong to at least one group, ordered alphabetically by symbol."""
+    """Return all assets, ordered alphabetically by symbol.
+
+    Includes assets not attached to any group — newly-created assets are orphans
+    until ``POST /api/groups/{id}/assets`` attaches them. Internal views that need
+    only grouped assets use repository-level filters directly.
+    """
     return await asset_service.list_assets(db)
 
 
