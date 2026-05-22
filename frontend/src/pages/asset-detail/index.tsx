@@ -17,6 +17,7 @@ import { useQuote } from "@/lib/quote-stream"
 import { StatsPanel } from "@/components/stats-panel"
 import { Header, type ChartMode } from "./header"
 import { ChartSection } from "./chart-section"
+import { MovementStats } from "./movement-stats"
 import { EarningsCountdown } from "@/components/earnings-countdown"
 import { HoldingsSection } from "./holdings-section"
 
@@ -47,6 +48,15 @@ export function AssetDetailPage() {
         assetType={asset?.type}
         mode={mode}
       />
+      {mode === "historical" && detail?.prices && detail.prices.length > 1 && (
+        <MovementStats
+          prices={detail.prices}
+          period={period}
+          symbol={symbol}
+          currency={asset?.currency ?? "USD"}
+          assetType={asset?.type ?? "stock"}
+        />
+      )}
       {mode === "historical" && detail?.indicators && detail.indicators.length > 0 && (
         <StatsPanel
           indicators={detail.indicators}
