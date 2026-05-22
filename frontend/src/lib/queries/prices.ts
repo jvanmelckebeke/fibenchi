@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { useCallback } from "react"
+import { useCallback, useMemo } from "react"
 import { api } from "../api"
+import { resolveWindow, type AssetWindow } from "../asset-window"
 import { keys, STALE_5MIN, STALE_24H, useInvalidatingMutation } from "./shared"
 
 export function useAssetDetail(symbol: string, period?: string, opts?: { enabled?: boolean }) {
@@ -11,6 +12,30 @@ export function useAssetDetail(symbol: string, period?: string, opts?: { enabled
     staleTime: STALE_5MIN, // 5 min — daily OHLCV data, SSE handles live quotes
     placeholderData: keepPreviousData,
   })
+}
+
+function sliceFrom<T extends { date: string }>(
+  rows: T[] | undefined,
+  startDate: string | null,
+): T[] | undefined {
+  if (!rows || !startDate) return rows
+  return rows.filter((r) => r.date >= startDate) // ISO dates compare lexicographically
+}
+
+/**
+ * Fetch asset detail for an analysis window. Resolves the window to a covering
+ * fixed period (so the underlying `useAssetDetail` cache is shared with the
+ * chart), then slices prices + indicators to the window's exact start.
+ */
+export function useAssetWindow(symbol: string, window: AssetWindow, opts?: { enabled?: boolean }) {
+  const { fetchPeriod, startDate, label } = resolveWindow(window)
+  const query = useAssetDetail(symbol, fetchPeriod, opts)
+  const prices = useMemo(() => sliceFrom(query.data?.prices, startDate), [query.data?.prices, startDate])
+  const indicators = useMemo(
+    () => sliceFrom(query.data?.indicators, startDate),
+    [query.data?.indicators, startDate],
+  )
+  return { ...query, prices, indicators, fetchPeriod, windowLabel: label }
 }
 
 export function useEtfHoldings(symbol: string, enabled: boolean) {

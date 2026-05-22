@@ -1,15 +1,16 @@
 import { PriceChart } from "@/components/price-chart"
 import { ChartSkeleton } from "@/components/chart-skeleton"
 import { IntradayChart } from "@/components/intraday-chart"
-import { useAssetDetail, useAnnotations } from "@/lib/queries"
+import { useAssetWindow, useAnnotations } from "@/lib/queries"
 import { useIntraday, useQuote } from "@/lib/quote-stream"
+import type { AssetWindow } from "@/lib/asset-window"
 import type { Placement } from "@/lib/indicator-registry"
 import type { AssetType } from "@/lib/api"
 import type { ChartMode } from "./header"
 
 export function ChartSection({
   symbol,
-  period,
+  assetWindow,
   indicatorVisibility,
   chartType,
   currency,
@@ -17,7 +18,7 @@ export function ChartSection({
   mode,
 }: {
   symbol: string
-  period: string
+  assetWindow: AssetWindow
   indicatorVisibility: Record<string, Placement[]>
   chartType: "candle" | "line"
   currency?: string
@@ -30,7 +31,7 @@ export function ChartSection({
   return (
     <HistoricalChartSection
       symbol={symbol}
-      period={period}
+      assetWindow={assetWindow}
       indicatorVisibility={indicatorVisibility}
       chartType={chartType}
       currency={currency}
@@ -63,22 +64,20 @@ function LiveChartSection({ symbol }: { symbol: string }) {
 
 function HistoricalChartSection({
   symbol,
-  period,
+  assetWindow,
   indicatorVisibility,
   chartType,
   currency,
   assetType,
 }: {
   symbol: string
-  period: string
+  assetWindow: AssetWindow
   indicatorVisibility: Record<string, Placement[]>
   chartType: "candle" | "line"
   currency?: string
   assetType?: AssetType
 }) {
-  const { data: detail, isLoading: detailLoading, isFetching: detailFetching } = useAssetDetail(symbol, period)
-  const prices = detail?.prices
-  const indicators = detail?.indicators
+  const { prices, indicators, isLoading: detailLoading, isFetching: detailFetching } = useAssetWindow(symbol, assetWindow)
   const { data: annotations } = useAnnotations(symbol)
 
   if (detailLoading) {

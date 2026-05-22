@@ -14,13 +14,13 @@ function formatDate(dateStr: string): string {
 
 interface MovementStatsProps {
   prices: Price[]
-  period: string
+  label: string
   symbol: string
   currency: string
   assetType: AssetType
 }
 
-export function MovementStats({ prices, period, symbol, currency, assetType }: MovementStatsProps) {
+export function MovementStats({ prices, label, symbol, currency, assetType }: MovementStatsProps) {
   const stats = useMemo(() => computeMovementStats(prices), [prices])
   if (!stats) return null
 
@@ -30,7 +30,7 @@ export function MovementStats({ prices, period, symbol, currency, assetType }: M
   return (
     <div className="rounded-lg border bg-card text-card-foreground px-4 py-3">
       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-        Movement · {period}
+        Movement · {label}
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatTile
