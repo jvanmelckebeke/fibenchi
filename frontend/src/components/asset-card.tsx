@@ -163,7 +163,7 @@ export const AssetCard = memo(function AssetCard({
         onRemove={() => onDelete(symbol)}
       />
       <EditAssetDialog
-        asset={{ id: assetId, symbol, name, type, currency, tags, created_at: "" }}
+        asset={{ id: assetId, symbol, name, type, currency }}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

@@ -19,8 +19,11 @@ import {
 import { useUpdateAsset } from "@/lib/queries"
 import type { Asset, AssetType } from "@/lib/api"
 
+/** Only the fields the edit form reads/writes — callers needn't supply a full Asset. */
+type EditableAsset = Pick<Asset, "id" | "symbol" | "name" | "type" | "currency">
+
 interface EditAssetDialogProps {
-  asset: Asset | null
+  asset: EditableAsset | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -31,7 +34,7 @@ const TYPE_OPTIONS: { value: AssetType; label: string }[] = [
   { value: "index", label: "Index" },
 ]
 
-function EditAssetForm({ asset, onClose }: { asset: Asset; onClose: () => void }) {
+function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () => void }) {
   const updateAsset = useUpdateAsset()
   const [name, setName] = useState(asset.name)
   const [type, setType] = useState<AssetType>(asset.type)
