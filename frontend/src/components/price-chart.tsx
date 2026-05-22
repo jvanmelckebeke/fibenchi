@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from "react"
-import type { Price, Indicator, Annotation } from "@/lib/api"
+import type { Price, Indicator, Annotation, AssetType } from "@/lib/api"
 import { ChartSyncProvider } from "./chart/chart-sync-provider"
 import { CandlestickChart } from "./chart/candlestick-chart"
 import { SubChart } from "./chart/sub-chart"
@@ -21,6 +21,8 @@ interface PriceChartProps {
   mainChartHeight?: number
   /** ISO 4217 currency code for formatting price-denominated indicators (e.g. ATR). */
   currency?: string
+  /** Asset type — indices have no meaningful volume, so the bars are suppressed. */
+  assetType?: AssetType
 }
 
 export function PriceChart({
@@ -32,13 +34,19 @@ export function PriceChart({
   chartType = "candle",
   mainChartHeight = 400,
   currency,
+  assetType,
 }: PriceChartProps) {
+  const effectiveExcludes = useMemo(() => {
+    const base = excludeIndicators ?? []
+    return assetType === "index" ? [...base, "volume"] : base
+  }, [excludeIndicators, assetType])
+
   const isVisible = useCallback(
     (id: string) => {
-      if (excludeIndicators?.includes(id)) return false
+      if (effectiveExcludes.includes(id)) return false
       return isVisibleAt(indicatorVisibility, id, "detail_chart")
     },
-    [indicatorVisibility, excludeIndicators],
+    [indicatorVisibility, effectiveExcludes],
   )
 
   const enabledSubCharts = useMemo(
@@ -60,6 +68,7 @@ export function PriceChart({
         <CandlestickChart
           annotations={annotations}
           indicatorVisibility={indicatorVisibility}
+          excludeIndicators={effectiveExcludes}
           chartType={chartType}
           height={mainChartHeight}
           hideTimeAxis={hasSubCharts}

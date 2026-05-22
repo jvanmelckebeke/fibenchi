@@ -1,15 +1,16 @@
-import { memo, useMemo } from "react"
+import { memo, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { AssetContextMenuContent } from "@/components/asset-context-menu"
+import { EditAssetDialog } from "@/components/edit-asset-dialog"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatPrice, formatCompactPrice, changeColor, formatChangePct } from "@/lib/format"
+import { formatAssetPrice, formatAssetCompactPrice, changeColor, formatChangePct } from "@/lib/format"
 import { getCardDescriptors, isVisibleAt, type IndicatorDescriptor, type Placement } from "@/lib/indicator-registry"
 import { IndicatorValue } from "@/components/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
@@ -81,6 +82,7 @@ export const AssetCard = memo(function AssetCard({
   const changeCls = changeColor(changePct)
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
+  const [editOpen, setEditOpen] = useState(false)
 
   return (
     <ContextMenu>
@@ -98,11 +100,11 @@ export const AssetCard = memo(function AssetCard({
                   <span
                     ref={priceRef}
                     className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1"
-                    title={settings.compact_numbers ? formatPrice(lastPrice, currency, undefined, settings.thousands_separator) : undefined}
+                    title={settings.compact_numbers ? formatAssetPrice(lastPrice, { type, symbol, currency }, undefined, settings.thousands_separator) : undefined}
                   >
                     {settings.compact_numbers
-                      ? formatCompactPrice(lastPrice, currency)
-                      : formatPrice(lastPrice, currency, undefined, settings.thousands_separator)}
+                      ? formatAssetCompactPrice(lastPrice, { type, symbol, currency })
+                      : formatAssetPrice(lastPrice, { type, symbol, currency }, undefined, settings.thousands_separator)}
                   </span>
                 ) : (
                   <Skeleton className="ml-auto h-5 w-16 rounded" />
@@ -157,7 +159,13 @@ export const AssetCard = memo(function AssetCard({
         groupId={groupId}
         assetId={assetId}
         symbol={symbol}
+        onEdit={() => setEditOpen(true)}
         onRemove={() => onDelete(symbol)}
+      />
+      <EditAssetDialog
+        asset={{ id: assetId, symbol, name, type, currency }}
+        open={editOpen}
+        onOpenChange={setEditOpen}
       />
     </ContextMenu>
   )

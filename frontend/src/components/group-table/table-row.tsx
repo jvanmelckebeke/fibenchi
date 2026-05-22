@@ -5,11 +5,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { AssetContextMenuContent } from "@/components/asset-context-menu"
+import { EditAssetDialog } from "@/components/edit-asset-dialog"
 import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatPrice, formatCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
+import { formatAssetPrice, formatAssetCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -105,6 +106,7 @@ export const TableRow = memo(function TableRow({
   const handleToggle = useCallback(() => onToggle(asset.symbol), [onToggle, asset.symbol])
   const handleDelete = useCallback(() => onDelete(asset.symbol), [onDelete, asset.symbol])
   const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
+  const [editOpen, setEditOpen] = useState(false)
 
   return (
     <ContextMenu>
@@ -158,11 +160,11 @@ export const TableRow = memo(function TableRow({
                 <span
                   ref={priceRef}
                   className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
-                  title={settings.compact_numbers ? formatPrice(displayPrice, asset.currency, undefined, settings.thousands_separator) : undefined}
+                  title={settings.compact_numbers ? formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator) : undefined}
                 >
                   {settings.compact_numbers
-                    ? formatCompactPrice(displayPrice, asset.currency)
-                    : formatPrice(displayPrice, asset.currency, undefined, settings.thousands_separator)}
+                    ? formatAssetCompactPrice(displayPrice, asset)
+                    : formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator)}
                 </span>
               ) : (
                 <Skeleton className="h-4 w-14 ml-auto rounded" />
@@ -260,8 +262,10 @@ export const TableRow = memo(function TableRow({
         groupId={groupId}
         assetId={asset.id}
         symbol={asset.symbol}
+        onEdit={() => setEditOpen(true)}
         onRemove={handleDelete}
       />
+      <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">

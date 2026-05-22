@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query"
-import { api, type AssetCreate, type SymbolSearchResult } from "../api"
+import { api, type AssetCreate, type AssetUpdate, type SymbolSearchResult } from "../api"
 import { keys, STALE_1MIN, STALE_5MIN, useInvalidatingMutation } from "./shared"
 
 export function useAssets() {
@@ -9,6 +9,13 @@ export function useAssets() {
 export function useCreateAsset() {
   return useInvalidatingMutation(
     (data: AssetCreate) => api.assets.create(data),
+    [keys.assets, keys.groups],
+  )
+}
+
+export function useUpdateAsset() {
+  return useInvalidatingMutation(
+    ({ id, data }: { id: number; data: AssetUpdate }) => api.assets.update(id, data),
     [keys.assets, keys.groups],
   )
 }
