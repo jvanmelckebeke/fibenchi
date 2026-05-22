@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PeriodSelector } from "@/components/period-selector"
+import { WindowSelector } from "@/components/window-selector"
+import { resolveWindow, type AssetWindow } from "@/lib/asset-window"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { resolveIcon } from "@/lib/icon-utils"
 import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatAssetPrice, formatAssetCompactPrice, formatChangePct } from "@/lib/format"
@@ -25,8 +26,8 @@ export function Header({
   name,
   currency,
   type,
-  period,
-  setPeriod,
+  assetWindow,
+  setAssetWindow,
   isTracked,
   assetId,
   mode,
@@ -36,8 +37,8 @@ export function Header({
   name?: string
   currency: string
   type: AssetType
-  period: string
-  setPeriod: (p: string) => void
+  assetWindow: AssetWindow
+  setAssetWindow: (w: AssetWindow) => void
   isTracked: boolean
   assetId?: number
   mode: ChartMode
@@ -149,12 +150,12 @@ export function Header({
         </Tabs>
         {mode === "historical" && (
           <>
-            <PeriodSelector value={period} onChange={setPeriod} />
+            <WindowSelector value={assetWindow} onChange={setAssetWindow} />
             {isTracked && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => refresh.mutate(period)}
+                onClick={() => refresh.mutate(resolveWindow(assetWindow).fetchPeriod)}
                 disabled={refresh.isPending}
               >
                 <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />

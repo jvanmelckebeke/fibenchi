@@ -121,6 +121,23 @@ export function formatChangePct(v: number | null): { text: string | null; classN
   }
 }
 
+/** Format an ISO date (`yyyy-mm-dd`) in the user's locale, e.g. "Feb 1, 2026". */
+export function formatDateLong(iso: string): string {
+  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+/** Format an ISO date (`yyyy-mm-dd`) without the year, e.g. "Feb 1". */
+export function formatDateShort(iso: string): string {
+  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  })
+}
+
 export function buildYahooQuoteUrl(symbol: string): string {
   return `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`
 }

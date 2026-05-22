@@ -3,6 +3,7 @@ import { useEarnings } from "@/lib/queries"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { formatDateLong } from "@/lib/format"
 
 const DIAL_SIZE = 96
 const STROKE = 6
@@ -16,14 +17,6 @@ function daysUntil(dateStr: string): number {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - now.getTime()) / 86_400_000)
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
 }
 
 function getColor(days: number): { stroke: string; text: string } {
@@ -104,7 +97,7 @@ export function EarningsCountdown({ symbol }: { symbol: string }) {
         <div className="space-y-1">
           <p className="text-sm font-semibold text-amber-500">Post-Earnings</p>
           <p className="text-xs text-muted-foreground">
-            Reported {formatDate(reportedDate)} — price action may be noisy
+            Reported {formatDateLong(reportedDate)} — price action may be noisy
           </p>
         </div>
       </div>
@@ -148,7 +141,7 @@ export function EarningsCountdown({ symbol }: { symbol: string }) {
       </div>
       <div className="space-y-1">
         <p className="text-sm font-medium text-muted-foreground">Earnings Countdown</p>
-        <p className="text-sm">{formatDate(date)}</p>
+        <p className="text-sm">{formatDateLong(date)}</p>
         {isEstimate && <Badge variant="outline" className="text-[10px]">Estimated</Badge>}
       </div>
     </div>
