@@ -77,7 +77,8 @@ function HistoricalChartSection({
   currency?: string
   assetType?: AssetType
 }) {
-  const { prices, indicators, isLoading: detailLoading, isFetching: detailFetching } = useAssetWindow(symbol, assetWindow)
+  const { prices, indicators, windowEmpty, isLoading: detailLoading, isFetching: detailFetching } =
+    useAssetWindow(symbol, assetWindow)
   const { data: annotations } = useAnnotations(symbol)
 
   if (detailLoading) {
@@ -87,7 +88,9 @@ function HistoricalChartSection({
   if (!prices?.length) {
     return (
       <div className="h-[520px] flex items-center justify-center text-muted-foreground">
-        No price data. Click Refresh to fetch.
+        {windowEmpty
+          ? "No data in this window — try a wider range."
+          : "No price data. Click Refresh to fetch."}
       </div>
     )
   }

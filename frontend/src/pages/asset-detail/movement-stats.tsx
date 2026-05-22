@@ -1,16 +1,7 @@
 import { useMemo } from "react"
 import { computeMovementStats } from "@/lib/movement-stats"
-import { formatChangePct, changeColor, formatAssetPrice } from "@/lib/format"
+import { formatChangePct, changeColor, formatAssetPrice, formatDateLong } from "@/lib/format"
 import type { Price, AssetType } from "@/lib/types"
-
-/** Matches the date formatting used by the sibling EarningsCountdown panel. */
-function formatDate(dateStr: string): string {
-  return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
 
 interface MovementStatsProps {
   prices: Price[]
@@ -45,7 +36,7 @@ export function MovementStats({ prices, label, symbol, currency, assetType }: Mo
           valueClass={stats.maxDrawdown ? "text-red-500" : "text-muted-foreground"}
           sub={
             stats.maxDrawdown
-              ? `${formatDate(stats.maxDrawdown.peakDate)} → ${formatDate(stats.maxDrawdown.troughDate)}`
+              ? `${formatDateLong(stats.maxDrawdown.peakDate)} → ${formatDateLong(stats.maxDrawdown.troughDate)}`
               : "no decline"
           }
         />
@@ -53,13 +44,13 @@ export function MovementStats({ prices, label, symbol, currency, assetType }: Mo
           label="Max daily gain"
           valueText={stats.maxDailyGain ? formatChangePct(stats.maxDailyGain.pct).text : "—"}
           valueClass={changeColor(stats.maxDailyGain?.pct)}
-          sub={stats.maxDailyGain ? formatDate(stats.maxDailyGain.date) : undefined}
+          sub={stats.maxDailyGain ? formatDateLong(stats.maxDailyGain.date) : undefined}
         />
         <StatTile
           label="Max daily loss"
           valueText={stats.maxDailyLoss ? formatChangePct(stats.maxDailyLoss.pct).text : "—"}
           valueClass={changeColor(stats.maxDailyLoss?.pct)}
-          sub={stats.maxDailyLoss ? formatDate(stats.maxDailyLoss.date) : undefined}
+          sub={stats.maxDailyLoss ? formatDateLong(stats.maxDailyLoss.date) : undefined}
         />
         <StatTile
           label="Up / down days"

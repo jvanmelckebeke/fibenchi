@@ -4,16 +4,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { STANDARD_PERIODS, relativeStart, ytdStart, todayISO, type AssetWindow } from "@/lib/asset-window"
+import { formatDateShort } from "@/lib/format"
 
 const RELATIVE_PRESETS: { label: string; days: number }[] = [
   { label: "1W", days: 7 },
   { label: "2W", days: 14 },
   { label: "3W", days: 21 },
 ]
-
-function formatShort(iso: string): string {
-  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })
-}
 
 interface WindowSelectorProps {
   value: AssetWindow
@@ -22,7 +19,7 @@ interface WindowSelectorProps {
 
 export function WindowSelector({ value, onChange }: WindowSelectorProps) {
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState("")
+  const [draft, setDraft] = useState(value.kind === "since" ? value.start : "")
   const isCustom = value.kind === "since"
 
   const applySince = (start: string) => {
@@ -48,7 +45,7 @@ export function WindowSelector({ value, onChange }: WindowSelectorProps) {
         <PopoverTrigger asChild>
           <Button variant={isCustom ? "default" : "ghost"} size="sm" className="text-xs gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" />
-            {isCustom ? formatShort(value.start) : "Custom"}
+            {isCustom ? formatDateShort(value.start) : "Custom"}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-56 space-y-3">

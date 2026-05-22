@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button"
-
-const DEFAULT_PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
+import { STANDARD_PERIODS } from "@/lib/asset-window"
 
 interface PeriodSelectorProps {
   value: string
@@ -11,7 +10,7 @@ interface PeriodSelectorProps {
 export function PeriodSelector({
   value,
   onChange,
-  periods = DEFAULT_PERIODS,
+  periods = STANDARD_PERIODS,
 }: PeriodSelectorProps) {
   return (
     <div className="flex gap-1">

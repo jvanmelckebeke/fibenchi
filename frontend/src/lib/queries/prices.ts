@@ -26,16 +26,23 @@ function sliceFrom<T extends { date: string }>(
  * Fetch asset detail for an analysis window. Resolves the window to a covering
  * fixed period (so the underlying `useAssetDetail` cache is shared with the
  * chart), then slices prices + indicators to the window's exact start.
+ *
+ * Consumers should read the sliced `prices` / `indicators` returned here — NOT
+ * `data.prices` (which is the unsliced full-period payload). `windowEmpty` is
+ * true when the fetch returned data but nothing falls inside the window (e.g.
+ * a "since" date with no trading days yet), so callers can distinguish that
+ * from "the asset has no data at all".
  */
-export function useAssetWindow(symbol: string, window: AssetWindow, opts?: { enabled?: boolean }) {
-  const { fetchPeriod, startDate, label } = resolveWindow(window)
+export function useAssetWindow(symbol: string, assetWindow: AssetWindow, opts?: { enabled?: boolean }) {
+  const { fetchPeriod, startDate, label } = resolveWindow(assetWindow)
   const query = useAssetDetail(symbol, fetchPeriod, opts)
   const prices = useMemo(() => sliceFrom(query.data?.prices, startDate), [query.data?.prices, startDate])
   const indicators = useMemo(
     () => sliceFrom(query.data?.indicators, startDate),
     [query.data?.indicators, startDate],
   )
-  return { ...query, prices, indicators, fetchPeriod, windowLabel: label }
+  const windowEmpty = !!query.data?.prices?.length && !prices?.length
+  return { ...query, prices, indicators, fetchPeriod, windowLabel: label, windowEmpty }
 }
 
 export function useEtfHoldings(symbol: string, enabled: boolean) {

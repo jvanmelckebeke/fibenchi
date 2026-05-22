@@ -8,6 +8,8 @@
  * no backend arbitrary-range endpoint required.
  */
 
+import { formatDateLong } from "./format"
+
 /** Calendar-day span of each fixed backend period. Mirrors backend `PERIOD_DAYS`. */
 export const PERIOD_DAYS: Record<string, number> = {
   "1mo": 30,
@@ -78,12 +80,7 @@ function daysSince(isoStart: string): number {
 }
 
 function formatSinceLabel(isoStart: string): string {
-  const d = new Date(isoStart + "T00:00:00").toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-  return `since ${d}`
+  return `since ${formatDateLong(isoStart)}`
 }
 
 export function resolveWindow(window: AssetWindow): ResolvedWindow {
