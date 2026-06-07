@@ -51,7 +51,7 @@ class ConfigGroup(_CamelModel):
 class CompanionConfig(_CamelModel):
     """The full config bundle the companion app pulls and caches."""
 
-    version: Literal[1] = Field(default=CONFIG_VERSION, description="Contract version the app gates on")
+    version: Literal[1] = Field(description="Contract version the app gates on (always sent; required so the app's gate can't be bypassed by an absent field)")
     generated_at: datetime.datetime = Field(description="When this bundle was produced (UTC)")
     groups: list[ConfigGroup] = Field(default_factory=list, description="User groups, ordered")
     tickers: dict[str, ConfigTicker] = Field(default_factory=dict, description="symbol -> metadata")

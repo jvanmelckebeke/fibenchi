@@ -96,8 +96,7 @@
   "properties": {
     "version": {
       "const": 1,
-      "default": 1,
-      "description": "Contract version the app gates on",
+      "description": "Contract version the app gates on (always sent; required so the app's gate can't be bypassed by an absent field)",
       "title": "Version",
       "type": "integer"
     },
@@ -133,6 +132,7 @@
     }
   },
   "required": [
+    "version",
     "generatedAt"
   ],
   "title": "CompanionConfig",
