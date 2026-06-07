@@ -19,7 +19,9 @@ async def build_config(db: AsyncSession) -> CompanionConfig:
 
     for group in groups:  # already ordered by position, name
         symbols: list[str] = []
-        for asset in group.assets:
+        # group_assets is an unordered M:N (no ordinal column), so sort by symbol
+        # for a stable, reproducible bundle — the app relies on deterministic order.
+        for asset in sorted(group.assets, key=lambda a: a.symbol):
             symbols.append(asset.symbol)
             if asset.symbol not in tickers:
                 display_currency, _ = currency_lookup(asset.currency)

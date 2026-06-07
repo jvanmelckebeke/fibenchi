@@ -1,3 +1,6 @@
+import json
+import pathlib
+
 import pytest
 
 from tests.helpers import create_asset_via_api
@@ -28,7 +31,8 @@ async def test_companion_config_shape(client):
 
     groups = {g["name"]: g for g in body["groups"]}
     assert groups["Watchlist"]["isDefault"] is True
-    assert set(groups["Watchlist"]["symbols"]) == {"AAPL", "MSFT"}
+    # Symbols are sorted deterministically (group_assets has no ordinal column).
+    assert groups["Watchlist"]["symbols"] == ["AAPL", "MSFT"]
     assert groups["Tech"]["isDefault"] is False
     assert groups["Tech"]["symbols"] == ["AAPL"]
 
@@ -50,3 +54,19 @@ async def test_companion_config_empty_is_valid(client):
     assert isinstance(body["groups"], list)
     assert isinstance(body["tickers"], dict)
     assert isinstance(body["tags"], dict)
+
+
+async def test_companion_schema_artifact_is_fresh():
+    """The committed JSON Schema is the codegen input for the companion app, so it
+    must stay in lock-step with the Pydantic SoT. If this fails, regenerate it:
+
+        python -m scripts.export_companion_schema
+    """
+    from app.schemas.companion import CompanionConfig
+
+    current = CompanionConfig.model_json_schema(by_alias=True)
+    artifact = pathlib.Path(__file__).parents[2] / "companion.schema.json"
+    on_disk = json.loads(artifact.read_text())
+    assert current == on_disk, (
+        "companion.schema.json is stale — run: python -m scripts.export_companion_schema"
+    )
