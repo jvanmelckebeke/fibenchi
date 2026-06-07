@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "AssetType": {
+      "enum": [
+        "stock",
+        "etf",
+        "index"
+      ],
+      "title": "AssetType",
+      "type": "string"
+    },
+    "ConfigGroup": {
+      "description": "A user group as ordered symbol references.",
+      "properties": {
+        "name": {
+          "description": "Group name",
+          "title": "Name",
+          "type": "string"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Lucide icon name",
+          "title": "Icon"
+        },
+        "isDefault": {
+          "description": "Whether this is the protected default group (Watchlist)",
+          "title": "Isdefault",
+          "type": "boolean"
+        },
+        "position": {
+          "description": "Display order (0 = first)",
+          "title": "Position",
+          "type": "integer"
+        },
+        "symbols": {
+          "description": "Ticker symbols in this group, in order",
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "isDefault",
+        "position"
+      ],
+      "title": "ConfigGroup",
+      "type": "object"
+    },
+    "ConfigTicker": {
+      "description": "Metadata for a single tracked symbol (defined once across all groups).",
+      "properties": {
+        "name": {
+          "description": "Display name",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/AssetType",
+          "description": "Asset type: stock, etf, or index"
+        },
+        "currency": {
+          "default": "USD",
+          "description": "ISO 4217 display code (normalized, e.g. GBp -> GBP)",
+          "title": "Currency",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tag names attached to this symbol",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ConfigTicker",
+      "type": "object"
+    }
+  },
+  "description": "The full config bundle the companion app pulls and caches.",
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "description": "Contract version the app gates on",
+      "title": "Version",
+      "type": "integer"
+    },
+    "generatedAt": {
+      "description": "When this bundle was produced (UTC)",
+      "format": "date-time",
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "groups": {
+      "description": "User groups, ordered",
+      "items": {
+        "$ref": "#/$defs/ConfigGroup"
+      },
+      "title": "Groups",
+      "type": "array"
+    },
+    "tickers": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ConfigTicker"
+      },
+      "description": "symbol -> metadata",
+      "title": "Tickers",
+      "type": "object"
+    },
+    "tags": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "tag name -> hex colour",
+      "title": "Tags",
+      "type": "object"
+    }
+  },
+  "required": [
+    "generatedAt"
+  ],
+  "title": "CompanionConfig",
+  "type": "object"
+}

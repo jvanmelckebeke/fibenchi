@@ -15,7 +15,7 @@ from starlette.responses import FileResponse
 from app.config import settings as app_settings
 
 from app.database import async_session, engine
-from app.routers import annotations, assets, data, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
+from app.routers import annotations, assets, companion, data, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
@@ -282,6 +282,10 @@ app = FastAPI(
             "description": "User preference storage for indicator visibility, chart preferences, and display options.",
         },
         {
+            "name": "companion",
+            "description": "Versioned config bundle (groups + tickers + tags) for the mobile companion app — tells it what to track; live data is fetched on-device.",
+        },
+        {
             "name": "system",
             "description": "Health checks and operational endpoints.",
         },
@@ -291,6 +295,7 @@ app = FastAPI(
 app.include_router(assets.router)
 app.include_router(data.router)
 app.include_router(groups.router)
+app.include_router(companion.router)
 app.include_router(tags.router)
 app.include_router(tags.asset_tag_router)
 app.include_router(portfolio.router)
