@@ -30,6 +30,9 @@ import type {
   TagBrief,
   TagCreate,
   Note,
+  Thesis,
+  ThesisCreate,
+  ThesisUpdate,
 } from "./types"
 
 export type * from "./types"
@@ -96,6 +99,20 @@ export const api = {
       request<TagBrief[]>(`/assets/${symbol}/tags/${tagId}`, { method: "POST" }),
     detach: (symbol: string, tagId: number) =>
       request<TagBrief[]>(`/assets/${symbol}/tags/${tagId}`, { method: "DELETE" }),
+  },
+  theses: {
+    list: () => request<Thesis[]>("/theses"),
+    get: (id: number) => request<Thesis>(`/theses/${id}`),
+    create: (data: ThesisCreate) =>
+      request<Thesis>("/theses", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: ThesisUpdate) =>
+      request<Thesis>(`/theses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: number) =>
+      request<void>(`/theses/${id}`, { method: "DELETE" }),
+    addAssets: (id: number, assetIds: number[]) =>
+      request<Thesis>(`/theses/${id}/assets`, { method: "POST", body: JSON.stringify({ asset_ids: assetIds }) }),
+    removeAsset: (id: number, assetId: number) =>
+      request<Thesis>(`/theses/${id}/assets/${assetId}`, { method: "DELETE" }),
   },
   groups: {
     list: () => request<Group[]>("/groups"),

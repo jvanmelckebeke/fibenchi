@@ -32,6 +32,8 @@ export const keys = {
   groupSparklines: (id: number, period?: string) => ["group-sparklines", id, period] as const,
   groupIndicators: (id: number) => ["group-indicators", id] as const,
   note: (symbol: string) => ["note", symbol] as const,
+  theses: ["theses"] as const,
+  thesis: (id: number) => ["theses", id] as const,
   annotations: (symbol: string) => ["annotations", symbol] as const,
   pseudoEtfs: ["pseudo-etfs"] as const,
   pseudoEtf: (id: number) => ["pseudo-etfs", id] as const,

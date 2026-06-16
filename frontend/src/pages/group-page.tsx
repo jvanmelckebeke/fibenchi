@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo, useTransition } from "react"
-import { Activity, ArrowDownAZ, ArrowUpAZ, LayoutGrid, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
+import { Activity, ArrowDownAZ, ArrowUpAZ, Layers, LayoutGrid, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,12 +15,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/add-symbol-dialog"
 import { AssetCard } from "@/components/asset-card"
 import { TagFilterPopover } from "@/components/tag-filter-popover"
-import { useGroup, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, usePrefetchAssetDetail, usePrefetchOtherGroups } from "@/lib/queries"
+import { useGroup, useGroups, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, useTheses, usePrefetchAssetDetail, usePrefetchOtherGroups } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode, type SortDir } from "@/lib/settings"
 import { useFilteredSortedAssets } from "@/lib/use-group-filter"
 import { GroupTable } from "@/components/group-table"
+import { ThesisGroupedTable } from "@/components/thesis-grouped-table"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 import { ScannerView } from "@/components/scanner-view"
 import { LiveDayView } from "@/components/live-day-view"
@@ -34,8 +35,11 @@ const SORT_LABELS: Record<string, string> = Object.fromEntries(SORT_OPTIONS)
 export function GroupPage({ groupId }: { groupId: number }) {
   const { data: group, isLoading: groupLoading } = useGroup(groupId)
   const { data: allTags } = useTags()
+  const { data: theses } = useTheses()
+  const { data: allGroups } = useGroups()
   const removeFromGroup = useRemoveAssetFromGroup()
   const [selectedTags, setSelectedTags] = useState<number[]>([])
+  const [groupByThesis, setGroupByThesis] = useState(false)
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
   const [isPending, startTransition] = useTransition()
@@ -189,6 +193,18 @@ export function GroupPage({ groupId }: { groupId: number }) {
             value={settings.group_view_mode}
             onChange={setViewMode}
           />
+          {viewMode === "table" && (
+            <Button
+              variant={groupByThesis ? "default" : "outline"}
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => setGroupByThesis((v) => !v)}
+              title="Group rows by thesis"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              By thesis
+            </Button>
+          )}
           {allTags && allTags.length > 0 && (
             <TagFilterPopover
               tags={allTags}
@@ -223,18 +239,35 @@ export function GroupPage({ groupId }: { groupId: number }) {
         </CrosshairTimeSyncProvider>
       ) : viewMode === "table" && assets && assets.length > 0 ? (
         <CrosshairTimeSyncProvider enabled={true}>
-          <GroupTable
-            groupId={groupId}
-            assets={assets}
-            quotes={quotes}
-            indicators={batchIndicators}
-            onDelete={handleRemove}
-            compactMode={settings.compact_mode}
-            onHover={prefetch}
-            sortBy={sortBy}
-            sortDir={sortDir}
-            onSort={handleSort}
-          />
+          {groupByThesis ? (
+            <ThesisGroupedTable
+              groupId={groupId}
+              assets={assets}
+              theses={theses ?? []}
+              allGroups={allGroups ?? []}
+              quotes={quotes}
+              indicators={batchIndicators}
+              onDelete={handleRemove}
+              compactMode={settings.compact_mode}
+              onHover={prefetch}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
+          ) : (
+            <GroupTable
+              groupId={groupId}
+              assets={assets}
+              quotes={quotes}
+              indicators={batchIndicators}
+              onDelete={handleRemove}
+              compactMode={settings.compact_mode}
+              onHover={prefetch}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
+          )}
         </CrosshairTimeSyncProvider>
       ) : (
         <div className={`grid gap-4 ${

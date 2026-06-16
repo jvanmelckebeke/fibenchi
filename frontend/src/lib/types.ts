@@ -119,6 +119,42 @@ export interface Note {
   updated_at: string
 }
 
+export type ThesisStatus = "watching" | "live" | "played_out"
+
+export interface ThesisAssetBrief {
+  id: number
+  symbol: string
+  name: string
+}
+
+export interface Thesis {
+  id: number
+  name: string
+  color: string
+  description: string | null
+  status: ThesisStatus
+  opened_at: string
+  created_at: string
+  assets: ThesisAssetBrief[]
+  aggregate_pct: number | null
+}
+
+export interface ThesisCreate {
+  name: string
+  color?: string
+  description?: string | null
+  status?: ThesisStatus
+  opened_at?: string
+}
+
+export interface ThesisUpdate {
+  name?: string
+  color?: string
+  description?: string | null
+  status?: ThesisStatus
+  opened_at?: string
+}
+
 export interface SyncResult {
   symbol: string
   synced: number
