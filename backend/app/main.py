@@ -15,7 +15,7 @@ from starlette.responses import FileResponse
 from app.config import settings as app_settings
 
 from app.database import async_session, engine
-from app.routers import annotations, assets, companion, data, groups, holdings, note, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags
+from app.routers import annotations, assets, companion, data, groups, holdings, note, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
@@ -261,6 +261,10 @@ app = FastAPI(
             "description": "Free-text note per asset. Supports Markdown content.",
         },
         {
+            "name": "theses",
+            "description": "Global cross-cutting theses: thematic baskets of tickers tracked under one hypothesis, with a lifecycle status and open date. An asset can belong to many theses.",
+        },
+        {
             "name": "annotations",
             "description": "Dated chart annotations per asset. Each annotation has a date, title, body, and color for visual markers on price charts.",
         },
@@ -302,6 +306,7 @@ app.include_router(portfolio.router)
 app.include_router(prices.router)
 app.include_router(holdings.router)
 app.include_router(note.router)
+app.include_router(thesis.router)
 app.include_router(annotations.router)
 app.include_router(pseudo_etfs.router)
 app.include_router(pseudo_etf_analysis.router)

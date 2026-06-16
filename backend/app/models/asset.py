@@ -27,6 +27,7 @@ class Asset(Base):
     annotations: Mapped[list["Annotation"]] = relationship(back_populates="asset", cascade="all, delete-orphan")
     note: Mapped["Note | None"] = relationship(back_populates="asset", cascade="all, delete-orphan", uselist=False)
     tags: Mapped[list["Tag"]] = relationship(secondary="tag_assets", lazy="selectin")
+    theses: Mapped[list["Thesis"]] = relationship(secondary="thesis_assets", lazy="selectin")
 
 
 # Avoid circular import issues - these are resolved at runtime
@@ -34,3 +35,4 @@ from app.models.price import PriceHistory  # noqa: E402, F401
 from app.models.annotation import Annotation  # noqa: E402, F401
 from app.models.note import Note  # noqa: E402, F401
 from app.models.tag import Tag, tag_assets  # noqa: E402, F401
+from app.models.thesis import Thesis, thesis_assets  # noqa: E402, F401

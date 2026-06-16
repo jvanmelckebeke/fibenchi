@@ -8,11 +8,12 @@ router layer.
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Asset, Group
+from app.models import Asset, Group, Thesis
 from app.models.pseudo_etf import PseudoETF
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
 from app.repositories.pseudo_etf_repo import PseudoEtfRepository
+from app.repositories.thesis_repo import ThesisRepository
 
 
 async def find_asset(symbol: str, db: AsyncSession) -> Asset | None:
@@ -42,3 +43,11 @@ async def get_group(group_id: int, db: AsyncSession) -> Group:
     if not group:
         raise HTTPException(404, "Group not found")
     return group
+
+
+async def get_thesis(thesis_id: int, db: AsyncSession) -> Thesis:
+    """Look up thesis by ID, raising 404 if not found."""
+    thesis = await ThesisRepository(db).get_by_id(thesis_id)
+    if not thesis:
+        raise HTTPException(404, "Thesis not found")
+    return thesis
