@@ -20,6 +20,7 @@ export interface AppSettings {
   group_sort_dir: SortDir
   group_table_columns: Record<string, boolean>
   group_table_column_widths: Record<string, number>
+  group_by_thesis: boolean
   chart_default_period: string
   chart_type: "candle" | "line"
   theme: "dark" | "light" | "system"
@@ -66,6 +67,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   group_sort_dir: "asc",
   group_table_columns: {},
   group_table_column_widths: {},
+  group_by_thesis: false,
   chart_default_period: "1y",
   chart_type: "candle",
   theme: "system",

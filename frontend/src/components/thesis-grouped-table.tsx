@@ -93,12 +93,7 @@ export function ThesisGroupedTable({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {sections.length === 0
-            ? "No theses for these tickers yet."
-            : `${sections.length} ${sections.length === 1 ? "thesis" : "theses"} here`}
-        </span>
+      <div className="flex justify-end">
         <Button
           variant="outline"
           size="sm"

@@ -39,9 +39,9 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const { data: allGroups } = useGroups()
   const removeFromGroup = useRemoveAssetFromGroup()
   const [selectedTags, setSelectedTags] = useState<number[]>([])
-  const [groupByThesis, setGroupByThesis] = useState(false)
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
+  const groupByThesis = settings.group_by_thesis
   const [isPending, startTransition] = useTransition()
   // settings.group_view_mode = immediate (drives SegmentedControl highlight)
   // viewMode = deferred via useTransition (drives content rendering)
@@ -198,7 +198,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               variant={groupByThesis ? "default" : "outline"}
               size="sm"
               className="h-7 gap-1.5 text-xs"
-              onClick={() => setGroupByThesis((v) => !v)}
+              onClick={() => updateSettings({ group_by_thesis: !groupByThesis })}
               title="Group rows by thesis"
             >
               <Layers className="h-3.5 w-3.5" />
