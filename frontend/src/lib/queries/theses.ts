@@ -49,3 +49,21 @@ export function useRemoveThesisAsset(id: number) {
     [keys.theses, keys.thesis(id)],
   )
 }
+
+// Generic (thesisId-as-argument) variants for toggling membership across an
+// arbitrary list of theses — usable in loops where the id-bound hooks can't be.
+export function useAddAssetToThesis() {
+  return useInvalidatingMutation(
+    ({ thesisId, assetId }: { thesisId: number; assetId: number }) =>
+      api.theses.addAssets(thesisId, [assetId]),
+    [keys.theses],
+  )
+}
+
+export function useRemoveAssetFromThesis() {
+  return useInvalidatingMutation(
+    ({ thesisId, assetId }: { thesisId: number; assetId: number }) =>
+      api.theses.removeAsset(thesisId, assetId),
+    [keys.theses],
+  )
+}

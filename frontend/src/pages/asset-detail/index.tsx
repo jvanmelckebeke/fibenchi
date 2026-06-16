@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom"
 import { ConnectedNote } from "@/components/connected-note"
 import { ConnectedAnnotations } from "@/components/connected-annotations"
 import { TagInput } from "@/components/tag-input"
+import { ThesisInput } from "@/components/thesis-input"
 import {
   useAssets,
   useAssetWindow,
@@ -76,6 +77,7 @@ export function AssetDetailPage() {
       {isTracked && (
         <>
           <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
+          {asset && <ThesisInput assetId={asset.id} />}
           <AssetAnnotations symbol={symbol} />
           <AssetNote symbol={symbol} />
         </>

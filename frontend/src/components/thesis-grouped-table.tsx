@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import type { Asset, Group, IndicatorSummary, Quote, Thesis, ThesisStatus } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { formatChangePct, formatDateLong } from "@/lib/format"
 import { GroupTable } from "@/components/group-table"
+import { NewThesisDialog } from "@/components/new-thesis-dialog"
 
 interface ThesisGroupedTableProps {
   groupId: number
@@ -40,6 +42,7 @@ export function ThesisGroupedTable({
   onDelete, compactMode, onHover, sortBy, sortDir, onSort,
 }: ThesisGroupedTableProps) {
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
+  const [newThesisOpen, setNewThesisOpen] = useState(false)
 
   const toggleReveal = (id: number) =>
     setRevealed((prev) => {
@@ -88,6 +91,23 @@ export function ThesisGroupedTable({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {sections.length === 0
+            ? "No theses for these tickers yet."
+            : `${sections.length} ${sections.length === 1 ? "thesis" : "theses"} here`}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => setNewThesisOpen(true)}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New thesis
+        </Button>
+      </div>
+
       {sections.map(({ thesis, inGroup, elsewhere }) => {
         const isOpen = revealed.has(thesis.id)
         const elsewhereGroups = [
@@ -161,6 +181,8 @@ export function ThesisGroupedTable({
           <GroupTable assets={ungrouped} {...passthrough} />
         </section>
       )}
+
+      <NewThesisDialog open={newThesisOpen} onOpenChange={setNewThesisOpen} />
     </div>
   )
 }
