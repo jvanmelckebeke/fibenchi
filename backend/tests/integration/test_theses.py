@@ -74,6 +74,25 @@ async def test_update_thesis(client):
     assert body["color"] == "#ff0000"
 
 
+async def test_update_to_duplicate_name_rejected(client):
+    await client.post("/api/theses", json={"name": "Alpha"})
+    bid = (await client.post("/api/theses", json={"name": "Beta"})).json()["id"]
+    # renaming Beta -> Alpha collides
+    resp = await client.put(f"/api/theses/{bid}", json={"name": "Alpha"})
+    assert resp.status_code == 400
+    # renaming to its own name is fine (no-op collision check)
+    assert (await client.put(f"/api/theses/{bid}", json={"name": "Beta"})).status_code == 200
+
+
+async def test_add_nonexistent_asset_rejected(client):
+    coco = await create_asset_via_api(client, "COCO.L", "Cocoa")
+    tid = (await client.post("/api/theses", json={"name": "El Niño"})).json()["id"]
+    resp = await client.post(f"/api/theses/{tid}/assets", json={"asset_ids": [coco["id"], 999999]})
+    assert resp.status_code == 404
+    # the valid id must not have been partially added
+    assert (await client.get(f"/api/theses/{tid}")).json()["assets"] == []
+
+
 async def test_delete_thesis(client):
     tid = (await client.post("/api/theses", json={"name": "ToDelete"})).json()["id"]
     assert (await client.delete(f"/api/theses/{tid}")).status_code == 204

@@ -29,7 +29,9 @@ const STATUSES: { value: ThesisStatus; label: string }[] = [
 ]
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
+  // Local calendar date as yyyy-mm-dd (en-CA), NOT UTC — toISOString() can roll
+  // to tomorrow in the evening for users west of UTC.
+  return new Date().toLocaleDateString("en-CA")
 }
 
 interface NewThesisDialogProps {

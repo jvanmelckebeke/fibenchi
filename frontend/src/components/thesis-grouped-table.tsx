@@ -68,7 +68,13 @@ export function ThesisGroupedTable({
     return map
   }, [allGroups, groupId])
 
-  const currentIds = useMemo(() => new Set(assets.map((a) => a.id)), [assets])
+  // Unfiltered membership of the current group: a thesis member that lives in
+  // this group but is hidden by an active type/tag filter must NOT be counted as
+  // living "elsewhere" (the filtered `assets` prop would misclassify it).
+  const currentGroupIds = useMemo(() => {
+    const g = allGroups.find((grp) => grp.id === groupId)
+    return new Set((g?.assets ?? []).map((a) => a.id))
+  }, [allGroups, groupId])
 
   // Sections: one per thesis with >=1 member in THIS group, preserving the
   // incoming sort order within each section. A ticker in several theses appears
@@ -79,13 +85,13 @@ export function ThesisGroupedTable({
       const memberIds = new Set(thesis.assets.map((m) => m.id))
       thesis.assets.forEach((m) => memberOfAnyThesis.add(m.id))
       const inGroup = assets.filter((a) => memberIds.has(a.id))
-      const elsewhere = thesis.assets.filter((m) => !currentIds.has(m.id))
+      const elsewhere = thesis.assets.filter((m) => !currentGroupIds.has(m.id))
       return { thesis, inGroup, elsewhere }
     }).filter((s) => s.inGroup.length > 0)
 
     const ungrouped = assets.filter((a) => !memberOfAnyThesis.has(a.id))
     return { sections, ungrouped }
-  }, [theses, assets, currentIds])
+  }, [theses, assets, currentGroupIds])
 
   const passthrough = {
     groupId, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort,
@@ -125,7 +131,7 @@ export function ThesisGroupedTable({
                 opened {formatDateLong(thesis.opened_at)}
               </span>
               {agg.text && (
-                <span className={`text-sm font-medium ${agg.className}`} title="Equal-weight return since opened">
+                <span className={`text-sm font-medium ${agg.className}`} title="Equal-weight return since opened, across all members (including any in other groups)">
                   {agg.text}
                 </span>
               )}

@@ -120,6 +120,7 @@ export function AssetContextMenuContent({
               <ContextMenuCheckboxItem
                 key={t.id}
                 checked={member}
+                onSelect={(e) => e.preventDefault()}
                 onCheckedChange={(checked) =>
                   checked
                     ? addToThesis.mutate({ thesisId: t.id, assetId })

@@ -78,8 +78,12 @@ async def create_thesis(
 
 async def update_thesis(db: AsyncSession, thesis_id: int, data: dict):
     thesis = await get_thesis(thesis_id, db)
-    if "name" in data:
-        thesis.name = data["name"]
+    repo = ThesisRepository(db)
+    name = data.get("name")
+    if name is not None and name != thesis.name:
+        if await repo.get_by_name(name):
+            raise HTTPException(400, f"Thesis '{name}' already exists")
+        thesis.name = name
     if "color" in data:
         thesis.color = data["color"]
     if "description" in data:
@@ -89,7 +93,7 @@ async def update_thesis(db: AsyncSession, thesis_id: int, data: dict):
         thesis.status = status.value if isinstance(status, ThesisStatus) else status
     if data.get("opened_at") is not None:
         thesis.opened_at = data["opened_at"]
-    saved = await ThesisRepository(db).save(thesis)
+    saved = await repo.save(thesis)
     return await _attach_aggregate(db, saved)
 
 
@@ -101,6 +105,9 @@ async def delete_thesis(db: AsyncSession, thesis_id: int):
 async def add_assets(db: AsyncSession, thesis_id: int, asset_ids: list[int]):
     thesis = await get_thesis(thesis_id, db)
     assets = await AssetRepository(db).get_by_ids(asset_ids)
+    missing = set(asset_ids) - {a.id for a in assets}
+    if missing:
+        raise HTTPException(404, f"Asset(s) not found: {sorted(missing)}")
     existing_ids = {a.id for a in thesis.assets}
     for asset in assets:
         if asset.id not in existing_ids:
