@@ -6,7 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { AssetContextMenuContent } from "@/components/asset-context-menu"
 import { EditAssetDialog } from "@/components/edit-asset-dialog"
+import { NewThesisDialog } from "@/components/new-thesis-dialog"
 import { MarketStatusDot } from "@/components/market-status-dot"
+import { useAddAssetToThesis } from "@/lib/queries"
 import { DeferredSparkline } from "@/components/sparkline"
 import { TagBadge } from "@/components/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
@@ -83,6 +85,8 @@ export const AssetCard = memo(function AssetCard({
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
   const [editOpen, setEditOpen] = useState(false)
+  const [newThesisOpen, setNewThesisOpen] = useState(false)
+  const addToThesis = useAddAssetToThesis()
 
   return (
     <ContextMenu>
@@ -161,11 +165,17 @@ export const AssetCard = memo(function AssetCard({
         symbol={symbol}
         onEdit={() => setEditOpen(true)}
         onRemove={() => onDelete(symbol)}
+        onNewThesis={() => setNewThesisOpen(true)}
       />
       <EditAssetDialog
         asset={{ id: assetId, symbol, name, type, currency }}
         open={editOpen}
         onOpenChange={setEditOpen}
+      />
+      <NewThesisDialog
+        open={newThesisOpen}
+        onOpenChange={setNewThesisOpen}
+        onCreated={(thesis) => addToThesis.mutate({ thesisId: thesis.id, assetId })}
       />
     </ContextMenu>
   )

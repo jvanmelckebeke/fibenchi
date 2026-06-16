@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Copy, Layers, Pencil, Trash2 } from "lucide-react"
+import { ArrowRightLeft, Copy, Layers, Pencil, Plus, Trash2 } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import {
   ContextMenuCheckboxItem,
@@ -24,6 +24,7 @@ interface AssetContextMenuContentProps {
   symbol: string
   onEdit: () => void
   onRemove: () => void
+  onNewThesis: () => void
 }
 
 export function AssetContextMenuContent({
@@ -32,6 +33,7 @@ export function AssetContextMenuContent({
   symbol,
   onEdit,
   onRemove,
+  onNewThesis,
 }: AssetContextMenuContentProps) {
   const { data: groups } = useGroups()
   const { data: theses } = useTheses()
@@ -112,27 +114,28 @@ export function AssetContextMenuContent({
           Theses
         </ContextMenuSubTrigger>
         <ContextMenuSubContent>
-          {thesisList.length === 0 ? (
-            <ContextMenuItem disabled>No theses yet</ContextMenuItem>
-          ) : (
-            thesisList.map((t) => {
-              const member = t.assets.some((a) => a.id === assetId)
-              return (
-                <ContextMenuCheckboxItem
-                  key={t.id}
-                  checked={member}
-                  onCheckedChange={(checked) =>
-                    checked
-                      ? addToThesis.mutate({ thesisId: t.id, assetId })
-                      : removeFromThesis.mutate({ thesisId: t.id, assetId })
-                  }
-                >
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
-                  {t.name}
-                </ContextMenuCheckboxItem>
-              )
-            })
-          )}
+          {thesisList.map((t) => {
+            const member = t.assets.some((a) => a.id === assetId)
+            return (
+              <ContextMenuCheckboxItem
+                key={t.id}
+                checked={member}
+                onCheckedChange={(checked) =>
+                  checked
+                    ? addToThesis.mutate({ thesisId: t.id, assetId })
+                    : removeFromThesis.mutate({ thesisId: t.id, assetId })
+                }
+              >
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: t.color }} />
+                {t.name}
+              </ContextMenuCheckboxItem>
+            )
+          })}
+          {thesisList.length > 0 && <ContextMenuSeparator />}
+          <ContextMenuItem onClick={onNewThesis}>
+            <Plus className="h-4 w-4" />
+            New thesis&hellip;
+          </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>
       <ContextMenuSeparator />

@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { AssetContextMenuContent } from "@/components/asset-context-menu"
 import { EditAssetDialog } from "@/components/edit-asset-dialog"
+import { NewThesisDialog } from "@/components/new-thesis-dialog"
+import { useAddAssetToThesis } from "@/lib/queries"
 import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
@@ -107,6 +109,8 @@ export const TableRow = memo(function TableRow({
   const handleDelete = useCallback(() => onDelete(asset.symbol), [onDelete, asset.symbol])
   const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
   const [editOpen, setEditOpen] = useState(false)
+  const [newThesisOpen, setNewThesisOpen] = useState(false)
+  const addToThesis = useAddAssetToThesis()
 
   return (
     <ContextMenu>
@@ -264,8 +268,14 @@ export const TableRow = memo(function TableRow({
         symbol={asset.symbol}
         onEdit={() => setEditOpen(true)}
         onRemove={handleDelete}
+        onNewThesis={() => setNewThesisOpen(true)}
       />
       <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
+      <NewThesisDialog
+        open={newThesisOpen}
+        onOpenChange={setNewThesisOpen}
+        onCreated={(thesis) => addToThesis.mutate({ thesisId: thesis.id, assetId: asset.id })}
+      />
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
