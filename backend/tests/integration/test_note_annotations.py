@@ -6,29 +6,29 @@ from tests.helpers import create_asset_via_api
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
-async def test_get_empty_thesis(client):
+async def test_get_empty_note(client):
     await create_asset_via_api(client, "AAPL", "Apple")
-    resp = await client.get("/api/assets/AAPL/thesis")
+    resp = await client.get("/api/assets/AAPL/note")
     assert resp.status_code == 200
     assert resp.json()["content"] == ""
 
 
-async def test_update_thesis(client):
+async def test_update_note(client):
     await create_asset_via_api(client, "AAPL", "Apple")
-    resp = await client.put("/api/assets/AAPL/thesis", json={"content": "# Apple Thesis\n\nStrong ecosystem."})
+    resp = await client.put("/api/assets/AAPL/note", json={"content": "# Apple Note\n\nStrong ecosystem."})
     assert resp.status_code == 200
-    assert "Apple Thesis" in resp.json()["content"]
+    assert "Apple Note" in resp.json()["content"]
 
 
-async def test_update_thesis_twice(client):
+async def test_update_note_twice(client):
     await create_asset_via_api(client, "AAPL", "Apple")
-    await client.put("/api/assets/AAPL/thesis", json={"content": "v1"})
-    resp = await client.put("/api/assets/AAPL/thesis", json={"content": "v2"})
+    await client.put("/api/assets/AAPL/note", json={"content": "v1"})
+    resp = await client.put("/api/assets/AAPL/note", json={"content": "v2"})
     assert resp.json()["content"] == "v2"
 
 
-async def test_thesis_nonexistent_asset(client):
-    resp = await client.get("/api/assets/NOPE/thesis")
+async def test_note_nonexistent_asset(client):
+    resp = await client.get("/api/assets/NOPE/note")
     assert resp.status_code == 404
 
 

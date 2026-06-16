@@ -29,7 +29,7 @@ import type {
   Tag,
   TagBrief,
   TagCreate,
-  Thesis,
+  Note,
 } from "./types"
 
 export type * from "./types"
@@ -120,10 +120,10 @@ export const api = {
     indicators: (id: number) =>
       request<Record<string, IndicatorSummary>>(`/groups/${id}/indicators`),
   },
-  thesis: {
-    get: (symbol: string) => request<Thesis>(`/assets/${symbol}/thesis`),
+  note: {
+    get: (symbol: string) => request<Note>(`/assets/${symbol}/note`),
     update: (symbol: string, content: string) =>
-      request<Thesis>(`/assets/${symbol}/thesis`, {
+      request<Note>(`/assets/${symbol}/note`, {
         method: "PUT",
         body: JSON.stringify({ content }),
       }),
@@ -180,10 +180,10 @@ export const api = {
       request<PseudoETF>(`/pseudo-etfs/${etfId}/constituents/${assetId}`, { method: "DELETE" }),
     performance: (id: number) => request<PerformanceBreakdownPoint[]>(`/pseudo-etfs/${id}/performance`),
     constituentsIndicators: (id: number) => request<ConstituentIndicator[]>(`/pseudo-etfs/${id}/constituents/indicators`),
-    thesis: {
-      get: (id: number) => request<Thesis>(`/pseudo-etfs/${id}/thesis`),
+    note: {
+      get: (id: number) => request<Note>(`/pseudo-etfs/${id}/note`),
       update: (id: number, content: string) =>
-        request<Thesis>(`/pseudo-etfs/${id}/thesis`, {
+        request<Note>(`/pseudo-etfs/${id}/note`, {
           method: "PUT",
           body: JSON.stringify({ content }),
         }),

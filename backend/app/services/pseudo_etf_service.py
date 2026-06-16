@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.repositories.pseudo_etf_repo import PseudoEtfRepository
-from app.schemas.thesis import ThesisResponse
+from app.schemas.note import NoteResponse
 from app.services.entity_lookups import get_pseudo_etf
 from app.services.price_sync import sync_asset_prices
 
@@ -77,19 +77,19 @@ async def remove_constituent(db: AsyncSession, etf_id: int, asset_id: int):
     return await PseudoEtfRepository(db).save(etf)
 
 
-# --- Thesis ---
+# --- Note ---
 
-async def get_thesis(db: AsyncSession, etf_id: int):
+async def get_note(db: AsyncSession, etf_id: int):
     etf = await get_pseudo_etf(etf_id, db)
-    thesis = await PseudoEtfRepository(db).get_thesis(etf_id)
-    if not thesis:
-        return ThesisResponse(content="", updated_at=etf.created_at)
-    return thesis
+    note = await PseudoEtfRepository(db).get_note(etf_id)
+    if not note:
+        return NoteResponse(content="", updated_at=etf.created_at)
+    return note
 
 
-async def upsert_thesis(db: AsyncSession, etf_id: int, content: str):
+async def upsert_note(db: AsyncSession, etf_id: int, content: str):
     await get_pseudo_etf(etf_id, db)
-    return await PseudoEtfRepository(db).upsert_thesis(etf_id, content)
+    return await PseudoEtfRepository(db).upsert_note(etf_id, content)
 
 
 # --- Annotations ---

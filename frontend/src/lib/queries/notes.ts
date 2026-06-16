@@ -2,20 +2,20 @@ import { useQuery } from "@tanstack/react-query"
 import { api, type AnnotationCreate } from "../api"
 import { keys, STALE_5MIN, useInvalidatingMutation } from "./shared"
 
-// Thesis
-export function useThesis(symbol: string) {
+// Note
+export function useNote(symbol: string) {
   return useQuery({
-    queryKey: keys.thesis(symbol),
-    queryFn: () => api.thesis.get(symbol),
+    queryKey: keys.note(symbol),
+    queryFn: () => api.note.get(symbol),
     enabled: !!symbol,
     staleTime: STALE_5MIN,
   })
 }
 
-export function useUpdateThesis(symbol: string) {
+export function useUpdateNote(symbol: string) {
   return useInvalidatingMutation(
-    (content: string) => api.thesis.update(symbol, content),
-    [keys.thesis(symbol)],
+    (content: string) => api.note.update(symbol, content),
+    [keys.note(symbol)],
   )
 }
 

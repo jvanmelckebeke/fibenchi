@@ -80,20 +80,20 @@ export function usePseudoEtfConstituentsIndicators(id: number, enabled: boolean)
   })
 }
 
-// Pseudo-ETF Thesis
-export function usePseudoEtfThesis(id: number) {
+// Pseudo-ETF Note
+export function usePseudoEtfNote(id: number) {
   return useQuery({
-    queryKey: keys.pseudoEtfThesis(id),
-    queryFn: () => api.pseudoEtfs.thesis.get(id),
+    queryKey: keys.pseudoEtfNote(id),
+    queryFn: () => api.pseudoEtfs.note.get(id),
     enabled: !!id,
     staleTime: STALE_5MIN,
   })
 }
 
-export function useUpdatePseudoEtfThesis(id: number) {
+export function useUpdatePseudoEtfNote(id: number) {
   return useInvalidatingMutation(
-    (content: string) => api.pseudoEtfs.thesis.update(id, content),
-    [keys.pseudoEtfThesis(id)],
+    (content: string) => api.pseudoEtfs.note.update(id, content),
+    [keys.pseudoEtfNote(id)],
   )
 }
 

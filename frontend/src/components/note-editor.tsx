@@ -4,10 +4,10 @@ import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import type { Thesis } from "@/lib/api"
+import type { Note } from "@/lib/api"
 
-interface ThesisEditorProps {
-  thesis: Thesis | undefined
+interface NoteEditorProps {
+  note: Note | undefined
   onSave: (content: string) => void
   isSaving: boolean
 }
@@ -37,12 +37,12 @@ function RawFallback({ content }: { content: string }) {
   )
 }
 
-export function ThesisEditor({ thesis, onSave, isSaving }: ThesisEditorProps) {
+export function NoteEditor({ note, onSave, isSaving }: NoteEditorProps) {
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState("")
 
   const handleEdit = () => {
-    setContent(thesis?.content ?? "")
+    setContent(note?.content ?? "")
     setEditing(true)
   }
 
@@ -54,7 +54,7 @@ export function ThesisEditor({ thesis, onSave, isSaving }: ThesisEditorProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base">Investment Thesis</CardTitle>
+        <CardTitle className="text-base">Notes</CardTitle>
         {editing ? (
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
@@ -76,17 +76,17 @@ export function ThesisEditor({ thesis, onSave, isSaving }: ThesisEditorProps) {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[200px] font-mono text-sm"
-            placeholder="Write your investment thesis in markdown..."
+            placeholder="Write your notes in markdown..."
           />
-        ) : thesis?.content ? (
-          <MarkdownErrorBoundary fallback={<RawFallback content={thesis.content} />}>
+        ) : note?.content ? (
+          <MarkdownErrorBoundary fallback={<RawFallback content={note.content} />}>
             <div className="prose prose-sm dark:prose-invert max-w-none min-h-[100px]">
-              <Markdown>{thesis.content}</Markdown>
+              <Markdown>{note.content}</Markdown>
             </div>
           </MarkdownErrorBoundary>
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none min-h-[100px]">
-            <p className="text-muted-foreground italic">No thesis yet. Click Edit to write one.</p>
+            <p className="text-muted-foreground italic">No notes yet. Click Edit to write some.</p>
           </div>
         )}
       </CardContent>

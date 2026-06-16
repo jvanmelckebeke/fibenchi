@@ -15,7 +15,7 @@ from starlette.responses import FileResponse
 from app.config import settings as app_settings
 
 from app.database import async_session, engine
-from app.routers import annotations, assets, companion, data, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
+from app.routers import annotations, assets, companion, data, groups, holdings, note, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
@@ -257,8 +257,8 @@ app = FastAPI(
             "description": "Colored labels for categorizing assets (e.g. 'tech', 'growth', 'dividend'). Tags can be attached to assets and used for dashboard filtering.",
         },
         {
-            "name": "thesis",
-            "description": "Free-text investment thesis per asset. Supports Markdown content.",
+            "name": "note",
+            "description": "Free-text note per asset. Supports Markdown content.",
         },
         {
             "name": "annotations",
@@ -275,7 +275,7 @@ app = FastAPI(
         },
         {
             "name": "pseudo-etfs",
-            "description": "User-created custom baskets (pseudo-ETFs) with equal-weight allocation and quarterly rebalancing. Includes constituent management, indexed performance with per-symbol breakdown, technical indicator snapshots, thesis, and annotations.",
+            "description": "User-created custom baskets (pseudo-ETFs) with equal-weight allocation and quarterly rebalancing. Includes constituent management, indexed performance with per-symbol breakdown, technical indicator snapshots, note, and annotations.",
         },
         {
             "name": "settings",
@@ -301,7 +301,7 @@ app.include_router(tags.asset_tag_router)
 app.include_router(portfolio.router)
 app.include_router(prices.router)
 app.include_router(holdings.router)
-app.include_router(thesis.router)
+app.include_router(note.router)
 app.include_router(annotations.router)
 app.include_router(pseudo_etfs.router)
 app.include_router(pseudo_etf_analysis.router)

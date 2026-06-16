@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useParams } from "react-router-dom"
-import { ConnectedThesis } from "@/components/connected-thesis"
+import { ConnectedNote } from "@/components/connected-note"
 import { ConnectedAnnotations } from "@/components/connected-annotations"
 import { TagInput } from "@/components/tag-input"
 import {
@@ -9,8 +9,8 @@ import {
   useAnnotations,
   useCreateAnnotation,
   useDeleteAnnotation,
-  useThesis,
-  useUpdateThesis,
+  useNote,
+  useUpdateNote,
 } from "@/lib/queries"
 import type { AssetWindow } from "@/lib/asset-window"
 import { useSettings } from "@/lib/settings"
@@ -77,7 +77,7 @@ export function AssetDetailPage() {
         <>
           <TagInput symbol={symbol} currentTags={asset?.tags ?? []} />
           <AssetAnnotations symbol={symbol} />
-          <AssetThesis symbol={symbol} />
+          <AssetNote symbol={symbol} />
         </>
       )}
     </div>
@@ -95,12 +95,12 @@ function AssetAnnotations({ symbol }: { symbol: string }) {
   )
 }
 
-function AssetThesis({ symbol }: { symbol: string }) {
-  const { data: thesis } = useThesis(symbol)
+function AssetNote({ symbol }: { symbol: string }) {
+  const { data: note } = useNote(symbol)
   return (
-    <ConnectedThesis
-      thesis={thesis}
-      updateMutation={useUpdateThesis(symbol)}
+    <ConnectedNote
+      note={note}
+      updateMutation={useUpdateNote(symbol)}
     />
   )
 }

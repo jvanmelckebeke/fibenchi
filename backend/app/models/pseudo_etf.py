@@ -24,7 +24,7 @@ class PseudoETF(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     constituents = relationship("Asset", secondary=pseudo_etf_constituents, lazy="selectin")
-    thesis: Mapped["PseudoEtfThesis | None"] = relationship(
+    note: Mapped["PseudoEtfNote | None"] = relationship(
         back_populates="pseudo_etf", cascade="all, delete-orphan", uselist=False
     )
     annotations: Mapped[list["PseudoEtfAnnotation"]] = relationship(
@@ -32,15 +32,15 @@ class PseudoETF(Base):
     )
 
 
-class PseudoEtfThesis(Base):
-    __tablename__ = "pseudo_etf_theses"
+class PseudoEtfNote(Base):
+    __tablename__ = "pseudo_etf_notes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pseudo_etf_id: Mapped[int] = mapped_column(ForeignKey("pseudo_etfs.id", ondelete="CASCADE"), unique=True)
     content: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    pseudo_etf: Mapped["PseudoETF"] = relationship(back_populates="thesis")
+    pseudo_etf: Mapped["PseudoETF"] = relationship(back_populates="note")
 
 
 class PseudoEtfAnnotation(Base):

@@ -3,7 +3,7 @@ import { useParams, Link, Navigate } from "react-router-dom"
 import { ArrowLeft, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ConnectedThesis } from "@/components/connected-thesis"
+import { ConnectedNote } from "@/components/connected-note"
 import { ConnectedAnnotations } from "@/components/connected-annotations"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/add-constituent-picker"
@@ -21,8 +21,8 @@ import {
   usePseudoEtfPerformance,
   usePseudoEtfConstituentsIndicators,
   useRemovePseudoEtfConstituent,
-  usePseudoEtfThesis,
-  useUpdatePseudoEtfThesis,
+  usePseudoEtfNote,
+  useUpdatePseudoEtfNote,
   usePseudoEtfAnnotations,
   useCreatePseudoEtfAnnotation,
   useDeletePseudoEtfAnnotation,
@@ -105,7 +105,7 @@ function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
 
       <HoldingsTable etfId={etfId} />
       <EtfAnnotations etfId={etfId} />
-      <EtfThesis etfId={etfId} />
+      <EtfNote etfId={etfId} />
     </div>
   )
 }
@@ -121,12 +121,12 @@ function EtfAnnotations({ etfId }: { etfId: number }) {
   )
 }
 
-function EtfThesis({ etfId }: { etfId: number }) {
-  const { data: thesis } = usePseudoEtfThesis(etfId)
+function EtfNote({ etfId }: { etfId: number }) {
+  const { data: note } = usePseudoEtfNote(etfId)
   return (
-    <ConnectedThesis
-      thesis={thesis}
-      updateMutation={useUpdatePseudoEtfThesis(etfId)}
+    <ConnectedNote
+      note={note}
+      updateMutation={useUpdatePseudoEtfNote(etfId)}
     />
   )
 }

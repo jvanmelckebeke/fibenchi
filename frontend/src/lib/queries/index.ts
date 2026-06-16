@@ -5,6 +5,6 @@ export { useAssetDetail, useAssetWindow, useEtfHoldings, useHoldingsIndicators, 
 export { useEarnings } from "./earnings"
 export { useTags, useCreateTag, useAttachTag, useDetachTag } from "./tags"
 export { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useReorderGroups, useAddAssetsToGroup, useRemoveAssetFromGroup, useGroup, useGroupSparklines, useGroupIndicators, usePrefetchOtherGroups } from "./groups"
-export { useThesis, useUpdateThesis, useAnnotations, useCreateAnnotation, useDeleteAnnotation } from "./notes"
-export { usePseudoEtfs, usePseudoEtf, useCreatePseudoEtf, useUpdatePseudoEtf, useDeletePseudoEtf, useAddPseudoEtfConstituents, useRemovePseudoEtfConstituent, usePseudoEtfPerformance, usePseudoEtfConstituentsIndicators, usePseudoEtfThesis, useUpdatePseudoEtfThesis, usePseudoEtfAnnotations, useCreatePseudoEtfAnnotation, useDeletePseudoEtfAnnotation } from "./pseudo-etfs"
+export { useNote, useUpdateNote, useAnnotations, useCreateAnnotation, useDeleteAnnotation } from "./notes"
+export { usePseudoEtfs, usePseudoEtf, useCreatePseudoEtf, useUpdatePseudoEtf, useDeletePseudoEtf, useAddPseudoEtfConstituents, useRemovePseudoEtfConstituent, usePseudoEtfPerformance, usePseudoEtfConstituentsIndicators, usePseudoEtfNote, useUpdatePseudoEtfNote, usePseudoEtfAnnotations, useCreatePseudoEtfAnnotation, useDeletePseudoEtfAnnotation } from "./pseudo-etfs"
 export { useSymbolSources, useSymbolSourceProviders, useCreateSymbolSource, useUpdateSymbolSource, useSyncSymbolSource, useDeleteSymbolSource } from "./symbol-sources"

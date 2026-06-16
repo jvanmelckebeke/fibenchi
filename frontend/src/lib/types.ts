@@ -114,7 +114,7 @@ export interface AnnotationCreate {
   color?: string
 }
 
-export interface Thesis {
+export interface Note {
   content: string
   updated_at: string
 }
