@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react"
-import { ChevronDown, ChevronRight, Plus } from "lucide-react"
+import { ChevronDown, ChevronRight, Pencil, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Group, IndicatorSummary, Quote, Thesis, ThesisStatus } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { formatChangePct, formatDateLong } from "@/lib/format"
 import { GroupTable } from "@/components/group-table"
 import { NewThesisDialog } from "@/components/new-thesis-dialog"
+import { EditThesisDialog } from "@/components/edit-thesis-dialog"
 
 interface ThesisGroupedTableProps {
   groupId: number
@@ -43,6 +44,7 @@ export function ThesisGroupedTable({
 }: ThesisGroupedTableProps) {
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
   const [newThesisOpen, setNewThesisOpen] = useState(false)
+  const [editThesis, setEditThesis] = useState<Thesis | null>(null)
 
   const toggleReveal = (id: number) =>
     setRevealed((prev) => {
@@ -135,6 +137,15 @@ export function ThesisGroupedTable({
               <span className="text-xs text-muted-foreground">
                 {inGroup.length} here
               </span>
+              <button
+                type="button"
+                onClick={() => setEditThesis(thesis)}
+                className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+                title="Edit thesis"
+                aria-label={`Edit ${thesis.name}`}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
             </div>
 
             <GroupTable assets={inGroup} {...passthrough} />
@@ -183,6 +194,13 @@ export function ThesisGroupedTable({
       )}
 
       <NewThesisDialog open={newThesisOpen} onOpenChange={setNewThesisOpen} />
+      <EditThesisDialog
+        thesis={editThesis}
+        open={editThesis !== null}
+        onOpenChange={(o) => {
+          if (!o) setEditThesis(null)
+        }}
+      />
     </div>
   )
 }
