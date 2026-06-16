@@ -36,3 +36,6 @@ examples/
 
 # Misc
 *.log
+
+# Local dev seed data (DB dumps)
+backend/scripts/dev_seed_groups.json
