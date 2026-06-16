@@ -55,5 +55,9 @@ class ThesisResponse(BaseModel):
     opened_at: datetime.date = Field(description="Date the thesis was formed")
     created_at: datetime.datetime = Field(description="Creation timestamp")
     assets: list[ThesisAssetBrief] = Field(default=[], description="Member assets")
+    aggregate_pct: float | None = Field(
+        default=None,
+        description="Equal-weight mean return of members since opened_at, in percent (null if no price data)",
+    )
 
     model_config = {"from_attributes": True}

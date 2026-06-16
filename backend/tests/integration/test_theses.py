@@ -1,10 +1,23 @@
 """Integration tests for the global thesis API — CRUD + membership."""
 
+from datetime import date
+
 import pytest
 
+from app.models import Asset, AssetType, PriceHistory
 from tests.helpers import create_asset_via_api
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
+
+
+async def _seed_asset_with_closes(db, symbol: str, closes: dict[date, float]) -> Asset:
+    asset = Asset(symbol=symbol, name=symbol, type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    for d, c in closes.items():
+        db.add(PriceHistory(asset_id=asset.id, date=d, open=c, high=c, low=c, close=c, volume=1000))
+    await db.commit()
+    return asset
 
 
 async def test_create_and_list_thesis(client):
@@ -102,3 +115,26 @@ async def test_asset_in_multiple_theses(client):
     for tid in (t1, t2):
         body = (await client.get(f"/api/theses/{tid}")).json()
         assert any(a["symbol"] == "COCO.L" for a in body["assets"])
+
+
+async def test_aggregate_pct_null_without_members(client):
+    body = (await client.post("/api/theses", json={"name": "Empty"})).json()
+    assert body["aggregate_pct"] is None
+
+
+async def test_aggregate_pct_equal_weight_since_opened_at(db, client):
+    # A: open 100 -> latest 120 (+20%)
+    a = await _seed_asset_with_closes(db, "AAA", {date(2026, 3, 1): 100.0, date(2026, 3, 15): 120.0})
+    # B: a PRE-open price (50 on Jan 1) that must be ignored; open 100 -> latest 110 (+10%)
+    b = await _seed_asset_with_closes(
+        db, "BBB", {date(2026, 1, 1): 50.0, date(2026, 3, 1): 100.0, date(2026, 3, 20): 110.0}
+    )
+
+    tid = (await client.post("/api/theses", json={"name": "Agg", "opened_at": "2026-03-01"})).json()["id"]
+    resp = await client.post(f"/api/theses/{tid}/assets", json={"asset_ids": [a.id, b.id]})
+
+    # aggregate is on the membership response and the detail/list responses
+    assert resp.json()["aggregate_pct"] == 15.0  # mean(+20%, +10%); B anchored to its Mar 1 close
+    assert (await client.get(f"/api/theses/{tid}")).json()["aggregate_pct"] == 15.0
+    listed = next(t for t in (await client.get("/api/theses")).json() if t["id"] == tid)
+    assert listed["aggregate_pct"] == 15.0
