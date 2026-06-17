@@ -4,7 +4,7 @@ export { useAssets, useCreateAsset, useUpdateAsset, useLocalSearch, useYahooSear
 export { useAssetDetail, useAssetWindow, useEtfHoldings, useHoldingsIndicators, useRefreshPrices, usePrefetchAssetDetail } from "./prices"
 export { useEarnings } from "./earnings"
 export { useTags, useCreateTag, useAttachTag, useDetachTag } from "./tags"
-export { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useReorderGroups, useAddAssetsToGroup, useRemoveAssetFromGroup, useGroup, useGroupSparklines, useGroupIndicators, usePrefetchOtherGroups } from "./groups"
+export { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useReorderGroups, useAddAssetsToGroup, useRemoveAssetFromGroup, useGroup, useGroupSparklines, useGroupIndicators, useIndicators, usePrefetchOtherGroups } from "./groups"
 export { useNote, useUpdateNote, useAnnotations, useCreateAnnotation, useDeleteAnnotation } from "./notes"
 export { useTheses, useThesis, useCreateThesis, useUpdateThesis, useDeleteThesis, useAddThesisAssets, useRemoveThesisAsset, useAddAssetToThesis, useRemoveAssetFromThesis } from "./theses"
 export { usePseudoEtfs, usePseudoEtf, useCreatePseudoEtf, useUpdatePseudoEtf, useDeletePseudoEtf, useAddPseudoEtfConstituents, useRemovePseudoEtfConstituent, usePseudoEtfPerformance, usePseudoEtfConstituentsIndicators, usePseudoEtfNote, useUpdatePseudoEtfNote, usePseudoEtfAnnotations, useCreatePseudoEtfAnnotation, useDeletePseudoEtfAnnotation } from "./pseudo-etfs"

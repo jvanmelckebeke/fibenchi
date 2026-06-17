@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react"
-import { ChevronsUpDown, ChevronsDownUp } from "lucide-react"
+import { useCallback, useMemo, useState, type ReactNode } from "react"
+import { ChevronsUpDown, ChevronsDownUp, ChevronRight, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
@@ -26,10 +26,25 @@ interface GroupTableProps {
   sortBy?: GroupSortBy
   sortDir?: SortDir
   onSort?: (key: GroupSortBy) => void
+  /**
+   * Secondary rows appended below the main rows behind a collapsible in-table
+   * footer toggle (e.g. thesis members that live in other groups). Rendered with
+   * the same columns — no second header.
+   */
+  moreAssets?: Asset[]
+  /** Label for the "more" footer toggle (e.g. "+2 more in hotlist, Watchlist"). */
+  moreLabel?: ReactNode
+  /** Controlled open state for the "more" footer. Falls back to internal state. */
+  moreOpen?: boolean
+  /** Controlled toggle handler for the "more" footer. */
+  onToggleMore?: () => void
 }
 
-export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: GroupTableProps) {
+export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
+  const [internalMoreOpen, setInternalMoreOpen] = useState(false)
+  const moreOpenState = moreOpen ?? internalMoreOpen
+  const toggleMore = onToggleMore ?? (() => setInternalMoreOpen((o) => !o))
   const { settings, updateSettings } = useSettings()
   const columnSettings = settings.group_table_columns
   const responsiveHidden = useResponsiveHidden()
@@ -65,6 +80,26 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
   const visibleBaseCount =
     BASE_COLUMN_DEFS.filter((c) => isColumnVisible(columnSettings, c.key)).length
   const totalColSpan = 1 + 1 + visibleBaseCount + visibleIndicatorFields.length
+
+  const hasMore = !!moreAssets && moreAssets.length > 0
+
+  const renderRow = (asset: Asset, keyPrefix = "") => (
+    <TableRow
+      key={`${keyPrefix}${asset.id}`}
+      groupId={groupId}
+      asset={asset}
+      quote={quotes[asset.symbol]}
+      indicator={indicators?.[asset.symbol]}
+      expanded={expandedSymbols.has(asset.symbol)}
+      onToggle={toggleExpand}
+      onDelete={onDelete}
+      onHover={onHover ?? noop}
+      compactMode={compactMode}
+      columnSettings={columnSettings}
+      visibleIndicatorFields={visibleIndicatorFields}
+      totalColSpan={totalColSpan}
+    />
+  )
 
   return (
     <div className="rounded-md border border-border overflow-x-auto">
@@ -154,23 +189,25 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
           </tr>
         </thead>
         <tbody>
-          {assets.map((asset) => (
-            <TableRow
-              key={asset.id}
-              groupId={groupId}
-              asset={asset}
-              quote={quotes[asset.symbol]}
-              indicator={indicators?.[asset.symbol]}
-              expanded={expandedSymbols.has(asset.symbol)}
-              onToggle={toggleExpand}
-              onDelete={onDelete}
-              onHover={onHover ?? noop}
-              compactMode={compactMode}
-              columnSettings={columnSettings}
-              visibleIndicatorFields={visibleIndicatorFields}
-              totalColSpan={totalColSpan}
-            />
-          ))}
+          {assets.map((asset) => renderRow(asset))}
+          {hasMore && (
+            <>
+              <tr className="border-b border-border bg-muted/20">
+                <td colSpan={totalColSpan} className="px-2 py-1.5">
+                  <button
+                    type="button"
+                    onClick={toggleMore}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    aria-expanded={moreOpenState}
+                  >
+                    {moreOpenState ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {moreLabel}
+                  </button>
+                </td>
+              </tr>
+              {moreOpenState && moreAssets!.map((asset) => renderRow(asset, "more-"))}
+            </>
+          )}
         </tbody>
       </table>
     </div>

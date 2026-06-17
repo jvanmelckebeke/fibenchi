@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react"
-import { ChevronDown, ChevronRight, Pencil, Plus } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Group, IndicatorSummary, Quote, Thesis, ThesisStatus } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { formatChangePct, formatDateLong } from "@/lib/format"
+import { useIndicators } from "@/lib/queries"
 import { GroupTable } from "@/components/group-table"
 import { NewThesisDialog } from "@/components/new-thesis-dialog"
 import { EditThesisDialog } from "@/components/edit-thesis-dialog"
@@ -42,9 +43,10 @@ export function ThesisGroupedTable({
   groupId, assets, theses, allGroups, quotes, indicators,
   onDelete, compactMode, onHover, sortBy, sortDir, onSort,
 }: ThesisGroupedTableProps) {
-  const [revealed, setRevealed] = useState<Set<number>>(new Set())
   const [newThesisOpen, setNewThesisOpen] = useState(false)
   const [editThesis, setEditThesis] = useState<Thesis | null>(null)
+  // Which theses have their "+N more" fold expanded (drives the lazy indicator fetch).
+  const [revealed, setRevealed] = useState<Set<number>>(new Set())
 
   const toggleReveal = (id: number) =>
     setRevealed((prev) => {
@@ -53,6 +55,19 @@ export function ThesisGroupedTable({
       else next.add(id)
       return next
     })
+
+  // Full Asset objects keyed by id, sourced from every group. Lets the "elsewhere"
+  // fold render the same rich GroupTable rows (price/change/indicators) as the
+  // in-group section — thesis members only carry id/symbol/name.
+  const assetsById = useMemo(() => {
+    const map = new Map<number, Asset>()
+    for (const g of allGroups) {
+      for (const a of g.assets) {
+        if (!map.has(a.id)) map.set(a.id, a)
+      }
+    }
+    return map
+  }, [allGroups])
 
   // Which other groups (by name) contain each asset — for the "+N more in [group]" fold.
   const otherGroupNamesById = useMemo(() => {
@@ -93,8 +108,32 @@ export function ThesisGroupedTable({
     return { sections, ungrouped }
   }, [theses, assets, currentGroupIds])
 
+  // Symbols of elsewhere-members for theses whose fold is open. Fetched lazily so
+  // expanding a fold (not just rendering the view) is what triggers the request.
+  const expandedElsewhereSymbols = useMemo(() => {
+    const syms = new Set<string>()
+    for (const { thesis, elsewhere } of sections) {
+      if (!revealed.has(thesis.id)) continue
+      for (const m of elsewhere) {
+        const a = assetsById.get(m.id)
+        if (a) syms.add(a.symbol)
+      }
+    }
+    return [...syms]
+  }, [sections, revealed, assetsById])
+
+  const { data: elsewhereIndicators } = useIndicators(expandedElsewhereSymbols)
+
+  // The per-group batch (`indicators`) only covers in-group assets; merge in the
+  // symbol-addressed snapshots so elsewhere rows get RSI/MACD/ATR/… too. Overlapping
+  // symbols carry identical values, so precedence is irrelevant.
+  const mergedIndicators = useMemo(
+    () => ({ ...(elsewhereIndicators ?? {}), ...(indicators ?? {}) }),
+    [elsewhereIndicators, indicators],
+  )
+
   const passthrough = {
-    groupId, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort,
+    groupId, quotes, indicators: mergedIndicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort,
   }
 
   return (
@@ -112,11 +151,19 @@ export function ThesisGroupedTable({
       </div>
 
       {sections.map(({ thesis, inGroup, elsewhere }) => {
-        const isOpen = revealed.has(thesis.id)
         const elsewhereGroups = [
           ...new Set(elsewhere.flatMap((m) => otherGroupNamesById.get(m.id) ?? [])),
         ]
         const agg = formatChangePct(thesis.aggregate_pct)
+        const elsewhereAssets = elsewhere
+          .map((m) => assetsById.get(m.id))
+          .filter((a): a is Asset => a != null)
+        const moreLabel = (
+          <>
+            +{elsewhereAssets.length} more
+            {elsewhereGroups.length > 0 && <> in {elsewhereGroups.join(", ")}</>}
+          </>
+        )
         return (
           <section key={thesis.id} className="space-y-2">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -135,9 +182,6 @@ export function ThesisGroupedTable({
                   {agg.text}
                 </span>
               )}
-              <span className="text-xs text-muted-foreground">
-                {inGroup.length} here
-              </span>
               <button
                 type="button"
                 onClick={() => setEditThesis(thesis)}
@@ -149,37 +193,14 @@ export function ThesisGroupedTable({
               </button>
             </div>
 
-            <GroupTable assets={inGroup} {...passthrough} />
-
-            {elsewhere.length > 0 && (
-              <div className="text-xs">
-                <button
-                  type="button"
-                  onClick={() => toggleReveal(thesis.id)}
-                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  +{elsewhere.length} more
-                  {elsewhereGroups.length > 0 && <> in {elsewhereGroups.join(", ")}</>}
-                </button>
-                {isOpen && (
-                  <ul className="mt-1 ml-4 space-y-0.5">
-                    {elsewhere.map((m) => {
-                      const where = otherGroupNamesById.get(m.id) ?? []
-                      return (
-                        <li key={m.id} className="text-muted-foreground">
-                          <span className="font-medium text-foreground">{m.symbol}</span>
-                          {" — "}{m.name}
-                          {where.length > 0 && (
-                            <span className="text-muted-foreground"> · in {where.join(", ")}</span>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
-            )}
+            <GroupTable
+              assets={inGroup}
+              moreAssets={elsewhereAssets}
+              moreLabel={moreLabel}
+              moreOpen={revealed.has(thesis.id)}
+              onToggleMore={() => toggleReveal(thesis.id)}
+              {...passthrough}
+            />
           </section>
         )
       })}
