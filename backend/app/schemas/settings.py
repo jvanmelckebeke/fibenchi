@@ -22,7 +22,9 @@ class AppSettingsData(BaseModel):
     group_sort_dir: Literal["asc", "desc"] | None = None
     group_table_columns: dict[str, bool] | None = None
     group_table_column_widths: dict[str, float] | None = None
-    group_by_thesis: bool | None = None
+    # 3-way thesis grouping for the table view. Old clients may still send the
+    # boolean `group_by_thesis`; it is preserved via extra="allow".
+    thesis_grouping: Literal["none", "sections", "inline"] | None = None
     chart_default_period: str | None = None
     chart_type: Literal["candle", "line"] | None = None
     theme: Literal["dark", "light", "system"] | None = None

@@ -8,6 +8,8 @@ export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"
 export type GroupViewMode = "card" | "table" | "scanner" | "live"
 export type YahooLinkMode = "chart" | "quote"
+/** How the table view organizes rows by thesis. */
+export type ThesisGrouping = "none" | "sections" | "inline"
 
 export interface AppSettings {
   /** Per-indicator placement visibility matrix. Missing key = use descriptor defaults. */
@@ -20,7 +22,7 @@ export interface AppSettings {
   group_sort_dir: SortDir
   group_table_columns: Record<string, boolean>
   group_table_column_widths: Record<string, number>
-  group_by_thesis: boolean
+  thesis_grouping: ThesisGrouping
   chart_default_period: string
   chart_type: "candle" | "line"
   theme: "dark" | "light" | "system"
@@ -56,6 +58,22 @@ function migrateOldVisibility(
   return result
 }
 
+/**
+ * Migrate the old boolean `group_by_thesis` toggle to the 3-way `thesis_grouping`
+ * selector: `true` → sectioned grouping, `false`/absent → no grouping. Only fills
+ * `thesis_grouping` when it isn't already set, so an explicit choice (including the
+ * new "inline" color-coded mode) is never clobbered by a stale boolean.
+ */
+type LegacySettings = Partial<AppSettings> & { group_by_thesis?: boolean }
+
+function withThesisGrouping(s: LegacySettings): LegacySettings {
+  if (s.thesis_grouping == null && "group_by_thesis" in s) {
+    const { group_by_thesis, ...rest } = s
+    return { ...rest, thesis_grouping: group_by_thesis ? "sections" : "none" }
+  }
+  return s
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_SETTINGS: AppSettings = {
   indicator_visibility: {},
@@ -67,7 +85,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   group_sort_dir: "asc",
   group_table_columns: {},
   group_table_column_widths: {},
-  group_by_thesis: false,
+  thesis_grouping: "none",
   chart_default_period: "1y",
   chart_type: "candle",
   theme: "system",
@@ -98,9 +116,10 @@ function loadFromStorage(): AppSettings {
         delete parsed.group_indicator_visibility
         delete parsed.detail_indicator_visibility
         // Persist migrated settings
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...parsed }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...withThesisGrouping(parsed) }))
       }
-      return { ...DEFAULT_SETTINGS, ...parsed }
+      // Migrate before merging defaults — the "none" default would otherwise mask the old flag.
+      return { ...DEFAULT_SETTINGS, ...withThesisGrouping(parsed) }
     }
   } catch {
     // ignore corrupt storage
@@ -131,9 +150,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       .then((body) => {
         if (cancelled) return
         if (body?.data && Object.keys(body.data).length > 0) {
+          const remoteData = withThesisGrouping(body.data as Partial<AppSettings>)
           setSettings((prev) => {
             const localTs = prev._updated_at
-            const remoteTs = (body.data as Partial<AppSettings>)._updated_at
+            const remoteTs = remoteData._updated_at
             // Only let backend overwrite if it has a newer (or equal) timestamp,
             // or if local has no timestamp yet (first sync)
             if (localTs && remoteTs && remoteTs < localTs) {
@@ -141,7 +161,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
               api.settings.update(prev as unknown as Record<string, unknown>).catch(() => {})
               return prev
             }
-            const merged = { ...prev, ...body.data }
+            const merged = { ...prev, ...remoteData }
             saveToStorage(merged)
             return merged
           })

@@ -3,6 +3,8 @@ import type { ReactNode } from "react"
 interface Option<T extends string> {
   value: T
   label: ReactNode
+  /** Tooltip / accessible label — useful when `label` is an icon only. */
+  title?: string
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -22,6 +24,8 @@ export function SegmentedControl<T extends string>({
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
+          title={opt.title}
+          aria-label={opt.title}
           className={`px-2.5 py-1 text-xs font-medium transition-colors ${
             value === opt.value
               ? "bg-primary text-primary-foreground"

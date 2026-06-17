@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo, useTransition } from "react"
-import { Activity, ArrowDownAZ, ArrowUpAZ, Layers, LayoutGrid, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
+import { Activity, ArrowDownAZ, ArrowUpAZ, Layers, LayoutGrid, List, Palette, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,7 +19,8 @@ import { useGroup, useGroups, useGroupSparklines, useGroupIndicators, useRemoveA
 import { useQuotes } from "@/lib/quote-stream"
 import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode, type SortDir } from "@/lib/settings"
-import { useFilteredSortedAssets } from "@/lib/use-group-filter"
+import { useFilteredSortedAssets, getSortValue, compareSortValues, type SortValue } from "@/lib/use-group-filter"
+import type { Asset, Thesis } from "@/lib/api"
 import { GroupTable } from "@/components/group-table"
 import { ThesisGroupedTable } from "@/components/thesis-grouped-table"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
@@ -41,7 +42,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
-  const groupByThesis = settings.group_by_thesis
+  const thesisGrouping = settings.thesis_grouping
   const [isPending, startTransition] = useTransition()
   // settings.group_view_mode = immediate (drives SegmentedControl highlight)
   // viewMode = deferred via useTransition (drives content rendering)
@@ -77,6 +78,75 @@ export function GroupPage({ groupId }: { groupId: number }) {
     quotes,
     indicators: batchIndicators,
   })
+
+  // "inline" thesis grouping: one flat table, but each thesis's members are pulled
+  // together into a block and ordered *within* the block by the active sort. Each
+  // block is then placed in the global order by the AVERAGE of its members' sort
+  // metric, interleaved with ungrouped assets (each its own size-1 unit). Members'
+  // left borders are coloured with the thesis colour — no section headers.
+  const { inlineAssets, accentColors, accentTitles } = useMemo(() => {
+    if (thesisGrouping !== "inline" || !theses || theses.length === 0 || !assets) {
+      return { inlineAssets: assets, accentColors: undefined, accentTitles: undefined }
+    }
+    // asset id -> theses containing it, in the API's order (alphabetical by name)
+    const thesesByAssetId = new Map<number, Thesis[]>()
+    for (const t of theses) {
+      for (const m of t.assets) {
+        const list = thesesByAssetId.get(m.id)
+        if (list) list.push(t)
+        else thesesByAssetId.set(m.id, [t])
+      }
+    }
+
+    const colors: Record<string, string> = {}
+    const titles: Record<string, string> = {}
+
+    // A unit is one sortable row of the global order: a thesis block (many rows) or
+    // a lone ungrouped asset (one row). `numVals` accumulates members' numeric metric
+    // for the block average. Units are created in first-appearance order (stable ties).
+    type Unit = { key: SortValue; rows: Asset[]; numVals: number[] }
+    const units: Unit[] = []
+    const blockByThesisId = new Map<number, Unit>()
+
+    for (const a of assets) {
+      const val = getSortValue(a, sortBy, quotes, batchIndicators)
+      const ts = thesesByAssetId.get(a.id)
+      if (!ts || ts.length === 0) {
+        units.push({ key: val, rows: [a], numVals: [] })
+        continue
+      }
+      colors[a.symbol] = ts[0].color
+      titles[a.symbol] = ts.map((t) => t.name).join(", ")
+      let block = blockByThesisId.get(ts[0].id)
+      if (!block) {
+        block = { key: null, rows: [], numVals: [] }
+        blockByThesisId.set(ts[0].id, block)
+        units.push(block)
+      }
+      block.rows.push(a) // assets are pre-sorted, so within-block order is the active sort
+      if (typeof val === "number") block.numVals.push(val)
+    }
+
+    // Block key = average of members' metric (numeric sorts); for the "name" sort the
+    // average is meaningless, so the leading member (in the current direction) stands in.
+    for (const block of blockByThesisId.values()) {
+      block.key =
+        sortBy === "name"
+          ? block.rows.length
+            ? getSortValue(block.rows[0], sortBy, quotes, batchIndicators)
+            : null
+          : block.numVals.length
+            ? block.numVals.reduce((s, v) => s + v, 0) / block.numVals.length
+            : null
+    }
+
+    const dir = sortDir === "asc" ? 1 : -1
+    const ordered = [...units]
+      .sort((x, y) => dir * compareSortValues(x.key, y.key))
+      .flatMap((u) => u.rows)
+
+    return { inlineAssets: ordered, accentColors: colors, accentTitles: titles }
+  }, [thesisGrouping, theses, assets, sortBy, sortDir, quotes, batchIndicators])
 
   const setTypeFilter = (v: AssetTypeFilter) =>
     updateSettings({ group_type_filter: v })
@@ -194,16 +264,15 @@ export function GroupPage({ groupId }: { groupId: number }) {
             onChange={setViewMode}
           />
           {viewMode === "table" && (
-            <Button
-              variant={groupByThesis ? "default" : "outline"}
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => updateSettings({ group_by_thesis: !groupByThesis })}
-              title="Group rows by thesis"
-            >
-              <Layers className="h-3.5 w-3.5" />
-              By thesis
-            </Button>
+            <SegmentedControl
+              options={[
+                { value: "none", label: <List className="h-3.5 w-3.5" />, title: "No thesis grouping" },
+                { value: "sections", label: <Layers className="h-3.5 w-3.5" />, title: "Group by thesis — sections" },
+                { value: "inline", label: <Palette className="h-3.5 w-3.5" />, title: "Group by thesis — colour-coded rows" },
+              ]}
+              value={thesisGrouping}
+              onChange={(v) => updateSettings({ thesis_grouping: v })}
+            />
           )}
           {allTags && allTags.length > 0 && (
             <TagFilterPopover
@@ -239,7 +308,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
         </CrosshairTimeSyncProvider>
       ) : viewMode === "table" && assets && assets.length > 0 ? (
         <CrosshairTimeSyncProvider enabled={true}>
-          {groupByThesis ? (
+          {thesisGrouping === "sections" ? (
             <ThesisGroupedTable
               groupId={groupId}
               assets={assets}
@@ -257,7 +326,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
           ) : (
             <GroupTable
               groupId={groupId}
-              assets={assets}
+              assets={inlineAssets ?? assets}
               quotes={quotes}
               indicators={batchIndicators}
               onDelete={handleRemove}
@@ -266,6 +335,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
               sortBy={sortBy}
               sortDir={sortDir}
               onSort={handleSort}
+              accentColors={accentColors}
+              accentTitles={accentTitles}
             />
           )}
         </CrosshairTimeSyncProvider>

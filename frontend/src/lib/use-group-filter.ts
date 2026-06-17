@@ -3,10 +3,41 @@ import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { AssetTypeFilter, GroupSortBy, SortDir } from "@/lib/settings"
 import { getNumericValue } from "@/lib/indicator-registry"
 
-function compareNullable(a: number | null, b: number | null): number {
+/** A row's value for a given sort field: number for metrics, string for "name". */
+export type SortValue = number | string | null
+
+/**
+ * Resolve the sortable value for an asset under `sortBy`, using the same sources
+ * the table renders from: live SSE quote for price/change, indicator snapshot for
+ * everything else. Shared so derived orderings (e.g. thesis-block averages) can't
+ * drift from the row sort.
+ */
+export function getSortValue(
+  asset: Asset,
+  sortBy: GroupSortBy,
+  quotes: Record<string, Quote>,
+  indicators?: Record<string, IndicatorSummary>,
+): SortValue {
+  switch (sortBy) {
+    case "name":
+      return asset.symbol
+    case "price":
+      return quotes[asset.symbol]?.price ?? null
+    case "change_pct":
+      return quotes[asset.symbol]?.change_percent ?? null
+    default:
+      return getNumericValue(indicators?.[asset.symbol]?.values, sortBy)
+  }
+}
+
+/** Ascending comparator for {@link SortValue}: nulls last, strings via locale. */
+export function compareSortValues(a: SortValue, b: SortValue): number {
   if (a == null && b == null) return 0
   if (a == null) return 1
   if (b == null) return -1
+  if (typeof a === "string" || typeof b === "string") {
+    return String(a).localeCompare(String(b))
+  }
   return a - b
 }
 
@@ -37,31 +68,10 @@ export function useFilteredSortedAssets(
     }
 
     const sorted = [...filtered].sort((a, b) => {
-      let cmp = 0
-      switch (sortBy) {
-        case "name":
-          cmp = a.symbol.localeCompare(b.symbol)
-          break
-        case "price":
-          cmp = compareNullable(
-            quotes[a.symbol]?.price ?? null,
-            quotes[b.symbol]?.price ?? null,
-          )
-          break
-        case "change_pct":
-          cmp = compareNullable(
-            quotes[a.symbol]?.change_percent ?? null,
-            quotes[b.symbol]?.change_percent ?? null,
-          )
-          break
-        default:
-          // Indicator-based sorting: sortBy is the field name (e.g. "rsi", "macd")
-          cmp = compareNullable(
-            getNumericValue(indicators?.[a.symbol]?.values, sortBy),
-            getNumericValue(indicators?.[b.symbol]?.values, sortBy),
-          )
-          break
-      }
+      const cmp = compareSortValues(
+        getSortValue(a, sortBy, quotes, indicators),
+        getSortValue(b, sortBy, quotes, indicators),
+      )
       return sortDir === "asc" ? cmp : -cmp
     })
 

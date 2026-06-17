@@ -70,6 +70,8 @@ export const TableRow = memo(function TableRow({
   columnSettings,
   visibleIndicatorFields,
   totalColSpan,
+  accent,
+  accentTitle,
 }: {
   groupId: number
   asset: Asset
@@ -83,6 +85,10 @@ export const TableRow = memo(function TableRow({
   columnSettings: Record<string, boolean>
   visibleIndicatorFields: string[]
   totalColSpan: number
+  /** Left-border accent colour (thesis colour) for the "inline" thesis grouping. */
+  accent?: string
+  /** Tooltip for the accent bar — the thesis name(s) this row belongs to. */
+  accentTitle?: string
 }) {
   // Use live SSE quote when available, fall back to DB-cached indicator values
   const livePrice = quote?.price ?? null
@@ -120,7 +126,11 @@ export const TableRow = memo(function TableRow({
           onClick={handleToggle}
           onMouseEnter={handleHover}
         >
-          <td className={`${py} pl-2`}>
+          <td
+            className={`${py} pl-2`}
+            style={accent ? { boxShadow: `inset 3px 0 0 0 ${accent}` } : undefined}
+            title={accent ? accentTitle : undefined}
+          >
             {expanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             ) : (
