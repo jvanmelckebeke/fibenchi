@@ -193,14 +193,14 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
           {hasMore && (
             <>
               <tr className="border-b border-border bg-muted/20">
-                <td colSpan={totalColSpan} className="px-2 py-1.5">
+                <td colSpan={totalColSpan} className="p-0">
                   <button
                     type="button"
                     onClick={toggleMore}
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex w-full items-center gap-1 px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors"
                     aria-expanded={moreOpenState}
                   >
-                    {moreOpenState ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {moreOpenState ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
                     {moreLabel}
                   </button>
                 </td>
