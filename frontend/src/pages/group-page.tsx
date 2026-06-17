@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo, useTransition } from "react"
-import { Activity, ArrowDownAZ, ArrowUpAZ, Layers, LayoutGrid, List, Palette, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
+import { Activity, ArrowDownAZ, ArrowUpAZ, Layers, LayoutGrid, List, Magnet, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,6 +43,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
   const thesisGrouping = settings.thesis_grouping
+  const thesisCluster = settings.thesis_cluster
   const [isPending, startTransition] = useTransition()
   // settings.group_view_mode = immediate (drives SegmentedControl highlight)
   // viewMode = deferred via useTransition (drives content rendering)
@@ -79,14 +80,14 @@ export function GroupPage({ groupId }: { groupId: number }) {
     indicators: batchIndicators,
   })
 
-  // "inline" thesis grouping: one flat table, but each thesis's members are pulled
-  // together into a block and ordered *within* the block by the active sort. Each
-  // block is then placed in the global order by the AVERAGE of its members' sort
-  // metric, interleaved with ungrouped assets (each its own size-1 unit). Members'
-  // left borders are coloured with the thesis colour — no section headers.
-  const { inlineAssets, accentColors, accentTitles } = useMemo(() => {
-    if (thesisGrouping !== "inline" || !theses || theses.length === 0 || !assets) {
-      return { inlineAssets: assets, accentColors: undefined, accentTitles: undefined }
+  // List view always paints each row's left border with its thesis colour. When the
+  // "keep together" toggle is on, members are additionally clustered: each thesis's
+  // rows are pulled into a block ordered *within* by the active sort, and the block is
+  // placed in the global order by the AVERAGE of its members' metric, interleaved with
+  // ungrouped assets (each a size-1 unit). Off → plain sort, just colour-edged.
+  const { listAssets, accentColors, accentTitles } = useMemo(() => {
+    if (thesisGrouping !== "list" || !theses || theses.length === 0 || !assets) {
+      return { listAssets: assets, accentColors: undefined, accentTitles: undefined }
     }
     // asset id -> theses containing it, in the API's order (alphabetical by name)
     const thesesByAssetId = new Map<number, Thesis[]>()
@@ -98,10 +99,22 @@ export function GroupPage({ groupId }: { groupId: number }) {
       }
     }
 
+    // Colour edges + tooltips are shown whether or not clustering is on.
     const colors: Record<string, string> = {}
     const titles: Record<string, string> = {}
+    for (const a of assets) {
+      const ts = thesesByAssetId.get(a.id)
+      if (ts && ts.length > 0) {
+        colors[a.symbol] = ts[0].color
+        titles[a.symbol] = ts.map((t) => t.name).join(", ")
+      }
+    }
 
-    // A unit is one sortable row of the global order: a thesis block (many rows) or
+    if (!thesisCluster) {
+      return { listAssets: assets, accentColors: colors, accentTitles: titles }
+    }
+
+    // A unit is one sortable entry of the global order: a thesis block (many rows) or
     // a lone ungrouped asset (one row). `numVals` accumulates members' numeric metric
     // for the block average. Units are created in first-appearance order (stable ties).
     type Unit = { key: SortValue; rows: Asset[]; numVals: number[] }
@@ -115,8 +128,6 @@ export function GroupPage({ groupId }: { groupId: number }) {
         units.push({ key: val, rows: [a], numVals: [] })
         continue
       }
-      colors[a.symbol] = ts[0].color
-      titles[a.symbol] = ts.map((t) => t.name).join(", ")
       let block = blockByThesisId.get(ts[0].id)
       if (!block) {
         block = { key: null, rows: [], numVals: [] }
@@ -145,8 +156,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
       .sort((x, y) => dir * compareSortValues(x.key, y.key))
       .flatMap((u) => u.rows)
 
-    return { inlineAssets: ordered, accentColors: colors, accentTitles: titles }
-  }, [thesisGrouping, theses, assets, sortBy, sortDir, quotes, batchIndicators])
+    return { listAssets: ordered, accentColors: colors, accentTitles: titles }
+  }, [thesisGrouping, thesisCluster, theses, assets, sortBy, sortDir, quotes, batchIndicators])
 
   const setTypeFilter = (v: AssetTypeFilter) =>
     updateSettings({ group_type_filter: v })
@@ -264,15 +275,28 @@ export function GroupPage({ groupId }: { groupId: number }) {
             onChange={setViewMode}
           />
           {viewMode === "table" && (
-            <SegmentedControl
-              options={[
-                { value: "none", label: <List className="h-3.5 w-3.5" />, title: "No thesis grouping" },
-                { value: "sections", label: <Layers className="h-3.5 w-3.5" />, title: "Group by thesis — sections" },
-                { value: "inline", label: <Palette className="h-3.5 w-3.5" />, title: "Group by thesis — colour-coded rows" },
-              ]}
-              value={thesisGrouping}
-              onChange={(v) => updateSettings({ thesis_grouping: v })}
-            />
+            <div className="flex items-center gap-1.5">
+              <SegmentedControl
+                options={[
+                  { value: "list", label: <List className="h-3.5 w-3.5" />, title: "List — colour-edged by thesis" },
+                  { value: "sections", label: <Layers className="h-3.5 w-3.5" />, title: "Group by thesis — sections" },
+                ]}
+                value={thesisGrouping}
+                onChange={(v) => updateSettings({ thesis_grouping: v })}
+              />
+              {thesisGrouping === "list" && (
+                <Button
+                  variant={thesisCluster ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => updateSettings({ thesis_cluster: !thesisCluster })}
+                  title="Keep each thesis's members together when sorting"
+                >
+                  <Magnet className="h-3.5 w-3.5" />
+                  Keep together
+                </Button>
+              )}
+            </div>
           )}
           {allTags && allTags.length > 0 && (
             <TagFilterPopover
@@ -326,7 +350,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
           ) : (
             <GroupTable
               groupId={groupId}
-              assets={inlineAssets ?? assets}
+              assets={listAssets ?? assets}
               quotes={quotes}
               indicators={batchIndicators}
               onDelete={handleRemove}

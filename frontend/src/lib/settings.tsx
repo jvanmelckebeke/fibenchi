@@ -8,8 +8,8 @@ export type SortDir = "asc" | "desc"
 export type MacdStyle = "classic" | "divergence"
 export type GroupViewMode = "card" | "table" | "scanner" | "live"
 export type YahooLinkMode = "chart" | "quote"
-/** How the table view organizes rows by thesis. */
-export type ThesisGrouping = "none" | "sections" | "inline"
+/** Thesis layout in the table view: a flat (colour-edged) list or per-thesis sections. */
+export type ThesisGrouping = "list" | "sections"
 
 export interface AppSettings {
   /** Per-indicator placement visibility matrix. Missing key = use descriptor defaults. */
@@ -23,6 +23,8 @@ export interface AppSettings {
   group_table_columns: Record<string, boolean>
   group_table_column_widths: Record<string, number>
   thesis_grouping: ThesisGrouping
+  /** In list view, keep a thesis's members together when sorting (average-and-interleave). */
+  thesis_cluster: boolean
   chart_default_period: string
   chart_type: "candle" | "line"
   theme: "dark" | "light" | "system"
@@ -64,14 +66,25 @@ function migrateOldVisibility(
  * `thesis_grouping` when it isn't already set, so an explicit choice (including the
  * new "inline" color-coded mode) is never clobbered by a stale boolean.
  */
-type LegacySettings = Partial<AppSettings> & { group_by_thesis?: boolean }
-
-function withThesisGrouping(s: LegacySettings): LegacySettings {
-  if (s.thesis_grouping == null && "group_by_thesis" in s) {
-    const { group_by_thesis, ...rest } = s
-    return { ...rest, thesis_grouping: group_by_thesis ? "sections" : "none" }
+/**
+ * Normalize legacy thesis settings into the current shape
+ * ({ thesis_grouping: "list" | "sections", thesis_cluster }):
+ *   - boolean `group_by_thesis`: true → sections, false → list
+ *   - old 3-way `thesis_grouping`: "none" → list, "inline" → list + cluster, "sections" → sections
+ * Only fills what it can derive; DEFAULT_SETTINGS backfills the rest, and a value
+ * already in the new shape is left untouched.
+ */
+function migrateThesisSettings(s: Record<string, unknown>): Partial<AppSettings> {
+  const out: Record<string, unknown> = { ...s }
+  const tg = out.thesis_grouping
+  if (tg === "none" || tg === "inline") {
+    out.thesis_cluster = tg === "inline"
+    out.thesis_grouping = "list"
+  } else if (tg == null && "group_by_thesis" in out) {
+    out.thesis_grouping = out.group_by_thesis ? "sections" : "list"
   }
-  return s
+  delete out.group_by_thesis
+  return out as Partial<AppSettings>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -85,7 +98,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   group_sort_dir: "asc",
   group_table_columns: {},
   group_table_column_widths: {},
-  thesis_grouping: "none",
+  thesis_grouping: "list",
+  thesis_cluster: false,
   chart_default_period: "1y",
   chart_type: "candle",
   theme: "system",
@@ -116,10 +130,10 @@ function loadFromStorage(): AppSettings {
         delete parsed.group_indicator_visibility
         delete parsed.detail_indicator_visibility
         // Persist migrated settings
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...withThesisGrouping(parsed) }))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...migrateThesisSettings(parsed) }))
       }
-      // Migrate before merging defaults — the "none" default would otherwise mask the old flag.
-      return { ...DEFAULT_SETTINGS, ...withThesisGrouping(parsed) }
+      // Migrate before merging defaults so legacy thesis values aren't masked.
+      return { ...DEFAULT_SETTINGS, ...migrateThesisSettings(parsed) }
     }
   } catch {
     // ignore corrupt storage
@@ -150,7 +164,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       .then((body) => {
         if (cancelled) return
         if (body?.data && Object.keys(body.data).length > 0) {
-          const remoteData = withThesisGrouping(body.data as Partial<AppSettings>)
+          const remoteData = migrateThesisSettings(body.data)
           setSettings((prev) => {
             const localTs = prev._updated_at
             const remoteTs = remoteData._updated_at
