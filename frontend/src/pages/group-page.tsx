@@ -290,10 +290,10 @@ export function GroupPage({ groupId }: { groupId: number }) {
                   size="sm"
                   className="h-7 gap-1.5 text-xs"
                   onClick={() => updateSettings({ thesis_cluster: !thesisCluster })}
-                  title="Keep each thesis's members together when sorting"
+                  title="Sort each thesis's members together as one block"
                 >
                   <Magnet className="h-3.5 w-3.5" />
-                  Keep together
+                  Sort together
                 </Button>
               )}
             </div>
