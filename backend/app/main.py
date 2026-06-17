@@ -15,7 +15,7 @@ from starlette.responses import FileResponse
 from app.config import settings as app_settings
 
 from app.database import async_session, engine
-from app.routers import annotations, assets, companion, data, groups, holdings, note, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
+from app.routers import annotations, assets, companion, data, groups, holdings, indicators, note, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
 from app.services.price_sync import sync_all_prices
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
@@ -305,6 +305,7 @@ app.include_router(tags.asset_tag_router)
 app.include_router(portfolio.router)
 app.include_router(prices.router)
 app.include_router(holdings.router)
+app.include_router(indicators.router)
 app.include_router(note.router)
 app.include_router(thesis.router)
 app.include_router(annotations.router)

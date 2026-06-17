@@ -101,6 +101,18 @@ export function useGroupIndicators(id: number) {
   })
 }
 
+/** Indicator snapshots for an arbitrary set of tracked symbols, keyed by symbol.
+ * Used to fill indicator columns for thesis members living in other groups —
+ * the per-group batch only covers the current group. */
+export function useIndicators(symbols: string[], enabled = true) {
+  return useQuery({
+    queryKey: keys.indicators(symbols),
+    queryFn: () => api.indicators.batch(symbols),
+    enabled: enabled && symbols.length > 0,
+    staleTime: STALE_5MIN,
+  })
+}
+
 /** Prefetch the metadata, sparklines and indicators for every group except
  * ``activeGroupId`` so switching groups feels instant. The active group's
  * data is already being fetched by the page that called this hook. */

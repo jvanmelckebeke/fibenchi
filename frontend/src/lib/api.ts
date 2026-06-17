@@ -137,6 +137,14 @@ export const api = {
     indicators: (id: number) =>
       request<Record<string, IndicatorSummary>>(`/groups/${id}/indicators`),
   },
+  indicators: {
+    /** Batch indicator snapshots for arbitrary tracked symbols, keyed by symbol. */
+    batch: (symbols: string[]) => {
+      const params = new URLSearchParams()
+      for (const s of symbols) params.append("symbols", s)
+      return request<Record<string, IndicatorSummary>>(`/indicators?${params.toString()}`)
+    },
+  },
   note: {
     get: (symbol: string) => request<Note>(`/assets/${symbol}/note`),
     update: (symbol: string, content: string) =>

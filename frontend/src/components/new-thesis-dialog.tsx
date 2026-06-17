@@ -18,9 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useCreateThesis } from "@/lib/queries"
+import { THESIS_PRESET_COLORS, DEFAULT_THESIS_COLOR } from "@/lib/thesis-colors"
 import type { Thesis, ThesisStatus } from "@/lib/api"
-
-const PRESET_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"]
 
 const STATUSES: { value: ThesisStatus; label: string }[] = [
   { value: "watching", label: "Watching" },
@@ -71,7 +70,7 @@ function NewThesisForm({
 }) {
   const createThesis = useCreateThesis()
   const [name, setName] = useState(initialName ?? "")
-  const [color, setColor] = useState(PRESET_COLORS[0])
+  const [color, setColor] = useState(DEFAULT_THESIS_COLOR)
   const [status, setStatus] = useState<ThesisStatus>("watching")
   const [openedAt, setOpenedAt] = useState(todayISO())
   const [description, setDescription] = useState("")
@@ -114,8 +113,8 @@ function NewThesisForm({
         </div>
         <div className="space-y-2">
           <Label>Colour</Label>
-          <div className="flex gap-1.5">
-            {PRESET_COLORS.map((c) => (
+          <div className="flex flex-wrap gap-1.5">
+            {THESIS_PRESET_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"

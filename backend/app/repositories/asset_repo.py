@@ -57,6 +57,20 @@ class AssetRepository:
         )
         return list(result.all())
 
+    async def list_id_symbol_pairs_by_symbols(self, symbols: list[str]) -> list[tuple[int, str]]:
+        """Return (id, symbol) pairs for the given symbols (tracked assets only).
+
+        Unknown symbols are silently omitted. Symbols are matched case-insensitively
+        (stored upper-cased, mirroring ``find_by_symbol``).
+        """
+        if not symbols:
+            return []
+        upper = [s.upper() for s in symbols]
+        result = await self.db.execute(
+            select(Asset.id, Asset.symbol).where(Asset.symbol.in_(upper))
+        )
+        return list(result.all())
+
     async def list_all(self) -> list[Asset]:
         result = await self.db.execute(select(Asset).order_by(Asset.symbol))
         return list(result.scalars().all())
