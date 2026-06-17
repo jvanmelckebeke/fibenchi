@@ -38,9 +38,16 @@ interface GroupTableProps {
   moreOpen?: boolean
   /** Controlled toggle handler for the "more" footer. */
   onToggleMore?: () => void
+  /**
+   * Per-symbol left-border accent colour (thesis colour) for the "inline" thesis
+   * grouping mode. Rows without an entry render no accent.
+   */
+  accentColors?: Record<string, string>
+  /** Per-symbol tooltip for the accent bar (the thesis name[s]). */
+  accentTitles?: Record<string, string>
 }
 
-export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore }: GroupTableProps) {
+export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
   const [internalMoreOpen, setInternalMoreOpen] = useState(false)
   const moreOpenState = moreOpen ?? internalMoreOpen
@@ -98,6 +105,8 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
       columnSettings={columnSettings}
       visibleIndicatorFields={visibleIndicatorFields}
       totalColSpan={totalColSpan}
+      accent={accentColors?.[asset.symbol]}
+      accentTitle={accentTitles?.[asset.symbol]}
     />
   )
 

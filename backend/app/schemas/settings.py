@@ -22,7 +22,12 @@ class AppSettingsData(BaseModel):
     group_sort_dir: Literal["asc", "desc"] | None = None
     group_table_columns: dict[str, bool] | None = None
     group_table_column_widths: dict[str, float] | None = None
-    group_by_thesis: bool | None = None
+    # Thesis layout for the table view, plus whether the list view clusters a
+    # thesis's members together when sorting. Legacy keys (`group_by_thesis`, the
+    # old "none"/"inline" thesis_grouping values) are tolerated via extra="allow"
+    # and normalized client-side.
+    thesis_grouping: Literal["list", "sections"] | None = None
+    thesis_cluster: bool | None = None
     chart_default_period: str | None = None
     chart_type: Literal["candle", "line"] | None = None
     theme: Literal["dark", "light", "system"] | None = None
