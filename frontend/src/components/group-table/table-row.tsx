@@ -12,7 +12,7 @@ import { TagBadge } from "@/components/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatAssetPrice, formatAssetCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
+import { formatAssetPrice, formatAssetCompactPrice, formatCompactNumber, changeColor, formatChangePct, readableTextColor } from "@/lib/format"
 import {
   getNumericValue,
   extractMacdValues,
@@ -24,6 +24,7 @@ import {
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
+import { resolveIcon } from "@/lib/icon-utils"
 import { isColumnVisible } from "./shared"
 
 function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: string }) {
@@ -72,6 +73,7 @@ export const TableRow = memo(function TableRow({
   totalColSpan,
   accent,
   accentTitle,
+  accentIcon,
 }: {
   groupId: number
   asset: Asset
@@ -89,6 +91,8 @@ export const TableRow = memo(function TableRow({
   accent?: string
   /** Tooltip for the accent bar — the thesis name(s) this row belongs to. */
   accentTitle?: string
+  /** Lucide icon name (the thesis icon) revealed when the accent bar expands on hover. */
+  accentIcon?: string
 }) {
   // Use live SSE quote when available, fall back to DB-cached indicator values
   const livePrice = quote?.price ?? null
@@ -117,6 +121,8 @@ export const TableRow = memo(function TableRow({
   const [editOpen, setEditOpen] = useState(false)
   const [newThesisOpen, setNewThesisOpen] = useState(false)
   const addToThesis = useAddAssetToThesis()
+  // resolveIcon returns stable refs from lucide's static icon map.
+  const AccentIcon = resolveIcon(accentIcon)
 
   return (
     <ContextMenu>
@@ -127,15 +133,31 @@ export const TableRow = memo(function TableRow({
           onMouseEnter={handleHover}
         >
           <td
-            className={`${py} pl-2`}
-            style={accent ? { boxShadow: `inset 3px 0 0 0 ${accent}` } : undefined}
+            className={`${py} relative pl-2`}
             title={accent ? accentTitle : undefined}
           >
-            {expanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            {accent && (
+              <span
+                aria-hidden
+                className="absolute inset-y-0 left-0 z-10 flex w-[3px] items-center justify-center overflow-hidden transition-[width] duration-200 ease-out group-hover:w-6"
+                style={{ backgroundColor: accent }}
+              >
+                {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
+                <AccentIcon
+                  className="h-3.5 w-3.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                  style={{ color: readableTextColor(accent) }}
+                />
+              </span>
             )}
+            <span
+              className={`inline-flex transition-transform duration-200 ease-out ${accent ? "group-hover:translate-x-[18px]" : ""}`}
+            >
+              {expanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </span>
           </td>
           <td className={`${py} px-3`}>
             <div className="flex items-center gap-2">

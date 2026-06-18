@@ -24,6 +24,7 @@ async def create_thesis(data: ThesisCreate, db: AsyncSession = Depends(get_db)):
         db,
         name=data.name,
         color=data.color,
+        icon=data.icon,
         description=data.description,
         status=data.status,
         opened_at=data.opened_at,

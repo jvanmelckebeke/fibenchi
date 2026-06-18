@@ -45,9 +45,11 @@ interface GroupTableProps {
   accentColors?: Record<string, string>
   /** Per-symbol tooltip for the accent bar (the thesis name[s]). */
   accentTitles?: Record<string, string>
+  /** Per-symbol Lucide icon name (the thesis icon) revealed when hovering the accent bar. */
+  accentIcons?: Record<string, string>
 }
 
-export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles }: GroupTableProps) {
+export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles, accentIcons }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
   const [internalMoreOpen, setInternalMoreOpen] = useState(false)
   const moreOpenState = moreOpen ?? internalMoreOpen
@@ -107,6 +109,7 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
       totalColSpan={totalColSpan}
       accent={accentColors?.[asset.symbol]}
       accentTitle={accentTitles?.[asset.symbol]}
+      accentIcon={accentIcons?.[asset.symbol]}
     />
   )
 

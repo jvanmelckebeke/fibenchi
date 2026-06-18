@@ -86,9 +86,9 @@ export function GroupPage({ groupId }: { groupId: number }) {
   // rows are pulled into a block ordered *within* by the active sort, and the block is
   // placed in the global order by the AVERAGE of its members' metric, interleaved with
   // ungrouped assets (each a size-1 unit). Off → plain sort, just colour-edged.
-  const { listAssets, accentColors, accentTitles } = useMemo(() => {
+  const { listAssets, accentColors, accentTitles, accentIcons } = useMemo(() => {
     if (thesisGrouping !== "list" || !theses || theses.length === 0 || !assets) {
-      return { listAssets: assets, accentColors: undefined, accentTitles: undefined }
+      return { listAssets: assets, accentColors: undefined, accentTitles: undefined, accentIcons: undefined }
     }
     // asset id -> theses containing it, in the API's order (alphabetical by name)
     const thesesByAssetId = new Map<number, Thesis[]>()
@@ -100,19 +100,21 @@ export function GroupPage({ groupId }: { groupId: number }) {
       }
     }
 
-    // Colour edges + tooltips are shown whether or not clustering is on.
+    // Colour edges + tooltips + hover icon are shown whether or not clustering is on.
     const colors: Record<string, string> = {}
     const titles: Record<string, string> = {}
+    const icons: Record<string, string> = {}
     for (const a of assets) {
       const ts = thesesByAssetId.get(a.id)
       if (ts && ts.length > 0) {
         colors[a.symbol] = ts[0].color
         titles[a.symbol] = ts.map((t) => t.name).join(", ")
+        icons[a.symbol] = ts[0].icon ?? "lightbulb"
       }
     }
 
     if (!thesisCluster) {
-      return { listAssets: assets, accentColors: colors, accentTitles: titles }
+      return { listAssets: assets, accentColors: colors, accentTitles: titles, accentIcons: icons }
     }
 
     // A unit is one sortable entry of the global order: a thesis block (many rows) or
@@ -157,7 +159,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
       .sort((x, y) => dir * compareSortValues(x.key, y.key))
       .flatMap((u) => u.rows)
 
-    return { listAssets: ordered, accentColors: colors, accentTitles: titles }
+    return { listAssets: ordered, accentColors: colors, accentTitles: titles, accentIcons: icons }
   }, [thesisGrouping, thesisCluster, theses, assets, sortBy, sortDir, quotes, batchIndicators])
 
   const setTypeFilter = (v: AssetTypeFilter) =>
@@ -366,6 +368,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
               onSort={handleSort}
               accentColors={accentColors}
               accentTitles={accentTitles}
+              accentIcons={accentIcons}
             />
           )}
         </CrosshairTimeSyncProvider>

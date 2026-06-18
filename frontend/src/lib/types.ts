@@ -131,6 +131,7 @@ export interface Thesis {
   id: number
   name: string
   color: string
+  icon: string | null
   description: string | null
   status: ThesisStatus
   opened_at: string
@@ -142,6 +143,7 @@ export interface Thesis {
 export interface ThesisCreate {
   name: string
   color?: string
+  icon?: string | null
   description?: string | null
   status?: ThesisStatus
   opened_at?: string
@@ -150,6 +152,7 @@ export interface ThesisCreate {
 export interface ThesisUpdate {
   name?: string
   color?: string
+  icon?: string | null
   description?: string | null
   status?: ThesisStatus
   opened_at?: string

@@ -37,6 +37,7 @@ class Thesis(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     color: Mapped[str] = mapped_column(String(7), default="#3b82f6", server_default="#3b82f6")
+    icon: Mapped[str | None] = mapped_column(String(50), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20),

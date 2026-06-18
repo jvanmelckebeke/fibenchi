@@ -59,6 +59,7 @@ async def create_thesis(
     db: AsyncSession,
     name: str,
     color: str,
+    icon: str | None,
     description: str | None,
     status: ThesisStatus,
     opened_at: date | None,
@@ -69,6 +70,7 @@ async def create_thesis(
     thesis = await repo.create(
         name=name,
         color=color,
+        icon=icon,
         description=description,
         status=status.value,
         opened_at=opened_at or date.today(),
@@ -86,6 +88,8 @@ async def update_thesis(db: AsyncSession, thesis_id: int, data: dict):
         thesis.name = name
     if "color" in data:
         thesis.color = data["color"]
+    if "icon" in data:
+        thesis.icon = data["icon"]
     if "description" in data:
         thesis.description = data["description"]
     if data.get("status") is not None:

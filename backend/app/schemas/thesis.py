@@ -17,6 +17,7 @@ class ThesisAssetBrief(BaseModel):
 class ThesisCreate(BaseModel):
     name: str = Field(max_length=120, description="Unique thesis name (e.g. 'El Niño', 'Cables')")
     color: str = Field(default="#3b82f6", description="Hex colour for the thesis badge")
+    icon: str | None = Field(default=None, max_length=50, description="Lucide icon name (e.g. 'lightbulb', 'flame')")
     description: str | None = Field(default=None, max_length=50_000, description="The hypothesis (Markdown supported)")
     status: ThesisStatus = Field(default=ThesisStatus.WATCHING, description="Lifecycle status")
     opened_at: datetime.date | None = Field(default=None, description="Date the thesis was formed (defaults to today)")
@@ -30,6 +31,7 @@ class ThesisCreate(BaseModel):
 class ThesisUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120, description="New thesis name")
     color: str | None = Field(default=None, description="New hex colour")
+    icon: str | None = Field(default=None, max_length=50, description="New Lucide icon name")
     description: str | None = Field(default=None, max_length=50_000, description="New hypothesis text")
     status: ThesisStatus | None = Field(default=None, description="New lifecycle status")
     opened_at: datetime.date | None = Field(default=None, description="New open date")
@@ -50,6 +52,7 @@ class ThesisResponse(BaseModel):
     id: int = Field(description="Thesis ID")
     name: str = Field(description="Thesis name")
     color: str = Field(description="Hex colour")
+    icon: str | None = Field(default=None, description="Lucide icon name")
     description: str | None = Field(description="The hypothesis (Markdown)")
     status: ThesisStatus = Field(description="Lifecycle status")
     opened_at: datetime.date = Field(description="Date the thesis was formed")

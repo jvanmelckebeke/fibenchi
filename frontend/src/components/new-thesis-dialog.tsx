@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { IconPicker } from "@/components/icon-picker"
 import { useCreateThesis } from "@/lib/queries"
 import { THESIS_PRESET_COLORS, DEFAULT_THESIS_COLOR } from "@/lib/thesis-colors"
 import type { Thesis, ThesisStatus } from "@/lib/api"
@@ -71,6 +72,7 @@ function NewThesisForm({
   const createThesis = useCreateThesis()
   const [name, setName] = useState(initialName ?? "")
   const [color, setColor] = useState(DEFAULT_THESIS_COLOR)
+  const [icon, setIcon] = useState("lightbulb")
   const [status, setStatus] = useState<ThesisStatus>("watching")
   const [openedAt, setOpenedAt] = useState(todayISO())
   const [description, setDescription] = useState("")
@@ -82,6 +84,7 @@ function NewThesisForm({
       {
         name: trimmed,
         color,
+        icon,
         status,
         opened_at: openedAt,
         description: description.trim() || undefined,
@@ -103,13 +106,17 @@ function NewThesisForm({
       <div className="space-y-4 py-2">
         <div className="space-y-2">
           <Label htmlFor="thesis-name">Name</Label>
-          <Input
-            id="thesis-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. El Niño"
-            autoFocus
-          />
+          <div className="flex gap-2">
+            <IconPicker value={icon} onChange={setIcon} />
+            <Input
+              id="thesis-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. El Niño"
+              className="flex-1"
+              autoFocus
+            />
+          </div>
         </div>
         <div className="space-y-2">
           <Label>Colour</Label>

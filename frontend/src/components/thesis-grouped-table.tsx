@@ -3,7 +3,8 @@ import { Pencil, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Group, IndicatorSummary, Quote, Thesis, ThesisStatus } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
-import { formatChangePct, formatDateLong } from "@/lib/format"
+import { formatChangePct, formatDateLong, readableTextColor } from "@/lib/format"
+import { resolveIcon } from "@/lib/icon-utils"
 import { useIndicators } from "@/lib/queries"
 import { GroupTable } from "@/components/group-table"
 import { NewThesisDialog } from "@/components/new-thesis-dialog"
@@ -164,14 +165,17 @@ export function ThesisGroupedTable({
             {elsewhereGroups.length > 0 && <> in {elsewhereGroups.join(", ")}</>}
           </>
         )
+        const ThesisIcon = resolveIcon(thesis.icon ?? "lightbulb")
         return (
           <section key={thesis.id} className="space-y-2">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
                 style={{ backgroundColor: thesis.color }}
                 aria-hidden
-              />
+              >
+                <ThesisIcon className="h-4 w-4" style={{ color: readableTextColor(thesis.color) }} />
+              </span>
               <h3 className="font-semibold">{thesis.name}</h3>
               <StatusBadge status={thesis.status} />
               <span className="text-xs text-muted-foreground">

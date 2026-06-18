@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { IconPicker } from "@/components/icon-picker"
 import { useUpdateThesis, useDeleteThesis } from "@/lib/queries"
 import { THESIS_PRESET_COLORS } from "@/lib/thesis-colors"
 import type { Thesis, ThesisStatus } from "@/lib/api"
@@ -51,6 +52,7 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
   const deleteThesis = useDeleteThesis()
   const [name, setName] = useState(thesis.name)
   const [color, setColor] = useState(thesis.color)
+  const [icon, setIcon] = useState(thesis.icon ?? "lightbulb")
   const [status, setStatus] = useState<ThesisStatus>(thesis.status)
   const [openedAt, setOpenedAt] = useState(thesis.opened_at)
   const [description, setDescription] = useState(thesis.description ?? "")
@@ -63,6 +65,7 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
       {
         name: trimmed,
         color,
+        icon,
         status,
         opened_at: openedAt,
         description: description.trim() || null,
@@ -87,12 +90,16 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
       <div className="space-y-4 py-2">
         <div className="space-y-2">
           <Label htmlFor="edit-thesis-name">Name</Label>
-          <Input
-            id="edit-thesis-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
+          <div className="flex gap-2">
+            <IconPicker value={icon} onChange={setIcon} />
+            <Input
+              id="edit-thesis-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="flex-1"
+              autoFocus
+            />
+          </div>
         </div>
         <div className="space-y-2">
           <Label>Colour</Label>

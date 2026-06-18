@@ -1,5 +1,21 @@
 import type { AssetType } from "@/lib/types"
 
+/**
+ * Pick a legible foreground (near-black or white) for content sitting on a solid
+ * hex background — used so an icon stays readable on light swatches (amber/yellow/
+ * lime) as well as dark ones. Falls back to white for malformed input.
+ */
+export function readableTextColor(hex: string): string {
+  const h = hex.replace("#", "")
+  if (h.length < 6) return "#ffffff"
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  // Perceived (sRGB-weighted) luminance, 0–1. Bright backgrounds → dark text.
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return lum > 0.6 ? "#1e293b" : "#ffffff"
+}
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
   EUR: "\u20ac",
