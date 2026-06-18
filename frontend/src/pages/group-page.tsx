@@ -57,7 +57,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
   }
   const [scannerIndicator, setScannerIndicator] = useState("macd")
   const [scannerPeriod, setScannerPeriod] = useState(settings.chart_default_period)
-  const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod)
+  // Sparklines only render on cards, so only fetch them in card view.
+  const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod, viewMode === "card")
   const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
   usePrefetchOtherGroups(groupId, sparklinePeriod)
@@ -187,21 +188,22 @@ export function GroupPage({ groupId }: { groupId: number }) {
         <div className="flex items-center gap-3 flex-wrap">
           <GroupHeader groupId={groupId} group={group} isDefaultGroup={isDefaultGroup} />
           {/* Type filter */}
-          <SegmentedControl
-            options={[
-              { value: "all", label: "All" },
-              { value: "stock", label: "Stocks" },
-              { value: "etf", label: "ETFs" },
-              { value: "index", label: "Indices" },
-            ]}
-            value={typeFilter}
-            onChange={setTypeFilter}
-          />
+          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AssetTypeFilter)}>
+            <SelectTrigger className="h-7! py-0 text-xs" aria-label="Filter by asset type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="stock">Stocks</SelectItem>
+              <SelectItem value="etf">ETFs</SelectItem>
+              <SelectItem value="index">Indices</SelectItem>
+            </SelectContent>
+          </Select>
           {viewMode === "scanner" ? (
             <>
               {/* Indicator selector */}
               <Select value={scannerIndicator} onValueChange={setScannerIndicator}>
-                <SelectTrigger className="text-xs h-7">
+                <SelectTrigger className="h-7! py-0 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -228,16 +230,18 @@ export function GroupPage({ groupId }: { groupId: number }) {
             </>
           ) : viewMode === "live" ? null : (
             <>
-              {/* Sparkline period */}
-              <SegmentedControl
-                options={[
-                  { value: "3mo", label: "3M" },
-                  { value: "6mo", label: "6M" },
-                  { value: "1y", label: "1Y" },
-                ]}
-                value={sparklinePeriod}
-                onChange={setSparklinePeriod}
-              />
+              {/* Sparkline period — only drives the card-view mini-charts */}
+              {viewMode === "card" && (
+                <SegmentedControl
+                  options={[
+                    { value: "3mo", label: "3M" },
+                    { value: "6mo", label: "6M" },
+                    { value: "1y", label: "1Y" },
+                  ]}
+                  value={sparklinePeriod}
+                  onChange={setSparklinePeriod}
+                />
+              )}
               {/* Sort */}
               <div className="flex items-center gap-1">
                 <DropdownMenu>
@@ -263,17 +267,18 @@ export function GroupPage({ groupId }: { groupId: number }) {
               </div>
             </>
           )}
-          {/* View mode toggle */}
-          <SegmentedControl
-            options={[
-              { value: "card", label: <LayoutGrid className="h-3.5 w-3.5" /> },
-              { value: "table", label: <Table className="h-3.5 w-3.5" /> },
-              { value: "scanner", label: <ScanLine className="h-3.5 w-3.5" /> },
-              { value: "live", label: <Activity className="h-3.5 w-3.5" /> },
-            ]}
-            value={settings.group_view_mode}
-            onChange={setViewMode}
-          />
+          {/* View mode */}
+          <Select value={settings.group_view_mode} onValueChange={(v) => setViewMode(v as GroupViewMode)}>
+            <SelectTrigger className="h-7! py-0 text-xs" aria-label="View mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="table"><span className="flex items-center gap-2"><Table className="h-3.5 w-3.5" />Table</span></SelectItem>
+              <SelectItem value="card"><span className="flex items-center gap-2"><LayoutGrid className="h-3.5 w-3.5" />Cards</span></SelectItem>
+              <SelectItem value="live"><span className="flex items-center gap-2"><Activity className="h-3.5 w-3.5" />Live</span></SelectItem>
+              <SelectItem value="scanner"><span className="flex items-center gap-2"><ScanLine className="h-3.5 w-3.5" />Indicators</span></SelectItem>
+            </SelectContent>
+          </Select>
           {viewMode === "table" && (
             <div className="flex items-center gap-1.5">
               <SegmentedControl

@@ -83,11 +83,11 @@ export function useGroup(id: number) {
   })
 }
 
-export function useGroupSparklines(id: number, period?: string) {
+export function useGroupSparklines(id: number, period?: string, enabled = true) {
   return useQuery({
     queryKey: keys.groupSparklines(id, period),
     queryFn: () => api.groups.sparklines(id, period),
-    enabled: !!id,
+    enabled: !!id && enabled,
     staleTime: STALE_5MIN,
   })
 }
