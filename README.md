@@ -2,22 +2,24 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A self-hosted investment research dashboard for tracking stocks, ETFs, and custom baskets. View OHLCV candlestick charts with technical indicators, write investment theses, annotate charts, and build pseudo-ETFs with equal-weight allocation.
+A self-hosted investment research dashboard for tracking stocks, ETFs, and custom baskets. View OHLCV candlestick charts with technical indicators, group tickers into cross-cutting investment theses, annotate charts, keep Markdown notes, and build pseudo-ETFs with equal-weight allocation. A native mobile companion app mirrors your watchlist for glanceable market data on the phone.
 
 ## Features
 
-- **Groups** — Organize assets into named groups with card or table view, sortable by any indicator, with configurable column visibility
+- **Groups** — Organize assets into named groups with table, card, live-quote, and indicator-scanner views, sortable by any indicator, with configurable column visibility
+- **Theses** — Cross-cutting thematic baskets (e.g. "El Niño", "Cables") that span groups — each with a colour, icon, lifecycle status (watching / live / played out), open date, and equal-weight aggregate return since opening. In the group table, thesis members render as colour-edged rows (hover to reveal the thesis icon) or fold into per-thesis sections
 - **Price charts** — Candlestick or line charts with overlay indicators (SMA 20/50, Bollinger Bands) and sub-charts (RSI, MACD) via [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 - **Technical indicators** — RSI, SMA, EMA, Bollinger Bands, MACD, ATR, ADX with color-coded thresholds and expandable per-asset charts in table rows
 - **Real-time quotes** — Server-sent events push live prices with adaptive polling (15s market hours, 60s pre/post, 300s closed) and automatic reconnection with exponential backoff
 - **Pseudo-ETFs** — Custom baskets with equal-weight allocation, quarterly rebalancing, indexed performance tracking, and synced crosshairs across constituent charts
 - **Portfolio overview** — Composite equal-weight index of all tracked assets with dynamic entry (filters penny stocks), top/bottom performer rankings
 - **ETF holdings** — Drill into ETF constituents with per-holding indicator snapshots and expandable charts
-- **Investment thesis** — Markdown-formatted notes per asset or pseudo-ETF
+- **Notes** — Markdown-formatted notes per asset or pseudo-ETF
 - **Chart annotations** — Dated, colored markers on price charts
 - **Tags** — Colored labels for categorizing assets within groups
 - **Global search** — Cmd+K search across tracked assets and Yahoo Finance symbol lookup
 - **Collapsible sidebar** — Navigation with group quick-access and inline group creation
+- **Mobile companion app** — A separate native React Native / Expo app reads `GET /api/companion/config` to learn what to track (groups, tickers, tags) and fetches live market data on-device — Fibenchi acts purely as the config plane
 - **Settings** — Configurable chart type, default period, indicator visibility, compact mode, decimal places, theme (dark/light/system)
 - **Dark mode** — Toggle between light, dark, and system themes
 
@@ -27,6 +29,7 @@ A self-hosted investment research dashboard for tracking stocks, ETFs, and custo
 |----------|------------|
 | Backend  | Python 3.12, FastAPI, SQLAlchemy (async), PostgreSQL, APScheduler |
 | Frontend | React 19, TypeScript, TanStack React Query, Tailwind CSS, shadcn/ui |
+| Mobile   | React Native + Expo (separate `fibenchi-app` repo) |
 | Charts   | lightweight-charts v5 |
 | Data     | Yahoo Finance via yahooquery |
 | Infra    | Docker Compose, GitHub Actions CI/CD, GHCR |
