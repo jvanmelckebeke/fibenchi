@@ -72,7 +72,7 @@ function NewThesisForm({
   const createThesis = useCreateThesis()
   const [name, setName] = useState(initialName ?? "")
   const [color, setColor] = useState(DEFAULT_THESIS_COLOR)
-  const [icon, setIcon] = useState("lightbulb")
+  const [icon, setIcon] = useState("briefcase")
   const [status, setStatus] = useState<ThesisStatus>("watching")
   const [openedAt, setOpenedAt] = useState(todayISO())
   const [description, setDescription] = useState("")

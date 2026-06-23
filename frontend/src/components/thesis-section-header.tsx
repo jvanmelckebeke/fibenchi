@@ -49,7 +49,7 @@ export function ThesisSectionHeader({
   actions,
   contextActions,
 }: ThesisSectionHeaderProps) {
-  const ThesisIcon = resolveIcon(thesis.icon ?? "lightbulb")
+  const ThesisIcon = resolveIcon(thesis.icon ?? "briefcase")
   const agg = formatChangePct(thesis.aggregate_pct)
 
   const content = (

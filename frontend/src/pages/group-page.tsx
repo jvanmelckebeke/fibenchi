@@ -110,7 +110,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
       if (ts && ts.length > 0) {
         colors[a.symbol] = ts[0].color
         titles[a.symbol] = ts.map((t) => t.name).join(", ")
-        icons[a.symbol] = ts[0].icon ?? "lightbulb"
+        icons[a.symbol] = ts[0].icon ?? "briefcase"
       }
     }
 
