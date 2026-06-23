@@ -16,8 +16,14 @@ from app.models.thesis import Thesis, ThesisStatus
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.repositories.thesis_repo import ThesisRepository
-from app.services.compute.thesis import aggregate_return_pct
+from app.services.compute.thesis import aggregate_return_pct, aggregate_return_series
 from app.services.entity_lookups import get_thesis
+from app.utils import TTLCache
+
+# Batch per-thesis performance curves (for the all-theses sparklines). Keyed by a
+# signature of every thesis (id, open date, member set) + latest price date, so it
+# auto-invalidates on price sync, membership changes, or an open-date edit.
+_thesis_perf_cache: TTLCache = TTLCache(default_ttl=600)
 
 
 async def _compute_aggregate(db: AsyncSession, thesis: Thesis) -> float | None:
@@ -49,6 +55,55 @@ async def list_theses(db: AsyncSession):
     for thesis in theses:
         await _attach_aggregate(db, thesis)
     return theses
+
+
+async def list_thesis_performance(db: AsyncSession) -> list[dict]:
+    """Equal-weight performance curve per thesis, for the all-theses sparklines.
+
+    Returns ``[{"thesis_id": int, "points": [{"date", "pct"}, ...]}, ...]``. Loads
+    every member's prices in a single query (anchored to the earliest open date),
+    then slices per thesis. Cached — see ``_thesis_perf_cache``.
+    """
+    theses = await ThesisRepository(db).list_all()
+    if not theses:
+        return []
+
+    all_ids = sorted({a.id for t in theses for a in t.assets})
+    if not all_ids:
+        return [{"thesis_id": t.id, "points": []} for t in theses]
+
+    price_repo = PriceRepository(db)
+    latest_date = await price_repo.get_latest_date(all_ids)
+    cache_key = (
+        frozenset(
+            (t.id, t.opened_at.isoformat(), frozenset(a.id for a in t.assets))
+            for t in theses
+        ),
+        latest_date,
+    )
+    cached = _thesis_perf_cache.get_value(cache_key)
+    if cached is not None:
+        return cached
+
+    rows = await price_repo.list_by_assets_since(all_ids, min(t.opened_at for t in theses))
+    by_asset: dict[int, list[tuple[date, float]]] = defaultdict(list)
+    for p in rows:  # rows arrive ordered by (asset_id, date) → ascending per asset
+        by_asset[p.asset_id].append((p.date, p.close))
+
+    out = [
+        {
+            "thesis_id": t.id,
+            "points": aggregate_return_series(
+                [
+                    [(d, c) for d, c in by_asset.get(a.id, []) if d >= t.opened_at]
+                    for a in t.assets
+                ]
+            ),
+        }
+        for t in theses
+    ]
+    _thesis_perf_cache.set_value(cache_key, out)
+    return out
 
 
 async def get_thesis_detail(db: AsyncSession, thesis_id: int):

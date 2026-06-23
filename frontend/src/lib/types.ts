@@ -158,6 +158,16 @@ export interface ThesisUpdate {
   opened_at?: string
 }
 
+export interface ThesisPerformancePoint {
+  date: string
+  pct: number
+}
+
+export interface ThesisPerformanceSeries {
+  thesis_id: number
+  points: ThesisPerformancePoint[]
+}
+
 export interface SyncResult {
   symbol: string
   synced: number

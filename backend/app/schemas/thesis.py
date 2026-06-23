@@ -64,3 +64,16 @@ class ThesisResponse(BaseModel):
     )
 
     model_config = {"from_attributes": True}
+
+
+class ThesisPerformancePoint(BaseModel):
+    date: datetime.date = Field(description="Date of the point")
+    pct: float = Field(description="Equal-weight return since opened_at, in percent")
+
+
+class ThesisPerformanceSeries(BaseModel):
+    thesis_id: int = Field(description="Thesis ID")
+    points: list[ThesisPerformancePoint] = Field(
+        default=[],
+        description="Downsampled equal-weight performance curve since opened_at (for sparklines)",
+    )

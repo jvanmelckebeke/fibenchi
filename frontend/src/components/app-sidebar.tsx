@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { LayoutDashboard, LineChart, Settings } from "lucide-react"
+import { LayoutDashboard, Lightbulb, LineChart, Settings } from "lucide-react"
 import { useQuoteStatus } from "@/lib/quote-stream"
 import { GroupsSection } from "@/components/groups-section"
 import {
@@ -18,6 +18,7 @@ import {
 const topNavItems = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/pseudo-etfs", label: "Pseudo-ETFs", icon: LineChart },
+  { to: "/theses", label: "Theses", icon: Lightbulb },
 ]
 
 const STATUS_CONFIG = {

@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react"
 import { Pencil, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Asset, Group, IndicatorSummary, Quote, Thesis, ThesisStatus } from "@/lib/api"
+import type { Asset, Group, IndicatorSummary, Quote, Thesis } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
-import { formatChangePct, formatDateLong, readableTextColor } from "@/lib/format"
-import { resolveIcon } from "@/lib/icon-utils"
 import { useIndicators } from "@/lib/queries"
-import { GroupTable } from "@/components/group-table"
+import { GroupTable, type RowMenuRenderer } from "@/components/group-table"
+import { AssetContextMenuContent } from "@/components/asset-context-menu"
 import { NewThesisDialog } from "@/components/new-thesis-dialog"
 import { EditThesisDialog } from "@/components/edit-thesis-dialog"
+import { ThesisSectionHeader } from "@/components/thesis-section-header"
 
 interface ThesisGroupedTableProps {
   groupId: number
@@ -23,21 +23,6 @@ interface ThesisGroupedTableProps {
   sortBy?: GroupSortBy
   sortDir?: SortDir
   onSort?: (key: GroupSortBy) => void
-}
-
-const STATUS_STYLES: Record<ThesisStatus, { label: string; className: string }> = {
-  live: { label: "Live", className: "bg-emerald-500/15 text-emerald-500" },
-  watching: { label: "Watching", className: "bg-amber-500/15 text-amber-500" },
-  played_out: { label: "Played out", className: "bg-muted text-muted-foreground" },
-}
-
-function StatusBadge({ status }: { status: ThesisStatus }) {
-  const s = STATUS_STYLES[status] ?? STATUS_STYLES.watching
-  return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${s.className}`}>
-      {s.label}
-    </span>
-  )
 }
 
 export function ThesisGroupedTable({
@@ -133,8 +118,21 @@ export function ThesisGroupedTable({
     [elsewhereIndicators, indicators],
   )
 
+  // These sections live inside the current group, so rows keep the group-scoped
+  // menu (built from this view's groupId/onDelete).
+  const renderContextMenu: RowMenuRenderer = ({ asset, openEdit, openNewThesis }) => (
+    <AssetContextMenuContent
+      groupId={groupId}
+      assetId={asset.id}
+      symbol={asset.symbol}
+      onEdit={openEdit}
+      onNewThesis={openNewThesis}
+      onRemove={() => onDelete(asset.symbol)}
+    />
+  )
+
   const passthrough = {
-    groupId, quotes, indicators: mergedIndicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort,
+    quotes, indicators: mergedIndicators, compactMode, onHover, sortBy, sortDir, onSort, renderContextMenu,
   }
 
   return (
@@ -155,7 +153,6 @@ export function ThesisGroupedTable({
         const elsewhereGroups = [
           ...new Set(elsewhere.flatMap((m) => otherGroupNamesById.get(m.id) ?? [])),
         ]
-        const agg = formatChangePct(thesis.aggregate_pct)
         const elsewhereAssets = elsewhere
           .map((m) => assetsById.get(m.id))
           .filter((a): a is Asset => a != null)
@@ -165,37 +162,22 @@ export function ThesisGroupedTable({
             {elsewhereGroups.length > 0 && <> in {elsewhereGroups.join(", ")}</>}
           </>
         )
-        const ThesisIcon = resolveIcon(thesis.icon ?? "lightbulb")
         return (
           <section key={thesis.id} className="space-y-2">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
-                style={{ backgroundColor: thesis.color }}
-                aria-hidden
-              >
-                <ThesisIcon className="h-4 w-4" style={{ color: readableTextColor(thesis.color) }} />
-              </span>
-              <h3 className="font-semibold">{thesis.name}</h3>
-              <StatusBadge status={thesis.status} />
-              <span className="text-xs text-muted-foreground">
-                opened {formatDateLong(thesis.opened_at)}
-              </span>
-              {agg.text && (
-                <span className={`text-sm font-medium ${agg.className}`} title="Equal-weight return since opened, across all members (including any in other groups)">
-                  {agg.text}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => setEditThesis(thesis)}
-                className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
-                title="Edit thesis"
-                aria-label={`Edit ${thesis.name}`}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            <ThesisSectionHeader
+              thesis={thesis}
+              actions={
+                <button
+                  type="button"
+                  onClick={() => setEditThesis(thesis)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  title="Edit thesis"
+                  aria-label={`Edit ${thesis.name}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
 
             <GroupTable
               assets={inGroup}

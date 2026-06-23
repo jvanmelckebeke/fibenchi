@@ -10,17 +10,18 @@ const noop = () => {}
 
 import { SortableHeader } from "./sortable-header"
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
-import { TableRow } from "./table-row"
+import { TableRow, type RowMenuRenderer } from "./table-row"
+export type { RowMenuContext, RowMenuRenderer } from "./table-row"
 import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden } from "./shared"
 import { useColumnResize } from "./use-column-resize"
 
 
 interface GroupTableProps {
-  groupId: number
   assets: Asset[]
   quotes: Record<string, Quote>
   indicators?: Record<string, IndicatorSummary>
-  onDelete: (symbol: string) => void
+  /** Caller-supplied row context menu (group-scoped, thesis-scoped, or none). */
+  renderContextMenu?: RowMenuRenderer
   compactMode: boolean
   onHover?: (symbol: string) => void
   sortBy?: GroupSortBy
@@ -49,7 +50,7 @@ interface GroupTableProps {
   accentIcons?: Record<string, string>
 }
 
-export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles, accentIcons }: GroupTableProps) {
+export function GroupTable({ assets, quotes, indicators, renderContextMenu, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles, accentIcons }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
   const [internalMoreOpen, setInternalMoreOpen] = useState(false)
   const moreOpenState = moreOpen ?? internalMoreOpen
@@ -95,18 +96,17 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
   const renderRow = (asset: Asset, keyPrefix = "") => (
     <TableRow
       key={`${keyPrefix}${asset.id}`}
-      groupId={groupId}
       asset={asset}
       quote={quotes[asset.symbol]}
       indicator={indicators?.[asset.symbol]}
       expanded={expandedSymbols.has(asset.symbol)}
       onToggle={toggleExpand}
-      onDelete={onDelete}
       onHover={onHover ?? noop}
       compactMode={compactMode}
       columnSettings={columnSettings}
       visibleIndicatorFields={visibleIndicatorFields}
       totalColSpan={totalColSpan}
+      renderContextMenu={renderContextMenu}
       accent={accentColors?.[asset.symbol]}
       accentTitle={accentTitles?.[asset.symbol]}
       accentIcon={accentIcons?.[asset.symbol]}
