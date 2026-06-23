@@ -79,7 +79,7 @@ export function ThesisSectionHeader({
       {agg.text && (
         <span
           className={`text-sm font-medium ${agg.className}`}
-          title="Equal-weight return since opened, across all members"
+          title="Equal-weight return of all members since the thesis opened (some may be in other groups or not shown)"
         >
           {agg.text}
         </span>

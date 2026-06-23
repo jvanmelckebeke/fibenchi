@@ -1,7 +1,6 @@
 import { FolderPlus, Pencil, Trash2 } from "lucide-react"
-import { resolveIcon } from "@/lib/icon-utils"
 import { ContextActionsContent, type ContextAction } from "@/components/context-actionable"
-import { useThesisMembershipAction } from "@/components/thesis-membership-action"
+import { useThesisMembershipAction, groupTargetActions } from "@/components/menu-actions"
 import { useGroups, useAddAssetsToGroup, useRemoveAssetFromThesis } from "@/lib/queries"
 
 interface ThesisMemberContextMenuContentProps {
@@ -30,19 +29,13 @@ export function ThesisMemberContextMenuContent({
   const thesisAction = useThesisMembershipAction(assetId, onNewThesis)
   const groupList = groups ?? []
 
-  const isInGroup = (g: { assets: { id: number }[] }) => g.assets.some((a) => a.id === assetId)
-
   const actions: ContextAction[] = [
     {
       label: "Add to group",
       icon: FolderPlus,
-      items: groupList.map((g): ContextAction => ({
-        label: g.name,
-        icon: resolveIcon(g.icon),
-        disabled: isInGroup(g),
-        hint: isInGroup(g) ? `${symbol} already in group` : undefined,
-        action: () => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] }),
-      })),
+      items: groupTargetActions(groupList, assetId, symbol, (gid) =>
+        addToGroup.mutate({ groupId: gid, assetIds: [assetId] }),
+      ),
     },
     thesisAction,
     { label: "Edit asset…", icon: Pencil, action: onEdit, separatorBefore: true },

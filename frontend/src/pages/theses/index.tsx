@@ -5,6 +5,7 @@ import { useTheses, useThesesPerformance, useGroups, useIndicators } from "@/lib
 import { useQuotes } from "@/lib/quote-stream"
 import { useSettings } from "@/lib/settings"
 import type { Asset, Thesis, ThesisPerformancePoint } from "@/lib/api"
+import { buildAssetsById } from "@/lib/assets"
 import { GroupTable } from "@/components/group-table"
 import { ThesisSectionHeader } from "@/components/thesis-section-header"
 import { ThesisMemberContextMenuContent } from "@/components/thesis-member-context-menu"
@@ -24,11 +25,7 @@ export function ThesesPage() {
 
   // Thesis members only carry id/symbol/name; resolve them to full Asset objects
   // (sourced from every group) so we can render the rich GroupTable rows.
-  const assetsById = useMemo(() => {
-    const map = new Map<number, Asset>()
-    for (const g of groups ?? []) for (const a of g.assets) if (!map.has(a.id)) map.set(a.id, a)
-    return map
-  }, [groups])
+  const assetsById = useMemo(() => buildAssetsById(groups ?? []), [groups])
 
   const perfById = useMemo(() => {
     const map = new Map<number, ThesisPerformancePoint[]>()

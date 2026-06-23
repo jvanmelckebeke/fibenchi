@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { Pencil, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Group, IndicatorSummary, Quote, Thesis } from "@/lib/api"
+import { buildAssetsById } from "@/lib/assets"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { useIndicators } from "@/lib/queries"
 import { GroupTable, type RowMenuRenderer } from "@/components/group-table"
@@ -45,15 +46,7 @@ export function ThesisGroupedTable({
   // Full Asset objects keyed by id, sourced from every group. Lets the "elsewhere"
   // fold render the same rich GroupTable rows (price/change/indicators) as the
   // in-group section — thesis members only carry id/symbol/name.
-  const assetsById = useMemo(() => {
-    const map = new Map<number, Asset>()
-    for (const g of allGroups) {
-      for (const a of g.assets) {
-        if (!map.has(a.id)) map.set(a.id, a)
-      }
-    }
-    return map
-  }, [allGroups])
+  const assetsById = useMemo(() => buildAssetsById(allGroups), [allGroups])
 
   // Which other groups (by name) contain each asset — for the "+N more in [group]" fold.
   const otherGroupNamesById = useMemo(() => {

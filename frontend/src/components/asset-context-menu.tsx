@@ -1,7 +1,7 @@
 import { ArrowRightLeft, Copy, Pencil, Trash2 } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { ContextActionsContent, type ContextAction } from "@/components/context-actionable"
-import { useThesisMembershipAction } from "@/components/thesis-membership-action"
+import { useThesisMembershipAction, groupTargetActions } from "@/components/menu-actions"
 import { useGroups, useAddAssetsToGroup, useRemoveAssetFromGroup } from "@/lib/queries"
 
 interface AssetContextMenuContentProps {
@@ -28,7 +28,6 @@ export function AssetContextMenuContent({
   const thesisAction = useThesisMembershipAction(assetId, onNewThesis)
 
   const otherGroups = groups?.filter((g) => g.id !== groupId) ?? []
-  const isInGroup = (g: { assets: { id: number }[] }) => g.assets.some((a) => a.id === assetId)
 
   const groupActions: ContextAction[] =
     otherGroups.length > 0
@@ -48,13 +47,9 @@ export function AssetContextMenuContent({
           {
             label: "Copy to group",
             icon: Copy,
-            items: otherGroups.map((g): ContextAction => ({
-              label: g.name,
-              icon: resolveIcon(g.icon),
-              disabled: isInGroup(g),
-              hint: isInGroup(g) ? `${symbol} already in group` : undefined,
-              action: () => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] }),
-            })),
+            items: groupTargetActions(otherGroups, assetId, symbol, (gid) =>
+              addToGroup.mutate({ groupId: gid, assetIds: [assetId] }),
+            ),
           },
         ]
       : []

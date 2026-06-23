@@ -61,7 +61,7 @@ function renderItems(actions: ContextAction[]): ReactNode {
 
     if (isSubmenu(a)) {
       return (
-        <Fragment key={a.label}>
+        <Fragment key={`${a.label}-${i}`}>
           {sep}
           <ContextMenuSub>
             <ContextMenuSubTrigger disabled={a.disabled} className="gap-2">
@@ -82,7 +82,7 @@ function renderItems(actions: ContextAction[]): ReactNode {
 
     if (isCheckbox(a)) {
       return (
-        <Fragment key={a.label}>
+        <Fragment key={`${a.label}-${i}`}>
           {sep}
           <ContextMenuCheckboxItem
             checked={a.checked}

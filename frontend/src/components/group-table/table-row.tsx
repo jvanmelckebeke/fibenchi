@@ -129,9 +129,13 @@ export const TableRow = memo(function TableRow({
   // resolveIcon returns stable refs from lucide's static icon map.
   const AccentIcon = resolveIcon(accentIcon)
 
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
+  const menu = renderContextMenu?.({
+    asset,
+    openEdit: () => setEditOpen(true),
+    openNewThesis: () => setNewThesisOpen(true),
+  })
+
+  const row = (
         <tr
           className="border-b border-border hover:bg-muted/30 data-[state=open]:bg-muted/30 cursor-pointer group transition-colors"
           onClick={handleToggle}
@@ -298,12 +302,18 @@ export const TableRow = memo(function TableRow({
             )
           })}
         </tr>
-      </ContextMenuTrigger>
-      {renderContextMenu?.({
-        asset,
-        openEdit: () => setEditOpen(true),
-        openNewThesis: () => setNewThesisOpen(true),
-      })}
+  )
+
+  return (
+    <>
+      {menu ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+          {menu}
+        </ContextMenu>
+      ) : (
+        row
+      )}
       <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
       <NewThesisDialog
         open={newThesisOpen}
@@ -319,6 +329,6 @@ export const TableRow = memo(function TableRow({
           </td>
         </tr>
       )}
-    </ContextMenu>
+    </>
   )
 })
