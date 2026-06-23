@@ -1,15 +1,8 @@
 import { ArrowRightLeft, Copy, Pencil, Trash2 } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
-import {
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-} from "@/components/ui/context-menu"
+import { ContextActionsContent, type ContextAction } from "@/components/context-actionable"
+import { useThesisMembershipAction } from "@/components/thesis-membership-action"
 import { useGroups, useAddAssetsToGroup, useRemoveAssetFromGroup } from "@/lib/queries"
-import { ThesisMembershipSubmenu } from "@/components/thesis-membership-submenu"
 
 interface AssetContextMenuContentProps {
   groupId: number
@@ -20,6 +13,7 @@ interface AssetContextMenuContentProps {
   onNewThesis: () => void
 }
 
+/** Group-scoped row menu: move/copy between groups, toggle theses, edit, remove. */
 export function AssetContextMenuContent({
   groupId,
   assetId,
@@ -31,83 +25,52 @@ export function AssetContextMenuContent({
   const { data: groups } = useGroups()
   const addToGroup = useAddAssetsToGroup()
   const removeFromGroup = useRemoveAssetFromGroup()
+  const thesisAction = useThesisMembershipAction(assetId, onNewThesis)
 
   const otherGroups = groups?.filter((g) => g.id !== groupId) ?? []
+  const isInGroup = (g: { assets: { id: number }[] }) => g.assets.some((a) => a.id === assetId)
 
-  const handleMove = (targetGroupId: number) => {
-    removeFromGroup.mutate({ groupId, assetId })
-    addToGroup.mutate({ groupId: targetGroupId, assetIds: [assetId] })
-  }
+  const groupActions: ContextAction[] =
+    otherGroups.length > 0
+      ? [
+          {
+            label: "Move to group",
+            icon: ArrowRightLeft,
+            items: otherGroups.map((g): ContextAction => ({
+              label: g.name,
+              icon: resolveIcon(g.icon),
+              action: () => {
+                removeFromGroup.mutate({ groupId, assetId })
+                addToGroup.mutate({ groupId: g.id, assetIds: [assetId] })
+              },
+            })),
+          },
+          {
+            label: "Copy to group",
+            icon: Copy,
+            items: otherGroups.map((g): ContextAction => ({
+              label: g.name,
+              icon: resolveIcon(g.icon),
+              disabled: isInGroup(g),
+              hint: isInGroup(g) ? `${symbol} already in group` : undefined,
+              action: () => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] }),
+            })),
+          },
+        ]
+      : []
 
-  const handleCopy = (targetGroupId: number) => {
-    addToGroup.mutate({ groupId: targetGroupId, assetIds: [assetId] })
-  }
+  const actions: ContextAction[] = [
+    ...groupActions,
+    { ...thesisAction, separatorBefore: otherGroups.length > 0 },
+    { label: "Edit asset…", icon: Pencil, action: onEdit, separatorBefore: true },
+    {
+      label: "Remove from group",
+      icon: Trash2,
+      action: onRemove,
+      destructive: true,
+      separatorBefore: true,
+    },
+  ]
 
-  const isInGroup = (group: { assets: { id: number }[] }) =>
-    group.assets.some((a) => a.id === assetId)
-
-  return (
-    <ContextMenuContent>
-      {otherGroups.length > 0 && (
-        <>
-          <ContextMenuSub>
-            <ContextMenuSubTrigger className="gap-2">
-              <ArrowRightLeft className="h-4 w-4" />
-              Move to group
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              {otherGroups.map((g) => {
-                const Icon = resolveIcon(g.icon)
-                return (
-                  <ContextMenuItem key={g.id} onClick={() => handleMove(g.id)}>
-                    <Icon className="h-4 w-4" />
-                    {g.name}
-                  </ContextMenuItem>
-                )
-              })}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-          <ContextMenuSub>
-            <ContextMenuSubTrigger className="gap-2">
-              <Copy className="h-4 w-4" />
-              Copy to group
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              {otherGroups.map((g) => {
-                const alreadyIn = isInGroup(g)
-                const Icon = resolveIcon(g.icon)
-                return (
-                  <ContextMenuItem
-                    key={g.id}
-                    disabled={alreadyIn}
-                    onClick={() => handleCopy(g.id)}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {g.name}
-                    {alreadyIn && (
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {symbol} already in group
-                      </span>
-                    )}
-                  </ContextMenuItem>
-                )
-              })}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-          <ContextMenuSeparator />
-        </>
-      )}
-      <ThesisMembershipSubmenu assetId={assetId} onNewThesis={onNewThesis} />
-      <ContextMenuSeparator />
-      <ContextMenuItem onClick={onEdit}>
-        <Pencil className="h-4 w-4" />
-        Edit asset…
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem variant="destructive" onClick={onRemove}>
-        <Trash2 className="h-4 w-4" />
-        Remove from group
-      </ContextMenuItem>
-    </ContextMenuContent>
-  )
+  return <ContextActionsContent actions={actions} />
 }

@@ -1,15 +1,8 @@
 import { FolderPlus, Pencil, Trash2 } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
-import {
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-} from "@/components/ui/context-menu"
+import { ContextActionsContent, type ContextAction } from "@/components/context-actionable"
+import { useThesisMembershipAction } from "@/components/thesis-membership-action"
 import { useGroups, useAddAssetsToGroup, useRemoveAssetFromThesis } from "@/lib/queries"
-import { ThesisMembershipSubmenu } from "@/components/thesis-membership-submenu"
 
 interface ThesisMemberContextMenuContentProps {
   thesisId: number
@@ -20,9 +13,9 @@ interface ThesisMemberContextMenuContentProps {
 }
 
 /**
- * Row context menu for the all-theses page, where there is no single "current
- * group". Unlike the group menu it offers "Add to group" (not Move/Copy/Remove)
- * and a destructive "Remove from this thesis" instead of "Remove from group".
+ * Row menu for the all-theses page, where there is no single "current group".
+ * Offers "Add to group" (not Move/Copy/Remove) and a destructive "Remove from
+ * this thesis".
  */
 export function ThesisMemberContextMenuContent({
   thesisId,
@@ -34,54 +27,33 @@ export function ThesisMemberContextMenuContent({
   const { data: groups } = useGroups()
   const addToGroup = useAddAssetsToGroup()
   const removeFromThesis = useRemoveAssetFromThesis()
+  const thesisAction = useThesisMembershipAction(assetId, onNewThesis)
   const groupList = groups ?? []
 
-  const isInGroup = (group: { assets: { id: number }[] }) =>
-    group.assets.some((a) => a.id === assetId)
+  const isInGroup = (g: { assets: { id: number }[] }) => g.assets.some((a) => a.id === assetId)
 
-  return (
-    <ContextMenuContent>
-      <ContextMenuSub>
-        <ContextMenuSubTrigger className="gap-2">
-          <FolderPlus className="h-4 w-4" />
-          Add to group
-        </ContextMenuSubTrigger>
-        <ContextMenuSubContent>
-          {groupList.map((g) => {
-            const alreadyIn = isInGroup(g)
-            const Icon = resolveIcon(g.icon)
-            return (
-              <ContextMenuItem
-                key={g.id}
-                disabled={alreadyIn}
-                onClick={() => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] })}
-              >
-                <Icon className="h-4 w-4" />
-                {g.name}
-                {alreadyIn && (
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {symbol} already in group
-                  </span>
-                )}
-              </ContextMenuItem>
-            )
-          })}
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <ThesisMembershipSubmenu assetId={assetId} onNewThesis={onNewThesis} />
-      <ContextMenuSeparator />
-      <ContextMenuItem onClick={onEdit}>
-        <Pencil className="h-4 w-4" />
-        Edit asset…
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem
-        variant="destructive"
-        onClick={() => removeFromThesis.mutate({ thesisId, assetId })}
-      >
-        <Trash2 className="h-4 w-4" />
-        Remove from this thesis
-      </ContextMenuItem>
-    </ContextMenuContent>
-  )
+  const actions: ContextAction[] = [
+    {
+      label: "Add to group",
+      icon: FolderPlus,
+      items: groupList.map((g): ContextAction => ({
+        label: g.name,
+        icon: resolveIcon(g.icon),
+        disabled: isInGroup(g),
+        hint: isInGroup(g) ? `${symbol} already in group` : undefined,
+        action: () => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] }),
+      })),
+    },
+    thesisAction,
+    { label: "Edit asset…", icon: Pencil, action: onEdit, separatorBefore: true },
+    {
+      label: "Remove from this thesis",
+      icon: Trash2,
+      action: () => removeFromThesis.mutate({ thesisId, assetId }),
+      destructive: true,
+      separatorBefore: true,
+    },
+  ]
+
+  return <ContextActionsContent actions={actions} />
 }
