@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react"
 import { ChevronsDownUp, ChevronsUpDown, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu"
 import { useTheses, useThesesPerformance, useGroups, useIndicators } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { useSettings } from "@/lib/settings"
@@ -146,14 +145,9 @@ export function ThesesPage() {
                   onToggle={() => toggle(thesis.id)}
                   memberCount={thesis.assets.length}
                   performance={perfById.get(thesis.id)}
-                  contextMenu={
-                    <ContextMenuContent>
-                      <ContextMenuItem onClick={() => setEditThesis(thesis)}>
-                        <Pencil className="h-4 w-4" />
-                        Edit thesis…
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  }
+                  contextActions={[
+                    { label: "Edit thesis…", action: () => setEditThesis(thesis), icon: Pencil },
+                  ]}
                   actions={
                     <button
                       type="button"

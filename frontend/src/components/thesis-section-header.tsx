@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react"
 import type { Thesis, ThesisStatus, ThesisPerformancePoint } from "@/lib/api"
 import { formatChangePct, formatDateLong, readableTextColor } from "@/lib/format"
 import { resolveIcon } from "@/lib/icon-utils"
-import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
+import { ContextActionable, type ContextAction } from "@/components/context-actionable"
 import { MiniSparkline } from "@/components/mini-sparkline"
 
 const STATUS_STYLES: Record<ThesisStatus, { label: string; className: string }> = {
@@ -30,8 +30,8 @@ interface ThesisSectionHeaderProps {
   performance?: ThesisPerformancePoint[]
   /** Trailing actions (e.g. an edit button) — rendered outside the toggle button. */
   actions?: ReactNode
-  /** Right-click menu for the header (a `ContextMenuContent`). */
-  contextMenu?: ReactNode
+  /** Right-click actions for the header (generated into a context menu). */
+  contextActions?: ContextAction[]
 }
 
 /**
@@ -47,7 +47,7 @@ export function ThesisSectionHeader({
   memberCount,
   performance,
   actions,
-  contextMenu,
+  contextActions,
 }: ThesisSectionHeaderProps) {
   const ThesisIcon = resolveIcon(thesis.icon ?? "lightbulb")
   const agg = formatChangePct(thesis.aggregate_pct)
@@ -108,12 +108,5 @@ export function ThesisSectionHeader({
     </div>
   )
 
-  if (!contextMenu) return header
-
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{header}</ContextMenuTrigger>
-      {contextMenu}
-    </ContextMenu>
-  )
+  return <ContextActionable actions={contextActions}>{header}</ContextActionable>
 }
