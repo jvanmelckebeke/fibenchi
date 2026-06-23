@@ -99,3 +99,28 @@ def test_series_downsample_caps_and_keeps_ends():
     assert pts[0]["date"] == "2026-01-01"
     assert pts[-1]["date"] == (date(2026, 1, 1) + timedelta(days=199)).isoformat()
     assert pts[-1]["pct"] == 199.0   # 100 -> 299 = +199%
+
+
+def test_series_last_point_equals_aggregate():
+    # Contract: the headline aggregate == the curve's final point. Both project the
+    # same _anchored normalisation, so this guards against future drift between them.
+    cases: list[list[list[tuple[date, float]]]] = [
+        [  # two members, different last dates
+            [(date(2026, 3, 1), 100.0), (date(2026, 3, 10), 120.0)],
+            [(date(2026, 3, 1), 100.0), (date(2026, 3, 20), 110.0)],
+        ],
+        [[(date(2026, 3, 1), 100.0), (date(2026, 3, 5), 90.0), (date(2026, 3, 9), 130.0)]],
+        [  # disjoint ranges + a zero-open member that must be excluded
+            [(date(2026, 3, 1), 50.0), (date(2026, 3, 4), 75.0)],
+            [(date(2026, 4, 1), 100.0), (date(2026, 4, 9), 130.0)],
+            [(date(2026, 3, 1), 0.0), (date(2026, 3, 9), 5.0)],
+        ],
+        [],  # empty → no contribution
+    ]
+    for dated in cases:
+        series = aggregate_return_series(dated)
+        agg = aggregate_return_pct([[c for _, c in m] for m in dated])
+        if not series:
+            assert agg is None
+        else:
+            assert series[-1]["pct"] == agg

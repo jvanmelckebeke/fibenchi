@@ -12,26 +12,36 @@ from typing import cast
 import pandas as pd
 
 
+def _anchored(closes: list[float]) -> list[float] | None:
+    """Normalise one member's closes to returns vs its first (open-anchor) close.
+
+    ``[c / first - 1 for c in closes]`` where ``first`` is the close on/nearest
+    after the open. Returns ``None`` when the member is excluded — no prices, or a
+    zero/missing opening close. The single source of truth for the anchoring +
+    exclusion rules shared by the headline aggregate and the curve, so the two
+    can't drift.
+    """
+    if not closes:
+        return None
+    first = closes[0]
+    if not first:
+        return None
+    return [c / first - 1.0 for c in closes]
+
+
 def aggregate_return_pct(member_closes: list[list[float]]) -> float | None:
     """Equal-weight mean return since the open, in percent (2 dp).
 
-    Each element is one member's close prices on/after the thesis open date,
-    ordered by date. Per-member return = ``last / first - 1`` where ``first`` is
-    the close on (or nearest after) the open date. Members with no prices, or a
-    zero/missing opening close, are excluded. Returns ``None`` when no member
-    contributes a return (e.g. an empty thesis or no price data since the open).
+    The headline number: the mean of each member's *final* return since the open.
+    Equals the last point of :func:`aggregate_return_series` for the same members
+    (both project the same :func:`_anchored` normalisation). Members with no prices
+    or a zero/missing opening close are excluded; returns ``None`` when none
+    contribute.
     """
-    returns: list[float] = []
-    for closes in member_closes:
-        if not closes:
-            continue
-        first = closes[0]
-        if not first:
-            continue
-        returns.append(closes[-1] / first - 1.0)
-    if not returns:
+    finals = [norm[-1] for closes in member_closes if (norm := _anchored(closes)) is not None]
+    if not finals:
         return None
-    return round(sum(returns) / len(returns) * 100.0, 2)
+    return round(sum(finals) / len(finals) * 100.0, 2)
 
 
 def _downsample(points: list[tuple], max_points: int) -> list[tuple]:
@@ -66,13 +76,11 @@ def aggregate_return_series(
     """
     columns: list[pd.Series] = []
     for closes in closes_by_member:
-        if not closes:
-            continue
-        first = closes[0][1]
-        if not first:
+        norm = _anchored([c for _, c in closes])
+        if norm is None:
             continue
         idx = pd.DatetimeIndex([d for d, _ in closes])
-        columns.append(pd.Series([c / first - 1.0 for _, c in closes], index=idx))
+        columns.append(pd.Series(norm, index=idx))
     if not columns:
         return []
 

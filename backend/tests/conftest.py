@@ -102,6 +102,16 @@ async def setup_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
+@pytest.fixture(autouse=True)
+def _clear_thesis_perf_cache():
+    """The thesis-performance TTLCache is module-level and outlives the per-test
+    in-memory DB (whose ids reset each test); clear it so one test can't read a
+    colliding cache key written by another."""
+    from app.services import thesis_service
+    thesis_service._thesis_perf_cache.clear()
+    yield
+
+
 @pytest.fixture
 async def db():
     async with TestSession() as session:

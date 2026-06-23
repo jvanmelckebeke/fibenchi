@@ -50,30 +50,20 @@ async def _attach_aggregate(db: AsyncSession, thesis: Thesis) -> Thesis:
     return thesis
 
 
-async def list_theses(db: AsyncSession):
-    theses = await ThesisRepository(db).list_all()
-    for thesis in theses:
-        await _attach_aggregate(db, thesis)
-    return theses
+async def _batch_thesis_curves(db: AsyncSession, theses: list[Thesis]) -> dict[int, list[dict]]:
+    """Per-thesis performance curve (``thesis_id -> points``), batch-loaded once + cached.
 
-
-async def list_thesis_performance(db: AsyncSession) -> list[dict]:
-    """Equal-weight performance curve per thesis, for the all-theses sparklines.
-
-    Returns ``[{"thesis_id": int, "points": [{"date", "pct"}, ...]}, ...]``. Loads
-    every member's prices in a single query (anchored to the earliest open date),
-    then slices per thesis. Cached — see ``_thesis_perf_cache``.
+    The single source of truth for both the sparkline curves and the headline
+    aggregate (a thesis's aggregate is its curve's last point — see
+    ``aggregate_return_pct``). Loads every member's prices in ONE query rather than
+    one round-trip per thesis.
     """
-    theses = await ThesisRepository(db).list_all()
     if not theses:
-        return []
+        return {}
 
     all_ids = sorted({a.id for t in theses for a in t.assets})
-    if not all_ids:
-        return [{"thesis_id": t.id, "points": []} for t in theses]
-
     price_repo = PriceRepository(db)
-    latest_date = await price_repo.get_latest_date(all_ids)
+    latest_date = await price_repo.get_latest_date(all_ids) if all_ids else None
     cache_key = (
         frozenset(
             (t.id, t.opened_at.isoformat(), frozenset(a.id for a in t.assets))
@@ -85,25 +75,42 @@ async def list_thesis_performance(db: AsyncSession) -> list[dict]:
     if cached is not None:
         return cached
 
-    rows = await price_repo.list_by_assets_since(all_ids, min(t.opened_at for t in theses))
     by_asset: dict[int, list[tuple[date, float]]] = defaultdict(list)
-    for p in rows:  # rows arrive ordered by (asset_id, date) → ascending per asset
-        by_asset[p.asset_id].append((p.date, p.close))
+    if all_ids:
+        rows = await price_repo.list_by_assets_since(all_ids, min(t.opened_at for t in theses))
+        for p in rows:  # rows arrive ordered by (asset_id, date) → ascending per asset
+            by_asset[p.asset_id].append((p.date, p.close))
 
-    out = [
-        {
-            "thesis_id": t.id,
-            "points": aggregate_return_series(
-                [
-                    [(d, c) for d, c in by_asset.get(a.id, []) if d >= t.opened_at]
-                    for a in t.assets
-                ]
-            ),
-        }
+    curves = {
+        t.id: aggregate_return_series(
+            [[(d, c) for d, c in by_asset.get(a.id, []) if d >= t.opened_at] for a in t.assets]
+        )
         for t in theses
-    ]
-    _thesis_perf_cache.set_value(cache_key, out)
-    return out
+    }
+    _thesis_perf_cache.set_value(cache_key, curves)
+    return curves
+
+
+async def list_theses(db: AsyncSession):
+    theses = await ThesisRepository(db).list_all()
+    curves = await _batch_thesis_curves(db, theses)
+    for thesis in theses:
+        points = curves.get(thesis.id) or []
+        # transient attr read by ThesisResponse.from_attributes; the headline is the
+        # curve's last point (provably equal to aggregate_return_pct — same anchor).
+        thesis.aggregate_pct = points[-1]["pct"] if points else None  # type: ignore[attr-defined]
+    return theses
+
+
+async def list_thesis_performance(db: AsyncSession) -> list[dict]:
+    """Equal-weight performance curve per thesis, for the all-theses sparklines.
+
+    ``[{"thesis_id": int, "points": [{"date", "pct"}, ...]}, ...]`` from the shared
+    batched + cached computation (see ``_batch_thesis_curves``).
+    """
+    theses = await ThesisRepository(db).list_all()
+    curves = await _batch_thesis_curves(db, theses)
+    return [{"thesis_id": t.id, "points": curves.get(t.id) or []} for t in theses]
 
 
 async def get_thesis_detail(db: AsyncSession, thesis_id: int):

@@ -160,11 +160,6 @@ async def test_aggregate_pct_equal_weight_since_opened_at(db, client):
 
 
 async def test_performance_endpoint_curve(db, client):
-    # The cache is module-level and the in-memory DB resets ids per test, so clear
-    # it to keep this test independent of suite ordering.
-    from app.services import thesis_service
-    thesis_service._thesis_perf_cache.clear()
-
     a = await _seed_asset_with_closes(db, "PPA", {date(2026, 3, 1): 100.0, date(2026, 3, 15): 120.0})
     b = await _seed_asset_with_closes(db, "PPB", {date(2026, 3, 1): 100.0, date(2026, 3, 20): 110.0})
     tid = (await client.post("/api/theses", json={"name": "Perf", "opened_at": "2026-03-01"})).json()["id"]
@@ -180,9 +175,6 @@ async def test_performance_endpoint_curve(db, client):
 
 
 async def test_performance_endpoint_empty_thesis(client):
-    from app.services import thesis_service
-    thesis_service._thesis_perf_cache.clear()
-
     tid = (await client.post("/api/theses", json={"name": "Hollow"})).json()["id"]
     resp = await client.get("/api/theses/performance")
     assert resp.status_code == 200
