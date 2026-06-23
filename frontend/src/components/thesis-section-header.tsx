@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react"
 import type { Thesis, ThesisStatus, ThesisPerformancePoint } from "@/lib/api"
 import { formatChangePct, formatDateLong, readableTextColor } from "@/lib/format"
 import { resolveIcon } from "@/lib/icon-utils"
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { MiniSparkline } from "@/components/mini-sparkline"
 
 const STATUS_STYLES: Record<ThesisStatus, { label: string; className: string }> = {
@@ -29,6 +30,8 @@ interface ThesisSectionHeaderProps {
   performance?: ThesisPerformancePoint[]
   /** Trailing actions (e.g. an edit button) — rendered outside the toggle button. */
   actions?: ReactNode
+  /** Right-click menu for the header (a `ContextMenuContent`). */
+  contextMenu?: ReactNode
 }
 
 /**
@@ -44,6 +47,7 @@ export function ThesisSectionHeader({
   memberCount,
   performance,
   actions,
+  contextMenu,
 }: ThesisSectionHeaderProps) {
   const ThesisIcon = resolveIcon(thesis.icon ?? "lightbulb")
   const agg = formatChangePct(thesis.aggregate_pct)
@@ -86,7 +90,7 @@ export function ThesisSectionHeader({
     </>
   )
 
-  return (
+  const header = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {onToggle ? (
         <button
@@ -102,5 +106,14 @@ export function ThesisSectionHeader({
       )}
       {actions && <div className="ml-auto shrink-0">{actions}</div>}
     </div>
+  )
+
+  if (!contextMenu) return header
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{header}</ContextMenuTrigger>
+      {contextMenu}
+    </ContextMenu>
   )
 }
