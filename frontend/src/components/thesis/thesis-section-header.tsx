@@ -1,8 +1,9 @@
 import type { ReactNode } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import type { Thesis, ThesisStatus, ThesisPerformancePoint } from "@/lib/api"
-import { formatChangePct, formatDateLong, readableTextColor } from "@/lib/format"
+import { formatDateLong, readableTextColor } from "@/lib/format"
 import { resolveIcon } from "@/lib/icon-utils"
+import { ChangePct } from "@/components/change-pct"
 import { ContextActionable, type ContextAction } from "@/components/context-menu/context-actionable"
 import { MiniSparkline } from "@/components/chart/mini-sparkline"
 
@@ -50,7 +51,6 @@ export function ThesisSectionHeader({
   contextActions,
 }: ThesisSectionHeaderProps) {
   const ThesisIcon = resolveIcon(thesis.icon ?? "briefcase")
-  const agg = formatChangePct(thesis.aggregate_pct)
 
   const content = (
     <>
@@ -76,13 +76,12 @@ export function ThesisSectionHeader({
         </span>
       )}
       <span className="text-xs text-muted-foreground">opened {formatDateLong(thesis.opened_at)}</span>
-      {agg.text && (
-        <span
-          className={`text-sm font-medium ${agg.className}`}
+      {thesis.aggregate_pct != null && (
+        <ChangePct
+          value={thesis.aggregate_pct}
+          className="text-sm font-medium"
           title="Equal-weight return of all members since the thesis opened (some may be in other groups or not shown)"
-        >
-          {agg.text}
-        </span>
+        />
       )}
       {performance && performance.length > 1 && (
         <MiniSparkline points={performance} className="ml-1 text-muted-foreground" />

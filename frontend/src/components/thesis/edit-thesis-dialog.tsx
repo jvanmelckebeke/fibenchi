@@ -1,33 +1,11 @@
 import { useState } from "react"
 import { Trash2 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { IconPicker } from "@/components/icon-picker"
+import { EntityDialog } from "@/components/entity-dialog"
+import { ThesisFormFields, type ThesisFormValues } from "@/components/thesis/thesis-form-fields"
 import { useUpdateThesis, useDeleteThesis } from "@/lib/queries"
-import { THESIS_PRESET_COLORS } from "@/lib/thesis-colors"
-import type { Thesis, ThesisStatus } from "@/lib/api"
-
-const STATUSES: { value: ThesisStatus; label: string }[] = [
-  { value: "watching", label: "Watching" },
-  { value: "live", label: "Live" },
-  { value: "played_out", label: "Played out" },
-]
+import type { Thesis } from "@/lib/api"
 
 interface EditThesisDialogProps {
   thesis: Thesis | null
@@ -37,38 +15,38 @@ interface EditThesisDialogProps {
 
 export function EditThesisDialog({ thesis, open, onOpenChange }: EditThesisDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        {thesis && (
-          <EditThesisForm key={thesis.id} thesis={thesis} onClose={() => onOpenChange(false)} />
-        )}
-      </DialogContent>
-    </Dialog>
+    <EntityDialog entity={thesis} open={open} onOpenChange={onOpenChange}>
+      {(thesis, close) => <EditThesisForm thesis={thesis} onClose={close} />}
+    </EntityDialog>
   )
 }
 
 function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => void }) {
   const updateThesis = useUpdateThesis(thesis.id)
   const deleteThesis = useDeleteThesis()
-  const [name, setName] = useState(thesis.name)
-  const [color, setColor] = useState(thesis.color)
-  const [icon, setIcon] = useState(thesis.icon ?? "briefcase")
-  const [status, setStatus] = useState<ThesisStatus>(thesis.status)
-  const [openedAt, setOpenedAt] = useState(thesis.opened_at)
-  const [description, setDescription] = useState(thesis.description ?? "")
+  const [values, setValues] = useState<ThesisFormValues>({
+    name: thesis.name,
+    color: thesis.color,
+    icon: thesis.icon ?? "briefcase",
+    status: thesis.status,
+    openedAt: thesis.opened_at,
+    description: thesis.description ?? "",
+  })
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const update: <K extends keyof ThesisFormValues>(key: K, value: ThesisFormValues[K]) => void =
+    (key, value) => setValues((v) => ({ ...v, [key]: value }))
 
   const handleSave = () => {
-    const trimmed = name.trim()
+    const trimmed = values.name.trim()
     if (!trimmed) return
     updateThesis.mutate(
       {
         name: trimmed,
-        color,
-        icon,
-        status,
-        opened_at: openedAt,
-        description: description.trim() || null,
+        color: values.color,
+        icon: values.icon,
+        status: values.status,
+        opened_at: values.openedAt,
+        description: values.description.trim() || null,
       },
       { onSuccess: onClose },
     )
@@ -87,69 +65,7 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
       <DialogHeader>
         <DialogTitle>Edit thesis</DialogTitle>
       </DialogHeader>
-      <div className="space-y-4 py-2">
-        <div className="space-y-2">
-          <Label htmlFor="edit-thesis-name">Name</Label>
-          <div className="flex gap-2">
-            <IconPicker value={icon} onChange={setIcon} />
-            <Input
-              id="edit-thesis-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="flex-1"
-              autoFocus
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Colour</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {THESIS_PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-label={`Colour ${c}`}
-                className={`h-6 w-6 rounded-full border-2 ${color === c ? "border-foreground" : "border-transparent"}`}
-                style={{ backgroundColor: c }}
-                onClick={() => setColor(c)}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="edit-thesis-status">Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as ThesisStatus)}>
-              <SelectTrigger id="edit-thesis-status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-thesis-opened">Opened</Label>
-            <Input
-              id="edit-thesis-opened"
-              type="date"
-              value={openedAt}
-              onChange={(e) => setOpenedAt(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-thesis-desc">Hypothesis</Label>
-          <Textarea
-            id="edit-thesis-desc"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What's the thesis? (optional)"
-          />
-        </div>
-      </div>
+      <ThesisFormFields values={values} onChange={update} idPrefix="edit-thesis" />
       <DialogFooter className="sm:justify-between">
         <Button
           variant="ghost"
@@ -162,7 +78,7 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
         </Button>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!name.trim() || updateThesis.isPending}>
+          <Button onClick={handleSave} disabled={!values.name.trim() || updateThesis.isPending}>
             Save
           </Button>
         </div>

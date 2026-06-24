@@ -12,7 +12,8 @@ import { useAddAssetToThesis } from "@/lib/queries"
 import { DeferredSparkline } from "@/components/chart/sparkline"
 import { TagBadge } from "@/components/tags/tag-badge"
 import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
-import { formatAssetPrice, formatAssetCompactPrice, changeColor, formatChangePct } from "@/lib/format"
+import { formatAssetPriceWithSettings } from "@/lib/format"
+import { ChangePct } from "@/components/change-pct"
 import { getCardDescriptors, isVisibleAt, type IndicatorDescriptor, type Placement } from "@/lib/indicator-registry"
 import { IndicatorValue } from "@/components/indicators/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
@@ -81,12 +82,18 @@ export const AssetCard = memo(function AssetCard({
   )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
-  const changeCls = changeColor(changePct)
 
   const [priceRef, pctRef] = usePriceFlash(lastPrice)
   const [editOpen, setEditOpen] = useState(false)
   const [newThesisOpen, setNewThesisOpen] = useState(false)
   const addToThesis = useAddAssetToThesis()
+
+  const priceFmt = lastPrice != null
+    ? formatAssetPriceWithSettings(lastPrice, { type, symbol, currency }, {
+        compact: settings.compact_numbers,
+        group: settings.thousands_separator,
+      })
+    : null
 
   return (
     <ContextMenu>
@@ -100,15 +107,13 @@ export const AssetCard = memo(function AssetCard({
                 <Badge variant="secondary" className="text-xs">
                   {type}
                 </Badge>
-                {lastPrice != null ? (
+                {priceFmt ? (
                   <span
                     ref={priceRef}
                     className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1"
-                    title={settings.compact_numbers ? formatAssetPrice(lastPrice, { type, symbol, currency }, undefined, settings.thousands_separator) : undefined}
+                    title={priceFmt.title}
                   >
-                    {settings.compact_numbers
-                      ? formatAssetCompactPrice(lastPrice, { type, symbol, currency })
-                      : formatAssetPrice(lastPrice, { type, symbol, currency }, undefined, settings.thousands_separator)}
+                    {priceFmt.text}
                   </span>
                 ) : (
                   <Skeleton className="ml-auto h-5 w-16 rounded" />
@@ -117,9 +122,11 @@ export const AssetCard = memo(function AssetCard({
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground truncate">{name}</p>
                 {changePct != null ? (
-                  <span ref={pctRef} className={`text-xs font-medium tabular-nums rounded px-1 -mx-1 ${changeCls}`}>
-                    {formatChangePct(changePct).text}
-                  </span>
+                  <ChangePct
+                    ref={pctRef}
+                    value={changePct}
+                    className="text-xs font-medium rounded px-1 -mx-1"
+                  />
                 ) : (
                   <Skeleton className="h-3.5 w-12 rounded" />
                 )}

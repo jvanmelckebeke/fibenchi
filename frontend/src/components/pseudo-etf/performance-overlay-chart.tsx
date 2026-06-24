@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useEffect, useRef, useMemo } from "react"
 import {
   createChart,
   type IChartApi,
@@ -6,13 +6,13 @@ import {
 } from "lightweight-charts"
 import { baseChartOptions, STACK_COLORS } from "@/lib/chart-utils"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
-import type { PerformanceBreakdownPoint } from "@/lib/api"
+import { useCrosshairHover } from "@/hooks/use-crosshair-hover"
 import { SymbolLegend } from "./symbol-legend"
+import type { BreakdownChartProps } from "./types"
 
-interface SharedChartProps {
-  data: PerformanceBreakdownPoint[]
-  sortedSymbols: string[]
-  symbolColorMap: Map<string, string>
+interface OverlayHover {
+  total: number
+  rebased: Record<string, number>
 }
 
 /**
@@ -24,20 +24,28 @@ export function PerformanceOverlayChart({
   baseValue,
   sortedSymbols,
   symbolColorMap,
-}: SharedChartProps & { baseValue: number }) {
+}: BreakdownChartProps & { baseValue: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const totalSeriesRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
   const baseLineRef = useRef<ReturnType<IChartApi["addSeries"]> | null>(null)
-  const [hoverData, setHoverData] = useState<{
-    total: number
-    rebased: Record<string, number>
-  } | null>(null)
   const { theme, startLifecycle } = useChartLifecycle(ref, [chartRef])
 
-  // Lookup maps for crosshair
-  const totalByTime = useRef(new Map<string, number>())
-  const rebasedByTime = useRef(new Map<string, Record<string, number>>())
+  // Default display: last point's data
+  const lastRebased = useMemo<OverlayHover | null>(() => {
+    if (!data.length || !sortedSymbols.length) return null
+    const firstBreakdown = data[0].breakdown
+    const last = data[data.length - 1]
+    const rebased: Record<string, number> = {}
+    for (const sym of sortedSymbols) {
+      const firstVal = firstBreakdown[sym] ?? 0
+      const curVal = last.breakdown[sym] ?? 0
+      rebased[sym] = firstVal !== 0 ? (curVal / firstVal) * baseValue : baseValue
+    }
+    return { total: last.value, rebased }
+  }, [data, sortedSymbols, baseValue])
+
+  const { hoverRef, setHover, displayData } = useCrosshairHover<OverlayHover>(lastRebased)
 
   useEffect(() => {
     if (!ref.current || !data.length || !sortedSymbols.length) return
@@ -46,8 +54,7 @@ export function PerformanceOverlayChart({
 
     // Pre-compute rebased values: contribution[sym][date] / contribution[sym][first_date] * baseValue
     // Symbols with a zero first-date contribution get a flat baseValue line.
-    totalByTime.current.clear()
-    rebasedByTime.current.clear()
+    hoverRef.current.clear()
 
     const rebasedSeries = new Map<string, { time: string; value: number }[]>()
     for (const sym of sortedSymbols) {
@@ -55,7 +62,6 @@ export function PerformanceOverlayChart({
     }
 
     for (const point of data) {
-      totalByTime.current.set(point.date, point.value)
       const rebasedRow: Record<string, number> = {}
       for (const sym of sortedSymbols) {
         const firstVal = firstBreakdown[sym] ?? 0
@@ -64,7 +70,7 @@ export function PerformanceOverlayChart({
         rebasedRow[sym] = rebased
         rebasedSeries.get(sym)!.push({ time: point.date, value: rebased })
       }
-      rebasedByTime.current.set(point.date, rebasedRow)
+      hoverRef.current.set(point.date, { total: point.value, rebased: rebasedRow })
     }
 
     const chart = createChart(ref.current, baseChartOptions(ref.current, 440))
@@ -110,19 +116,17 @@ export function PerformanceOverlayChart({
     let snapping = false
     chart.subscribeCrosshairMove((param) => {
       if (param.time) {
-        const key = String(param.time)
-        const total = totalByTime.current.get(key)
-        const rebased = rebasedByTime.current.get(key)
-        if (total !== undefined && rebased) {
-          setHoverData({ total, rebased })
-        }
-        if (!snapping && total !== undefined) {
-          snapping = true
-          chart.setCrosshairPosition(total, param.time, totalSeries)
-          snapping = false
+        const h = hoverRef.current.get(String(param.time))
+        if (h) {
+          setHover(h)
+          if (!snapping) {
+            snapping = true
+            chart.setCrosshairPosition(h.total, param.time, totalSeries)
+            snapping = false
+          }
         }
       } else {
-        setHoverData(null)
+        setHover(null)
       }
     })
 
@@ -135,7 +139,7 @@ export function PerformanceOverlayChart({
       totalSeriesRef.current = null
       baseLineRef.current = null
     }
-  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle, theme.dark])
+  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle, theme.dark, hoverRef, setHover])
 
   // Apply baseLine + totalLine theme colors on theme change
   useEffect(() => {
@@ -146,22 +150,6 @@ export function PerformanceOverlayChart({
       color: theme.dark ? "rgba(250, 250, 250, 0.85)" : "rgba(24, 24, 27, 0.85)",
     })
   }, [theme])
-
-  // Default display: last point's data
-  const lastRebased = useMemo(() => {
-    if (!data.length || !sortedSymbols.length) return null
-    const firstBreakdown = data[0].breakdown
-    const last = data[data.length - 1]
-    const rebased: Record<string, number> = {}
-    for (const sym of sortedSymbols) {
-      const firstVal = firstBreakdown[sym] ?? 0
-      const curVal = last.breakdown[sym] ?? 0
-      rebased[sym] = firstVal !== 0 ? (curVal / firstVal) * baseValue : baseValue
-    }
-    return { total: last.value, rebased }
-  }, [data, sortedSymbols, baseValue])
-
-  const displayData = hoverData ?? lastRebased
 
   return (
     <div className="space-y-2">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
-import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts"
+import { createChart, ColorType, AreaSeries } from "lightweight-charts"
 import { Skeleton } from "@/components/ui/skeleton"
+import { attachResizeAndCleanup } from "@/hooks/use-chart-lifecycle"
 import type { SparklinePoint } from "@/lib/api"
 
 export function SparklineChart({
@@ -9,7 +10,6 @@ export function SparklineChart({
   batchData?: SparklinePoint[]
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<IChartApi | null>(null)
 
   useEffect(() => {
     if (!containerRef.current || !batchData?.length) return
@@ -51,21 +51,8 @@ export function SparklineChart({
     )
 
     chart.timeScale().fitContent()
-    chartRef.current = chart
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width })
-        chart.timeScale().fitContent()
-      }
-    })
-    resizeObserver.observe(containerRef.current)
-
-    return () => {
-      resizeObserver.disconnect()
-      chart.remove()
-      chartRef.current = null
-    }
+    return attachResizeAndCleanup(containerRef.current, chart, { refit: true })
   }, [batchData])
 
   if (!batchData) {

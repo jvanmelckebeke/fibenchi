@@ -1,11 +1,10 @@
 import { useState } from "react"
 import {
-  Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { EntityDialog } from "@/components/entity-dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -77,16 +76,8 @@ function EditGroupForm({ group, onClose }: { group: Group; onClose: () => void }
 
 export function EditGroupDialog({ group, open, onOpenChange }: EditGroupDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        {group && (
-          <EditGroupForm
-            key={group.id}
-            group={group}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+    <EntityDialog entity={group} open={open} onOpenChange={onOpenChange} contentClassName="sm:max-w-[400px]">
+      {(group, close) => <EditGroupForm group={group} onClose={close} />}
+    </EntityDialog>
   )
 }

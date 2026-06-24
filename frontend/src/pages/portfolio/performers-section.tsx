@@ -3,7 +3,7 @@ import { Loader2, TrendingUp, TrendingDown } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { usePrefetchAssetDetail } from "@/lib/queries"
-import { formatChangePct } from "@/lib/format"
+import { ChangePct } from "@/components/change-pct"
 import type { AssetPerformance } from "@/lib/api"
 
 export function PerformersSection({
@@ -72,25 +72,20 @@ function PerformersList({
         <Badge variant="secondary" className="text-xs ml-auto">{period}</Badge>
       </div>
       <div className="space-y-0">
-        {assets.map((a) => {
-          const chg = formatChangePct(a.change_pct)
-          return (
-            <Link
-              key={a.symbol}
-              to={`/asset/${a.symbol}`}
-              className="flex items-center justify-between py-2 hover:bg-muted/50 rounded px-2 -mx-2 transition-colors"
-              onMouseEnter={() => prefetch(a.symbol)}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="font-mono text-sm text-primary">{a.symbol}</span>
-                <span className="text-xs text-muted-foreground truncate">{a.name}</span>
-              </div>
-              <span className={`text-sm font-medium tabular-nums ${chg.className}`}>
-                {chg.text}
-              </span>
-            </Link>
-          )
-        })}
+        {assets.map((a) => (
+          <Link
+            key={a.symbol}
+            to={`/asset/${a.symbol}`}
+            className="flex items-center justify-between py-2 hover:bg-muted/50 rounded px-2 -mx-2 transition-colors"
+            onMouseEnter={() => prefetch(a.symbol)}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="font-mono text-sm text-primary">{a.symbol}</span>
+              <span className="text-xs text-muted-foreground truncate">{a.name}</span>
+            </div>
+            <ChangePct value={a.change_pct} className="text-sm font-medium" />
+          </Link>
+        ))}
       </div>
     </Card>
   )

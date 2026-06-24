@@ -11,15 +11,14 @@ import { TagBadge } from "@/components/tags/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/chart/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatAssetPrice, formatAssetCompactPrice, formatCompactNumber, changeColor, formatChangePct, readableTextColor } from "@/lib/format"
+import { formatAssetPriceWithSettings, formatCompactNumber, readableTextColor } from "@/lib/format"
+import { ChangePct } from "@/components/change-pct"
 import {
   getNumericValue,
   extractMacdValues,
   formatDeltaAnnotation,
-  getSeriesByField,
   getDescriptorByField,
-  resolveThresholdColor,
-  resolveAdxColor,
+  formatIndicatorField,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -105,7 +104,6 @@ export const TableRow = memo(function TableRow({
   const livePct = quote?.change_percent ?? null
   const displayPrice = livePrice ?? indicator?.close ?? null
   const displayPct = livePct ?? indicator?.change_pct ?? null
-  const changeCls = changeColor(displayPct)
 
   // Stale = we have DB data but no live quote yet
   const hasLiveQuote = livePrice != null
@@ -120,6 +118,12 @@ export const TableRow = memo(function TableRow({
   const [priceRef, pctRef] = usePriceFlash(displayPrice)
   const py = compactMode ? "py-1.5" : "py-2.5"
   const staleClass = showStale ? "stale-price" : ""
+  const priceFmt = displayPrice != null
+    ? formatAssetPriceWithSettings(displayPrice, asset, {
+        compact: settings.compact_numbers,
+        group: settings.thousands_separator,
+      })
+    : null
 
   const handleToggle = useCallback(() => onToggle(asset.symbol), [onToggle, asset.symbol])
   const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
@@ -201,15 +205,13 @@ export const TableRow = memo(function TableRow({
           )}
           {isColumnVisible(columnSettings, "price") && (
             <td className={`${py} px-3 text-right tabular-nums`}>
-              {displayPrice != null ? (
+              {priceFmt ? (
                 <span
                   ref={priceRef}
                   className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
-                  title={settings.compact_numbers ? formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator) : undefined}
+                  title={priceFmt.title}
                 >
-                  {settings.compact_numbers
-                    ? formatAssetCompactPrice(displayPrice, asset)
-                    : formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator)}
+                  {priceFmt.text}
                 </span>
               ) : (
                 <Skeleton className="h-4 w-14 ml-auto rounded" />
@@ -219,9 +221,11 @@ export const TableRow = memo(function TableRow({
           {isColumnVisible(columnSettings, "change_pct") && (
             <td className={`${py} px-3 text-right tabular-nums`}>
               {displayPct != null ? (
-                <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls} ${staleClass}`}>
-                  {formatChangePct(displayPct).text}
-                </span>
+                <ChangePct
+                  ref={pctRef}
+                  value={displayPct}
+                  className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
+                />
               ) : (
                 <Skeleton className="h-4 w-12 ml-auto rounded" />
               )}
@@ -275,25 +279,20 @@ export const TableRow = memo(function TableRow({
               )
             }
             const val = getNumericValue(indicator?.values, field)
-            const series = getSeriesByField(field)
             const desc = getDescriptorByField(field)
-            const colorClass = field === "adx" && val != null && indicator?.values
-              ? resolveAdxColor(val, indicator.values)
-              : resolveThresholdColor(series?.thresholdColors, val)
-            const decimals = desc?.decimals ?? (val != null && Math.abs(val) >= 100 ? 0 : 2)
-            const formatted = val != null
-              ? desc?.compactFormat
-                ? formatCompactNumber(val)
-                : `${val.toFixed(decimals)}${desc?.suffix ?? ""}`
+            // Route through the shared registry formatter so the table matches the
+            // card/detail rendering (decimals, threshold colours, currency prefix).
+            const formatted = val != null && desc && indicator?.values
+              ? formatIndicatorField(field, desc, indicator.values, asset.currency)
               : null
             return (
               <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
-                {formatted != null ? (
+                {formatted ? (
                   <span
-                    className={colorClass}
+                    className={formatted.colorClass}
                     title={desc?.compactFormat && val != null ? val.toLocaleString() : undefined}
                   >
-                    {formatted}
+                    {formatted.text}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">&mdash;</span>
