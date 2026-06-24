@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom"
-import { CommandSearch } from "@/components/command-search"
-import { AppSidebar } from "@/components/app-sidebar"
+import { CommandSearch } from "@/components/search/command-search"
+import { AppSidebar } from "@/components/layout/app-sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import {
   SidebarInset,

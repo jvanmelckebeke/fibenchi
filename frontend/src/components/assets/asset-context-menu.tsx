@@ -1,7 +1,7 @@
 import { ArrowRightLeft, Copy, Pencil, Trash2 } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
-import { ContextActionsContent, type ContextAction } from "@/components/context-actionable"
-import { useThesisMembershipAction, groupTargetActions } from "@/components/menu-actions"
+import { ContextActionsContent, type ContextAction } from "@/components/context-menu/context-actionable"
+import { useThesisMembershipAction, groupTargetActions } from "@/components/context-menu/menu-actions"
 import { useGroups, useAddAssetsToGroup, useRemoveAssetFromGroup } from "@/lib/queries"
 
 interface AssetContextMenuContentProps {

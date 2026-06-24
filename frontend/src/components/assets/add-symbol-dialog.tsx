@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SearchResultsList } from "@/components/search-results-list"
+import { SearchResultsList } from "@/components/search/search-results-list"
 import { useCreateAsset, useAddAssetsToGroup, useGroups } from "@/lib/queries"
 import { useTwoPhaseSearch } from "@/hooks/use-two-phase-search"
 

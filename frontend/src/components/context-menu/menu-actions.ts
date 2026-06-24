@@ -2,7 +2,7 @@ import { Layers, Plus } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { useTheses, useAddAssetToThesis, useRemoveAssetFromThesis } from "@/lib/queries"
 import type { Group } from "@/lib/api"
-import type { ContextAction } from "@/components/context-actionable"
+import type { ContextAction } from "@/components/context-menu/context-actionable"
 
 /**
  * The shared "Theses" submenu, as data: a checkbox per thesis (toggles the

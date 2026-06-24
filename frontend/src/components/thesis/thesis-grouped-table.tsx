@@ -6,10 +6,10 @@ import { buildAssetsById } from "@/lib/assets"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { useIndicators } from "@/lib/queries"
 import { GroupTable, type RowMenuRenderer } from "@/components/group-table"
-import { AssetContextMenuContent } from "@/components/asset-context-menu"
-import { NewThesisDialog } from "@/components/new-thesis-dialog"
-import { EditThesisDialog } from "@/components/edit-thesis-dialog"
-import { ThesisSectionHeader } from "@/components/thesis-section-header"
+import { AssetContextMenuContent } from "@/components/assets/asset-context-menu"
+import { NewThesisDialog } from "@/components/thesis/new-thesis-dialog"
+import { EditThesisDialog } from "@/components/thesis/edit-thesis-dialog"
+import { ThesisSectionHeader } from "@/components/thesis/thesis-section-header"
 
 interface ThesisGroupedTableProps {
   groupId: number

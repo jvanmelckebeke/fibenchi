@@ -7,7 +7,7 @@ import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 import { formatPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
 import { formatDeltaAnnotation } from "@/lib/indicator-registry"
-import { IntradayChart } from "@/components/intraday-chart"
+import { IntradayChart } from "@/components/chart/intraday-chart"
 
 const DELTA_FIELDS = ["rsi", "macd_hist", "atr", "adx"] as const
 

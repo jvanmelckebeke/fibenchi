@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react"
-import { SearchResultItem } from "@/components/search-result-item"
+import { SearchResultItem } from "@/components/search/search-result-item"
 import { useTrackedSymbols } from "@/hooks/use-tracked-symbols"
 import type { SymbolSearchResult } from "@/lib/api"
 

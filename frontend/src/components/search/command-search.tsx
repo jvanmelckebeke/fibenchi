@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { Search } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { SearchResultsList } from "@/components/search-results-list"
+import { SearchResultsList } from "@/components/search/search-results-list"
 import { useTwoPhaseSearch } from "@/hooks/use-two-phase-search"
 
 export function CommandSearch() {

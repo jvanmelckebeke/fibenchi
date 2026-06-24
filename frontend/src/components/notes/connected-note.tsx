@@ -1,4 +1,4 @@
-import { NoteEditor } from "@/components/note-editor"
+import { NoteEditor } from "@/components/notes/note-editor"
 import type { Note } from "@/lib/api"
 import type { UseMutationResult } from "@tanstack/react-query"
 

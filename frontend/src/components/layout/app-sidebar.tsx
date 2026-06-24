@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom"
 import { LayoutDashboard, Briefcase, LineChart, Settings } from "lucide-react"
 import { useQuoteStatus } from "@/lib/quote-stream"
-import { GroupsSection } from "@/components/groups-section"
+import { GroupsSection } from "@/components/layout/groups-section"
 import {
   Sidebar,
   SidebarContent,

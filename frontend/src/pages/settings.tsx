@@ -10,9 +10,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useSettings, type AppSettings, type GroupViewMode, type YahooLinkMode } from "@/lib/settings"
-import { VisibilityToggle } from "@/components/visibility-toggle"
-import { IndicatorVisibilityEditor } from "@/components/indicator-visibility-editor"
-import { SymbolSourcesSettings } from "@/components/symbol-sources-settings"
+import { VisibilityToggle } from "@/components/settings/visibility-toggle"
+import { IndicatorVisibilityEditor } from "@/components/settings/indicator-visibility-editor"
+import { SymbolSourcesSettings } from "@/components/settings/symbol-sources-settings"
 
 export function SettingsPage() {
   const { settings, updateSettings } = useSettings()

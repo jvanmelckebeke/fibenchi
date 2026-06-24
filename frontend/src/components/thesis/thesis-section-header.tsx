@@ -3,8 +3,8 @@ import { ChevronDown, ChevronRight } from "lucide-react"
 import type { Thesis, ThesisStatus, ThesisPerformancePoint } from "@/lib/api"
 import { formatChangePct, formatDateLong, readableTextColor } from "@/lib/format"
 import { resolveIcon } from "@/lib/icon-utils"
-import { ContextActionable, type ContextAction } from "@/components/context-actionable"
-import { MiniSparkline } from "@/components/mini-sparkline"
+import { ContextActionable, type ContextAction } from "@/components/context-menu/context-actionable"
+import { MiniSparkline } from "@/components/chart/mini-sparkline"
 
 const STATUS_STYLES: Record<ThesisStatus, { label: string; className: string }> = {
   live: { label: "Live", className: "bg-emerald-500/15 text-emerald-500" },

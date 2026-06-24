@@ -25,7 +25,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useGroups, useCreateGroup, useDeleteGroup, useReorderGroups } from "@/lib/queries"
-import { ContextActionable } from "@/components/context-actionable"
+import { ContextActionable } from "@/components/context-menu/context-actionable"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { resolveIcon } from "@/lib/icon-utils"
-import { EditGroupDialog } from "@/components/edit-group-dialog"
+import { EditGroupDialog } from "@/components/layout/edit-group-dialog"
 import type { Group } from "@/lib/api"
 
 /** Drag handle rendered inside the sidebar menu button. */
