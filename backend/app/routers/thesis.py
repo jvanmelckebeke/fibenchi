@@ -5,6 +5,7 @@ from app.database import get_db
 from app.schemas.thesis import (
     ThesisAddAssets,
     ThesisCreate,
+    ThesisPerformanceSeries,
     ThesisResponse,
     ThesisUpdate,
 )
@@ -16,6 +17,17 @@ router = APIRouter(prefix="/api/theses", tags=["theses"])
 @router.get("", response_model=list[ThesisResponse], summary="List all theses")
 async def list_theses(db: AsyncSession = Depends(get_db)):
     return await thesis_service.list_theses(db)
+
+
+# NOTE: must precede ``/{thesis_id}`` — otherwise "performance" is captured as an
+# (invalid int) thesis_id and 422s.
+@router.get(
+    "/performance",
+    response_model=list[ThesisPerformanceSeries],
+    summary="Per-thesis equal-weight performance curves (for sparklines)",
+)
+async def list_thesis_performance(db: AsyncSession = Depends(get_db)):
+    return await thesis_service.list_thesis_performance(db)
 
 
 @router.post("", response_model=ThesisResponse, status_code=201, summary="Create a thesis")

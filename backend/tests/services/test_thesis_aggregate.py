@@ -1,6 +1,8 @@
 """Unit tests for the pure thesis aggregate computation (no I/O)."""
 
-from app.services.compute.thesis import aggregate_return_pct
+from datetime import date, timedelta
+
+from app.services.compute.thesis import aggregate_return_pct, aggregate_return_series
 
 
 def test_empty_returns_none():
@@ -42,3 +44,83 @@ def test_zero_open_excluded():
 def test_rounds_to_two_dp():
     # 100 -> 133.333 ≈ +33.33%
     assert aggregate_return_pct([[100.0, 133.333]]) == 33.33
+
+
+# --- aggregate_return_series (the sparkline curve) -------------------------
+
+
+def test_series_empty():
+    assert aggregate_return_series([]) == []
+    assert aggregate_return_series([[], []]) == []
+
+
+def test_series_single_member_curve():
+    pts = aggregate_return_series([[
+        (date(2026, 3, 1), 100.0),
+        (date(2026, 3, 2), 110.0),
+        (date(2026, 3, 3), 120.0),
+    ]])
+    assert pts[0] == {"date": "2026-03-01", "pct": 0.0}   # anchored to the open
+    assert pts[-1] == {"date": "2026-03-03", "pct": 20.0}
+
+
+def test_series_equal_weight_aligned_and_ffilled():
+    # A runs day1-3 (100->110->120); B joins day2 (100->110). Each member is
+    # anchored to its own first close; B is absent (NaN) on day1, so:
+    #   d1 = A only (0%), d2 = mean(+10%, 0%) = 5%, d3 = mean(+20%, +10%) = 15%.
+    a = [(date(2026, 3, 1), 100.0), (date(2026, 3, 2), 110.0), (date(2026, 3, 3), 120.0)]
+    b = [(date(2026, 3, 2), 100.0), (date(2026, 3, 3), 110.0)]
+    by_date = {p["date"]: p["pct"] for p in aggregate_return_series([a, b])}
+    assert by_date["2026-03-01"] == 0.0
+    assert by_date["2026-03-02"] == 5.0
+    assert by_date["2026-03-03"] == 15.0
+
+
+def test_series_carries_forward_over_gaps():
+    # B has no print on day2; its day1 value (0%) carries forward, so day2 is
+    # mean(A's +10%, B's carried 0%) = 5% (not A-only).
+    a = [(date(2026, 3, 1), 100.0), (date(2026, 3, 2), 110.0)]
+    b = [(date(2026, 3, 1), 100.0)]
+    by_date = {p["date"]: p["pct"] for p in aggregate_return_series([a, b])}
+    assert by_date["2026-03-02"] == 5.0
+
+
+def test_series_zero_open_member_excluded():
+    a = [(date(2026, 3, 1), 0.0), (date(2026, 3, 2), 50.0)]   # zero open -> dropped
+    b = [(date(2026, 3, 1), 100.0), (date(2026, 3, 2), 110.0)]
+    by_date = {p["date"]: p["pct"] for p in aggregate_return_series([a, b])}
+    assert by_date["2026-03-02"] == 10.0
+
+
+def test_series_downsample_caps_and_keeps_ends():
+    closes = [[(date(2026, 1, 1) + timedelta(days=i), 100.0 + i) for i in range(200)]]
+    pts = aggregate_return_series(closes, max_points=10)
+    assert len(pts) <= 10
+    assert pts[0]["date"] == "2026-01-01"
+    assert pts[-1]["date"] == (date(2026, 1, 1) + timedelta(days=199)).isoformat()
+    assert pts[-1]["pct"] == 199.0   # 100 -> 299 = +199%
+
+
+def test_series_last_point_equals_aggregate():
+    # Contract: the headline aggregate == the curve's final point. Both project the
+    # same _anchored normalisation, so this guards against future drift between them.
+    cases: list[list[list[tuple[date, float]]]] = [
+        [  # two members, different last dates
+            [(date(2026, 3, 1), 100.0), (date(2026, 3, 10), 120.0)],
+            [(date(2026, 3, 1), 100.0), (date(2026, 3, 20), 110.0)],
+        ],
+        [[(date(2026, 3, 1), 100.0), (date(2026, 3, 5), 90.0), (date(2026, 3, 9), 130.0)]],
+        [  # disjoint ranges + a zero-open member that must be excluded
+            [(date(2026, 3, 1), 50.0), (date(2026, 3, 4), 75.0)],
+            [(date(2026, 4, 1), 100.0), (date(2026, 4, 9), 130.0)],
+            [(date(2026, 3, 1), 0.0), (date(2026, 3, 9), 5.0)],
+        ],
+        [],  # empty → no contribution
+    ]
+    for dated in cases:
+        series = aggregate_return_series(dated)
+        agg = aggregate_return_pct([[c for _, c in m] for m in dated])
+        if not series:
+            assert agg is None
+        else:
+            assert series[-1]["pct"] == agg

@@ -33,6 +33,7 @@ import type {
   Thesis,
   ThesisCreate,
   ThesisUpdate,
+  ThesisPerformanceSeries,
 } from "./types"
 
 export type * from "./types"
@@ -102,6 +103,7 @@ export const api = {
   },
   theses: {
     list: () => request<Thesis[]>("/theses"),
+    performance: () => request<ThesisPerformanceSeries[]>("/theses/performance"),
     get: (id: number) => request<Thesis>(`/theses/${id}`),
     create: (data: ThesisCreate) =>
       request<Thesis>("/theses", { method: "POST", body: JSON.stringify(data) }),

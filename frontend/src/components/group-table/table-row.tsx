@@ -1,10 +1,9 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
-import { AssetContextMenuContent } from "@/components/asset-context-menu"
 import { EditAssetDialog } from "@/components/edit-asset-dialog"
 import { NewThesisDialog } from "@/components/new-thesis-dialog"
 import { useAddAssetToThesis } from "@/lib/queries"
@@ -26,6 +25,15 @@ import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 import { resolveIcon } from "@/lib/icon-utils"
 import { isColumnVisible } from "./shared"
+
+export interface RowMenuContext {
+  asset: Asset
+  openEdit: () => void
+  openNewThesis: () => void
+}
+
+/** Caller-supplied row context menu — keeps `TableRow` ignorant of groups/theses. */
+export type RowMenuRenderer = (ctx: RowMenuContext) => ReactNode
 
 function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -59,34 +67,32 @@ function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: str
 }
 
 export const TableRow = memo(function TableRow({
-  groupId,
   asset,
   quote,
   indicator,
   expanded,
   onToggle,
-  onDelete,
   onHover,
   compactMode,
   columnSettings,
   visibleIndicatorFields,
   totalColSpan,
+  renderContextMenu,
   accent,
   accentTitle,
   accentIcon,
 }: {
-  groupId: number
   asset: Asset
   quote?: Quote
   indicator?: IndicatorSummary
   expanded: boolean
   onToggle: (symbol: string) => void
-  onDelete: (symbol: string) => void
   onHover: (symbol: string) => void
   compactMode: boolean
   columnSettings: Record<string, boolean>
   visibleIndicatorFields: string[]
   totalColSpan: number
+  renderContextMenu?: RowMenuRenderer
   /** Left-border accent colour (thesis colour) for the "inline" thesis grouping. */
   accent?: string
   /** Tooltip for the accent bar — the thesis name(s) this row belongs to. */
@@ -116,7 +122,6 @@ export const TableRow = memo(function TableRow({
   const staleClass = showStale ? "stale-price" : ""
 
   const handleToggle = useCallback(() => onToggle(asset.symbol), [onToggle, asset.symbol])
-  const handleDelete = useCallback(() => onDelete(asset.symbol), [onDelete, asset.symbol])
   const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
   const [editOpen, setEditOpen] = useState(false)
   const [newThesisOpen, setNewThesisOpen] = useState(false)
@@ -124,9 +129,13 @@ export const TableRow = memo(function TableRow({
   // resolveIcon returns stable refs from lucide's static icon map.
   const AccentIcon = resolveIcon(accentIcon)
 
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
+  const menu = renderContextMenu?.({
+    asset,
+    openEdit: () => setEditOpen(true),
+    openNewThesis: () => setNewThesisOpen(true),
+  })
+
+  const row = (
         <tr
           className="border-b border-border hover:bg-muted/30 data-[state=open]:bg-muted/30 cursor-pointer group transition-colors"
           onClick={handleToggle}
@@ -293,15 +302,18 @@ export const TableRow = memo(function TableRow({
             )
           })}
         </tr>
-      </ContextMenuTrigger>
-      <AssetContextMenuContent
-        groupId={groupId}
-        assetId={asset.id}
-        symbol={asset.symbol}
-        onEdit={() => setEditOpen(true)}
-        onRemove={handleDelete}
-        onNewThesis={() => setNewThesisOpen(true)}
-      />
+  )
+
+  return (
+    <>
+      {menu ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+          {menu}
+        </ContextMenu>
+      ) : (
+        row
+      )}
       <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
       <NewThesisDialog
         open={newThesisOpen}
@@ -317,6 +329,6 @@ export const TableRow = memo(function TableRow({
           </td>
         </tr>
       )}
-    </ContextMenu>
+    </>
   )
 })

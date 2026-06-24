@@ -157,3 +157,25 @@ async def test_aggregate_pct_equal_weight_since_opened_at(db, client):
     assert (await client.get(f"/api/theses/{tid}")).json()["aggregate_pct"] == 15.0
     listed = next(t for t in (await client.get("/api/theses")).json() if t["id"] == tid)
     assert listed["aggregate_pct"] == 15.0
+
+
+async def test_performance_endpoint_curve(db, client):
+    a = await _seed_asset_with_closes(db, "PPA", {date(2026, 3, 1): 100.0, date(2026, 3, 15): 120.0})
+    b = await _seed_asset_with_closes(db, "PPB", {date(2026, 3, 1): 100.0, date(2026, 3, 20): 110.0})
+    tid = (await client.post("/api/theses", json={"name": "Perf", "opened_at": "2026-03-01"})).json()["id"]
+    await client.post(f"/api/theses/{tid}/assets", json={"asset_ids": [a.id, b.id]})
+
+    resp = await client.get("/api/theses/performance")
+    assert resp.status_code == 200  # also proves /performance isn't captured by /{thesis_id}
+    pts = next(s for s in resp.json() if s["thesis_id"] == tid)["points"]
+    assert pts, "expected a non-empty curve"
+    assert [p["date"] for p in pts] == sorted(p["date"] for p in pts)  # ascending
+    assert pts[0] == {"date": "2026-03-01", "pct": 0.0}                # open anchor
+    assert pts[-1]["pct"] == 15.0                                      # matches aggregate_pct
+
+
+async def test_performance_endpoint_empty_thesis(client):
+    tid = (await client.post("/api/theses", json={"name": "Hollow"})).json()["id"]
+    resp = await client.get("/api/theses/performance")
+    assert resp.status_code == 200
+    assert next(s for s in resp.json() if s["thesis_id"] == tid)["points"] == []

@@ -25,13 +25,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useGroups, useCreateGroup, useDeleteGroup, useReorderGroups } from "@/lib/queries"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+import { ContextActionable } from "@/components/context-actionable"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -106,41 +100,30 @@ function SortableGroupItem({
 
   return (
     <SidebarMenuItem ref={setNodeRef} style={style}>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <div className="flex items-center w-full rounded-md data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-            {showDragHandle && <DragHandle {...attributes} {...listeners} />}
-            <SidebarMenuButton
-              asChild
-              isActive={isActive}
-              tooltip={group.name}
-            >
-              <Link to={`/groups/${group.id}`}>
-                {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
-                <GroupIcon />
-                <span>{group.name}</span>
-              </Link>
-            </SidebarMenuButton>
-            {group.assets.length > 0 && (
-              <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>
-            )}
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={onEdit}>
-            <Pencil />
-            Edit group
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            onClick={onDelete}
+      <ContextActionable
+        actions={[
+          { label: "Edit group", action: onEdit, icon: Pencil },
+          { label: "Delete group", action: onDelete, icon: Trash2, destructive: true, separatorBefore: true },
+        ]}
+      >
+        <div className="flex items-center w-full rounded-md data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+          {showDragHandle && <DragHandle {...attributes} {...listeners} />}
+          <SidebarMenuButton
+            asChild
+            isActive={isActive}
+            tooltip={group.name}
           >
-            <Trash2 />
-            Delete group
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+            <Link to={`/groups/${group.id}`}>
+              {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
+              <GroupIcon />
+              <span>{group.name}</span>
+            </Link>
+          </SidebarMenuButton>
+          {group.assets.length > 0 && (
+            <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>
+          )}
+        </div>
+      </ContextActionable>
     </SidebarMenuItem>
   )
 }

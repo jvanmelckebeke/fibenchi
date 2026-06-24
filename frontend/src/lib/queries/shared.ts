@@ -35,6 +35,7 @@ export const keys = {
   indicators: (symbols: readonly string[]) => ["indicators", [...symbols].sort().join(",")] as const,
   note: (symbol: string) => ["note", symbol] as const,
   theses: ["theses"] as const,
+  thesesPerformance: ["theses", "performance"] as const,
   thesis: (id: number) => ["theses", id] as const,
   annotations: (symbol: string) => ["annotations", symbol] as const,
   pseudoEtfs: ["pseudo-etfs"] as const,

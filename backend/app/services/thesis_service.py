@@ -16,8 +16,14 @@ from app.models.thesis import Thesis, ThesisStatus
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.repositories.thesis_repo import ThesisRepository
-from app.services.compute.thesis import aggregate_return_pct
+from app.services.compute.thesis import aggregate_return_pct, aggregate_return_series
 from app.services.entity_lookups import get_thesis
+from app.utils import TTLCache
+
+# Batch per-thesis performance curves (for the all-theses sparklines). Keyed by a
+# signature of every thesis (id, open date, member set) + latest price date, so it
+# auto-invalidates on price sync, membership changes, or an open-date edit.
+_thesis_perf_cache: TTLCache = TTLCache(default_ttl=600)
 
 
 async def _compute_aggregate(db: AsyncSession, thesis: Thesis) -> float | None:
@@ -44,11 +50,67 @@ async def _attach_aggregate(db: AsyncSession, thesis: Thesis) -> Thesis:
     return thesis
 
 
+async def _batch_thesis_curves(db: AsyncSession, theses: list[Thesis]) -> dict[int, list[dict]]:
+    """Per-thesis performance curve (``thesis_id -> points``), batch-loaded once + cached.
+
+    The single source of truth for both the sparkline curves and the headline
+    aggregate (a thesis's aggregate is its curve's last point — see
+    ``aggregate_return_pct``). Loads every member's prices in ONE query rather than
+    one round-trip per thesis.
+    """
+    if not theses:
+        return {}
+
+    all_ids = sorted({a.id for t in theses for a in t.assets})
+    price_repo = PriceRepository(db)
+    latest_date = await price_repo.get_latest_date(all_ids) if all_ids else None
+    cache_key = (
+        frozenset(
+            (t.id, t.opened_at.isoformat(), frozenset(a.id for a in t.assets))
+            for t in theses
+        ),
+        latest_date,
+    )
+    cached = _thesis_perf_cache.get_value(cache_key)
+    if cached is not None:
+        return cached
+
+    by_asset: dict[int, list[tuple[date, float]]] = defaultdict(list)
+    if all_ids:
+        rows = await price_repo.list_by_assets_since(all_ids, min(t.opened_at for t in theses))
+        for p in rows:  # rows arrive ordered by (asset_id, date) → ascending per asset
+            by_asset[p.asset_id].append((p.date, p.close))
+
+    curves = {
+        t.id: aggregate_return_series(
+            [[(d, c) for d, c in by_asset.get(a.id, []) if d >= t.opened_at] for a in t.assets]
+        )
+        for t in theses
+    }
+    _thesis_perf_cache.set_value(cache_key, curves)
+    return curves
+
+
 async def list_theses(db: AsyncSession):
     theses = await ThesisRepository(db).list_all()
+    curves = await _batch_thesis_curves(db, theses)
     for thesis in theses:
-        await _attach_aggregate(db, thesis)
+        points = curves.get(thesis.id) or []
+        # transient attr read by ThesisResponse.from_attributes; the headline is the
+        # curve's last point (provably equal to aggregate_return_pct — same anchor).
+        thesis.aggregate_pct = points[-1]["pct"] if points else None  # type: ignore[attr-defined]
     return theses
+
+
+async def list_thesis_performance(db: AsyncSession) -> list[dict]:
+    """Equal-weight performance curve per thesis, for the all-theses sparklines.
+
+    ``[{"thesis_id": int, "points": [{"date", "pct"}, ...]}, ...]`` from the shared
+    batched + cached computation (see ``_batch_thesis_curves``).
+    """
+    theses = await ThesisRepository(db).list_all()
+    curves = await _batch_thesis_curves(db, theses)
+    return [{"thesis_id": t.id, "points": curves.get(t.id) or []} for t in theses]
 
 
 async def get_thesis_detail(db: AsyncSession, thesis_id: int):

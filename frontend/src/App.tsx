@@ -20,6 +20,9 @@ const PseudoEtfDetailPage = lazy(() =>
     default: m.PseudoEtfDetailPage,
   })),
 )
+const ThesesPage = lazy(() =>
+  import("@/pages/theses").then((m) => ({ default: m.ThesesPage })),
+)
 const SettingsPage = lazy(() =>
   import("@/pages/settings").then((m) => ({ default: m.SettingsPage })),
 )
@@ -66,6 +69,14 @@ export default function App() {
           element={
             <Suspense>
               <PseudoEtfDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/theses"
+          element={
+            <Suspense>
+              <ThesesPage />
             </Suspense>
           }
         />

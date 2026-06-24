@@ -6,6 +6,14 @@ export function useTheses() {
   return useQuery({ queryKey: keys.theses, queryFn: api.theses.list, staleTime: STALE_5MIN })
 }
 
+export function useThesesPerformance() {
+  return useQuery({
+    queryKey: keys.thesesPerformance,
+    queryFn: api.theses.performance,
+    staleTime: STALE_5MIN,
+  })
+}
+
 export function useThesis(id: number) {
   return useQuery({
     queryKey: keys.thesis(id),

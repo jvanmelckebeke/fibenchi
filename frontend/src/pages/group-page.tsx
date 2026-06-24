@@ -22,6 +22,7 @@ import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode
 import { useFilteredSortedAssets, getSortValue, compareSortValues, type SortValue } from "@/lib/use-group-filter"
 import type { Asset, Thesis } from "@/lib/api"
 import { GroupTable } from "@/components/group-table"
+import { AssetContextMenuContent } from "@/components/asset-context-menu"
 import { ThesisGroupedTable } from "@/components/thesis-grouped-table"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 import { ScannerView } from "@/components/scanner-view"
@@ -109,7 +110,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
       if (ts && ts.length > 0) {
         colors[a.symbol] = ts[0].color
         titles[a.symbol] = ts.map((t) => t.name).join(", ")
-        icons[a.symbol] = ts[0].icon ?? "lightbulb"
+        icons[a.symbol] = ts[0].icon ?? "briefcase"
       }
     }
 
@@ -356,11 +357,9 @@ export function GroupPage({ groupId }: { groupId: number }) {
             />
           ) : (
             <GroupTable
-              groupId={groupId}
               assets={listAssets ?? assets}
               quotes={quotes}
               indicators={batchIndicators}
-              onDelete={handleRemove}
               compactMode={settings.compact_mode}
               onHover={prefetch}
               sortBy={sortBy}
@@ -369,6 +368,16 @@ export function GroupPage({ groupId }: { groupId: number }) {
               accentColors={accentColors}
               accentTitles={accentTitles}
               accentIcons={accentIcons}
+              renderContextMenu={({ asset, openEdit, openNewThesis }) => (
+                <AssetContextMenuContent
+                  groupId={groupId}
+                  assetId={asset.id}
+                  symbol={asset.symbol}
+                  onEdit={openEdit}
+                  onNewThesis={openNewThesis}
+                  onRemove={() => handleRemove(asset.symbol)}
+                />
+              )}
             />
           )}
         </CrosshairTimeSyncProvider>
