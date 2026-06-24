@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
+import { ExpandedAssetChart } from "@/components/chart/expanded-asset-chart"
 import { formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
 import { HoldingSummaryCell } from "./holding-summary-cell"

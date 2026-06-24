@@ -5,7 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { TagBadge } from "@/components/tag-badge"
+import { TagBadge } from "@/components/tags/tag-badge"
 import type { Tag } from "@/lib/api"
 
 interface TagFilterPopoverProps {

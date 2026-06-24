@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
-import { TagBadge } from "@/components/tag-badge"
-import { NewThesisDialog } from "@/components/new-thesis-dialog"
+import { TagBadge } from "@/components/tags/tag-badge"
+import { NewThesisDialog } from "@/components/thesis/new-thesis-dialog"
 import { useTheses, useAddAssetToThesis, useRemoveAssetFromThesis } from "@/lib/queries"
 
 export function ThesisInput({ assetId }: { assetId: number }) {

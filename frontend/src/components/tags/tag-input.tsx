@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
-import { TagBadge } from "@/components/tag-badge"
+import { TagBadge } from "@/components/tags/tag-badge"
 import type { TagBrief } from "@/lib/api"
 import { useTags, useCreateTag, useAttachTag, useDetachTag } from "@/lib/queries"
 

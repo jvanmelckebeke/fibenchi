@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { type IndicatorDescriptor } from "@/lib/indicator-registry"
 import { buildIndicatorTimeMap } from "@/lib/chart-utils"
-import { IndicatorValue } from "@/components/indicator-value"
+import { IndicatorValue } from "@/components/indicators/indicator-value"
 import { useChartHoverValues, useChartData } from "./chart-sync-provider"
 import { createSubChart, setSubChartData, type SubChartState } from "./chart-builders"
 import { SubChartLegend } from "./chart-legends"

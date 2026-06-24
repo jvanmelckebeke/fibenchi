@@ -1,9 +1,9 @@
 import { useMemo, useCallback } from "react"
 import type { Price, Indicator, Annotation, AssetType } from "@/lib/api"
-import { ChartSyncProvider } from "./chart/chart-sync-provider"
-import { CandlestickChart } from "./chart/candlestick-chart"
-import { SubChart } from "./chart/sub-chart"
-import { IndicatorCards } from "./chart/indicator-cards"
+import { ChartSyncProvider } from "./chart-sync-provider"
+import { CandlestickChart } from "./candlestick-chart"
+import { SubChart } from "./sub-chart"
+import { IndicatorCards } from "./indicator-cards"
 import { getSubChartDescriptors, getCardDescriptors, isVisibleAt, type Placement } from "@/lib/indicator-registry"
 
 const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()

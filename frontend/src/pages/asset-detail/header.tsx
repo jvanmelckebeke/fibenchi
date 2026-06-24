@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { WindowSelector } from "@/components/window-selector"
+import { WindowSelector } from "@/components/assets/window-selector"
 import { resolveWindow, type AssetWindow } from "@/lib/asset-window"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { resolveIcon } from "@/lib/icon-utils"

@@ -7,10 +7,10 @@ import { useSettings } from "@/lib/settings"
 import type { Asset, Thesis, ThesisPerformancePoint } from "@/lib/api"
 import { buildAssetsById } from "@/lib/assets"
 import { GroupTable } from "@/components/group-table"
-import { ThesisSectionHeader } from "@/components/thesis-section-header"
-import { ThesisMemberContextMenuContent } from "@/components/thesis-member-context-menu"
+import { ThesisSectionHeader } from "@/components/thesis/thesis-section-header"
+import { ThesisMemberContextMenuContent } from "@/components/thesis/thesis-member-context-menu"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
-import { EditThesisDialog } from "@/components/edit-thesis-dialog"
+import { EditThesisDialog } from "@/components/thesis/edit-thesis-dialog"
 
 export function ThesesPage() {
   const { data: theses, isLoading } = useTheses()

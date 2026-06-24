@@ -1,4 +1,4 @@
-import { IndicatorCell } from "@/components/indicator-cell"
+import { IndicatorCell } from "@/components/indicators/indicator-cell"
 import { getNumericValue, getStringValue } from "@/lib/indicator-registry"
 
 export function HoldingSummaryCell({

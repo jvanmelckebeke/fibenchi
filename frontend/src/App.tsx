@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react"
 import { Routes, Route } from "react-router-dom"
-import { Layout } from "@/components/layout"
+import { Layout } from "@/components/layout/layout"
 import { WatchlistRedirect } from "@/pages/watchlist-redirect"
 
 const PortfolioPage = lazy(() =>

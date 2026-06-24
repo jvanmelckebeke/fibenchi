@@ -1,4 +1,4 @@
-import { AnnotationsList } from "@/components/annotations-list"
+import { AnnotationsList } from "@/components/notes/annotations-list"
 import type { Annotation, AnnotationCreate } from "@/lib/api"
 import type { UseMutationResult } from "@tanstack/react-query"
 

@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { useParams } from "react-router-dom"
-import { ConnectedNote } from "@/components/connected-note"
-import { ConnectedAnnotations } from "@/components/connected-annotations"
-import { TagInput } from "@/components/tag-input"
-import { ThesisInput } from "@/components/thesis-input"
+import { ConnectedNote } from "@/components/notes/connected-note"
+import { ConnectedAnnotations } from "@/components/notes/connected-annotations"
+import { TagInput } from "@/components/tags/tag-input"
+import { ThesisInput } from "@/components/thesis/thesis-input"
 import {
   useAssets,
   useAssetWindow,
@@ -16,11 +16,11 @@ import {
 import type { AssetWindow } from "@/lib/asset-window"
 import { useSettings } from "@/lib/settings"
 import { useQuote } from "@/lib/quote-stream"
-import { StatsPanel } from "@/components/stats-panel"
+import { StatsPanel } from "@/components/assets/stats-panel"
 import { Header, type ChartMode } from "./header"
 import { ChartSection } from "./chart-section"
 import { MovementStats } from "./movement-stats"
-import { EarningsCountdown } from "@/components/earnings-countdown"
+import { EarningsCountdown } from "@/components/assets/earnings-countdown"
 import { HoldingsSection } from "./holdings-section"
 
 
