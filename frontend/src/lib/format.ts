@@ -75,26 +75,48 @@ export function formatAssetPrice(
   return isYieldIndex(asset.symbol) ? `${body}%` : body
 }
 
-export function formatCompactPrice(value: number, currency: string): string {
+/** Significant figures kept by the compact abbreviation. Tuning knob, not a user setting. */
+export const COMPACT_SIG_FIGS = 3
+
+// Suffix bands, largest first. Compact abbreviation only kicks in at |value| >= 1,000.
+const COMPACT_BANDS = [
+  { threshold: 1e9, divisor: 1e9, suffix: "B" },
+  { threshold: 1e6, divisor: 1e6, suffix: "M" },
+  { threshold: 1e3, divisor: 1e3, suffix: "K" },
+] as const
+
+/**
+ * Abbreviate `value` (|value| >= 1,000) to ~`sigFigs` significant figures with a
+ * K/M/B suffix — adaptive decimals per band (2 for `1.xxK`, 1 for `xx.xK`, 0 for
+ * `xxxK`). Trailing zeros are kept for uniform column width (`72.0K`, `1.40M`),
+ * unlike the old fixed-1-decimal formatter that stripped `.0` and collapsed
+ * distinct low-thousands prices (`1,007` and `1,042` both → `1.0K`).
+ */
+export function compactSigFig(value: number, sigFigs = COMPACT_SIG_FIGS): string {
   const abs = Math.abs(value)
-  const sym = currencySymbol(currency)
-  let scaled: string
-  if (abs >= 1e9) {
-    scaled = (value / 1e9).toFixed(1)
-    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
-    return `${sym}${scaled}B`
+  for (let i = 0; i < COMPACT_BANDS.length; i++) {
+    const { threshold, divisor, suffix } = COMPACT_BANDS[i]
+    if (abs < threshold) continue
+    const scaled = value / divisor
+    const intDigits = Math.floor(Math.abs(scaled)).toString().length
+    const decimals = Math.max(0, sigFigs - intDigits)
+    // Rounding can tip a value just under a band (e.g. 999,700 → "1000K"); when it
+    // rolls to 4 integer digits, promote to the next band up (→ "1.00M").
+    if (Math.abs(Number(scaled.toFixed(decimals))) >= 1000 && i > 0) {
+      const up = COMPACT_BANDS[i - 1]
+      const upScaled = value / up.divisor
+      const upDecimals = Math.max(0, sigFigs - Math.floor(Math.abs(upScaled)).toString().length)
+      return `${upScaled.toFixed(upDecimals)}${up.suffix}`
+    }
+    return `${scaled.toFixed(decimals)}${suffix}`
   }
-  if (abs >= 1e6) {
-    scaled = (value / 1e6).toFixed(1)
-    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
-    return `${sym}${scaled}M`
-  }
-  if (abs >= 1e3) {
-    scaled = (value / 1e3).toFixed(1)
-    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
-    return `${sym}${scaled}K`
-  }
-  return formatPrice(value, currency)
+  return value.toString()
+}
+
+export function formatCompactPrice(value: number, currency: string): string {
+  // Below 1,000 the abbreviation buys no width, so keep full currency precision.
+  if (Math.abs(value) < 1e3) return formatPrice(value, currency)
+  return `${currencySymbol(currency)}${compactSigFig(value)}`
 }
 
 export function formatAssetCompactPrice(value: number, asset: AssetFormatHints): string {
@@ -119,24 +141,9 @@ export function formatAssetPriceWithSettings(
 }
 
 export function formatCompactNumber(value: number): string {
-  const abs = Math.abs(value)
-  let scaled: string
-  if (abs >= 1e9) {
-    scaled = (value / 1e9).toFixed(1)
-    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
-    return `${scaled}B`
-  }
-  if (abs >= 1e6) {
-    scaled = (value / 1e6).toFixed(1)
-    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
-    return `${scaled}M`
-  }
-  if (abs >= 1e3) {
-    scaled = (value / 1e3).toFixed(1)
-    if (scaled.endsWith(".0")) scaled = scaled.slice(0, -2)
-    return `${scaled}K`
-  }
-  return value.toFixed(0)
+  // Same sig-fig rule as prices, for volume / chart axis / indicator cards.
+  if (Math.abs(value) < 1e3) return value.toFixed(0)
+  return compactSigFig(value)
 }
 
 export function changeColor(pct: number | null | undefined): string {
