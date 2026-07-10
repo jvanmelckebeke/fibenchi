@@ -52,7 +52,7 @@ export function SparklineChart({
 
     chart.timeScale().fitContent()
 
-    return attachResizeAndCleanup(containerRef.current, chart, { refit: true })
+    return attachResizeAndCleanup(containerRef.current, chart)
   }, [batchData])
 
   if (!batchData) {

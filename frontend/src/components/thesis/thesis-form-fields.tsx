@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/select"
 import { IconPicker } from "@/components/icon-picker"
 import { ColorSwatchPicker } from "@/components/color-swatch-picker"
-import { THESIS_PRESET_COLORS } from "@/lib/thesis-colors"
 import type { ThesisStatus } from "@/lib/api"
 
 export interface ThesisFormValues {
@@ -63,7 +62,7 @@ export function ThesisFormFields({
       </div>
       <div className="space-y-2">
         <Label>Colour</Label>
-        <ColorSwatchPicker value={values.color} onChange={(c) => onChange("color", c)} colors={THESIS_PRESET_COLORS} />
+        <ColorSwatchPicker value={values.color} onChange={(c) => onChange("color", c)} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">

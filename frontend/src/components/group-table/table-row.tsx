@@ -111,14 +111,16 @@ export const TableRow = memo(function TableRow({
   // Suppress stale indicator when market is closed — DB prices are already current.
   // When no quote yet, market_state is unknown so we assume market hours (show stale).
   const marketState = quote?.market_state
-  const isMarketClosed = marketState === "CLOSED" || marketState === "POSTMARKET"
+  // "POSTPOST" = post-market session ended (prices settled); Yahoo never emits
+  // "POSTMARKET". "POST" is still active after-hours, so stale stays meaningful.
+  const isMarketClosed = marketState === "CLOSED" || marketState === "POSTPOST"
   const showStale = hasDbFallback && !isMarketClosed
 
   const { settings } = useSettings()
   const [priceRef, pctRef] = usePriceFlash(displayPrice)
   const py = compactMode ? "py-1.5" : "py-2.5"
   const staleClass = showStale ? "stale-price" : ""
-  const priceFmt = displayPrice != null
+  const priceFmt = displayPrice != null && isColumnVisible(columnSettings, "price")
     ? formatAssetPriceWithSettings(displayPrice, asset, {
         compact: settings.compact_numbers,
         group: settings.thousands_separator,

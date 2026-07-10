@@ -143,7 +143,7 @@ export const IntradayChart = memo(function IntradayChart({
     chartVersionRef.current += 1
     setChartVersion(chartVersionRef.current)
 
-    const detach = attachResizeAndCleanup(containerRef.current, chart, { refit: true })
+    const detach = attachResizeAndCleanup(containerRef.current, chart)
 
     return () => {
       detach()

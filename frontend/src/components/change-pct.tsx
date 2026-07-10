@@ -11,17 +11,15 @@ import { formatChangePct } from "@/lib/format"
  */
 export function ChangePct({
   value,
-  placeholder = "—",
   className,
   ...rest
 }: {
   value: number | null
-  placeholder?: string
 } & React.ComponentProps<"span">) {
   const { text, className: colorClass } = formatChangePct(value)
   return (
     <span className={cn("tabular-nums", colorClass, className)} {...rest}>
-      {text ?? placeholder}
+      {text ?? "—"}
     </span>
   )
 }

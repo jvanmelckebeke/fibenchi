@@ -141,7 +141,7 @@ On startup (`main.py` lifespan):
 - **Generic components:** `ThesisEditor` and `AnnotationsList` accept data + callbacks as props, reused across asset detail and pseudo-ETF detail pages.
 - **Price warmup:** Indicator endpoint fetches `WARMUP_DAYS` extra calendar days before the display period to warm up SMA50/Bollinger Bands. Derived from `max_warmup_periods * 2.3`.
 - **SSE quote stream:** Backend pushes quotes for assets in any group via SSE (`AssetRepository.list_in_any_group_id_symbol_pairs`) with adaptive intervals (15s during market hours, 60s pre/post, 300s closed). Frontend reconnects with exponential backoff (1s→30s) on disconnect.
-- **Stale price animation:** Group table falls back to DB-cached indicator prices when no live SSE quote is available. During market hours, stale values show a pulsing opacity animation (`.stale-price` CSS class). Suppressed when `market_state` is `CLOSED` or `POSTMARKET`.
+- **Stale price animation:** Group table falls back to DB-cached indicator prices when no live SSE quote is available. During market hours, stale values show a pulsing opacity animation (`.stale-price` CSS class). Suppressed when `market_state` is `CLOSED` or `POSTPOST` (post-market ended).
 - **Price flash:** `usePriceFlash` hook triggers green/red background fade animation (1.8s) on price tick changes, using a reflow trick to restart CSS animations on repeated same-direction ticks.
 - **SPA fallback:** In production, the root `Dockerfile` copies the built SPA into `static/`. `main.py` mounts it and serves `index.html` for all non-API, non-asset routes. In dev, this directory doesn't exist so the mount is skipped.
 
