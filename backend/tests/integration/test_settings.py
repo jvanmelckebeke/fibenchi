@@ -25,6 +25,19 @@ async def test_put_get_roundtrip(client):
     assert resp.json()["data"] == {"chart_type": "line", "decimal_places": 4}
 
 
+async def test_put_get_column_order_roundtrip(client):
+    order = ["macd", "rsi", "atr_pct"]
+    await client.put("/api/settings", json={"data": {"group_table_column_order": order}})
+    resp = await client.get("/api/settings")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["group_table_column_order"] == order
+
+
+async def test_put_rejects_non_list_column_order(client):
+    resp = await client.put("/api/settings", json={"data": {"group_table_column_order": "macd"}})
+    assert resp.status_code == 422
+
+
 async def test_put_overwrites(client):
     await client.put("/api/settings", json={"data": {"theme": "dark"}})
     await client.put("/api/settings", json={"data": {"theme": "light", "extra": 1}})
