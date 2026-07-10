@@ -19,6 +19,7 @@ export function isColumnVisible(columnSettings: Record<string, boolean>, key: st
 const RESPONSIVE_HIDE_BREAKPOINTS: Record<string, number> = {
   adx: 1280,
   atr_pct: 1280,
+  vnr: 1280,
   avg_volume: 1280,
   atr: 1024,
   volume: 1024,

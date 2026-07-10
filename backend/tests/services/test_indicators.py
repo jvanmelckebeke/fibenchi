@@ -17,6 +17,7 @@ from app.services.compute.indicators import (
     normalized_force_index,
     rsi,
     sma,
+    volatility_normalized_return,
 )
 from tests.helpers import make_price_df as _make_price_df
 
@@ -465,3 +466,97 @@ def test_nefi_snapshot_crossover_signal():
     assert "values" in snapshot
     assert "nefi_signal" in snapshot["values"]
     assert snapshot["values"]["nefi_signal"] in ("bullish", "bearish", None)
+
+
+# ---------------------------------------------------------------------------
+# Volatility-normalized return (σ-move / return z-score) tests (#543)
+# ---------------------------------------------------------------------------
+
+
+def _series_from_returns(returns: list[float], start: float = 100.0) -> pd.Series:
+    """Build a close series from a list of simple returns (cumulative product)."""
+    closes = [start]
+    for r in returns:
+        closes.append(closes[-1] * (1 + r))
+    return pd.Series(closes)
+
+
+def test_vnr_length():
+    """VNR output should have the same length as its input."""
+    df = _make_price_df(100)
+    result = volatility_normalized_return(df["close"])
+    assert len(result) == 100
+
+
+def test_vnr_first_value_nan():
+    """First value is NaN — there is no prior close to compute a return from."""
+    df = _make_price_df(100)
+    result = volatility_normalized_return(df["close"])
+    assert pd.isna(result.iloc[0])
+
+
+def test_vnr_in_compute_indicators():
+    """VNR should appear as a column in compute_indicators output."""
+    df = _make_price_df(100)
+    result = compute_indicators(df)
+    assert "vnr" in result.columns
+    valid = result["vnr"].dropna()
+    assert len(valid) > 0
+
+
+def test_vnr_in_snapshot():
+    """vnr should appear in snapshot values."""
+    df = _make_price_df(200)
+    snapshot = build_indicator_snapshot(compute_indicators(df))
+    assert "values" in snapshot
+    assert "vnr" in snapshot["values"]
+
+
+def test_vnr_in_all_output_fields():
+    """vnr should be listed in get_all_output_fields."""
+    assert "vnr" in get_all_output_fields()
+
+
+def test_vnr_sign_matches_return():
+    """A day that closes up gets a positive σ-move; a down day gets a negative one."""
+    up = _series_from_returns([0.01, -0.01] * 40 + [0.02])
+    down = _series_from_returns([0.01, -0.01] * 40 + [-0.02])
+    assert volatility_normalized_return(up).iloc[-1] > 0
+    assert volatility_normalized_return(down).iloc[-1] < 0
+
+
+def test_vnr_normalizes_across_volatility_regimes():
+    """The core property: a move that is 2× the asset's own typical move scores
+    ~2σ regardless of the asset's absolute volatility level.
+
+    Asset A oscillates ±1%/day; asset B ±4%/day (4× more volatile). Both take a
+    final move of exactly twice their usual size. Their σ-moves should be nearly
+    equal (~2.0) even though B's headline % move is 4× A's.
+    """
+    calm = _series_from_returns([0.01, -0.01] * 60 + [0.02])
+    wild = _series_from_returns([0.04, -0.04] * 60 + [0.08])
+
+    vnr_calm = volatility_normalized_return(calm).iloc[-1]
+    vnr_wild = volatility_normalized_return(wild).iloc[-1]
+
+    assert vnr_calm == pytest.approx(2.0, abs=0.05)
+    assert vnr_wild == pytest.approx(2.0, abs=0.05)
+    # Same normalized surprise despite a 4× difference in raw move size.
+    assert abs(vnr_calm - vnr_wild) < 0.05
+
+
+def test_vnr_flat_series_no_inf():
+    """A flat (zero-volatility) series must not produce inf (division guard)."""
+    result = volatility_normalized_return(pd.Series([100.0] * 50))
+    assert not np.isinf(result.to_numpy()[~np.isnan(result.to_numpy())]).any()
+
+
+def test_vnr_lambda_affects_result():
+    """The decay `lam` must actually feed through: on a series with *varying*
+    volatility, different decays produce different σ-moves. (On a constant-vol
+    series every decay converges to the same estimate, so a real-world varying
+    series is used here.)"""
+    df = _make_price_df(200)
+    fast = volatility_normalized_return(df["close"], lam=0.80).iloc[-1]
+    slow = volatility_normalized_return(df["close"], lam=0.97).iloc[-1]
+    assert fast != pytest.approx(slow)
