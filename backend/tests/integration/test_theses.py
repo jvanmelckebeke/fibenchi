@@ -123,6 +123,27 @@ async def test_add_and_remove_members(client):
     assert {a["symbol"] for a in resp.json()["assets"]} == {"ECAF.L"}
 
 
+async def test_members_returned_as_full_assets(client, db):
+    """#533: members come back as full asset rows (type/currency/tags), even when
+    the asset is in no group — so the theses page renders every member instead of
+    dropping groupless ones while still counting them in the aggregate."""
+    # Seed directly (NOT via the API), so the asset belongs to zero groups — the
+    # exact orphan state that used to vanish from the theses table.
+    orphan = await _seed_asset_with_closes(db, "ORPH.L", {date(2026, 3, 1): 100.0})
+    tid = (await client.post("/api/theses", json={"name": "Orphans"})).json()["id"]
+
+    resp = await client.post(f"/api/theses/{tid}/assets", json={"asset_ids": [orphan.id]})
+    assert resp.status_code == 200
+    members = resp.json()["assets"]
+    assert len(members) == 1
+    member = members[0]
+    assert member["symbol"] == "ORPH.L"
+    # Full AssetResponse shape, not the old id/symbol/name brief.
+    assert member["type"] == "stock"
+    assert member["currency"] == "USD"
+    assert member["tags"] == []
+
+
 async def test_asset_in_multiple_theses(client):
     coco = await create_asset_via_api(client, "COCO.L", "Cocoa")
     t1 = (await client.post("/api/theses", json={"name": "El Niño"})).json()["id"]

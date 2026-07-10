@@ -121,12 +121,6 @@ export interface Note {
 
 export type ThesisStatus = "watching" | "live" | "played_out"
 
-export interface ThesisAssetBrief {
-  id: number
-  symbol: string
-  name: string
-}
-
 export interface Thesis {
   id: number
   name: string
@@ -136,7 +130,8 @@ export interface Thesis {
   status: ThesisStatus
   opened_at: string
   created_at: string
-  assets: ThesisAssetBrief[]
+  // Full member rows (backend returns AssetResponse), so groupless members render too.
+  assets: Asset[]
   aggregate_pct: number | null
 }
 
