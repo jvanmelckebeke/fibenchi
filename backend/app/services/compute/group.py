@@ -60,13 +60,13 @@ async def get_batch_sparklines(
 
 
 async def _compute_snapshots_for_rows(
-    db: AsyncSession, asset_rows, scope,
+    db: AsyncSession, asset_rows,
 ) -> dict[str, dict]:
     """Compute DB-backed indicator snapshots for (id, symbol) rows, with caching.
 
-    ``scope`` only disambiguates the cache key; the snapshot *values* depend purely
-    on (symbols, latest price date), so identical symbol sets across scopes compute
-    the same result.
+    The snapshot *values* depend purely on (symbols, latest price date), so the
+    cache is keyed by exactly that — identical symbol sets share entries across
+    callers (group pages and the symbol-addressed indicators endpoint alike).
     """
     if not asset_rows:
         return {}
@@ -76,9 +76,9 @@ async def _compute_snapshots_for_rows(
 
     price_repo = PriceRepository(db)
 
-    # Build cache key: symbols + latest price date + scope
+    # Build cache key: symbols + latest price date (scope-independent by design)
     latest_date = await price_repo.get_latest_date(asset_ids)
-    cache_key = (frozenset(id_to_symbol.values()), latest_date, scope)
+    cache_key = (frozenset(id_to_symbol.values()), latest_date)
 
     cached = _indicator_cache.get_value(cache_key)
     if cached is not None:
@@ -127,7 +127,7 @@ async def compute_and_cache_indicators(
     else:
         asset_rows = await _get_default_group_pairs(db)
 
-    return await _compute_snapshots_for_rows(db, asset_rows, group_id)
+    return await _compute_snapshots_for_rows(db, asset_rows)
 
 
 async def compute_indicators_for_symbols(
@@ -142,4 +142,4 @@ async def compute_indicators_for_symbols(
     if not symbols:
         return {}
     asset_rows = await AssetRepository(db).list_id_symbol_pairs_by_symbols(symbols)
-    return await _compute_snapshots_for_rows(db, asset_rows, None)
+    return await _compute_snapshots_for_rows(db, asset_rows)
