@@ -1,9 +1,10 @@
 """Unit tests for tag_service — CRUD, attach/detach M2M operations."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.models import Asset, Tag
+import pytest
+
+from app.models import Tag
 from app.services.tag_service import (
     attach_tag,
     create_tag,

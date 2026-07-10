@@ -2,10 +2,9 @@
 
 from datetime import date, datetime, timedelta
 
+import pandas as pd
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import pandas as pd
 
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.models import Asset, PriceHistory

@@ -2,9 +2,9 @@
 
 import asyncio
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.quote_service import get_quotes, quote_event_generator
 

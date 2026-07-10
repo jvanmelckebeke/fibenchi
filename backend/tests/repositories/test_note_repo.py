@@ -2,7 +2,6 @@
 
 import pytest
 
-from app.models import Asset, AssetType, Note
 from app.repositories.note_repo import NoteRepository
 from tests.helpers import create_test_asset as _create_asset
 

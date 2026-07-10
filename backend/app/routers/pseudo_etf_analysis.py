@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.services.entity_lookups import get_pseudo_etf
-from app.schemas.pseudo_etf import PerformanceBreakdownPoint, ConstituentIndicatorResponse
-from app.services.compute.pseudo_etf import calculate_performance
+from app.schemas.pseudo_etf import ConstituentIndicatorResponse, PerformanceBreakdownPoint
 from app.services.compute.indicators import compute_batch_indicator_snapshots
+from app.services.compute.pseudo_etf import calculate_performance
+from app.services.entity_lookups import get_pseudo_etf
 from app.services.fundamentals_cache import merge_fundamentals_into_batch
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])

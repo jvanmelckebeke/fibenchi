@@ -1,9 +1,8 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
-
 from datetime import date
+from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -13,14 +12,32 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from app.config import settings as app_settings
-
 from app.database import async_session, engine
-from app.routers import annotations, assets, companion, data, groups, holdings, indicators, note, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
-from app.services.price_sync import sync_all_prices
+from app.routers import (
+    annotations,
+    assets,
+    companion,
+    data,
+    groups,
+    holdings,
+    indicators,
+    note,
+    portfolio,
+    prices,
+    pseudo_etf_analysis,
+    pseudo_etfs,
+    quotes,
+    search,
+    symbol_sources,
+    tags,
+    thesis,
+)
+from app.routers import settings as settings_router
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
+from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
 from app.services.price_providers import init_price_provider
-from app.services.intraday import fetch_and_store_intraday, cleanup_old_intraday
+from app.services.price_sync import sync_all_prices
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
 logger = logging.getLogger(__name__)

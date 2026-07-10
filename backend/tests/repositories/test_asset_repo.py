@@ -86,7 +86,7 @@ async def test_list_in_any_group_symbols(db):
 
 async def test_list_in_group_id_symbol_pairs(db):
     aapl = await _create_asset(db, "AAPL")
-    msft = await _create_asset(db, "MSFT")
+    await _create_asset(db, "MSFT")
     await _add_to_default_group(db, aapl)
 
     default_group = await GroupRepository(db).get_default()
@@ -123,7 +123,7 @@ async def test_create_and_save(db):
 
 async def test_get_by_ids(db):
     a1 = await _create_asset(db, "AAPL")
-    a2 = await _create_asset(db, "MSFT")
+    await _create_asset(db, "MSFT")
     a3 = await _create_asset(db, "GOOGL")
     repo = AssetRepository(db)
 

@@ -1,7 +1,8 @@
 """Unit tests for pseudo_etf_service — CRUD, constituents, note, annotations."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models import Asset
 from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfNote

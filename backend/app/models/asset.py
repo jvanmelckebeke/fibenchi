@@ -31,8 +31,8 @@ class Asset(Base):
 
 
 # Avoid circular import issues - these are resolved at runtime
-from app.models.price import PriceHistory  # noqa: E402, F401
 from app.models.annotation import Annotation  # noqa: E402, F401
 from app.models.note import Note  # noqa: E402, F401
+from app.models.price import PriceHistory  # noqa: E402, F401
 from app.models.tag import Tag, tag_assets  # noqa: E402, F401
 from app.models.thesis import Thesis, thesis_assets  # noqa: E402, F401

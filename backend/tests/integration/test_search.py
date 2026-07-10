@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.models.symbol_directory import SymbolDirectory
-from tests.conftest import TestSession
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 

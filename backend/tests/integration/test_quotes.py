@@ -2,9 +2,9 @@
 
 import asyncio
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.services.quote_service import _reset_asset_list_cache
 from tests.conftest import TestSession

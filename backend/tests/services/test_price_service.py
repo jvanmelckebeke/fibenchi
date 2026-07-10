@@ -1,23 +1,21 @@
 """Unit tests for price_service — tests caching, ephemeral fetch, warmup logic."""
 
-import pytest
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
+import pytest
 
-from app.models import Asset, AssetType, PriceHistory
+from app.models import PriceHistory
 from app.services.price_service import (
     _backfill_already_attempted,
     _display_start,
     _earliest_date_cache,
     _fetch_ephemeral,
-    get_detail,
     get_indicators,
     get_prices,
     refresh_prices,
 )
-
 from tests.helpers import make_model_asset as _make_asset
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")

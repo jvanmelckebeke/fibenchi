@@ -8,6 +8,8 @@ import pytest
 from app.services.yahoo import yahoo_client
 from app.services.yahoo._parsers import (
     last_reported_date as _extract_last_reported_date,
+)
+from app.services.yahoo._parsers import (
     parse_earnings_date as _parse_earnings_date,
 )
 

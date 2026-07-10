@@ -1,7 +1,8 @@
 """Unit tests for asset_service — tests service logic with mocked repos."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models import AssetType
 from app.services.asset_service import create_asset, delete_asset, list_assets, update_asset

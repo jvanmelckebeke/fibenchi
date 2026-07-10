@@ -1,7 +1,8 @@
 """Tests for group endpoints — CRUD and batch (sparklines, indicators)."""
 
-import pytest
 from datetime import date, timedelta
+
+import pytest
 
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.group_repo import GroupRepository

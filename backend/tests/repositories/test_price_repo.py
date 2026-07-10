@@ -1,11 +1,11 @@
 """Tests for PriceRepository — date-range queries and aggregations against real SQLite DB."""
 
-import pytest
 from datetime import date, timedelta
 
 import pandas as pd
+import pytest
 
-from app.models import Asset, AssetType, PriceHistory
+from app.models import PriceHistory
 from app.repositories.price_repo import PriceRepository
 from tests.helpers import create_test_asset as _create_asset
 

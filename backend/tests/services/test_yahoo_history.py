@@ -125,8 +125,9 @@ class TestFetchHistory:
     @patch("app.services.yahoo.client.Ticker")
     async def test_normalizes_mixed_date_datetime_index(self, mock_ticker_cls):
         """Yahoo can append a tz-aware datetime row for intraday data to daily date index."""
-        import pytz
         from datetime import datetime as dt
+
+        import pytz
 
         daily_dates = [date(2026, 4, 2), date(2026, 4, 3)]
         intraday = dt(2026, 4, 6, 9, 0, tzinfo=pytz.timezone("Asia/Seoul"))

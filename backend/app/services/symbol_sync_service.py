@@ -1,7 +1,7 @@
 """Sync service — orchestrates provider execution and symbol_directory upserts."""
 
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert

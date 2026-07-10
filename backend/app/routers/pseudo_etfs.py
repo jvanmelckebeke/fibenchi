@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.pseudo_etf import (
-    PseudoETFCreate,
-    PseudoETFUpdate,
-    PseudoETFAddConstituents,
-    PseudoETFResponse,
-)
-from app.schemas.note import NoteResponse, NoteUpdate
 from app.schemas.annotation import AnnotationCreate, AnnotationResponse
+from app.schemas.note import NoteResponse, NoteUpdate
+from app.schemas.pseudo_etf import (
+    PseudoETFAddConstituents,
+    PseudoETFCreate,
+    PseudoETFResponse,
+    PseudoETFUpdate,
+)
 from app.services import pseudo_etf_service
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])

@@ -1,0 +1,15 @@
+# Ruff config for the backend. Intentionally lenient to start: catch the real
+# footguns (unused imports, undefined names, import order) with near-zero style
+# noise. Broaden `select` over time; a type checker (pyright/mypy) is a separate
+# follow-up for the None-access / return-type class of issues ruff can't see.
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+# F = pyflakes (unused imports, undefined names, f-string bugs, …), I = isort.
+select = ["F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]

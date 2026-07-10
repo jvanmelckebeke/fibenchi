@@ -2,7 +2,6 @@
 
 import pytest
 
-from app.models import Group
 from app.repositories.group_repo import GroupRepository
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")

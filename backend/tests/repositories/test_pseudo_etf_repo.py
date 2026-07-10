@@ -1,9 +1,10 @@
 """Tests for PseudoEtfRepository — CRUD, note, and annotation operations."""
 
-import pytest
 from datetime import date
 
-from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfNote
+import pytest
+
+from app.models.pseudo_etf import PseudoETF
 from app.repositories.pseudo_etf_repo import PseudoEtfRepository
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")

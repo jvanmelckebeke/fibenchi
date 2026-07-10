@@ -5,7 +5,6 @@ import pytest
 
 from app.services import asset_service
 
-
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
