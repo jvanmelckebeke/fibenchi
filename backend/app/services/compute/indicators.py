@@ -84,7 +84,27 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return _wilder_smooth(tr, period)
 
 
-def volatility_normalized_return(closes: pd.Series, lam: float = 0.94) -> pd.Series:
+# RiskMetrics daily decay; shared by the vnr indicator and its live forecast.
+VNR_LAMBDA = 0.94
+
+
+def _ewma_daily_vol(closes: pd.Series, lam: float) -> pd.Series:
+    """Forward EWMA volatility forecast (RiskMetrics zero-mean).
+
+    Returns the sqrt of the EWMA variance built from returns *through each bar*
+    — i.e. the volatility with which to normalize the *next* bar's return. Flat
+    stretches (variance 0) become NaN to guard division. This is the un-shifted
+    counterpart of the ``sigma_forecast`` inside :func:`volatility_normalized_return`;
+    the value at the last bar is the forecast for the in-progress day, which the
+    live snapshot uses to score today's move before its bar is written.
+    """
+    returns = closes.pct_change()
+    # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
+    ewma_var = (returns**2).ewm(alpha=1 - lam, adjust=False).mean()
+    return np.sqrt(ewma_var).replace(0, float("nan"))
+
+
+def volatility_normalized_return(closes: pd.Series, lam: float = VNR_LAMBDA) -> pd.Series:
     """Volatility-normalized daily return — a "sigma move" / return z-score.
 
     Expresses each day's close-to-close return in units of the asset's own
@@ -101,10 +121,8 @@ def volatility_normalized_return(closes: pd.Series, lam: float = 0.94) -> pd.Ser
     abruptly and stepping the score ("ghosting").
     """
     returns = closes.pct_change()
-    # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
-    ewma_var = (returns**2).ewm(alpha=1 - lam, adjust=False).mean()
     # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
-    sigma_forecast = np.sqrt(ewma_var.shift(1)).replace(0, float("nan"))
+    sigma_forecast = _ewma_daily_vol(closes, lam).shift(1)
     return returns / sigma_forecast
 
 
@@ -288,6 +306,17 @@ def _cmf_snapshot_derived(row: pd.Series) -> dict:
     return {"cmf_signal": None}
 
 
+def _vnr_post_compute(result: pd.DataFrame) -> None:
+    """Attach the forward EWMA vol forecast used to score an in-progress day.
+
+    ``vnr`` itself normalizes the *last completed* bar's return; ``vnr_sigma`` is
+    the vol (a return fraction) to divide a live intraday return by so the UI can
+    show today's σ-move before today's bar has been written to the DB. Flat
+    stretches yield NaN, which ``build_indicator_snapshot`` renders as None.
+    """
+    result["vnr_sigma"] = _ewma_daily_vol(result["close"], VNR_LAMBDA)
+
+
 def _chop_snapshot_derived(row: pd.Series) -> dict:
     """Derive choppiness state from latest row."""
     if pd.notna(row.get("chop")):
@@ -428,10 +457,12 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     ),
     "vnr": IndicatorDef(
         func=volatility_normalized_return,
-        params={"lam": 0.94},
-        output_fields=["vnr"],
+        params={"lam": VNR_LAMBDA},
+        output_fields=["vnr", "vnr_sigma"],
         decimals=2,
         warmup_periods=60,
+        post_compute=_vnr_post_compute,
+        field_decimals={"vnr_sigma": 6},
     ),
 }
 

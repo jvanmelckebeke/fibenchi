@@ -19,6 +19,7 @@ import {
   formatDeltaAnnotation,
   getDescriptorByField,
   formatIndicatorField,
+  computeLiveVnr,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -280,12 +281,22 @@ export const TableRow = memo(function TableRow({
                 </td>
               )
             }
-            const val = getNumericValue(indicator?.values, field)
+            // σ-Move is a daily-bar indicator; its stored value reflects the last
+            // completed bar (yesterday during market hours), which can contradict
+            // the live change % beside it. Recompute it against the live quote so
+            // it tracks today. Falls back to the DB value once today's bar syncs.
+            const liveVnr = field === "vnr"
+              ? computeLiveVnr(quote, indicator?.values, indicator?.close)
+              : null
+            const values = liveVnr != null
+              ? { ...indicator?.values, vnr: liveVnr }
+              : indicator?.values
+            const val = getNumericValue(values, field)
             const desc = getDescriptorByField(field)
             // Route through the shared registry formatter so the table matches the
             // card/detail rendering (decimals, threshold colours, currency prefix).
-            const formatted = val != null && desc && indicator?.values
-              ? formatIndicatorField(field, desc, indicator.values, asset.currency)
+            const formatted = val != null && desc && values
+              ? formatIndicatorField(field, desc, values, asset.currency)
               : null
             return (
               <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>

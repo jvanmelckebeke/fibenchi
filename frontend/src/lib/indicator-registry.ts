@@ -174,6 +174,40 @@ export function getStringValue(
   return typeof v === "string" ? v : null
 }
 
+/**
+ * Recompute the σ-Move (vnr) against a live intraday quote so the table shows
+ * *today's* move in σ units instead of the last completed daily bar.
+ *
+ * vnr = daily_return / EWMA_vol_forecast. The DB snapshot's `vnr` is anchored to
+ * the last stored bar; during market hours that bar is *yesterday*, so it can
+ * contradict the live change % shown beside it (positive σ next to a red day).
+ * Here we normalize the live return (`quote.change_percent`) by the forward vol
+ * forecast (`vnr_sigma` — the EWMA vol built through the last stored bar).
+ *
+ * The forecast only applies to the quote's day when the last stored bar is the
+ * session *before* the quote — detected by `quote.previous_close ≈ dbClose`.
+ * Once today's bar is synced (previous_close no longer matches the stored close),
+ * the DB `vnr` is already current, so we return null and let the caller fall back
+ * to it. Also returns null when the forecast/quote data is missing or degenerate.
+ */
+export function computeLiveVnr(
+  quote: { change_percent: number | null; previous_close: number | null } | undefined,
+  values: Record<string, number | string | null | undefined> | undefined,
+  dbClose: number | null | undefined,
+): number | null {
+  if (!quote) return null
+  const changePct = quote.change_percent
+  const prevClose = quote.previous_close
+  const sigma = getNumericValue(values, "vnr_sigma")
+  if (changePct == null || prevClose == null || sigma == null || sigma <= 0) return null
+  if (dbClose == null || dbClose === 0) return null
+  // Only reuse the forecast when the stored bar is the quote's prior session.
+  // (When they differ, the two anchors are close enough that either formula
+  // agrees — a flat day — or today's bar is stored and the DB vnr is correct.)
+  if (Math.abs(prevClose - dbClose) / dbClose > 0.005) return null
+  return changePct / 100 / sigma
+}
+
 export function getOverlayDescriptors(): IndicatorDescriptor[] {
   return INDICATOR_REGISTRY.filter((d) => d.placement === "overlay")
 }
