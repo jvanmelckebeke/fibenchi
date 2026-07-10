@@ -100,6 +100,14 @@ def make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:
     }, index=dates)
 
 
+def make_series_from_returns(returns: list[float], start: float = 100.0) -> pd.Series:
+    """Build a close series from a list of simple returns (cumulative product)."""
+    closes = [start]
+    for r in returns:
+        closes.append(closes[-1] * (1 + r))
+    return pd.Series(closes)
+
+
 # ---------------------------------------------------------------------------
 # Repository test helpers — real SQLAlchemy model instances (need db session)
 # ---------------------------------------------------------------------------
