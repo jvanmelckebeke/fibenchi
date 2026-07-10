@@ -12,7 +12,7 @@ import { SortableHeader } from "./sortable-header"
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
 import { TableRow, type RowMenuRenderer } from "./table-row"
 export type { RowMenuContext, RowMenuRenderer } from "./table-row"
-import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden } from "./shared"
+import { BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden, useOrderedIndicatorFields } from "./shared"
 import { useColumnResize } from "./use-column-resize"
 
 
@@ -71,6 +71,10 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
     })
   }
 
+  const reorderColumns = (nextOrder: string[]) => {
+    updateSettings({ group_table_column_order: nextOrder })
+  }
+
   const allExpanded = assets.length > 0 && assets.every((a) => expandedSymbols.has(a.symbol))
 
   const toggleExpandAll = () => {
@@ -81,9 +85,10 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
     }
   }
 
+  const orderedIndicatorFields = useOrderedIndicatorFields()
   const visibleIndicatorFields = useMemo(
-    () => SORTABLE_FIELDS.filter((f) => isColumnVisible(columnSettings, f) && !responsiveHidden.has(f)),
-    [columnSettings, responsiveHidden],
+    () => orderedIndicatorFields.filter((f) => isColumnVisible(columnSettings, f) && !responsiveHidden.has(f)),
+    [orderedIndicatorFields, columnSettings, responsiveHidden],
   )
 
   // Total visible columns: expand chevron (1) + symbol (1) + toggleable base + toggleable indicators
@@ -133,6 +138,8 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
           columnSettings={columnSettings}
           onToggle={toggleColumn}
           responsiveHidden={responsiveHidden}
+          orderedIndicatorFields={orderedIndicatorFields}
+          onReorder={reorderColumns}
         />
       </div>
       <table className="w-full table-fixed">

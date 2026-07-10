@@ -22,6 +22,8 @@ export interface AppSettings {
   group_sort_dir: SortDir
   group_table_columns: Record<string, boolean>
   group_table_column_widths: Record<string, number>
+  /** Left-to-right order of indicator columns (field ids). Empty = registry order. */
+  group_table_column_order: string[]
   thesis_grouping: ThesisGrouping
   /** In list view, keep a thesis's members together when sorting (average-and-interleave). */
   thesis_cluster: boolean
@@ -98,6 +100,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   group_sort_dir: "asc",
   group_table_columns: {},
   group_table_column_widths: {},
+  group_table_column_order: [],
   thesis_grouping: "list",
   thesis_cluster: false,
   chart_default_period: "1y",

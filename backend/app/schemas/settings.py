@@ -22,6 +22,9 @@ class AppSettingsData(BaseModel):
     group_sort_dir: Literal["asc", "desc"] | None = None
     group_table_columns: dict[str, bool] | None = None
     group_table_column_widths: dict[str, float] | None = None
+    # Persisted left-to-right order of the indicator columns (list of field ids).
+    # Empty/absent = registry order. Stale/new fields are reconciled client-side.
+    group_table_column_order: list[str] | None = None
     # Thesis layout for the table view, plus whether the list view clusters a
     # thesis's members together when sorting. Legacy keys (`group_by_thesis`, the
     # old "none"/"inline" thesis_grouping values) are tolerated via extra="allow"
