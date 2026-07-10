@@ -340,3 +340,31 @@ def test_vnr_lambda_affects_result():
     fast = volatility_normalized_return(df["close"], lam=0.80).iloc[-1]
     slow = volatility_normalized_return(df["close"], lam=0.97).iloc[-1]
     assert fast != pytest.approx(slow)
+
+
+def test_vnr_sigma_in_snapshot():
+    """The forward vol forecast is exposed so the UI can score an in-progress day."""
+    df = _make_price_df(200)
+    snapshot = build_indicator_snapshot(compute_indicators(df))
+    assert "vnr_sigma" in snapshot["values"]
+    assert snapshot["values"]["vnr_sigma"] > 0
+
+
+def test_vnr_sigma_reconstructs_live_move():
+    """vnr_sigma is exactly the forecast that turns a next-day return into its σ-move.
+
+    Mirrors the frontend live recompute: the DB snapshot holds bars through
+    'yesterday'; today's live return divided by the snapshot's vnr_sigma must
+    reproduce the σ-move the full series (with today's bar) computes for that day.
+    """
+    df = _make_price_df(200)
+    # DB state = everything up to but excluding the final ("today") bar.
+    db_snapshot = build_indicator_snapshot(compute_indicators(df.iloc[:-1]))
+    vnr_sigma = db_snapshot["values"]["vnr_sigma"]
+
+    closes = df["close"]
+    today_return = closes.iloc[-1] / closes.iloc[-2] - 1
+    live_vnr = today_return / vnr_sigma
+
+    full = compute_indicators(df)
+    assert live_vnr == pytest.approx(full["vnr"].iloc[-1], rel=1e-4)
