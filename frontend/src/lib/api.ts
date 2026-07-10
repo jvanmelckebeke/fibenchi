@@ -2,6 +2,7 @@ import type {
   Annotation,
   AnnotationCreate,
   Asset,
+  AssetAttachments,
   AssetCreate,
   AssetDetail,
   AssetUpdate,
@@ -79,6 +80,11 @@ export const api = {
       request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: AssetUpdate) =>
       request<Asset>(`/assets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    attachments: (symbol: string) =>
+      request<AssetAttachments>(`/assets/${encodeURIComponent(symbol)}/attachments`),
+    // Hard delete: removes the row + all memberships/note/tags/annotations/prices.
+    hardDelete: (symbol: string) =>
+      request<void>(`/assets/${encodeURIComponent(symbol)}?hard=true`, { method: "DELETE" }),
   },
   prices: {
     detail: (symbol: string, period?: string) =>

@@ -13,9 +13,10 @@ import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/assets/add-symbol-dialog"
+import { RemoveAssetDialog } from "@/components/assets/remove-asset-dialog"
 import { AssetCard } from "@/components/assets/asset-card"
 import { TagFilterPopover } from "@/components/tags/tag-filter-popover"
-import { useGroup, useGroups, useGroupSparklines, useGroupIndicators, useRemoveAssetFromGroup, useUpdateGroup, useTags, useTheses, usePrefetchAssetDetail, usePrefetchOtherGroups } from "@/lib/queries"
+import { useGroup, useGroups, useGroupSparklines, useGroupIndicators, useUpdateGroup, useTags, useTheses, usePrefetchAssetDetail, usePrefetchOtherGroups } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
 import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode, type SortDir } from "@/lib/settings"
@@ -39,7 +40,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const { data: allTags } = useTags()
   const { data: theses } = useTheses()
   const { data: allGroups } = useGroups()
-  const removeFromGroup = useRemoveAssetFromGroup()
+  const [removeTarget, setRemoveTarget] = useState<Asset | null>(null)
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [sparklinePeriod, setSparklinePeriod] = useState("3mo")
   const { settings, updateSettings } = useSettings()
@@ -177,8 +178,8 @@ export function GroupPage({ groupId }: { groupId: number }) {
 
   const handleRemove = useCallback((symbol: string) => {
     const asset = allAssets?.find((a) => a.symbol === symbol)
-    if (asset) removeFromGroup.mutate({ groupId, assetId: asset.id })
-  }, [allAssets, removeFromGroup, groupId])
+    if (asset) setRemoveTarget(asset)
+  }, [allAssets])
 
   const toggleTag = (id: number) =>
     setSelectedTags((prev) =>
@@ -409,6 +410,16 @@ export function GroupPage({ groupId }: { groupId: number }) {
         </div>
       )}
       </div>
+
+      <RemoveAssetDialog
+        asset={removeTarget}
+        groupId={groupId}
+        groupName={group?.name ?? "this group"}
+        open={removeTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setRemoveTarget(null)
+        }}
+      />
     </div>
   )
 }

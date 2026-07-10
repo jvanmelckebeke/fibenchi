@@ -36,6 +36,17 @@ export interface Asset {
   tags: TagBrief[]
 }
 
+/** What is attached to an asset — drives the remove dialog's orphan warning + hard-delete confirm. */
+export interface AssetAttachments {
+  symbol: string
+  groups: string[]
+  theses: string[]
+  pseudo_etfs: string[]
+  tags: string[]
+  has_note: boolean
+  annotation_count: number
+}
+
 export interface AssetCreate {
   symbol: string
   name?: string

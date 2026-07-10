@@ -26,6 +26,20 @@ class TagBrief(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AssetAttachments(BaseModel):
+    """What is attached to an asset, for the remove dialog to warn before an orphan
+    or a hard delete. ``groups`` drives the last-group warning; ``pseudo_etfs`` and
+    ``theses`` are the silent-mutation risks a hard delete would cascade into."""
+
+    symbol: str = Field(description="Ticker symbol")
+    groups: list[str] = Field(default=[], description="Names of groups containing this asset")
+    theses: list[str] = Field(default=[], description="Names of theses this asset is a member of")
+    pseudo_etfs: list[str] = Field(default=[], description="Names of pseudo-ETFs this asset is a constituent of")
+    tags: list[str] = Field(default=[], description="Tag names attached to this asset")
+    has_note: bool = Field(default=False, description="Whether the asset has a non-empty note")
+    annotation_count: int = Field(default=0, description="Number of chart annotations")
+
+
 class AssetResponse(BaseModel):
     id: int = Field(description="Internal asset ID")
     symbol: str = Field(description="Ticker symbol")

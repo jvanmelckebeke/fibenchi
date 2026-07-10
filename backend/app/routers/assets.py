@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.asset import AssetCreate, AssetResponse, AssetUpdate
+from app.schemas.asset import AssetAttachments, AssetCreate, AssetResponse, AssetUpdate
 from app.services import asset_service
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -46,9 +46,35 @@ async def update_asset(asset_id: int, data: AssetUpdate, db: AsyncSession = Depe
     )
 
 
-@router.delete("/{symbol}", status_code=204, summary="Remove an asset from the default group")
-async def delete_asset(symbol: str, db: AsyncSession = Depends(get_db)):
-    """Remove the asset from the default group. The row is preserved so that
-    pseudo-ETF constituent relationships remain intact.
+@router.get(
+    "/{symbol}/attachments",
+    response_model=AssetAttachments,
+    summary="Summarise what is attached to an asset",
+)
+async def get_asset_attachments(symbol: str, db: AsyncSession = Depends(get_db)):
+    """Return the asset's group / pseudo-ETF / thesis memberships, tags, note and
+    annotation count. The remove dialog uses this to warn before leaving the asset
+    in zero groups, and to show what a hard delete would cascade into.
     """
-    await asset_service.delete_asset(db, symbol)
+    return await asset_service.get_attachments(db, symbol)
+
+
+@router.delete("/{symbol}", status_code=204, summary="Remove an asset (soft) or delete it entirely (hard)")
+async def delete_asset(
+    symbol: str,
+    hard: bool = Query(
+        default=False,
+        description="If true, permanently delete the asset row and cascade "
+        "(group + pseudo-ETF + thesis memberships, tags, note, annotations, prices). "
+        "Default false only removes it from the default group, preserving the row.",
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove the asset from the default group (soft, the row is preserved so
+    pseudo-ETF constituent relationships remain intact), or — with ``hard=true`` —
+    permanently delete the asset and everything attached to it.
+    """
+    if hard:
+        await asset_service.hard_delete_asset(db, symbol)
+    else:
+        await asset_service.delete_asset(db, symbol)

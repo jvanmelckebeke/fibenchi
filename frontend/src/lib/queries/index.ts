@@ -1,6 +1,6 @@
 export { keys, STALE_1MIN, STALE_5MIN, STALE_24H, useInvalidatingMutation } from "./shared"
 export { usePortfolioIndex, usePortfolioPerformers } from "./portfolio"
-export { useAssets, useCreateAsset, useUpdateAsset, useLocalSearch, useYahooSearch } from "./assets"
+export { useAssets, useCreateAsset, useUpdateAsset, useAssetAttachments, useHardDeleteAsset, useLocalSearch, useYahooSearch } from "./assets"
 export { useAssetDetail, useAssetWindow, useEtfHoldings, useHoldingsIndicators, useRefreshPrices, usePrefetchAssetDetail } from "./prices"
 export { useEarnings } from "./earnings"
 export { useTags, useCreateTag, useAttachTag, useDetachTag } from "./tags"
