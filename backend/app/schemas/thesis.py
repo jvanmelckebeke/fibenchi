@@ -4,14 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.models.thesis import ThesisStatus
 from app.schemas._validators import validate_hex_color
-
-
-class ThesisAssetBrief(BaseModel):
-    id: int = Field(description="Asset ID")
-    symbol: str = Field(description="Ticker symbol")
-    name: str = Field(description="Display name")
-
-    model_config = {"from_attributes": True}
+from app.schemas.asset import AssetResponse
 
 
 class ThesisCreate(BaseModel):
@@ -57,7 +50,11 @@ class ThesisResponse(BaseModel):
     status: ThesisStatus = Field(description="Lifecycle status")
     opened_at: datetime.date = Field(description="Date the thesis was formed")
     created_at: datetime.datetime = Field(description="Creation timestamp")
-    assets: list[ThesisAssetBrief] = Field(default=[], description="Member assets")
+    assets: list[AssetResponse] = Field(
+        default=[],
+        description="Member assets as full rows (type/currency/tags), so callers can "
+        "render every member — including ones that are in no group.",
+    )
     aggregate_pct: float | None = Field(
         default=None,
         description="Equal-weight mean return of members since opened_at, in percent (null if no price data)",

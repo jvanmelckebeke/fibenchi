@@ -23,6 +23,7 @@ export const keys = {
   portfolioIndex: (period?: string) => ["portfolio-index", period] as const,
   portfolioPerformers: (period?: string) => ["portfolio-performers", period] as const,
   assets: ["assets"] as const,
+  assetAttachments: (symbol: string) => ["asset-attachments", symbol] as const,
   assetDetail: (symbol: string, period?: string) => ["asset-detail", symbol, period] as const,
   etfHoldings: (symbol: string) => ["etf-holdings", symbol] as const,
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,

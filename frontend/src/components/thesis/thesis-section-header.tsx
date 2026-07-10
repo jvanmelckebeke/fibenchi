@@ -80,7 +80,7 @@ export function ThesisSectionHeader({
         <ChangePct
           value={thesis.aggregate_pct}
           className="text-sm font-medium"
-          title="Equal-weight return of all members since the thesis opened (some may be in other groups or not shown)"
+          title="Equal-weight return of all members since the thesis opened"
         />
       )}
       {performance && performance.length > 1 && (

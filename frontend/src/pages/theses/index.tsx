@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react"
 import { ChevronsDownUp, ChevronsUpDown, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useTheses, useThesesPerformance, useGroups, useIndicators } from "@/lib/queries"
+import { useTheses, useThesesPerformance, useIndicators } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { useSettings } from "@/lib/settings"
-import type { Asset, Thesis, ThesisPerformancePoint } from "@/lib/api"
-import { buildAssetsById } from "@/lib/assets"
+import type { Thesis, ThesisPerformancePoint } from "@/lib/api"
 import { GroupTable } from "@/components/group-table"
 import { ThesisSectionHeader } from "@/components/thesis/thesis-section-header"
 import { ThesisMemberContextMenuContent } from "@/components/thesis/thesis-member-context-menu"
@@ -15,17 +14,12 @@ import { EditThesisDialog } from "@/components/thesis/edit-thesis-dialog"
 export function ThesesPage() {
   const { data: theses, isLoading } = useTheses()
   const { data: performance } = useThesesPerformance()
-  const { data: groups } = useGroups()
   const quotes = useQuotes()
   const { settings } = useSettings()
 
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [showPlayedOut, setShowPlayedOut] = useState(false)
   const [editThesis, setEditThesis] = useState<Thesis | null>(null)
-
-  // Thesis members only carry id/symbol/name; resolve them to full Asset objects
-  // (sourced from every group) so we can render the rich GroupTable rows.
-  const assetsById = useMemo(() => buildAssetsById(groups ?? []), [groups])
 
   const perfById = useMemo(() => {
     const map = new Map<number, ThesisPerformancePoint[]>()
@@ -50,26 +44,15 @@ export function ThesesPage() {
     })
   }, [allTheses, showPlayedOut])
 
-  const membersByThesis = useMemo(() => {
-    const map = new Map<number, Asset[]>()
-    for (const t of allTheses) {
-      map.set(
-        t.id,
-        t.assets.map((m) => assetsById.get(m.id)).filter((a): a is Asset => a != null),
-      )
-    }
-    return map
-  }, [allTheses, assetsById])
-
   // Fetch indicators only for the members of expanded theses (lazy on expand).
   const expandedSymbols = useMemo(() => {
     const syms = new Set<string>()
     for (const t of visible) {
       if (!expanded.has(t.id)) continue
-      for (const a of membersByThesis.get(t.id) ?? []) syms.add(a.symbol)
+      for (const a of t.assets) syms.add(a.symbol)
     }
     return [...syms]
-  }, [visible, expanded, membersByThesis])
+  }, [visible, expanded])
   const { data: indicators } = useIndicators(expandedSymbols)
 
   const toggle = (id: number) =>
@@ -132,8 +115,7 @@ export function ThesesPage() {
         <div className="space-y-3">
           {visible.map((thesis) => {
             const isOpen = expanded.has(thesis.id)
-            const members = membersByThesis.get(thesis.id) ?? []
-            const unresolved = thesis.assets.length - members.length
+            const members = thesis.assets
             return (
               <section key={thesis.id} className="rounded-md border border-border p-2">
                 <ThesisSectionHeader
@@ -177,12 +159,7 @@ export function ThesesPage() {
                       />
                     ) : (
                       <p className="px-2 py-3 text-sm text-muted-foreground">
-                        No members in any group yet.
-                      </p>
-                    )}
-                    {unresolved > 0 && (
-                      <p className="px-2 text-xs text-muted-foreground">
-                        +{unresolved} member{unresolved === 1 ? "" : "s"} not in any group
+                        No members yet.
                       </p>
                     )}
                   </div>
