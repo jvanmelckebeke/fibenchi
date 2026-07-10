@@ -84,6 +84,30 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return _wilder_smooth(tr, period)
 
 
+def volatility_normalized_return(closes: pd.Series, lam: float = 0.94) -> pd.Series:
+    """Volatility-normalized daily return — a "sigma move" / return z-score.
+
+    Expresses each day's close-to-close return in units of the asset's own
+    recent volatility, so moves become comparable across assets regardless of
+    how volatile each one usually is: a +3% day in a calm name can be a bigger
+    event (larger sigma move) than a +6% day in a high-beta name. A value of
+    +2.0 means "today's up-move was twice the size recent volatility predicted".
+
+    Volatility is a RiskMetrics-style zero-mean EWMA forecast built from returns
+    through the *previous* day (``shift(1)``), so a large move does not deflate
+    its own score. ``lam`` is the EWMA decay (RiskMetrics daily default 0.94);
+    a larger lam means longer memory. Unlike a fixed rolling window, the EWMA
+    has no hard edge, so an old shock decays smoothly instead of dropping out
+    abruptly and stepping the score ("ghosting").
+    """
+    returns = closes.pct_change()
+    # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
+    ewma_var = (returns**2).ewm(alpha=1 - lam, adjust=False).mean()
+    # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
+    sigma_forecast = np.sqrt(ewma_var.shift(1)).replace(0, float("nan"))
+    return returns / sigma_forecast
+
+
 def adx(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
     """Average Directional Index with +DI and -DI using Wilder's smoothing.
 
@@ -401,6 +425,13 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         warmup_periods=14,
         uses_ohlc=True,
         snapshot_derived=_chop_snapshot_derived,
+    ),
+    "vnr": IndicatorDef(
+        func=volatility_normalized_return,
+        params={"lam": 0.94},
+        output_fields=["vnr"],
+        decimals=2,
+        warmup_periods=60,
     ),
 }
 
