@@ -3,8 +3,8 @@ import { useParams, Link, Navigate } from "react-router-dom"
 import { ArrowLeft, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ConnectedNote } from "@/components/notes/connected-note"
-import { ConnectedAnnotations } from "@/components/notes/connected-annotations"
+import { NoteEditor } from "@/components/notes/note-editor"
+import { AnnotationsList } from "@/components/notes/annotations-list"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/pseudo-etf/add-constituent-picker"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
@@ -112,23 +112,22 @@ function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
 
 function EtfAnnotations({ etfId }: { etfId: number }) {
   const { data: annotations } = usePseudoEtfAnnotations(etfId)
+  const create = useCreatePseudoEtfAnnotation(etfId)
+  const remove = useDeletePseudoEtfAnnotation(etfId)
   return (
-    <ConnectedAnnotations
+    <AnnotationsList
       annotations={annotations}
-      createMutation={useCreatePseudoEtfAnnotation(etfId)}
-      deleteMutation={useDeletePseudoEtfAnnotation(etfId)}
+      onCreate={create.mutate}
+      onDelete={remove.mutate}
+      isCreating={create.isPending}
     />
   )
 }
 
 function EtfNote({ etfId }: { etfId: number }) {
   const { data: note } = usePseudoEtfNote(etfId)
-  return (
-    <ConnectedNote
-      note={note}
-      updateMutation={useUpdatePseudoEtfNote(etfId)}
-    />
-  )
+  const update = useUpdatePseudoEtfNote(etfId)
+  return <NoteEditor note={note} onSave={update.mutate} isSaving={update.isPending} />
 }
 
 function PerformanceStats({ data, baseValue }: { data: PerformanceBreakdownPoint[]; baseValue: number }) {

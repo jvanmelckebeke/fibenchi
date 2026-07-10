@@ -2,7 +2,8 @@ import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ExpandedAssetChart } from "@/components/chart/expanded-asset-chart"
-import { formatPrice, formatCompactPrice, formatChangePct } from "@/lib/format"
+import { formatPrice, formatCompactPrice } from "@/lib/format"
+import { ChangePct } from "@/components/change-pct"
 import { useSettings } from "@/lib/settings"
 import { HoldingSummaryCell } from "./holding-summary-cell"
 import { SUMMARY_DESCRIPTORS } from "./types"
@@ -28,7 +29,6 @@ export function HoldingRow({
   totalColSpan: number
 }) {
   const { settings } = useSettings()
-  const chg = formatChangePct(indicator?.change_pct ?? null)
 
   return (
     <>
@@ -78,8 +78,8 @@ export function HoldingRow({
                   : formatPrice(indicator.close, indicator.currency, 0, settings.thousands_separator)
                 : "\u2014"}
             </td>
-            <td className={`py-1 px-2 text-right text-xs ${chg.className}`}>
-              {chg.text ?? "\u2014"}
+            <td className="py-1 px-2 text-right text-xs">
+              <ChangePct value={indicator?.change_pct ?? null} />
             </td>
             {SUMMARY_DESCRIPTORS.map((desc) => {
               const hs = desc.holdingSummary

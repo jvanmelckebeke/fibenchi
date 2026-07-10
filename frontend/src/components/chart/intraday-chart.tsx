@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, memo } from "react"
 import { createChart, type IChartApi, ColorType, BaselineSeries, CrosshairMode } from "lightweight-charts"
 import type { IntradayPoint } from "@/lib/types"
 import { useChartTheme } from "@/lib/chart-utils"
+import { attachResizeAndCleanup } from "@/hooks/use-chart-lifecycle"
 
 /** 6-color session × direction palette */
 const SESSION_COLORS = {
@@ -142,17 +143,10 @@ export const IntradayChart = memo(function IntradayChart({
     chartVersionRef.current += 1
     setChartVersion(chartVersionRef.current)
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width })
-        chart.timeScale().fitContent()
-      }
-    })
-    resizeObserver.observe(containerRef.current)
+    const detach = attachResizeAndCleanup(containerRef.current, chart)
 
     return () => {
-      resizeObserver.disconnect()
-      chart.remove()
+      detach()
       chartRef.current = null
       seriesListRef.current = []
       currentPriceLineRef.current = null

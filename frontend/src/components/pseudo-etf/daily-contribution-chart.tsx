@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useEffect, useRef, useMemo } from "react"
 import {
   createChart,
   type IChartApi,
@@ -6,27 +6,43 @@ import {
 } from "lightweight-charts"
 import { baseChartOptions, STACK_COLORS } from "@/lib/chart-utils"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
-import type { PerformanceBreakdownPoint } from "@/lib/api"
+import { useCrosshairHover } from "@/hooks/use-crosshair-hover"
 import { SymbolLegend } from "./symbol-legend"
+import type { BreakdownChartProps } from "./types"
 
-interface SharedChartProps {
-  data: PerformanceBreakdownPoint[]
-  sortedSymbols: string[]
-  symbolColorMap: Map<string, string>
+interface ContribHover {
+  date: string
+  deltas: Record<string, number>
+  total: number
 }
 
-export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: SharedChartProps) {
+function sumDeltas(deltas: Record<string, number>): number {
+  return Object.values(deltas).reduce((s, v) => s + v, 0)
+}
+
+export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: BreakdownChartProps) {
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const [hoverData, setHoverData] = useState<{ date: string; deltas: Record<string, number>; total: number } | null>(null)
   const { startLifecycle } = useChartLifecycle(ref, [chartRef])
 
-  const deltasByTime = useRef(new Map<string, Record<string, number>>())
+  // Default to latest day
+  const latestDeltas = useMemo<ContribHover | null>(() => {
+    if (data.length < 2 || !sortedSymbols.length) return null
+    const last = data[data.length - 1]
+    const prev = data[data.length - 2]
+    const deltas: Record<string, number> = {}
+    for (const sym of sortedSymbols) {
+      deltas[sym] = (last.breakdown[sym] ?? 0) - (prev.breakdown[sym] ?? 0)
+    }
+    return { date: last.date, deltas, total: sumDeltas(deltas) }
+  }, [data, sortedSymbols])
+
+  const { hoverRef, subscribe, displayData } = useCrosshairHover<ContribHover>(latestDeltas)
 
   useEffect(() => {
     if (!ref.current || data.length < 2 || !sortedSymbols.length) return
 
-    deltasByTime.current.clear()
+    hoverRef.current.clear()
 
     // Compute daily deltas per symbol
     const dailyData: { date: string; deltas: Record<string, number> }[] = []
@@ -36,7 +52,7 @@ export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: 
         deltas[sym] = (data[d].breakdown[sym] ?? 0) - (data[d - 1].breakdown[sym] ?? 0)
       }
       dailyData.push({ date: data[d].date, deltas })
-      deltasByTime.current.set(data[d].date, deltas)
+      hoverRef.current.set(data[d].date, { date: data[d].date, deltas, total: sumDeltas(deltas) })
     }
 
     // Compute positive and negative cumulative stacks per day
@@ -94,39 +110,13 @@ export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: 
       )
     }
 
-    // Crosshair
-    chart.subscribeCrosshairMove((param) => {
-      if (param.time) {
-        const key = String(param.time)
-        const deltas = deltasByTime.current.get(key)
-        if (deltas) {
-          const total = Object.values(deltas).reduce((s, v) => s + v, 0)
-          setHoverData({ date: key, deltas, total })
-        }
-      } else {
-        setHoverData(null)
-      }
-    })
+    subscribe(chart)
 
     chart.timeScale().fitContent()
     chartRef.current = chart
 
     return startLifecycle([chart])
-  }, [data, sortedSymbols, symbolColorMap, startLifecycle])
-
-  // Default to latest day
-  const latestDeltas = useMemo(() => {
-    if (data.length < 2 || !sortedSymbols.length) return null
-    const last = data[data.length - 1]
-    const prev = data[data.length - 2]
-    const deltas: Record<string, number> = {}
-    for (const sym of sortedSymbols) {
-      deltas[sym] = (last.breakdown[sym] ?? 0) - (prev.breakdown[sym] ?? 0)
-    }
-    const total = Object.values(deltas).reduce((s, v) => s + v, 0)
-    return { date: last.date, deltas, total }
-  }, [data, sortedSymbols])
-  const displayData = hoverData ?? latestDeltas
+  }, [data, sortedSymbols, symbolColorMap, startLifecycle, hoverRef, subscribe])
 
   return (
     <div className="space-y-2">

@@ -1,7 +1,7 @@
-// Preset colours for thesis dots, shared by the new/edit thesis dialogs so the
-// palette can't drift between them. Tailwind 500-level hues, rainbow-ordered for
-// a pleasant picker. All eight original presets are retained (existing theses
-// keep matching a swatch).
+// Shared colour palette for thesis dots and tag swatches (via ColorSwatchPicker),
+// so the palette can't drift between pickers. Tailwind 500-level hues,
+// rainbow-ordered for a pleasant picker. All eight original presets are retained
+// (existing theses keep matching a swatch).
 export const THESIS_PRESET_COLORS = [
   "#ef4444", // red
   "#f97316", // orange

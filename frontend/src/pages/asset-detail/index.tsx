@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useParams } from "react-router-dom"
-import { ConnectedNote } from "@/components/notes/connected-note"
-import { ConnectedAnnotations } from "@/components/notes/connected-annotations"
+import { NoteEditor } from "@/components/notes/note-editor"
+import { AnnotationsList } from "@/components/notes/annotations-list"
 import { TagInput } from "@/components/tags/tag-input"
 import { ThesisInput } from "@/components/thesis/thesis-input"
 import {
@@ -88,21 +88,20 @@ export function AssetDetailPage() {
 
 function AssetAnnotations({ symbol }: { symbol: string }) {
   const { data: annotations } = useAnnotations(symbol)
+  const create = useCreateAnnotation(symbol)
+  const remove = useDeleteAnnotation(symbol)
   return (
-    <ConnectedAnnotations
+    <AnnotationsList
       annotations={annotations}
-      createMutation={useCreateAnnotation(symbol)}
-      deleteMutation={useDeleteAnnotation(symbol)}
+      onCreate={create.mutate}
+      onDelete={remove.mutate}
+      isCreating={create.isPending}
     />
   )
 }
 
 function AssetNote({ symbol }: { symbol: string }) {
   const { data: note } = useNote(symbol)
-  return (
-    <ConnectedNote
-      note={note}
-      updateMutation={useUpdateNote(symbol)}
-    />
-  )
+  const update = useUpdateNote(symbol)
+  return <NoteEditor note={note} onSave={update.mutate} isSaving={update.isPending} />
 }

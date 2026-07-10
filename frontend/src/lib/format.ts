@@ -102,6 +102,22 @@ export function formatAssetCompactPrice(value: number, asset: AssetFormatHints):
   return formatAssetPrice(value, asset, 2)
 }
 
+/**
+ * Settings-aware asset price. When `compact`, returns the abbreviated form
+ * (1.2K/3.4M) plus the full grouped price as `title` (for a hover tooltip);
+ * otherwise the full price with optional thousands grouping. Encapsulates the
+ * ternary previously duplicated across the asset card, table row, and detail header.
+ */
+export function formatAssetPriceWithSettings(
+  value: number,
+  asset: AssetFormatHints,
+  opts: { compact?: boolean; group?: boolean },
+): { text: string; title?: string } {
+  const full = formatAssetPrice(value, asset, undefined, opts.group)
+  if (!opts.compact) return { text: full }
+  return { text: formatAssetCompactPrice(value, asset), title: full }
+}
+
 export function formatCompactNumber(value: number): string {
   const abs = Math.abs(value)
   let scaled: string

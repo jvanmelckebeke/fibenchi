@@ -5,8 +5,10 @@ import type { Asset, IntradayPoint, IndicatorSummary } from "@/lib/types"
 import { useIntraday, useQuoteStatus } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
-import { formatPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
+import { formatPrice, formatCompactNumber, changeColor } from "@/lib/format"
 import { formatDeltaAnnotation } from "@/lib/indicator-registry"
+import { marketState } from "@/lib/market-state"
+import { ChangePct } from "@/components/change-pct"
 import { IntradayChart } from "@/components/chart/intraday-chart"
 
 const DELTA_FIELDS = ["rsi", "macd_hist", "atr", "adx"] as const
@@ -46,15 +48,6 @@ interface LiveCardProps {
   indicatorData?: IndicatorSummary
 }
 
-const MARKET_STATE_LABELS: Record<string, string> = {
-  CLOSED: "Closed",
-  REGULAR: "Regular",
-  PRE: "Pre-Market",
-  PREPRE: "Pre-Market",
-  POST: "Post-Market",
-  POSTPOST: "Post-Market",
-}
-
 const LiveCard = memo(function LiveCard({
   symbol,
   name,
@@ -70,10 +63,8 @@ const LiveCard = memo(function LiveCard({
   const price = quote?.price
   const previousClose = quote?.previous_close
   const changePct = quote?.change_percent
-  const { text: pctText, className: pctClass } = formatChangePct(changePct ?? null)
   const volume = quote?.volume
-  const marketState = quote?.market_state ?? ""
-  const marketLabel = MARKET_STATE_LABELS[marketState] ?? marketState
+  const marketLabel = marketState(quote?.market_state).label
 
   return (
     <Link to={`/asset/${symbol}`} className="block border rounded-lg bg-card overflow-hidden hover:border-primary/50 transition-colors">
@@ -91,13 +82,12 @@ const LiveCard = memo(function LiveCard({
             >
               {price != null ? formatPrice(price, currency, undefined, settings.thousands_separator) : "--"}
             </span>
-            {pctText && (
-              <span
+            {changePct != null && (
+              <ChangePct
                 ref={pctRef}
-                className={`text-xs tabular-nums rounded px-0.5 -mx-0.5 ${pctClass}`}
-              >
-                {pctText}
-              </span>
+                value={changePct}
+                className="text-xs rounded px-0.5 -mx-0.5"
+              />
             )}
           </div>
         </div>

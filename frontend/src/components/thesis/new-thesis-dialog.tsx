@@ -6,27 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { IconPicker } from "@/components/icon-picker"
+import { ThesisFormFields, type ThesisFormValues } from "@/components/thesis/thesis-form-fields"
 import { useCreateThesis } from "@/lib/queries"
-import { THESIS_PRESET_COLORS, DEFAULT_THESIS_COLOR } from "@/lib/thesis-colors"
-import type { Thesis, ThesisStatus } from "@/lib/api"
-
-const STATUSES: { value: ThesisStatus; label: string }[] = [
-  { value: "watching", label: "Watching" },
-  { value: "live", label: "Live" },
-  { value: "played_out", label: "Played out" },
-]
+import { DEFAULT_THESIS_COLOR } from "@/lib/thesis-colors"
+import type { Thesis } from "@/lib/api"
 
 function todayISO(): string {
   // Local calendar date as yyyy-mm-dd (en-CA), NOT UTC — toISOString() can roll
@@ -70,24 +54,28 @@ function NewThesisForm({
   onCreated?: (thesis: Thesis) => void
 }) {
   const createThesis = useCreateThesis()
-  const [name, setName] = useState(initialName ?? "")
-  const [color, setColor] = useState(DEFAULT_THESIS_COLOR)
-  const [icon, setIcon] = useState("briefcase")
-  const [status, setStatus] = useState<ThesisStatus>("watching")
-  const [openedAt, setOpenedAt] = useState(todayISO())
-  const [description, setDescription] = useState("")
+  const [values, setValues] = useState<ThesisFormValues>({
+    name: initialName ?? "",
+    color: DEFAULT_THESIS_COLOR,
+    icon: "briefcase",
+    status: "watching",
+    openedAt: todayISO(),
+    description: "",
+  })
+  const update: <K extends keyof ThesisFormValues>(key: K, value: ThesisFormValues[K]) => void =
+    (key, value) => setValues((v) => ({ ...v, [key]: value }))
 
   const handleCreate = () => {
-    const trimmed = name.trim()
+    const trimmed = values.name.trim()
     if (!trimmed) return
     createThesis.mutate(
       {
         name: trimmed,
-        color,
-        icon,
-        status,
-        opened_at: openedAt,
-        description: description.trim() || undefined,
+        color: values.color,
+        icon: values.icon,
+        status: values.status,
+        opened_at: values.openedAt,
+        description: values.description.trim() || undefined,
       },
       {
         onSuccess: (thesis) => {
@@ -103,73 +91,10 @@ function NewThesisForm({
       <DialogHeader>
         <DialogTitle>New thesis</DialogTitle>
       </DialogHeader>
-      <div className="space-y-4 py-2">
-        <div className="space-y-2">
-          <Label htmlFor="thesis-name">Name</Label>
-          <div className="flex gap-2">
-            <IconPicker value={icon} onChange={setIcon} />
-            <Input
-              id="thesis-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. El Niño"
-              className="flex-1"
-              autoFocus
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Colour</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {THESIS_PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-label={`Colour ${c}`}
-                className={`h-6 w-6 rounded-full border-2 ${color === c ? "border-foreground" : "border-transparent"}`}
-                style={{ backgroundColor: c }}
-                onClick={() => setColor(c)}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="thesis-status">Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as ThesisStatus)}>
-              <SelectTrigger id="thesis-status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="thesis-opened">Opened</Label>
-            <Input
-              id="thesis-opened"
-              type="date"
-              value={openedAt}
-              onChange={(e) => setOpenedAt(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="thesis-desc">Hypothesis</Label>
-          <Textarea
-            id="thesis-desc"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What's the thesis? (optional)"
-          />
-        </div>
-      </div>
+      <ThesisFormFields values={values} onChange={update} idPrefix="thesis" namePlaceholder="e.g. El Niño" />
       <DialogFooter>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button onClick={handleCreate} disabled={!name.trim() || createThesis.isPending}>
+        <Button onClick={handleCreate} disabled={!values.name.trim() || createThesis.isPending}>
           Create
         </Button>
       </DialogFooter>

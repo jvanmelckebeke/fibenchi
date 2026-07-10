@@ -1,11 +1,10 @@
 import { useState } from "react"
 import {
-  Dialog,
-  DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { EntityDialog } from "@/components/entity-dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -120,16 +119,8 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
 
 export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        {asset && (
-          <EditAssetForm
-            key={asset.id}
-            asset={asset}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+    <EntityDialog entity={asset} open={open} onOpenChange={onOpenChange} contentClassName="sm:max-w-[400px]">
+      {(asset, close) => <EditAssetForm asset={asset} onClose={close} />}
+    </EntityDialog>
   )
 }
