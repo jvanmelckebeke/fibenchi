@@ -1,7 +1,8 @@
 """Tests for GET /api/data batch query endpoint."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from tests.helpers import make_yahoo_df, seed_asset_with_prices
 

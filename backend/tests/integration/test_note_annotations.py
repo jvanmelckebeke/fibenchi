@@ -2,7 +2,6 @@ import pytest
 
 from tests.helpers import create_asset_via_api
 
-
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 

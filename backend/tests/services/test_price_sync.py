@@ -1,17 +1,17 @@
 """Tests for the price_sync service (sync orchestration and upsert logic)."""
 
-import pytest
 from datetime import date
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
+import pytest
 
 from app.models import Asset, AssetType
 from app.services.price_sync import (
+    _upsert_prices,
+    sync_all_prices,
     sync_asset_prices,
     sync_asset_prices_range,
-    sync_all_prices,
-    _upsert_prices,
 )
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")

@@ -2,7 +2,6 @@
 
 import pytest
 
-from app.models import Tag
 from app.repositories.tag_repo import TagRepository
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")

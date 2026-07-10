@@ -1,9 +1,9 @@
 """Unit tests for note_service — tests service logic with mocked repos."""
 
 import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.schemas.note import NoteResponse
 from app.services.note_service import get_note, upsert_note

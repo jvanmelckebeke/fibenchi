@@ -474,12 +474,12 @@ def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
       - {field}_delta_sigma = |Δ| expressed in rolling σ units, only when
         the absolute delta exceeds mean + 2σ of the rolling window (else NaN).
     """
-    for field in _get_delta_fields():
-        if field not in result.columns:
+    for field_name in _get_delta_fields():
+        if field_name not in result.columns:
             continue
-        series = result[field]
+        series = result[field_name]
         delta = series.diff()
-        result[f"{field}_delta"] = delta
+        result[f"{field_name}_delta"] = delta
 
         abs_delta = delta.abs()
         rolling_mean = abs_delta.rolling(window=window, min_periods=window).mean()
@@ -487,7 +487,7 @@ def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
 
         sigma = (abs_delta - rolling_mean) / rolling_std
         # Only keep sigma when |Δ| exceeds the 2σ threshold
-        result[f"{field}_delta_sigma"] = sigma.where(
+        result[f"{field_name}_delta_sigma"] = sigma.where(
             abs_delta > rolling_mean + 2 * rolling_std
         )
 

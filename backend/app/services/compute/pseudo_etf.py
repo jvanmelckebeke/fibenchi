@@ -25,7 +25,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 
-
 QUARTER_MONTHS = {1, 4, 7, 10}
 
 

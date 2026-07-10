@@ -44,6 +44,7 @@ def show(after_label: str):
 async def main():
     global _label
     from yahooquery import Ticker
+
     from app.services.yahoo.client import YahooClient
     from app.services.yahoo.rate_limit import YahooThrottle
 

@@ -1,7 +1,8 @@
 """Tests for the holdings router (ETF holdings + holding indicators)."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.services.compute.indicators import bb_position
 from app.services.yahoo import yahoo_client

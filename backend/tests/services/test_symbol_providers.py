@@ -2,8 +2,8 @@
 
 import pytest
 
-from app.services.symbol_providers import get_provider, get_available_providers
-from app.services.symbol_providers.euronext import _resolve_market, EuronextProvider
+from app.services.symbol_providers import get_available_providers, get_provider
+from app.services.symbol_providers.euronext import EuronextProvider, _resolve_market
 from app.services.symbol_providers.xetra import XetraProvider
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -130,7 +130,6 @@ SAMPLE_ETFS_CSV = """\
 
 def _make_mock_client(stocks_csv, etfs_csv):
     """Create a mock httpx.AsyncClient that returns different CSVs per URL."""
-    from app.services.symbol_providers.euronext import EURONEXT_STOCKS_URL, EURONEXT_ETFS_URL
 
     class MockResponse:
         def __init__(self, text):

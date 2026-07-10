@@ -1,7 +1,7 @@
 """Integration tests for pseudo-ETF analysis router (performance + constituent indicators)."""
 
 from datetime import date, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

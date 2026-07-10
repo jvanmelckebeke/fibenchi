@@ -1,7 +1,8 @@
 """Unit tests for settings_service — tests service logic with mocked repos."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.schemas.settings import SettingsResponse
 from app.services.settings_service import get_settings, update_settings

@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.services.entity_lookups import get_asset
 from app.schemas.annotation import AnnotationCreate, AnnotationResponse
 from app.services import annotation_service
+from app.services.entity_lookups import get_asset
 
 router = APIRouter(prefix="/api/assets/{symbol}/annotations", tags=["annotations"])
 

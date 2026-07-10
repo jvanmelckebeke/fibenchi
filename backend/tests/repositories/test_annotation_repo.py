@@ -4,7 +4,6 @@ from datetime import date
 
 import pytest
 
-from app.models import Annotation, Asset, AssetType
 from app.repositories.annotation_repo import AnnotationRepository
 from tests.helpers import create_test_asset as _create_asset
 

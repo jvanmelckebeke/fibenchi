@@ -1,7 +1,8 @@
 """Unit tests for holdings_service — tests service logic with mocked lookups."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.holdings_service import get_holdings, get_holdings_indicators
 

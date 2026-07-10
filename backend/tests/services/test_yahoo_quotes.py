@@ -7,6 +7,8 @@ import pytest
 from app.services.yahoo import yahoo_client
 from app.services.yahoo._parsers import (
     parse_quotes as _parse_quotes,
+)
+from app.services.yahoo._parsers import (
     sanitize_float as _sanitize_float,
 )
 from app.services.yahoo.rate_limit import crumb_rejected
