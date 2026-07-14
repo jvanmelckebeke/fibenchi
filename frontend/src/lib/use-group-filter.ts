@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { AssetTypeFilter, GroupSortBy, SortDir } from "@/lib/settings"
-import { getNumericValue, computeLiveVnr } from "@/lib/indicator-registry"
+import { getNumericValue, computeLiveVnr, isStoredVnrStale } from "@/lib/indicator-registry"
 
 /** A row's value for a given sort field: number for metrics, string for "name". */
 export type SortValue = number | string | null
@@ -31,8 +31,12 @@ export function getSortValue(
       // computeLiveVnr / table-row.tsx). Sort by that same live value so the
       // ordering matches what the row shows; fall back to the stored snapshot.
       if (sortBy === "vnr") {
-        const liveVnr = computeLiveVnr(quotes[asset.symbol], summary?.values, summary?.close)
+        const quote = quotes[asset.symbol]
+        const liveVnr = computeLiveVnr(quote, summary?.values, summary?.close)
         if (liveVnr != null) return liveVnr
+        // The table blanks a stored σ-Move that predates the live quote, so it
+        // must sort as "no value" too — not by the stale stored number.
+        if (isStoredVnrStale(quote, summary?.close)) return null
       }
       return getNumericValue(summary?.values, sortBy)
     }
