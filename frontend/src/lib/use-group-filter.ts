@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { AssetTypeFilter, GroupSortBy, SortDir } from "@/lib/settings"
-import { getNumericValue } from "@/lib/indicator-registry"
+import { getNumericValue, computeLiveVnr } from "@/lib/indicator-registry"
 
 /** A row's value for a given sort field: number for metrics, string for "name". */
 export type SortValue = number | string | null
@@ -25,8 +25,17 @@ export function getSortValue(
       return quotes[asset.symbol]?.price ?? null
     case "change_pct":
       return quotes[asset.symbol]?.change_percent ?? null
-    default:
-      return getNumericValue(indicators?.[asset.symbol]?.values, sortBy)
+    default: {
+      const summary = indicators?.[asset.symbol]
+      // σ-Move is displayed live-recomputed against today's quote (see
+      // computeLiveVnr / table-row.tsx). Sort by that same live value so the
+      // ordering matches what the row shows; fall back to the stored snapshot.
+      if (sortBy === "vnr") {
+        const liveVnr = computeLiveVnr(quotes[asset.symbol], summary?.values, summary?.close)
+        if (liveVnr != null) return liveVnr
+      }
+      return getNumericValue(summary?.values, sortBy)
+    }
   }
 }
 
