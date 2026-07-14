@@ -185,6 +185,20 @@ async def lifespan(app: FastAPI):
         )
         scheduler.add_job(scheduled_refresh, trigger, id="price_refresh")
 
+        # Supplemental daytime refreshes. The primary run above fires once at
+        # REFRESH_CRON (23:00 UTC by default), but Yahoo publishes some markets'
+        # daily bars well after their close — notably KRX (``.KS``), whose bar
+        # for a session isn't in Yahoo's daily history until the *following* day.
+        # A single nightly run therefore leaves Asian markets a full day stale
+        # (a stale σ-Move/change sitting beside a live quote). Extra 08:00 and
+        # 16:00 UTC runs catch the prior Asian session (published overnight) and
+        # any late Yahoo publish, so no market stays stale longer than ~8h.
+        scheduler.add_job(
+            scheduled_refresh,
+            CronTrigger(minute="0", hour="8,16"),
+            id="price_refresh_supplemental",
+        )
+
         # Weekly symbol directory sync (Sundays at 02:00)
         scheduler.add_job(
             scheduled_symbol_sync,
