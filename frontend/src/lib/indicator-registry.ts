@@ -175,6 +175,14 @@ export function getStringValue(
 }
 
 /**
+ * Fractional tolerance for treating a stored close and a quoted close as the
+ * *same session*. Shared by {@link computeLiveVnr} (is the stored bar the
+ * quote's prior session?) and {@link isStoredVnrStale} (is it the current or
+ * prior session at all?) so the two can't drift apart.
+ */
+const SESSION_MATCH_TOL = 0.005
+
+/**
  * Recompute the σ-Move (vnr) against a live intraday quote so the table shows
  * *today's* move in σ units instead of the last completed daily bar.
  *
@@ -204,8 +212,35 @@ export function computeLiveVnr(
   // Only reuse the forecast when the stored bar is the quote's prior session.
   // (When they differ, the two anchors are close enough that either formula
   // agrees — a flat day — or today's bar is stored and the DB vnr is correct.)
-  if (Math.abs(prevClose - dbClose) / dbClose > 0.005) return null
+  if (Math.abs(prevClose - dbClose) / dbClose > SESSION_MATCH_TOL) return null
   return changePct / 100 / sigma
+}
+
+/**
+ * Whether the stored σ-Move (vnr) is stale relative to a live quote — i.e. its
+ * bar can't be reconciled with the quote, so showing it would contradict the
+ * live change % beside it.
+ *
+ * The stored `vnr` describes the last completed daily bar. It is safe to show
+ * when that bar is the quote's *current* session (today's bar already synced, so
+ * `dbClose ≈ quote.price`) or its *prior* session (`dbClose ≈ previous_close` —
+ * in which case {@link computeLiveVnr} yields a live value and this is moot). It
+ * is stale when the stored close matches *neither*: the price sync is behind by
+ * ≥2 sessions, so the stored bar predates the live quote entirely.
+ *
+ * Returns false when there is no live quote — then the σ-Move and the change %
+ * both come from the same stored bar and cannot disagree — and when there is no
+ * stored close to anchor against. Meant to gate the DB fallback: only call it
+ * once `computeLiveVnr` has returned null.
+ */
+export function isStoredVnrStale(
+  quote: { price: number | null; previous_close: number | null } | undefined,
+  dbClose: number | null | undefined,
+): boolean {
+  if (!quote || dbClose == null || dbClose === 0) return false
+  const near = (v: number | null) =>
+    v != null && Math.abs(v - dbClose) / dbClose <= SESSION_MATCH_TOL
+  return !(near(quote.price) || near(quote.previous_close))
 }
 
 export function getOverlayDescriptors(): IndicatorDescriptor[] {

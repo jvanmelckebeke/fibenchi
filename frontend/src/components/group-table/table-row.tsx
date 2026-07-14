@@ -20,6 +20,7 @@ import {
   getDescriptorByField,
   formatIndicatorField,
   computeLiveVnr,
+  isStoredVnrStale,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -288,6 +289,12 @@ export const TableRow = memo(function TableRow({
             const liveVnr = field === "vnr"
               ? computeLiveVnr(quote, indicator?.values, indicator?.close)
               : null
+            // When we can't recompute live and fall back to the stored σ-Move,
+            // that stored bar may predate the live quote (price sync behind ≥2
+            // sessions) — showing it would contradict the live change % beside
+            // it. Blank the cell rather than render a wrong-signed number.
+            const vnrStale = field === "vnr" && liveVnr == null
+              && isStoredVnrStale(quote, indicator?.close)
             const values = liveVnr != null
               ? { ...indicator?.values, vnr: liveVnr }
               : indicator?.values
@@ -295,7 +302,7 @@ export const TableRow = memo(function TableRow({
             const desc = getDescriptorByField(field)
             // Route through the shared registry formatter so the table matches the
             // card/detail rendering (decimals, threshold colours, currency prefix).
-            const formatted = val != null && desc && values
+            const formatted = !vnrStale && val != null && desc && values
               ? formatIndicatorField(field, desc, values, asset.currency)
               : null
             return (
@@ -308,7 +315,12 @@ export const TableRow = memo(function TableRow({
                     {formatted.text}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">&mdash;</span>
+                  <span
+                    className="text-muted-foreground"
+                    title={vnrStale ? "σ-Move unavailable — price data is behind the live quote" : undefined}
+                  >
+                    &mdash;
+                  </span>
                 )}
               </td>
             )
