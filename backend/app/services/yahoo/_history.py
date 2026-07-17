@@ -92,6 +92,7 @@ class _HistoryMixin(_YahooBase):
                     else:
                         df = hist.copy()
                     if df.empty or len(df) < 2:
+                        logger.debug("batch_history: %s returned %d rows; skipping", sym, len(df))
                         continue
                     info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
                     info = info if isinstance(info, dict) else {}
@@ -99,6 +100,7 @@ class _HistoryMixin(_YahooBase):
                     df = _normalize_ohlcv_df(df, divisor)
                     out[sym] = normalize_date_index(df)
                 except KeyError:
+                    logger.debug("batch_history: %s missing from Yahoo batch response", sym)
                     continue
             return out
 

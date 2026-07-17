@@ -38,6 +38,7 @@ def drop_unsettled_last_bar(
     price: float | None,
     previous_close: float | None,
     market_state: str | None,
+    symbol: str | None = None,
 ) -> pd.DataFrame:
     """Drop a trailing daily bar that reflects an in-progress / unsettled session.
 
@@ -74,6 +75,10 @@ def drop_unsettled_last_bar(
     # An open session's bar is always a live partial — drop it even though it
     # matches the live price right now, because it will drift as trading goes on.
     if market_state in _ACTIVE_SESSION_STATES:
+        logger.debug(
+            "%s: dropping trailing %s bar (session open; close=%s, live=%s)",
+            symbol or "?", df.index[-1], last_close, price,
+        )
         return df.iloc[:-1]
 
     # Market closed: keep the bar once it has settled to the live close; drop it
@@ -81,6 +86,13 @@ def drop_unsettled_last_bar(
     if _reconciles(last_close, price):
         return df
 
+    # Noteworthy: this leaves the symbol without its latest session's bar. Once
+    # the quote's previous_close rolls at the next open, the remaining stored
+    # bar reconciles with nothing and σ-Move blanks until a sync stores it.
+    logger.info(
+        "%s: dropping trailing %s bar (market %s; close=%s hasn't settled to quote %s)",
+        symbol or "?", df.index[-1], market_state, last_close, price,
+    )
     return df.iloc[:-1]
 
 
@@ -113,7 +125,7 @@ async def sync_asset_prices(db: AsyncSession, asset: Asset, period: str = "3mo")
     price, previous_close, market_state = (await _quote_anchors(provider, [asset.symbol])).get(
         asset.symbol, (None, None, None)
     )
-    df = drop_unsettled_last_bar(df, price, previous_close, market_state)
+    df = drop_unsettled_last_bar(df, price, previous_close, market_state, symbol=asset.symbol)
     return await _upsert_prices(db, asset.id, df)
 
 
@@ -144,8 +156,34 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
         asset_id = asset_map.get(sym)
         if asset_id:
             price, previous_close, market_state = anchors.get(sym, (None, None, None))
-            df = drop_unsettled_last_bar(df, price, previous_close, market_state)
+            df = drop_unsettled_last_bar(df, price, previous_close, market_state, symbol=sym)
             counts[sym] = await _upsert_prices(db, asset_id, df)
+
+    # The batch response silently omits symbols Yahoo hiccupped on; without a
+    # retry those stay stale until the next scheduled run (up to a full day).
+    missing = [s for s in symbols if s not in data]
+    if missing and not data:
+        logger.error(
+            "Batch history returned no data for all %d symbols; skipping per-symbol retries",
+            len(symbols),
+        )
+    elif missing:
+        logger.warning(
+            "Batch history missing %d/%d symbols; retrying individually: %s",
+            len(missing), len(symbols), ", ".join(sorted(missing)),
+        )
+        for sym in missing:
+            try:
+                df = await provider.fetch_history(sym, period=period)
+            except Exception:
+                logger.warning("Retry fetch for %s failed", sym, exc_info=True)
+                continue
+            if df is None or df.empty:
+                logger.warning("Retry fetch for %s returned no data", sym)
+                continue
+            price, previous_close, market_state = anchors.get(sym, (None, None, None))
+            df = drop_unsettled_last_bar(df, price, previous_close, market_state, symbol=sym)
+            counts[sym] = await _upsert_prices(db, asset_map[sym], df)
 
     return counts
 
