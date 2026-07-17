@@ -36,6 +36,7 @@ from app.routers import settings as settings_router
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
 from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
+from app.services.price_heal import heal_unreconciled_prices
 from app.services.price_providers import init_price_provider
 from app.services.price_sync import sync_all_prices
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
@@ -117,6 +118,19 @@ async def _startup_warmup() -> None:
             logger.info(f"Startup warmup complete: {warmed} groups cached")
     except Exception:
         logger.exception("Startup indicator warmup failed (non-fatal)")
+
+
+async def scheduled_price_heal():
+    """Background job: refresh symbols whose stored bars contradict live quotes."""
+    async with async_session() as db:
+        try:
+            healed = await heal_unreconciled_prices(db)
+            if healed:
+                logger.info(
+                    f"Price heal: refreshed {len(healed)} symbol(s): {', '.join(sorted(healed))}"
+                )
+        except Exception:
+            logger.exception("Price heal failed")
 
 
 async def scheduled_symbol_sync():
@@ -211,6 +225,16 @@ async def lifespan(app: FastAPI):
             scheduled_intraday_sync,
             IntervalTrigger(seconds=60),
             id="intraday_sync",
+        )
+
+        # Self-heal stragglers the scheduled refreshes missed: when a symbol's
+        # latest stored bar reconciles with neither the live price nor the
+        # quote's previous close (the state that blanks σ-Move), refresh just
+        # that symbol instead of waiting for the next full run.
+        scheduler.add_job(
+            scheduled_price_heal,
+            IntervalTrigger(minutes=10),
+            id="price_heal",
         )
 
         scheduler.start()

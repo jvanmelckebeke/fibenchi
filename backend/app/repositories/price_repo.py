@@ -81,6 +81,30 @@ class PriceRepository:
         )
         return {row.asset_id: row.last_date for row in result}
 
+    async def get_latest_closes(
+        self, asset_ids: list[int]
+    ) -> dict[int, tuple[date, float]]:
+        """Latest stored (date, close) per asset."""
+        if not asset_ids:
+            return {}
+        last_dates = (
+            select(
+                PriceHistory.asset_id,
+                func.max(PriceHistory.date).label("last_date"),
+            )
+            .where(PriceHistory.asset_id.in_(asset_ids))
+            .group_by(PriceHistory.asset_id)
+            .subquery()
+        )
+        result = await self.db.execute(
+            select(PriceHistory.asset_id, PriceHistory.date, PriceHistory.close).join(
+                last_dates,
+                (PriceHistory.asset_id == last_dates.c.asset_id)
+                & (PriceHistory.date == last_dates.c.last_date),
+            )
+        )
+        return {row.asset_id: (row.date, row.close) for row in result}
+
     async def get_prices_at_dates(
         self, asset_ids: list[int], dates: set[date]
     ) -> dict[tuple[int, date], float]:

@@ -1,5 +1,6 @@
 """Tests for the price_sync service (sync orchestration and upsert logic)."""
 
+import logging
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -152,6 +153,59 @@ async def test_sync_all_skips_unknown_symbols(db):
     assert "EXTRA" not in counts
 
 
+async def test_sync_all_retries_symbols_missing_from_batch(db, caplog):
+    """Symbols Yahoo silently omits from the batch response are retried one by one."""
+    a1 = Asset(symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD")
+    a2 = Asset(symbol="PRY.MI", name="Prysmian", type=AssetType.STOCK, currency="EUR")
+    db.add_all([a1, a2])
+    await db.commit()
+
+    # Batch response only contains AAPL; PRY.MI must come from the per-symbol retry.
+    mock_prov = _mock_provider(batch_fetch_history={"AAPL": _make_df()})
+    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
+         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10), \
+         caplog.at_level(logging.WARNING, logger="app.services.price_sync"):
+        counts = await sync_all_prices(db, period="1y")
+
+    mock_prov.fetch_history.assert_awaited_once_with("PRY.MI", period="1y")
+    assert counts == {"AAPL": 10, "PRY.MI": 10}
+    assert "PRY.MI" in caplog.text
+
+
+async def test_sync_all_no_retry_when_batch_entirely_empty(db, caplog):
+    """A fully empty batch (breaker open / Yahoo down) is not retried per symbol."""
+    a1 = Asset(symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD")
+    a2 = Asset(symbol="MSFT", name="Microsoft", type=AssetType.STOCK, currency="USD")
+    db.add_all([a1, a2])
+    await db.commit()
+
+    mock_prov = _mock_provider(batch_fetch_history={})
+    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
+         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10), \
+         caplog.at_level(logging.ERROR, logger="app.services.price_sync"):
+        counts = await sync_all_prices(db)
+
+    mock_prov.fetch_history.assert_not_awaited()
+    assert counts == {}
+    assert "no data" in caplog.text
+
+
+async def test_sync_all_retry_failure_is_non_fatal(db):
+    """A failing per-symbol retry doesn't abort the sync of other symbols."""
+    a1 = Asset(symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD")
+    a2 = Asset(symbol="KOG.OL", name="Kongsberg", type=AssetType.STOCK, currency="NOK")
+    db.add_all([a1, a2])
+    await db.commit()
+
+    mock_prov = _mock_provider(batch_fetch_history={"AAPL": _make_df()})
+    mock_prov.fetch_history = AsyncMock(side_effect=Exception("boom"))
+    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
+         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10):
+        counts = await sync_all_prices(db)
+
+    assert counts == {"AAPL": 10}
+
+
 # --- drop_unsettled_last_bar (settlement reconciliation) ---
 #
 # The last stored bar must reconcile with the live quote or the frontend blanks
@@ -198,6 +252,20 @@ async def test_drop_unsettled_missing_quote_kept():
     df = _df_from_closes([100.0, 105.0, 130.0])
     assert len(drop_unsettled_last_bar(df, None, None, "REGULAR")) == len(df)
     assert len(drop_unsettled_last_bar(df, 130.0, None, "REGULAR")) == len(df)
+
+
+async def test_drop_unsettled_logs_closed_market_lag(caplog):
+    """Dropping a closed session's lagging bar is logged with the symbol.
+
+    This is the path that leaves a symbol without its latest session's bar —
+    the state the heal job repairs — so it must be diagnosable from logs.
+    """
+    df = _df_from_closes([130.0, 133.35, 137.0])
+    with caplog.at_level(logging.INFO, logger="app.services.price_sync"):
+        out = drop_unsettled_last_bar(df, 137.85, 133.35, "POSTPOST", symbol="PRY.MI")
+    assert len(out) == len(df) - 1
+    assert "PRY.MI" in caplog.text
+    assert "settled" in caplog.text
 
 
 async def test_drop_unsettled_short_frame_kept():
