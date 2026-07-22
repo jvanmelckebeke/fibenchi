@@ -233,6 +233,25 @@ def volume_stats(df: pd.DataFrame, period: int = 20) -> dict[str, pd.Series]:
     return {"volume": df["volume"], "avg_volume": df["volume"].rolling(window=period).mean()}
 
 
+def relative_volume(df: pd.DataFrame, period: int = 20) -> pd.Series:
+    """Relative Volume (RVOL) — a session's volume vs its recent normal.
+
+    RVOL = volume / SMA(volume over the *prior* ``period`` sessions).
+
+    Puts volume on a cross-asset scale: 1.0 is an average day, >1.5 elevated,
+    >2 unusually heavy (news / breakout / capitulation), <0.5 quiet. The
+    baseline is shifted by one bar so the current session is excluded from its
+    own average — a volume spike therefore doesn't inflate the reference it is
+    measured against. A flat/zero baseline becomes NaN to guard the division.
+
+    Note: this is the daily-over-N-days RVOL. An intraday "volume so far vs
+    average volume at this time of day" measure would need minute bars the
+    daily pipeline doesn't carry.
+    """
+    baseline = df["volume"].shift(1).rolling(window=period).mean().replace(0, float("nan"))
+    return df["volume"] / baseline
+
+
 def bb_position(close: float, upper: float, middle: float, lower: float) -> str:
     """Classify where price sits relative to Bollinger Bands."""
     if close > upper:
@@ -315,6 +334,20 @@ def _vnr_post_compute(result: pd.DataFrame) -> None:
     stretches yield NaN, which ``build_indicator_snapshot`` renders as None.
     """
     result["vnr_sigma"] = _ewma_daily_vol(result["close"], VNR_LAMBDA)
+
+
+def _rvol_snapshot_derived(row: pd.Series) -> dict:
+    """Derive a qualitative relative-volume state from the latest row."""
+    val = row.get("rvol")
+    if pd.notna(val):
+        if val >= 2:
+            return {"rvol_state": "high"}
+        elif val >= 1.5:
+            return {"rvol_state": "elevated"}
+        elif val < 0.5:
+            return {"rvol_state": "quiet"}
+        return {"rvol_state": "normal"}
+    return {"rvol_state": None}
 
 
 def _chop_snapshot_derived(row: pd.Series) -> dict:
@@ -426,6 +459,16 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         decimals=0,
         warmup_periods=20,
         uses_ohlc=True,
+    ),
+    "rvol": IndicatorDef(
+        func=relative_volume,
+        params={"period": 20},
+        output_fields=["rvol"],
+        decimals=2,
+        # 20-session baseline + 1 shifted bar before the first finite value.
+        warmup_periods=21,
+        uses_ohlc=True,
+        snapshot_derived=_rvol_snapshot_derived,
     ),
     "nefi": IndicatorDef(
         func=normalized_force_index,
