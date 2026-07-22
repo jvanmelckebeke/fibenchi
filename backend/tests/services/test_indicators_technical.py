@@ -1,4 +1,4 @@
-"""Tests for momentum / trend / volume-flow indicators: RSI, SMA, MACD, NEFI, CMF."""
+"""Tests for momentum / trend / volume-flow indicators: RSI, SMA, MACD, NEFI, CMF, RVOL."""
 
 import pandas as pd
 import pytest
@@ -9,6 +9,7 @@ from app.services.compute.indicators import (
     compute_indicators,
     macd,
     normalized_force_index,
+    relative_volume,
     rsi,
     sma,
 )
@@ -169,3 +170,79 @@ def test_cmf_snapshot_derived():
     assert "values" in snapshot
     assert "cmf_signal" in snapshot["values"]
     assert snapshot["values"]["cmf_signal"] in ("buying", "selling", None)
+
+
+def _make_volume_df(volumes: list[float]) -> pd.DataFrame:
+    """Build a price frame with an explicit volume series (prices held flat)."""
+    n = len(volumes)
+    dates = pd.date_range("2024-01-01", periods=n, freq="B")
+    return pd.DataFrame({
+        "open": [100.0] * n,
+        "high": [101.0] * n,
+        "low": [99.0] * n,
+        "close": [100.0] * n,
+        "volume": volumes,
+    }, index=dates)
+
+
+def test_rvol_calculation():
+    """RVOL = volume / mean of the prior 20 sessions' volume (current bar excluded)."""
+    # 25 flat sessions at 1M, then a 2.5M spike on the final bar.
+    df = _make_volume_df([1_000_000.0] * 25 + [2_500_000.0])
+    rvol = relative_volume(df, period=20)
+    # Baseline for the last bar is the mean of the prior 20 flat bars = 1M.
+    assert rvol.iloc[-1] == pytest.approx(2.5)
+    # A bar inside the flat stretch sits at exactly 1×.
+    assert rvol.iloc[24] == pytest.approx(1.0)
+
+
+def test_rvol_excludes_current_bar_from_baseline():
+    """The spike must not dilute its own baseline (baseline is shifted by one)."""
+    df = _make_volume_df([1_000_000.0] * 20 + [5_000_000.0])
+    rvol = relative_volume(df, period=20)
+    # If the current bar leaked into the mean, the ratio would be < 5.
+    assert rvol.iloc[-1] == pytest.approx(5.0)
+
+
+def test_rvol_warmup_nans():
+    """First 20 sessions are NaN (20-window rolling mean over a 1-bar-shifted series)."""
+    df = _make_volume_df([1_000_000.0] * 40)
+    rvol = relative_volume(df, period=20)
+    assert rvol.iloc[:20].isna().all()
+    assert pd.notna(rvol.iloc[20])
+
+
+def test_rvol_zero_baseline_is_nan():
+    """A flat-zero baseline must not divide-by-zero — it yields NaN."""
+    df = _make_volume_df([0.0] * 20 + [1_000_000.0])
+    rvol = relative_volume(df, period=20)
+    assert pd.isna(rvol.iloc[-1])
+
+
+def test_rvol_in_compute_indicators():
+    """RVOL should be computed as part of the full indicator pass."""
+    df = _make_price_df(100)
+    result = compute_indicators(df)
+    assert "rvol" in result.columns
+    valid = result["rvol"].dropna()
+    assert len(valid) > 0
+    assert all(v > 0 for v in valid)
+
+
+def test_rvol_snapshot_derived():
+    """RVOL snapshot should expose the numeric value and a qualitative state."""
+    df = _make_volume_df([1_000_000.0] * 25 + [2_500_000.0])
+    snapshot = build_indicator_snapshot(compute_indicators(df))
+    assert snapshot["values"]["rvol"] == pytest.approx(2.5)
+    assert snapshot["values"]["rvol_state"] == "high"
+
+
+def test_rvol_state_thresholds():
+    """rvol_state buckets: high ≥2, elevated ≥1.5, quiet <0.5, else normal."""
+    from app.services.compute.indicators import _rvol_snapshot_derived
+
+    assert _rvol_snapshot_derived(pd.Series({"rvol": 2.4}))["rvol_state"] == "high"
+    assert _rvol_snapshot_derived(pd.Series({"rvol": 1.7}))["rvol_state"] == "elevated"
+    assert _rvol_snapshot_derived(pd.Series({"rvol": 1.0}))["rvol_state"] == "normal"
+    assert _rvol_snapshot_derived(pd.Series({"rvol": 0.3}))["rvol_state"] == "quiet"
+    assert _rvol_snapshot_derived(pd.Series({"rvol": float("nan")}))["rvol_state"] is None
