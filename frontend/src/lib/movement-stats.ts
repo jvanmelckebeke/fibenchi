@@ -23,9 +23,9 @@ export interface MovementStats {
   startClose: number
   /** Latest close in the window. */
   endClose: number
-  /** Largest single-day gain (close-to-close). Null only when there are no day-over-day transitions. */
+  /** Largest single-day gain (close-to-close); `pct` is positive. Null when the window has no up day. */
   maxDailyGain: DailyExtreme | null
-  /** Largest single-day loss (close-to-close); `pct` is negative for a genuine loss. */
+  /** Largest single-day loss (close-to-close); `pct` is negative. Null when the window has no down day. */
   maxDailyLoss: DailyExtreme | null
   /** Largest peak-to-trough decline over the window. Null when the close never fell below a running peak. */
   maxDrawdown: Drawdown | null
@@ -73,8 +73,12 @@ export function computeMovementStats(prices: Price[]): MovementStats | null {
       const dayPct = (cur / prev - 1) * 100
       if (dayPct > 0) upDays++
       else if (dayPct < 0) downDays++
-      if (maxDailyGain === null || dayPct > maxDailyGain.pct) maxDailyGain = { pct: dayPct, date }
-      if (maxDailyLoss === null || dayPct < maxDailyLoss.pct) maxDailyLoss = { pct: dayPct, date }
+      // Sign-guarded so an all-up (or all-down) window can't file the smallest
+      // gain under "Max daily loss" (or vice versa): a gain is only a gain, a
+      // loss only a loss. A window with no down day leaves maxDailyLoss null,
+      // which the UI renders as "—".
+      if (dayPct > 0 && (maxDailyGain === null || dayPct > maxDailyGain.pct)) maxDailyGain = { pct: dayPct, date }
+      if (dayPct < 0 && (maxDailyLoss === null || dayPct < maxDailyLoss.pct)) maxDailyLoss = { pct: dayPct, date }
     }
 
     if (cur > peak) {
