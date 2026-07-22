@@ -122,6 +122,13 @@ async def _startup_warmup() -> None:
 
 async def scheduled_price_heal():
     """Background job: refresh symbols whose stored bars contradict live quotes."""
+    # No market is open anywhere on the weekend, so quotes are frozen and no
+    # stored bar can newly diverge — skip the full portfolio quote+DB scan
+    # entirely (~288 no-op fetches/weekend). Weekdays always have some market
+    # open across the Asia/EU/US rotation, so this is the practical "all markets
+    # closed" gate. Mirrors the intraday sync's weekend guard.
+    if date.today().weekday() >= 5:
+        return
     async with async_session() as db:
         try:
             healed = await heal_unreconciled_prices(db)
