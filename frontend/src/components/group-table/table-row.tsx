@@ -5,8 +5,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
 import { EditAssetDialog } from "@/components/assets/edit-asset-dialog"
-import { NewThesisDialog } from "@/components/thesis/new-thesis-dialog"
-import { useAddAssetToThesis } from "@/lib/queries"
 import { TagBadge } from "@/components/tags/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/chart/expanded-asset-chart"
@@ -79,6 +77,7 @@ export const TableRow = memo(function TableRow({
   visibleIndicatorFields,
   totalColSpan,
   renderContextMenu,
+  onNewThesis,
   accent,
   accentTitle,
   accentIcon,
@@ -94,6 +93,8 @@ export const TableRow = memo(function TableRow({
   visibleIndicatorFields: string[]
   totalColSpan: number
   renderContextMenu?: RowMenuRenderer
+  /** Open the (table-owned, single) "new thesis for this asset" dialog. */
+  onNewThesis?: (asset: Asset) => void
   /** Left-border accent colour (thesis colour) for the "inline" thesis grouping. */
   accent?: string
   /** Tooltip for the accent bar — the thesis name(s) this row belongs to. */
@@ -132,15 +133,13 @@ export const TableRow = memo(function TableRow({
   const handleToggle = useCallback(() => onToggle(asset.symbol), [onToggle, asset.symbol])
   const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
   const [editOpen, setEditOpen] = useState(false)
-  const [newThesisOpen, setNewThesisOpen] = useState(false)
-  const addToThesis = useAddAssetToThesis()
   // resolveIcon returns stable refs from lucide's static icon map.
   const AccentIcon = resolveIcon(accentIcon)
 
   const menu = renderContextMenu?.({
     asset,
     openEdit: () => setEditOpen(true),
-    openNewThesis: () => setNewThesisOpen(true),
+    openNewThesis: () => onNewThesis?.(asset),
   })
 
   const row = (
@@ -339,11 +338,6 @@ export const TableRow = memo(function TableRow({
         row
       )}
       <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
-      <NewThesisDialog
-        open={newThesisOpen}
-        onOpenChange={setNewThesisOpen}
-        onCreated={(thesis) => addToThesis.mutate({ thesisId: thesis.id, assetId: asset.id })}
-      />
       {expanded && (
         <tr>
           <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">

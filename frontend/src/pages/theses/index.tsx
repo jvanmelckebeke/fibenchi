@@ -6,6 +6,8 @@ import { useQuotes } from "@/lib/quote-stream"
 import { useSettings } from "@/lib/settings"
 import type { Thesis, ThesisPerformancePoint } from "@/lib/api"
 import { GroupTable } from "@/components/group-table"
+import { compareSortValues } from "@/lib/use-group-filter"
+import { toggleSetItem } from "@/lib/utils"
 import { ThesisSectionHeader } from "@/components/thesis/thesis-section-header"
 import { ThesisMemberContextMenuContent } from "@/components/thesis/thesis-member-context-menu"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
@@ -34,14 +36,11 @@ export function ThesesPage() {
   )
 
   // Visible theses, sorted as a leaderboard: best aggregate first, nulls last.
+  // Reuse the group table's nulls-last comparator (args swapped for descending)
+  // so the leaderboard can't order null aggregates differently from the table.
   const visible = useMemo(() => {
     const filtered = showPlayedOut ? allTheses : allTheses.filter((t) => t.status !== "played_out")
-    return [...filtered].sort((a, b) => {
-      if (a.aggregate_pct == null && b.aggregate_pct == null) return 0
-      if (a.aggregate_pct == null) return 1
-      if (b.aggregate_pct == null) return -1
-      return b.aggregate_pct - a.aggregate_pct
-    })
+    return [...filtered].sort((a, b) => compareSortValues(b.aggregate_pct, a.aggregate_pct))
   }, [allTheses, showPlayedOut])
 
   // Fetch indicators only for the members of expanded theses (lazy on expand).
@@ -55,13 +54,7 @@ export function ThesesPage() {
   }, [visible, expanded])
   const { data: indicators } = useIndicators(expandedSymbols)
 
-  const toggle = (id: number) =>
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const toggle = (id: number) => setExpanded((prev) => toggleSetItem(prev, id))
 
   const allExpanded = visible.length > 0 && visible.every((t) => expanded.has(t.id))
   const toggleAll = () => setExpanded(allExpanded ? new Set() : new Set(visible.map((t) => t.id)))

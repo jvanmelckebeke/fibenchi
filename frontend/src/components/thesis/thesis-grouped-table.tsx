@@ -3,6 +3,7 @@ import { Pencil, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Group, IndicatorSummary, Quote, Thesis } from "@/lib/api"
 import { buildAssetsById } from "@/lib/assets"
+import { toggleSetItem } from "@/lib/utils"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { useIndicators } from "@/lib/queries"
 import { GroupTable, type RowMenuRenderer } from "@/components/group-table"
@@ -35,13 +36,7 @@ export function ThesisGroupedTable({
   // Which theses have their "+N more" fold expanded (drives the lazy indicator fetch).
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
 
-  const toggleReveal = (id: number) =>
-    setRevealed((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const toggleReveal = (id: number) => setRevealed((prev) => toggleSetItem(prev, id))
 
   // Full Asset objects keyed by id, sourced from every group. Lets the "elsewhere"
   // fold render the same rich GroupTable rows (price/change/indicators) as the
