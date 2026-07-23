@@ -183,6 +183,28 @@ async def _drop_and_persist(
     return count
 
 
+async def _persist_symbol(
+    db: AsyncSession, asset_id: int, df: pd.DataFrame, anchor: Anchor, symbol: str,
+) -> int | None:
+    """Persist one symbol's frame, isolating its failure from the rest of the run.
+
+    ``sync_all_prices`` shares one session across every symbol, and each symbol
+    commits independently (``_drop_and_persist`` upserts then purges, both of
+    which commit). Without this guard a single symbol raising — a malformed frame
+    or a mid-transaction DB error — aborts the whole nightly refresh, leaving
+    every symbol after it stale until the next run. On failure we roll back so a
+    half-applied transaction can't poison the session for the following symbols
+    (only the failed symbol's uncommitted work is discarded; prior symbols have
+    already committed) and return ``None`` to skip it.
+    """
+    try:
+        return await _drop_and_persist(db, asset_id, df, anchor, symbol)
+    except Exception:
+        logger.warning("Persisting prices for %s failed; skipping", symbol, exc_info=True)
+        await db.rollback()
+        return None
+
+
 async def sync_asset_prices(
     db: AsyncSession, asset: Asset, period: str = "3mo", anchor: Anchor | None = None,
 ) -> int:
@@ -225,9 +247,9 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
     for sym, df in data.items():
         asset_id = asset_map.get(sym)
         if asset_id:
-            counts[sym] = await _drop_and_persist(
-                db, asset_id, df, anchors.get(sym, _NO_ANCHOR), sym,
-            )
+            count = await _persist_symbol(db, asset_id, df, anchors.get(sym, _NO_ANCHOR), sym)
+            if count is not None:
+                counts[sym] = count
 
     # The batch response silently omits symbols Yahoo hiccupped on; without a
     # retry those stay stale until the next scheduled run (up to a full day).
@@ -251,9 +273,9 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
             if df is None or df.empty:
                 logger.warning("Retry fetch for %s returned no data", sym)
                 continue
-            counts[sym] = await _drop_and_persist(
-                db, asset_map[sym], df, anchors.get(sym, _NO_ANCHOR), sym,
-            )
+            count = await _persist_symbol(db, asset_map[sym], df, anchors.get(sym, _NO_ANCHOR), sym)
+            if count is not None:
+                counts[sym] = count
 
     return counts
 
