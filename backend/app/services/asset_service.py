@@ -8,12 +8,9 @@ from app.models import (
     AssetType,
     Group,
     Note,
-    PriceHistory,
     PseudoETF,
     group_assets,
     pseudo_etf_constituents,
-    tag_assets,
-    thesis_assets,
 )
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
@@ -151,22 +148,20 @@ async def get_attachments(db: AsyncSession, symbol: str) -> AssetAttachments:
 
 async def hard_delete_asset(db: AsyncSession, symbol: str):
     """Permanently delete the asset row and everything attached to it: group and
-    pseudo-ETF memberships, thesis memberships, tags, note, annotations, prices.
+    pseudo-ETF memberships, thesis memberships, tags, note, annotations, prices,
+    intraday bars.
 
     This is the explicit lifecycle choice offered in the remove dialog — distinct
-    from the soft ``delete_asset`` (default-group only). Every dependent row is
-    cleared explicitly rather than via ``ON DELETE CASCADE`` (which the SQLite test
-    DB doesn't enforce) or async ORM cascade (which would lazy-load during flush),
-    so the delete behaves identically on Postgres and SQLite.
+    from the soft ``delete_asset`` (default-group only). A single Core ``DELETE``
+    on the asset relies on the ``ON DELETE CASCADE`` every dependent FK declares,
+    so the database clears the dependent rows in one statement (no ORM cascade, so
+    nothing lazy-loads during flush). Tests enforce SQLite FK cascade to match
+    Postgres (see ``conftest``), so this path is exercised the same everywhere.
     """
     asset = await get_asset(symbol, db)
     aid = asset.id
-    # Detach the ORM object so its loaded tag/thesis collections don't make the
-    # unit-of-work re-issue (and mis-count) the association deletes we do by hand.
+    # Detach the ORM object so a stale identity-map entry can't try to manage the
+    # row we're deleting out from under it.
     db.expunge(asset)
-    for table in (group_assets, pseudo_etf_constituents, tag_assets, thesis_assets):
-        await db.execute(delete(table).where(table.c.asset_id == aid))
-    for model in (PriceHistory, Annotation, Note):
-        await db.execute(delete(model).where(model.asset_id == aid))
     await db.execute(delete(Asset).where(Asset.id == aid))
     await db.commit()

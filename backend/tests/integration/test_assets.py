@@ -170,9 +170,10 @@ async def test_soft_delete_leaves_other_attachments(client, db):
 
 async def test_hard_delete_cascades(client, db):
     """#536: hard delete removes the asset and every attachment — group / pseudo-ETF
-    / thesis links, tag, note, annotation, prices — while the group / thesis /
-    pseudo-ETF entities themselves survive."""
-    from datetime import date
+    / thesis links, tag, note, annotation, prices, intraday bars — while the group /
+    thesis / pseudo-ETF entities themselves survive. Relies on the DB ON DELETE
+    CASCADE (tests enforce SQLite FK cascade, mirroring Postgres)."""
+    from datetime import date, datetime, timezone
 
     from sqlalchemy import func, select
 
@@ -180,6 +181,7 @@ async def test_hard_delete_cascades(client, db):
         Annotation,
         Asset,
         AssetType,
+        IntradayPrice,
         Note,
         PriceHistory,
         PseudoETF,
@@ -208,6 +210,9 @@ async def test_hard_delete_cascades(client, db):
     db.add(Note(asset_id=aid, content="thesis note"))
     db.add(Annotation(asset_id=aid, date=date(2026, 1, 1), title="entry"))
     db.add(PriceHistory(asset_id=aid, date=date(2026, 1, 1), open=1, high=1, low=1, close=1, volume=1))
+    db.add(IntradayPrice(
+        asset_id=aid, timestamp=datetime(2026, 1, 1, 15, 0, tzinfo=timezone.utc), price=1.0, volume=10,
+    ))
     await db.commit()
 
     tid = (await client.post("/api/theses", json={"name": "El Niño"})).json()["id"]
@@ -223,7 +228,7 @@ async def test_hard_delete_cascades(client, db):
         assert await count(Asset, Asset.id == aid) == 0
         for table in (group_assets, tag_assets, thesis_assets, pseudo_etf_constituents):
             assert await count(table, table.c.asset_id == aid) == 0
-        for model in (Note, Annotation, PriceHistory):
+        for model in (Note, Annotation, PriceHistory, IntradayPrice):
             assert await count(model, model.asset_id == aid) == 0
         # Parent entities survive the cascade.
         assert await count(PseudoETF, PseudoETF.id == petf.id) == 1
