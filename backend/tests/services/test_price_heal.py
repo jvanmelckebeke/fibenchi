@@ -55,7 +55,11 @@ async def test_heal_refreshes_unreconciled_asset(db):
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {"PRY.MI": 22}
-    mock_sync.assert_awaited_once_with(db, asset, period="1mo")
+    # The heal threads the already-fetched quote anchor into the sync so it
+    # doesn't re-fetch the same quote (#5): (price, previous_close, state, date).
+    mock_sync.assert_awaited_once_with(
+        db, asset, period="1mo", anchor=(close * 0.90, close * 0.95, "REGULAR", None),
+    )
 
 
 async def test_heal_skips_reconciling_assets(db):

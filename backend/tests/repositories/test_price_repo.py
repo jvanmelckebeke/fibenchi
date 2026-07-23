@@ -53,6 +53,38 @@ async def test_list_by_asset_since(db):
     assert all(p.date >= since for p in result)
 
 
+async def test_delete_prices_after(db):
+    """delete_prices_after removes only rows strictly after the cutoff date."""
+    asset = await _create_asset(db)
+    await _seed_prices(db, asset.id, n_days=20)
+    repo = PriceRepository(db)
+
+    all_rows = await repo.list_by_asset(asset.id)
+    cutoff = all_rows[len(all_rows) // 2].date
+    expected = sum(1 for p in all_rows if p.date > cutoff)
+
+    deleted = await repo.delete_prices_after(asset.id, cutoff)
+
+    assert deleted == expected
+    assert deleted > 0  # the split actually left rows past the cutoff to delete
+    remaining = await repo.list_by_asset(asset.id)
+    assert all(p.date <= cutoff for p in remaining)
+
+
+async def test_delete_prices_after_scoped_to_asset(db):
+    """Deletion never touches another asset's rows."""
+    a1 = await _create_asset(db, "AAPL")
+    a2 = await _create_asset(db, "MSFT")
+    await _seed_prices(db, a1.id, n_days=10)
+    await _seed_prices(db, a2.id, n_days=10)
+    repo = PriceRepository(db)
+
+    await repo.delete_prices_after(a1.id, date(1900, 1, 1))  # wipe a1 entirely
+
+    assert await repo.list_by_asset(a1.id) == []
+    assert len(await repo.list_by_asset(a2.id)) > 0
+
+
 async def test_list_by_assets_since(db):
     a1 = await _create_asset(db, "AAPL")
     a2 = await _create_asset(db, "MSFT")

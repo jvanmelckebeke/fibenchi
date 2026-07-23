@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ChartSyncProvider } from "@/components/chart/chart-sync-provider"
 import { SubChart } from "@/components/chart/sub-chart"
 import { useAssetDetail } from "@/lib/queries"
+import { toggleSetItem } from "@/lib/utils"
 import type { Asset } from "@/lib/api"
 
 interface ScannerViewProps {
@@ -20,12 +21,7 @@ export function ScannerView({ assets, descriptorId, period }: ScannerViewProps) 
   const hiddenAssets = assets.filter((a) => hiddenSymbols.has(a.symbol))
 
   const toggleHide = (symbol: string) => {
-    setHiddenSymbols((prev) => {
-      const next = new Set(prev)
-      if (next.has(symbol)) next.delete(symbol)
-      else next.add(symbol)
-      return next
-    })
+    setHiddenSymbols((prev) => toggleSetItem(prev, symbol))
   }
 
   return (

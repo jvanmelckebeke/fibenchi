@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.services.price_providers import get_price_provider
-from app.services.price_sync import _reconciles, sync_asset_prices
+from app.services.price_sync import Anchor, _as_date, _reconciles, sync_asset_prices
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,10 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
     latest = await PriceRepository(db).get_latest_closes([a.id for a in assets])
     quotes = await get_price_provider().batch_fetch_quotes(list(by_symbol))
 
-    stale: list[str] = []
+    # Carry each stale symbol's reconciliation anchor so the per-symbol refresh
+    # below can reuse the quote we already fetched instead of round-tripping to
+    # Yahoo again for the same (price, previous_close, market_state) data.
+    stale: list[tuple[str, Anchor]] = []
     for q in quotes:
         sym = q.get("symbol")
         if not sym:
@@ -69,14 +72,15 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
             "%s: stored %s close %s reconciles with neither price %s nor previous_close %s",
             sym, bar_date, bar_close, price, previous_close,
         )
-        stale.append(sym)
+        anchor: Anchor = (price, previous_close, q.get("market_state"), _as_date(q.get("session_date")))
+        stale.append((sym, anchor))
 
     if not stale:
         return {}
 
     now = time.monotonic()
     due = [
-        s for s in stale
+        (s, a) for (s, a) in stale
         if (t := _last_attempt.get(s)) is None or now - t >= HEAL_COOLDOWN_SECONDS
     ]
     skipped_cooldown = len(stale) - len(due)
@@ -89,10 +93,10 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
         )
 
     healed: dict[str, int] = {}
-    for sym in due:
+    for sym, anchor in due:
         _last_attempt[sym] = now
         try:
-            healed[sym] = await sync_asset_prices(db, by_symbol[sym], period="1mo")
+            healed[sym] = await sync_asset_prices(db, by_symbol[sym], period="1mo", anchor=anchor)
         except Exception:
             logger.warning("Price heal for %s failed", sym, exc_info=True)
     return healed

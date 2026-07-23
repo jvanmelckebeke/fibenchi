@@ -39,6 +39,7 @@ def drop_unsettled_last_bar(
     previous_close: float | None,
     market_state: str | None,
     symbol: str | None = None,
+    session_date: date | None = None,
 ) -> pd.DataFrame:
     """Drop a trailing daily bar that reflects an in-progress / unsettled session.
 
@@ -57,6 +58,14 @@ def drop_unsettled_last_bar(
     last completed close, which always reconciles, letting the frontend
     recompute σ-Move live from the quote.
 
+    ``session_date`` is the current session's exchange-local date (from the
+    quote). When known, it disambiguates the one case the close heuristic can't:
+    if Yahoo's daily feed hasn't appended today's forming bar yet, the trailing
+    row is a *completed* prior session whose own predecessor can still fall
+    within tol of ``previous_close`` (a flat prior day) — which would otherwise
+    misfire the drop and discard a real completed bar. A trailing bar dated
+    before the session is therefore kept.
+
     A no-op (returns ``df`` unchanged) when the quote is missing, the frame is
     too short to have a predecessor, the last bar is already a completed prior
     session, or a closed session's bar has settled to the live price.
@@ -71,6 +80,17 @@ def drop_unsettled_last_bar(
     # the quote's previous close). Otherwise it is already a completed bar.
     if not _reconciles(prev_bar_close, previous_close):
         return df
+
+    # If we know the live session's date and the trailing bar predates it, Yahoo
+    # simply hasn't appended today's forming bar yet: this row is a completed
+    # prior session, not an unsettled one — keep it. (Without this a flat prior
+    # day, where the predecessor also matches ``previous_close``, would be
+    # wrongly dropped and blank σ-Move until a heal.)
+    if session_date is not None:
+        last_bar_dt = df.index[-1]
+        last_bar_date = last_bar_dt.date() if hasattr(last_bar_dt, "date") else last_bar_dt
+        if last_bar_date < session_date:
+            return df
 
     # An open session's bar is always a live partial — drop it even though it
     # matches the live price right now, because it will drift as trading goes on.
@@ -96,10 +116,27 @@ def drop_unsettled_last_bar(
     return df.iloc[:-1]
 
 
+# A per-symbol reconciliation anchor: (price, previous_close, market_state,
+# session_date). ``session_date`` is the exchange-local date of the live
+# session, used to keep a completed bar Yahoo's feed hasn't superseded yet.
+Anchor = tuple[float | None, float | None, str | None, date | None]
+_NO_ANCHOR: Anchor = (None, None, None, None)
+
+
+def _as_date(value: str | None) -> date | None:
+    """Parse an ISO date string (from a quote's ``session_date``) to a date."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 async def _quote_anchors(
     provider: PriceProvider, symbols: list[str],
-) -> dict[str, tuple[float | None, float | None, str | None]]:
-    """Fetch ``{symbol: (price, previous_close, market_state)}`` for reconciliation.
+) -> dict[str, Anchor]:
+    """Fetch ``{symbol: (price, previous_close, market_state, session_date)}``.
 
     Best-effort: a quote-fetch failure degrades to storing every bar (the prior
     behaviour) rather than aborting the sync.
@@ -112,21 +149,54 @@ async def _quote_anchors(
         logger.warning("Quote fetch for settlement check failed; storing all bars", exc_info=True)
         return {}
     return {
-        q["symbol"]: (q.get("price"), q.get("previous_close"), q.get("market_state"))
+        q["symbol"]: (
+            q.get("price"), q.get("previous_close"),
+            q.get("market_state"), _as_date(q.get("session_date")),
+        )
         for q in quotes
         if q.get("symbol")
     }
 
 
-async def sync_asset_prices(db: AsyncSession, asset: Asset, period: str = "3mo") -> int:
-    """Fetch and upsert price data for a single asset. Returns number of rows upserted."""
+async def _drop_and_persist(
+    db: AsyncSession, asset_id: int, df: pd.DataFrame, anchor: Anchor, symbol: str,
+) -> int:
+    """Drop the trailing unsettled bar (if any), upsert the rest, and purge any
+    stale copy left behind. Returns the number of rows upserted.
+
+    When the trailing bar is dropped, a partial persisted at that date by an
+    earlier (e.g. quote-degraded) sync would linger in the DB — upsert only
+    touches the completed rows it received, so it can never clear a row it no
+    longer has. That orphan keeps ``get_latest_closes`` returning an unreconciled
+    close and blanks σ-Move for the whole session. Delete any row past the last
+    kept bar so the settled data is authoritative.
+    """
+    price, previous_close, market_state, session_date = anchor
+    kept = drop_unsettled_last_bar(
+        df, price, previous_close, market_state, symbol=symbol, session_date=session_date,
+    )
+    count = await _upsert_prices(db, asset_id, kept)
+    if not kept.empty and len(kept) < len(df):
+        last_kept = kept.index[-1]
+        last_kept = last_kept.date() if hasattr(last_kept, "date") else last_kept
+        await PriceRepository(db).delete_prices_after(asset_id, last_kept)
+    return count
+
+
+async def sync_asset_prices(
+    db: AsyncSession, asset: Asset, period: str = "3mo", anchor: Anchor | None = None,
+) -> int:
+    """Fetch and upsert price data for a single asset. Returns number of rows upserted.
+
+    ``anchor`` lets a caller that already holds the symbol's reconciliation
+    anchor (e.g. the price-heal loop, which batch-fetched every quote) pass it
+    in, avoiding a redundant per-symbol quote round-trip.
+    """
     provider = get_price_provider()
     df = await provider.fetch_history(asset.symbol, period=period)
-    price, previous_close, market_state = (await _quote_anchors(provider, [asset.symbol])).get(
-        asset.symbol, (None, None, None)
-    )
-    df = drop_unsettled_last_bar(df, price, previous_close, market_state, symbol=asset.symbol)
-    return await _upsert_prices(db, asset.id, df)
+    if anchor is None:
+        anchor = (await _quote_anchors(provider, [asset.symbol])).get(asset.symbol, _NO_ANCHOR)
+    return await _drop_and_persist(db, asset.id, df, anchor, asset.symbol)
 
 
 async def sync_asset_prices_range(
@@ -155,9 +225,9 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
     for sym, df in data.items():
         asset_id = asset_map.get(sym)
         if asset_id:
-            price, previous_close, market_state = anchors.get(sym, (None, None, None))
-            df = drop_unsettled_last_bar(df, price, previous_close, market_state, symbol=sym)
-            counts[sym] = await _upsert_prices(db, asset_id, df)
+            counts[sym] = await _drop_and_persist(
+                db, asset_id, df, anchors.get(sym, _NO_ANCHOR), sym,
+            )
 
     # The batch response silently omits symbols Yahoo hiccupped on; without a
     # retry those stay stale until the next scheduled run (up to a full day).
@@ -181,9 +251,9 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
             if df is None or df.empty:
                 logger.warning("Retry fetch for %s returned no data", sym)
                 continue
-            price, previous_close, market_state = anchors.get(sym, (None, None, None))
-            df = drop_unsettled_last_bar(df, price, previous_close, market_state, symbol=sym)
-            counts[sym] = await _upsert_prices(db, asset_map[sym], df)
+            counts[sym] = await _drop_and_persist(
+                db, asset_map[sym], df, anchors.get(sym, _NO_ANCHOR), sym,
+            )
 
     return counts
 

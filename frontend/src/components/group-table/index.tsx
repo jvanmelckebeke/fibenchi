@@ -6,6 +6,8 @@ import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { getSeriesByField } from "@/lib/indicator-registry"
 import { toggleSetItem } from "@/lib/utils"
 import { useSettings } from "@/lib/settings"
+import { useAddAssetToThesis } from "@/lib/queries"
+import { NewThesisDialog } from "@/components/thesis/new-thesis-dialog"
 const noop = () => {}
 
 import { SortableHeader } from "./sortable-header"
@@ -52,6 +54,10 @@ interface GroupTableProps {
 
 export function GroupTable({ assets, quotes, indicators, renderContextMenu, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles, accentIcons }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
+  // Single "new thesis for asset" dialog owned by the table, targeted by the
+  // active row — instead of every row mounting its own dialog + mutation.
+  const [newThesisFor, setNewThesisFor] = useState<Asset | null>(null)
+  const addToThesis = useAddAssetToThesis()
   const [internalMoreOpen, setInternalMoreOpen] = useState(false)
   const moreOpenState = moreOpen ?? internalMoreOpen
   const toggleMore = onToggleMore ?? (() => setInternalMoreOpen((o) => !o))
@@ -112,6 +118,7 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
       visibleIndicatorFields={visibleIndicatorFields}
       totalColSpan={totalColSpan}
       renderContextMenu={renderContextMenu}
+      onNewThesis={setNewThesisFor}
       accent={accentColors?.[asset.symbol]}
       accentTitle={accentTitles?.[asset.symbol]}
       accentIcon={accentIcons?.[asset.symbol]}
@@ -229,6 +236,13 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
           )}
         </tbody>
       </table>
+      <NewThesisDialog
+        open={newThesisFor != null}
+        onOpenChange={(o) => { if (!o) setNewThesisFor(null) }}
+        onCreated={(thesis) => {
+          if (newThesisFor) addToThesis.mutate({ thesisId: thesis.id, assetId: newThesisFor.id })
+        }}
+      />
     </div>
   )
 }

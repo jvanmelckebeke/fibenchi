@@ -7,8 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 import pytest
 
-from app.models import Asset, AssetType
+from app.models import Asset, AssetType, PriceHistory
+from app.repositories.price_repo import PriceRepository
 from app.services.price_sync import (
+    _drop_and_persist,
     _upsert_prices,
     drop_unsettled_last_bar,
     sync_all_prices,
@@ -325,3 +327,83 @@ async def test_sync_all_keeps_settled_bar(db):
         await sync_all_prices(db, period="1y")
 
     assert captured["len"] == 3  # nothing dropped
+
+
+# --- drop_unsettled_last_bar: session-date guard (mid-session Yahoo lag) ---
+#
+# When Yahoo hasn't appended today's forming bar yet, the trailing row is a
+# *completed* prior session whose own predecessor can coincidentally fall within
+# tol of previous_close (a flat prior day). The close heuristic alone would drop
+# that real bar; the session date keeps it.
+
+async def test_drop_unsettled_keeps_completed_bar_before_session():
+    """A trailing bar dated before the live session is completed → kept, even
+    when its predecessor reconciles with previous_close (the flat-day misfire)."""
+    # Last bar (100.0) is yesterday; predecessor (99.8) is within 0.5% of the
+    # quote's previous_close (100.0) — the exact coincidence that misfires.
+    df = _df_from_closes([100.0, 99.8, 100.0])
+    session_date = date(2025, 1, 7)  # after the last bar's date (2025-01-06)
+    out = drop_unsettled_last_bar(
+        df, price=102.0, previous_close=100.0, market_state="REGULAR",
+        session_date=session_date,
+    )
+    assert len(out) == len(df)  # kept — it is a completed prior session
+
+    # Without the session date the close heuristic can't tell and drops it —
+    # this is the latent bug the guard closes.
+    out_no_date = drop_unsettled_last_bar(df, 102.0, 100.0, "REGULAR")
+    assert len(out_no_date) == len(df) - 1
+
+
+async def test_drop_unsettled_drops_forming_bar_on_session_date():
+    """A trailing bar dated on the live session is the forming bar → still dropped."""
+    df = _df_from_closes([305.0, 290.23, 224.14])
+    out = drop_unsettled_last_bar(
+        df, price=220.84, previous_close=290.23, market_state="REGULAR",
+        session_date=date(2025, 1, 6),  # == the last bar's date
+    )
+    assert len(out) == len(df) - 1
+    assert float(out.iloc[-1]["close"]) == 290.23
+
+
+# --- _drop_and_persist: purge an orphaned partial a re-sync can't upsert away ---
+
+async def test_drop_and_persist_deletes_orphaned_partial(db):
+    """When a bar is dropped, a stale partial persisted past it is purged, so an
+    upsert-only re-sync can't leave σ-Move blank all session."""
+    asset = Asset(symbol="ORPH", name="Orphan", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    # A leftover partial at a later date than anything the fetch will keep.
+    db.add(PriceHistory(asset_id=asset.id, date=date(2025, 6, 30),
+                        open=1, high=1, low=1, close=999.0, volume=0))
+    await db.commit()
+
+    # Fetched frame's last bar is a forming partial (predecessor == previous_close),
+    # so drop_unsettled removes it; kept ends at an early-January date.
+    df = _df_from_closes([305.0, 290.23, 224.14])
+    anchor = (220.84, 290.23, "REGULAR", None)
+    with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=2):
+        await _drop_and_persist(db, asset.id, df, anchor, "ORPH")
+
+    latest = await PriceRepository(db).get_latest_closes([asset.id])
+    assert asset.id not in latest  # the orphaned 2025-06-30 partial was deleted
+
+
+async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
+    """No drop → no delete: a settled frame leaves later stored rows untouched."""
+    asset = Asset(symbol="KEEP", name="Keep", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    db.add(PriceHistory(asset_id=asset.id, date=date(2025, 6, 30),
+                        open=1, high=1, low=1, close=500.0, volume=0))
+    await db.commit()
+
+    # Closed, settled bar (matches live price) → drop_unsettled keeps everything.
+    df = _df_from_closes([57.5, 58.04, 59.0])
+    anchor = (58.72, 58.04, "POSTPOST", None)
+    with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
+        await _drop_and_persist(db, asset.id, df, anchor, "KEEP")
+
+    latest = await PriceRepository(db).get_latest_closes([asset.id])
+    assert latest[asset.id][0] == date(2025, 6, 30)  # untouched
