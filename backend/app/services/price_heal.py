@@ -99,4 +99,7 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
             healed[sym] = await sync_asset_prices(db, by_symbol[sym], period="1mo", anchor=anchor)
         except Exception:
             logger.warning("Price heal for %s failed", sym, exc_info=True)
+            # This loop shares one session across symbols; roll back a
+            # half-applied transaction so it can't poison the next heal.
+            await db.rollback()
     return healed

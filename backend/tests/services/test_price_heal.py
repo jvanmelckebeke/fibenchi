@@ -62,6 +62,37 @@ async def test_heal_refreshes_unreconciled_asset(db):
     )
 
 
+async def test_heal_failure_is_non_fatal_and_rolls_back(db):
+    """A heal that raises doesn't abort the others, and its half-applied
+    transaction is rolled back so the shared session stays usable for the
+    remaining symbols."""
+    good = await seed_asset_with_prices(db, "GOOD.OL", n_days=30)
+    bad = await seed_asset_with_prices(db, "BAD.OL", n_days=30)
+    good_close = await _latest_close(db, good)
+    bad_close = await _latest_close(db, bad)
+
+    # Both quotes sit two sessions ahead of the stored bar: nothing reconciles,
+    # so both are due for a heal.
+    provider = _provider_with_quotes([
+        _quote("GOOD.OL", good_close * 0.90, good_close * 0.95),
+        _quote("BAD.OL", bad_close * 0.90, bad_close * 0.95),
+    ])
+
+    async def fake_sync(_db, asset, **_kw):
+        if asset.symbol == "BAD.OL":
+            raise RuntimeError("boom")
+        return 22
+
+    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
+         patch("app.services.price_heal.sync_asset_prices", side_effect=fake_sync), \
+         patch.object(db, "rollback", new_callable=AsyncMock) as mock_rollback:
+        healed = await heal_unreconciled_prices(db)
+
+    assert healed == {"GOOD.OL": 22}
+    assert "BAD.OL" not in healed
+    mock_rollback.assert_awaited_once()
+
+
 async def test_heal_skips_reconciling_assets(db):
     """Assets whose stored bar matches price or previous_close are left alone."""
     a1 = await seed_asset_with_prices(db, "PREV", n_days=30)

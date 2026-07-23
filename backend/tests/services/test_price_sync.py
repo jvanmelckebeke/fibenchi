@@ -208,6 +208,34 @@ async def test_sync_all_retry_failure_is_non_fatal(db):
     assert counts == {"AAPL": 10}
 
 
+async def test_sync_all_main_loop_failure_is_non_fatal(db):
+    """A symbol raising during persist in the main batch loop doesn't abort the
+    rest of the run, and its half-applied transaction is rolled back so it can't
+    poison the symbols that follow it on the shared session."""
+    db.add_all([
+        Asset(symbol="BAD", name="Bad", type=AssetType.STOCK, currency="USD"),
+        Asset(symbol="GOOD", name="Good", type=AssetType.STOCK, currency="USD"),
+    ])
+    await db.commit()
+
+    async def fake_persist(_db, _asset_id, _df, _anchor, symbol):
+        if symbol == "BAD":
+            raise RuntimeError("boom")
+        return 10
+
+    # "BAD" is ordered before "GOOD" in the batch, so GOOD only syncs if the loop
+    # survives BAD's failure rather than aborting on it.
+    mock_prov = _mock_provider(batch_fetch_history={"BAD": _make_df(), "GOOD": _make_df()})
+    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
+         patch("app.services.price_sync._drop_and_persist", side_effect=fake_persist), \
+         patch.object(db, "rollback", new_callable=AsyncMock) as mock_rollback:
+        counts = await sync_all_prices(db, period="1y")
+
+    assert counts == {"GOOD": 10}
+    assert "BAD" not in counts
+    mock_rollback.assert_awaited_once()
+
+
 # --- drop_unsettled_last_bar (settlement reconciliation) ---
 #
 # The last stored bar must reconcile with the live quote or the frontend blanks
