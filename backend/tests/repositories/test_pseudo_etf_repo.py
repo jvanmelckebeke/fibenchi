@@ -1,9 +1,10 @@
-"""Tests for PseudoEtfRepository — CRUD, thesis, and annotation operations."""
+"""Tests for PseudoEtfRepository — CRUD, note, and annotation operations."""
 
-import pytest
 from datetime import date
 
-from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfThesis
+import pytest
+
+from app.models.pseudo_etf import PseudoETF
 from app.repositories.pseudo_etf_repo import PseudoEtfRepository
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -56,26 +57,26 @@ async def test_create_and_delete(db):
     assert result is None
 
 
-async def test_get_thesis_none(db):
+async def test_get_note_none(db):
     etf = await _create_etf(db)
 
     repo = PseudoEtfRepository(db)
-    result = await repo.get_thesis(etf.id)
+    result = await repo.get_note(etf.id)
     assert result is None
 
 
-async def test_upsert_thesis_create_and_update(db):
+async def test_upsert_note_create_and_update(db):
     etf = await _create_etf(db)
 
     repo = PseudoEtfRepository(db)
-    thesis = await repo.upsert_thesis(etf.id, "Version 1")
-    assert thesis.content == "Version 1"
-    assert thesis.pseudo_etf_id == etf.id
+    note = await repo.upsert_note(etf.id, "Version 1")
+    assert note.content == "Version 1"
+    assert note.pseudo_etf_id == etf.id
 
     # Update
-    updated = await repo.upsert_thesis(etf.id, "Version 2")
+    updated = await repo.upsert_note(etf.id, "Version 2")
     assert updated.content == "Version 2"
-    assert updated.id == thesis.id  # same row
+    assert updated.id == note.id  # same row
 
 
 async def test_list_annotations_ordered(db):

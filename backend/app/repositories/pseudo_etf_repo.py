@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfThesis
+from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfNote
 
 
 class PseudoEtfRepository:
@@ -39,24 +39,24 @@ class PseudoEtfRepository:
         await self.db.delete(etf)
         await self.db.commit()
 
-    # --- Thesis ---
+    # --- Note ---
 
-    async def get_thesis(self, etf_id: int) -> PseudoEtfThesis | None:
+    async def get_note(self, etf_id: int) -> PseudoEtfNote | None:
         result = await self.db.execute(
-            select(PseudoEtfThesis).where(PseudoEtfThesis.pseudo_etf_id == etf_id)
+            select(PseudoEtfNote).where(PseudoEtfNote.pseudo_etf_id == etf_id)
         )
         return result.scalar_one_or_none()
 
-    async def upsert_thesis(self, etf_id: int, content: str) -> PseudoEtfThesis:
-        thesis = await self.get_thesis(etf_id)
-        if thesis:
-            thesis.content = content
+    async def upsert_note(self, etf_id: int, content: str) -> PseudoEtfNote:
+        note = await self.get_note(etf_id)
+        if note:
+            note.content = content
         else:
-            thesis = PseudoEtfThesis(pseudo_etf_id=etf_id, content=content)
-            self.db.add(thesis)
+            note = PseudoEtfNote(pseudo_etf_id=etf_id, content=content)
+            self.db.add(note)
         await self.db.commit()
-        await self.db.refresh(thesis)
-        return thesis
+        await self.db.refresh(note)
+        return note
 
     # --- Annotations ---
 

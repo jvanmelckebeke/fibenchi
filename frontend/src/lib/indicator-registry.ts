@@ -174,6 +174,75 @@ export function getStringValue(
   return typeof v === "string" ? v : null
 }
 
+/**
+ * Fractional tolerance for treating a stored close and a quoted close as the
+ * *same session*. Shared by {@link computeLiveVnr} (is the stored bar the
+ * quote's prior session?) and {@link isStoredVnrStale} (is it the current or
+ * prior session at all?) so the two can't drift apart.
+ */
+const SESSION_MATCH_TOL = 0.005
+
+/**
+ * Recompute the σ-Move (vnr) against a live intraday quote so the table shows
+ * *today's* move in σ units instead of the last completed daily bar.
+ *
+ * vnr = daily_return / EWMA_vol_forecast. The DB snapshot's `vnr` is anchored to
+ * the last stored bar; during market hours that bar is *yesterday*, so it can
+ * contradict the live change % shown beside it (positive σ next to a red day).
+ * Here we normalize the live return (`quote.change_percent`) by the forward vol
+ * forecast (`vnr_sigma` — the EWMA vol built through the last stored bar).
+ *
+ * The forecast only applies to the quote's day when the last stored bar is the
+ * session *before* the quote — detected by `quote.previous_close ≈ dbClose`.
+ * Once today's bar is synced (previous_close no longer matches the stored close),
+ * the DB `vnr` is already current, so we return null and let the caller fall back
+ * to it. Also returns null when the forecast/quote data is missing or degenerate.
+ */
+export function computeLiveVnr(
+  quote: { change_percent: number | null; previous_close: number | null } | undefined,
+  values: Record<string, number | string | null | undefined> | undefined,
+  dbClose: number | null | undefined,
+): number | null {
+  if (!quote) return null
+  const changePct = quote.change_percent
+  const prevClose = quote.previous_close
+  const sigma = getNumericValue(values, "vnr_sigma")
+  if (changePct == null || prevClose == null || sigma == null || sigma <= 0) return null
+  if (dbClose == null || dbClose === 0) return null
+  // Only reuse the forecast when the stored bar is the quote's prior session.
+  // (When they differ, the two anchors are close enough that either formula
+  // agrees — a flat day — or today's bar is stored and the DB vnr is correct.)
+  if (Math.abs(prevClose - dbClose) / dbClose > SESSION_MATCH_TOL) return null
+  return changePct / 100 / sigma
+}
+
+/**
+ * Whether the stored σ-Move (vnr) is stale relative to a live quote — i.e. its
+ * bar can't be reconciled with the quote, so showing it would contradict the
+ * live change % beside it.
+ *
+ * The stored `vnr` describes the last completed daily bar. It is safe to show
+ * when that bar is the quote's *current* session (today's bar already synced, so
+ * `dbClose ≈ quote.price`) or its *prior* session (`dbClose ≈ previous_close` —
+ * in which case {@link computeLiveVnr} yields a live value and this is moot). It
+ * is stale when the stored close matches *neither*: the price sync is behind by
+ * ≥2 sessions, so the stored bar predates the live quote entirely.
+ *
+ * Returns false when there is no live quote — then the σ-Move and the change %
+ * both come from the same stored bar and cannot disagree — and when there is no
+ * stored close to anchor against. Meant to gate the DB fallback: only call it
+ * once `computeLiveVnr` has returned null.
+ */
+export function isStoredVnrStale(
+  quote: { price: number | null; previous_close: number | null } | undefined,
+  dbClose: number | null | undefined,
+): boolean {
+  if (!quote || dbClose == null || dbClose === 0) return false
+  const near = (v: number | null) =>
+    v != null && Math.abs(v - dbClose) / dbClose <= SESSION_MATCH_TOL
+  return !(near(quote.price) || near(quote.previous_close))
+}
+
 export function getOverlayDescriptors(): IndicatorDescriptor[] {
   return INDICATOR_REGISTRY.filter((d) => d.placement === "overlay")
 }

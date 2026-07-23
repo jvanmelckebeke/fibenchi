@@ -185,6 +185,34 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     holdingSummary: { label: "ATR%", field: "atr_pct", format: "numeric" },
   },
   {
+    id: "vnr",
+    label: "σ-Move",
+    shortLabel: "σ-Move",
+    description:
+      "Volatility-normalized daily return — today's move in units of the asset's own EWMA volatility. Puts every asset on one scale: ±1σ is a typical day, ±2σ or more is a genuine surprise regardless of headline %.",
+    category: "volatility",
+    placement: "card",
+    capabilities: ["group_table", "group_card", "detail_card", "detail_stats"],
+    defaults: ["group_table", "detail_card"],
+    fields: ["vnr"],
+    sortableFields: ["vnr"],
+    series: [
+      {
+        field: "vnr",
+        label: "σ-Move",
+        color: "#eab308",
+        lineWidth: 2,
+        thresholdColors: [
+          { condition: "gte", value: 0, className: "text-emerald-500" },
+          { condition: "lt", value: 0, className: "text-red-500" },
+        ],
+      },
+    ],
+    decimals: 2,
+    suffix: "σ",
+    holdingSummary: { label: "σ-Move", field: "vnr", format: "numeric" },
+  },
+  {
     id: "adx",
     label: "ADX (14)",
     shortLabel: "ADX",
@@ -238,6 +266,44 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     series: [],
     decimals: 0,
     compactFormat: true,
+  },
+  {
+    id: "rvol",
+    label: "RVOL (20)",
+    shortLabel: "RVOL",
+    description:
+      "Relative Volume — last session's volume vs its 20-day average. 1× is a normal day, above 1.5× elevated, above 2× unusually heavy, below 0.5× quiet.",
+    category: "market_data",
+    placement: "card",
+    capabilities: ["group_table", "group_card", "detail_card", "detail_stats"],
+    defaults: ["group_table", "detail_card"],
+    fields: ["rvol"],
+    sortableFields: ["rvol"],
+    series: [
+      {
+        field: "rvol",
+        label: "RVOL",
+        color: "#f97316",
+        lineWidth: 2,
+        thresholdColors: [
+          { condition: "gte", value: 2, className: "text-orange-500" },
+          { condition: "gte", value: 1.5, className: "text-amber-500" },
+          { condition: "lt", value: 0.5, className: "text-zinc-400" },
+        ],
+      },
+    ],
+    decimals: 2,
+    suffix: "×",
+    holdingSummary: {
+      label: "RVOL",
+      field: "rvol_state",
+      format: "string_map",
+      colorMap: {
+        high: "text-orange-500",
+        elevated: "text-amber-500",
+        quiet: "text-zinc-400",
+      },
+    },
   },
 
   {

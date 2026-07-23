@@ -1,28 +1,38 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import { ChevronRight, ChevronDown } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu"
-import { AssetContextMenuContent } from "@/components/asset-context-menu"
-import { EditAssetDialog } from "@/components/edit-asset-dialog"
-import { TagBadge } from "@/components/tag-badge"
+import { EditAssetDialog } from "@/components/assets/edit-asset-dialog"
+import { TagBadge } from "@/components/tags/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
-import { ExpandedAssetChart } from "@/components/expanded-asset-chart"
+import { ExpandedAssetChart } from "@/components/chart/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatAssetPrice, formatAssetCompactPrice, formatCompactNumber, changeColor, formatChangePct } from "@/lib/format"
+import { formatAssetPriceWithSettings, formatCompactNumber, readableTextColor } from "@/lib/format"
+import { ChangePct } from "@/components/change-pct"
 import {
   getNumericValue,
   extractMacdValues,
   formatDeltaAnnotation,
-  getSeriesByField,
   getDescriptorByField,
-  resolveThresholdColor,
-  resolveAdxColor,
+  formatIndicatorField,
+  computeLiveVnr,
+  isStoredVnrStale,
 } from "@/lib/indicator-registry"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
+import { resolveIcon } from "@/lib/icon-utils"
 import { isColumnVisible } from "./shared"
+
+export interface RowMenuContext {
+  asset: Asset
+  openEdit: () => void
+  openNewThesis: () => void
+}
+
+/** Caller-supplied row context menu — keeps `TableRow` ignorant of groups/theses. */
+export type RowMenuRenderer = (ctx: RowMenuContext) => ReactNode
 
 function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -56,38 +66,47 @@ function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: str
 }
 
 export const TableRow = memo(function TableRow({
-  groupId,
   asset,
   quote,
   indicator,
   expanded,
   onToggle,
-  onDelete,
   onHover,
   compactMode,
   columnSettings,
   visibleIndicatorFields,
   totalColSpan,
+  renderContextMenu,
+  onNewThesis,
+  accent,
+  accentTitle,
+  accentIcon,
 }: {
-  groupId: number
   asset: Asset
   quote?: Quote
   indicator?: IndicatorSummary
   expanded: boolean
   onToggle: (symbol: string) => void
-  onDelete: (symbol: string) => void
   onHover: (symbol: string) => void
   compactMode: boolean
   columnSettings: Record<string, boolean>
   visibleIndicatorFields: string[]
   totalColSpan: number
+  renderContextMenu?: RowMenuRenderer
+  /** Open the (table-owned, single) "new thesis for this asset" dialog. */
+  onNewThesis?: (asset: Asset) => void
+  /** Left-border accent colour (thesis colour) for the "inline" thesis grouping. */
+  accent?: string
+  /** Tooltip for the accent bar — the thesis name(s) this row belongs to. */
+  accentTitle?: string
+  /** Lucide icon name (the thesis icon) revealed when the accent bar expands on hover. */
+  accentIcon?: string
 }) {
   // Use live SSE quote when available, fall back to DB-cached indicator values
   const livePrice = quote?.price ?? null
   const livePct = quote?.change_percent ?? null
   const displayPrice = livePrice ?? indicator?.close ?? null
   const displayPct = livePct ?? indicator?.change_pct ?? null
-  const changeCls = changeColor(displayPct)
 
   // Stale = we have DB data but no live quote yet
   const hasLiveQuote = livePrice != null
@@ -95,33 +114,66 @@ export const TableRow = memo(function TableRow({
   // Suppress stale indicator when market is closed — DB prices are already current.
   // When no quote yet, market_state is unknown so we assume market hours (show stale).
   const marketState = quote?.market_state
-  const isMarketClosed = marketState === "CLOSED" || marketState === "POSTMARKET"
+  // "POSTPOST" = post-market session ended (prices settled); Yahoo never emits
+  // "POSTMARKET". "POST" is still active after-hours, so stale stays meaningful.
+  const isMarketClosed = marketState === "CLOSED" || marketState === "POSTPOST"
   const showStale = hasDbFallback && !isMarketClosed
 
   const { settings } = useSettings()
   const [priceRef, pctRef] = usePriceFlash(displayPrice)
   const py = compactMode ? "py-1.5" : "py-2.5"
   const staleClass = showStale ? "stale-price" : ""
+  const priceFmt = displayPrice != null && isColumnVisible(columnSettings, "price")
+    ? formatAssetPriceWithSettings(displayPrice, asset, {
+        compact: settings.compact_numbers,
+        group: settings.thousands_separator,
+      })
+    : null
 
   const handleToggle = useCallback(() => onToggle(asset.symbol), [onToggle, asset.symbol])
-  const handleDelete = useCallback(() => onDelete(asset.symbol), [onDelete, asset.symbol])
   const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
   const [editOpen, setEditOpen] = useState(false)
+  // resolveIcon returns stable refs from lucide's static icon map.
+  const AccentIcon = resolveIcon(accentIcon)
 
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
+  const menu = renderContextMenu?.({
+    asset,
+    openEdit: () => setEditOpen(true),
+    openNewThesis: () => onNewThesis?.(asset),
+  })
+
+  const row = (
         <tr
           className="border-b border-border hover:bg-muted/30 data-[state=open]:bg-muted/30 cursor-pointer group transition-colors"
           onClick={handleToggle}
           onMouseEnter={handleHover}
         >
-          <td className={`${py} pl-2`}>
-            {expanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <td
+            className={`${py} relative pl-2`}
+            title={accent ? accentTitle : undefined}
+          >
+            {accent && (
+              <span
+                aria-hidden
+                className="absolute inset-y-0 left-0 z-10 flex w-[3px] items-center justify-center overflow-hidden transition-[width] duration-200 ease-out group-hover:w-6"
+                style={{ backgroundColor: accent }}
+              >
+                {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
+                <AccentIcon
+                  className="h-3.5 w-3.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                  style={{ color: readableTextColor(accent) }}
+                />
+              </span>
             )}
+            <span
+              className={`inline-flex transition-transform duration-200 ease-out ${accent ? "group-hover:translate-x-[18px]" : ""}`}
+            >
+              {expanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </span>
           </td>
           <td className={`${py} px-3`}>
             <div className="flex items-center gap-2">
@@ -156,15 +208,13 @@ export const TableRow = memo(function TableRow({
           )}
           {isColumnVisible(columnSettings, "price") && (
             <td className={`${py} px-3 text-right tabular-nums`}>
-              {displayPrice != null ? (
+              {priceFmt ? (
                 <span
                   ref={priceRef}
                   className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
-                  title={settings.compact_numbers ? formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator) : undefined}
+                  title={priceFmt.title}
                 >
-                  {settings.compact_numbers
-                    ? formatAssetCompactPrice(displayPrice, asset)
-                    : formatAssetPrice(displayPrice, asset, undefined, settings.thousands_separator)}
+                  {priceFmt.text}
                 </span>
               ) : (
                 <Skeleton className="h-4 w-14 ml-auto rounded" />
@@ -174,9 +224,11 @@ export const TableRow = memo(function TableRow({
           {isColumnVisible(columnSettings, "change_pct") && (
             <td className={`${py} px-3 text-right tabular-nums`}>
               {displayPct != null ? (
-                <span ref={pctRef} className={`font-medium rounded px-1 -mx-1 ${changeCls} ${staleClass}`}>
-                  {formatChangePct(displayPct).text}
-                </span>
+                <ChangePct
+                  ref={pctRef}
+                  value={displayPct}
+                  className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
+                />
               ) : (
                 <Skeleton className="h-4 w-12 ml-auto rounded" />
               )}
@@ -229,42 +281,62 @@ export const TableRow = memo(function TableRow({
                 </td>
               )
             }
-            const val = getNumericValue(indicator?.values, field)
-            const series = getSeriesByField(field)
+            // σ-Move is a daily-bar indicator; its stored value reflects the last
+            // completed bar (yesterday during market hours), which can contradict
+            // the live change % beside it. Recompute it against the live quote so
+            // it tracks today. Falls back to the DB value once today's bar syncs.
+            const liveVnr = field === "vnr"
+              ? computeLiveVnr(quote, indicator?.values, indicator?.close)
+              : null
+            // When we can't recompute live and fall back to the stored σ-Move,
+            // that stored bar may predate the live quote (price sync behind ≥2
+            // sessions) — showing it would contradict the live change % beside
+            // it. Blank the cell rather than render a wrong-signed number.
+            const vnrStale = field === "vnr" && liveVnr == null
+              && isStoredVnrStale(quote, indicator?.close)
+            const values = liveVnr != null
+              ? { ...indicator?.values, vnr: liveVnr }
+              : indicator?.values
+            const val = getNumericValue(values, field)
             const desc = getDescriptorByField(field)
-            const colorClass = field === "adx" && val != null && indicator?.values
-              ? resolveAdxColor(val, indicator.values)
-              : resolveThresholdColor(series?.thresholdColors, val)
-            const decimals = desc?.decimals ?? (val != null && Math.abs(val) >= 100 ? 0 : 2)
-            const formatted = val != null
-              ? desc?.compactFormat
-                ? formatCompactNumber(val)
-                : `${val.toFixed(decimals)}${desc?.suffix ?? ""}`
+            // Route through the shared registry formatter so the table matches the
+            // card/detail rendering (decimals, threshold colours, currency prefix).
+            const formatted = !vnrStale && val != null && desc && values
+              ? formatIndicatorField(field, desc, values, asset.currency)
               : null
             return (
               <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
-                {formatted != null ? (
+                {formatted ? (
                   <span
-                    className={colorClass}
+                    className={formatted.colorClass}
                     title={desc?.compactFormat && val != null ? val.toLocaleString() : undefined}
                   >
-                    {formatted}
+                    {formatted.text}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">&mdash;</span>
+                  <span
+                    className="text-muted-foreground"
+                    title={vnrStale ? "σ-Move unavailable — price data is behind the live quote" : undefined}
+                  >
+                    &mdash;
+                  </span>
                 )}
               </td>
             )
           })}
         </tr>
-      </ContextMenuTrigger>
-      <AssetContextMenuContent
-        groupId={groupId}
-        assetId={asset.id}
-        symbol={asset.symbol}
-        onEdit={() => setEditOpen(true)}
-        onRemove={handleDelete}
-      />
+  )
+
+  return (
+    <>
+      {menu ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+          {menu}
+        </ContextMenu>
+      ) : (
+        row
+      )}
       <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
       {expanded && (
         <tr>
@@ -275,6 +347,6 @@ export const TableRow = memo(function TableRow({
           </td>
         </tr>
       )}
-    </ContextMenu>
+    </>
   )
 })

@@ -3,17 +3,18 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
+from alembic import context
 
 # Ensure the backend root (/app) is on sys.path so `app.*` imports resolve
 # when alembic is invoked as a CLI command.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.database import Base  # noqa: E402
-from app.config import settings  # noqa: E402
 import app.models  # noqa: E402,F401 — register all models with Base.metadata
+from app.config import settings  # noqa: E402
+from app.database import Base  # noqa: E402
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

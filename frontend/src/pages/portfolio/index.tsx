@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChartSkeleton } from "@/components/chart-skeleton"
+import { ChartSkeleton } from "@/components/chart/chart-skeleton"
 import { PeriodSelector } from "@/components/period-selector"
 import { usePortfolioIndex, usePortfolioPerformers } from "@/lib/queries"
 import { formatChangePct, changeColor } from "@/lib/format"

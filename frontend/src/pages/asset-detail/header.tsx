@@ -8,10 +8,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PeriodSelector } from "@/components/period-selector"
+import { WindowSelector } from "@/components/assets/window-selector"
+import { resolveWindow, type AssetWindow } from "@/lib/asset-window"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { resolveIcon } from "@/lib/icon-utils"
-import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatAssetPrice, formatAssetCompactPrice, formatChangePct } from "@/lib/format"
+import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatAssetPriceWithSettings } from "@/lib/format"
+import { ChangePct } from "@/components/change-pct"
 import type { AssetType } from "@/lib/api"
 import { useQuote } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
@@ -25,8 +27,8 @@ export function Header({
   name,
   currency,
   type,
-  period,
-  setPeriod,
+  assetWindow,
+  setAssetWindow,
   isTracked,
   assetId,
   mode,
@@ -36,8 +38,8 @@ export function Header({
   name?: string
   currency: string
   type: AssetType
-  period: string
-  setPeriod: (p: string) => void
+  assetWindow: AssetWindow
+  setAssetWindow: (w: AssetWindow) => void
   isTracked: boolean
   assetId?: number
   mode: ChartMode
@@ -51,8 +53,13 @@ export function Header({
   const quote = useQuote(symbol.toUpperCase())
   const price = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
-  const changeFmt = changePct != null ? formatChangePct(changePct) : null
   const [priceRef, pctRef] = usePriceFlash(price)
+  const priceFmt = price != null
+    ? formatAssetPriceWithSettings(price, { type, symbol, currency }, {
+        compact: settings.compact_numbers,
+        group: settings.thousands_separator,
+      })
+    : null
 
   return (
     <div className="flex items-center justify-between">
@@ -69,24 +76,21 @@ export function Header({
           </div>
           {name && <p className="text-sm text-muted-foreground">{name}</p>}
         </div>
-        {price != null && (
+        {priceFmt && (
           <span
             ref={priceRef}
             className="text-xl font-semibold tabular-nums rounded px-1"
-            title={settings.compact_numbers ? formatAssetPrice(price, { type, symbol, currency }, undefined, settings.thousands_separator) : undefined}
+            title={priceFmt.title}
           >
-            {settings.compact_numbers
-              ? formatAssetCompactPrice(price, { type, symbol, currency })
-              : formatAssetPrice(price, { type, symbol, currency }, undefined, settings.thousands_separator)}
+            {priceFmt.text}
           </span>
         )}
-        {changeFmt && (
-          <span
+        {changePct != null && (
+          <ChangePct
             ref={pctRef}
-            className={`text-sm font-medium tabular-nums rounded px-1 ${changeFmt.className}`}
-          >
-            {changeFmt.text}
-          </span>
+            value={changePct}
+            className="text-sm font-medium rounded px-1"
+          />
         )}
         <a
           href={settings.yahoo_link_mode === "quote" ? buildYahooQuoteUrl(symbol) : buildYahooFinanceUrl(symbol)}
@@ -149,12 +153,12 @@ export function Header({
         </Tabs>
         {mode === "historical" && (
           <>
-            <PeriodSelector value={period} onChange={setPeriod} />
+            <WindowSelector value={assetWindow} onChange={setAssetWindow} />
             {isTracked && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => refresh.mutate(period)}
+                onClick={() => refresh.mutate(resolveWindow(assetWindow).fetchPeriod)}
                 disabled={refresh.isPending}
               >
                 <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />

@@ -3,15 +3,15 @@ import { useParams, Link, Navigate } from "react-router-dom"
 import { ArrowLeft, UserPlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ConnectedThesis } from "@/components/connected-thesis"
-import { ConnectedAnnotations } from "@/components/connected-annotations"
+import { NoteEditor } from "@/components/notes/note-editor"
+import { AnnotationsList } from "@/components/notes/annotations-list"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
-import { AddConstituentPicker } from "@/components/add-constituent-picker"
+import { AddConstituentPicker } from "@/components/pseudo-etf/add-constituent-picker"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
 import {
   PerformanceOverlayChart,
   DailyContributionChart,
-} from "@/components/chart/pseudo-etf"
+} from "@/components/pseudo-etf"
 import { STACK_COLORS } from "@/lib/chart-utils"
 import { formatChangePct } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
@@ -21,8 +21,8 @@ import {
   usePseudoEtfPerformance,
   usePseudoEtfConstituentsIndicators,
   useRemovePseudoEtfConstituent,
-  usePseudoEtfThesis,
-  useUpdatePseudoEtfThesis,
+  usePseudoEtfNote,
+  useUpdatePseudoEtfNote,
   usePseudoEtfAnnotations,
   useCreatePseudoEtfAnnotation,
   useDeletePseudoEtfAnnotation,
@@ -105,30 +105,29 @@ function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
 
       <HoldingsTable etfId={etfId} />
       <EtfAnnotations etfId={etfId} />
-      <EtfThesis etfId={etfId} />
+      <EtfNote etfId={etfId} />
     </div>
   )
 }
 
 function EtfAnnotations({ etfId }: { etfId: number }) {
   const { data: annotations } = usePseudoEtfAnnotations(etfId)
+  const create = useCreatePseudoEtfAnnotation(etfId)
+  const remove = useDeletePseudoEtfAnnotation(etfId)
   return (
-    <ConnectedAnnotations
+    <AnnotationsList
       annotations={annotations}
-      createMutation={useCreatePseudoEtfAnnotation(etfId)}
-      deleteMutation={useDeletePseudoEtfAnnotation(etfId)}
+      onCreate={create.mutate}
+      onDelete={remove.mutate}
+      isCreating={create.isPending}
     />
   )
 }
 
-function EtfThesis({ etfId }: { etfId: number }) {
-  const { data: thesis } = usePseudoEtfThesis(etfId)
-  return (
-    <ConnectedThesis
-      thesis={thesis}
-      updateMutation={useUpdatePseudoEtfThesis(etfId)}
-    />
-  )
+function EtfNote({ etfId }: { etfId: number }) {
+  const { data: note } = usePseudoEtfNote(etfId)
+  const update = useUpdatePseudoEtfNote(etfId)
+  return <NoteEditor note={note} onSave={update.mutate} isSaving={update.isPending} />
 }
 
 function PerformanceStats({ data, baseValue }: { data: PerformanceBreakdownPoint[]; baseValue: number }) {

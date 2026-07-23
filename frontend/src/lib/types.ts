@@ -36,6 +36,17 @@ export interface Asset {
   tags: TagBrief[]
 }
 
+/** What is attached to an asset — drives the remove dialog's orphan warning + hard-delete confirm. */
+export interface AssetAttachments {
+  symbol: string
+  groups: string[]
+  theses: string[]
+  pseudo_etfs: string[]
+  tags: string[]
+  has_note: boolean
+  annotation_count: number
+}
+
 export interface AssetCreate {
   symbol: string
   name?: string
@@ -114,9 +125,53 @@ export interface AnnotationCreate {
   color?: string
 }
 
-export interface Thesis {
+export interface Note {
   content: string
   updated_at: string
+}
+
+export type ThesisStatus = "watching" | "live" | "played_out"
+
+export interface Thesis {
+  id: number
+  name: string
+  color: string
+  icon: string | null
+  description: string | null
+  status: ThesisStatus
+  opened_at: string
+  created_at: string
+  // Full member rows (backend returns AssetResponse), so groupless members render too.
+  assets: Asset[]
+  aggregate_pct: number | null
+}
+
+export interface ThesisCreate {
+  name: string
+  color?: string
+  icon?: string | null
+  description?: string | null
+  status?: ThesisStatus
+  opened_at?: string
+}
+
+export interface ThesisUpdate {
+  name?: string
+  color?: string
+  icon?: string | null
+  description?: string | null
+  status?: ThesisStatus
+  opened_at?: string
+}
+
+export interface ThesisPerformancePoint {
+  date: string
+  pct: number
+}
+
+export interface ThesisPerformanceSeries {
+  thesis_id: number
+  points: ThesisPerformancePoint[]
 }
 
 export interface SyncResult {

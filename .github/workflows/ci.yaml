@@ -33,6 +33,7 @@ jobs:
           cache-dependency-glob: backend/requirements*.txt
 
       - run: uv pip install --system -r requirements-dev.txt
+      - run: ruff check .
       - run: pytest
       - run: uv pip install --system pip-audit
       - run: pip-audit -r requirements.txt
@@ -58,6 +59,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
       - run: pnpm run build
+      - run: pnpm run test
       - run: pnpm audit --prod || true
 
   build-image:

@@ -1,18 +1,19 @@
-"""Unit tests for pseudo_etf_service — CRUD, constituents, thesis, annotations."""
+"""Unit tests for pseudo_etf_service — CRUD, constituents, note, annotations."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.models import Asset
-from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfThesis
+from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfNote
 from app.services.pseudo_etf_service import (
     add_constituents,
     create_annotation,
     create_pseudo_etf,
     delete_annotation,
-    get_thesis,
+    get_note,
     remove_constituent,
-    upsert_thesis,
+    upsert_note,
 )
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -118,32 +119,32 @@ async def test_remove_constituent_not_found_raises_404(MockRepo):
 
 
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")
-async def test_get_thesis_empty_returns_default(MockRepo):
+async def test_get_note_empty_returns_default(MockRepo):
     db = AsyncMock()
     etf = _make_etf()
 
     mock_repo = MockRepo.return_value
-    mock_repo.get_thesis = AsyncMock(return_value=None)
+    mock_repo.get_note = AsyncMock(return_value=None)
 
     with patch(_PATCH_GET_ETF, new_callable=AsyncMock, return_value=etf):
-        result = await get_thesis(db, etf_id=1)
+        result = await get_note(db, etf_id=1)
 
     assert result.content == ""
 
 
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")
-async def test_upsert_thesis_creates_new(MockRepo):
+async def test_upsert_note_creates_new(MockRepo):
     db = AsyncMock()
     mock_repo = MockRepo.return_value
-    thesis = MagicMock(spec=PseudoEtfThesis)
-    thesis.content = "New thesis"
-    mock_repo.upsert_thesis = AsyncMock(return_value=thesis)
+    note = MagicMock(spec=PseudoEtfNote)
+    note.content = "New note"
+    mock_repo.upsert_note = AsyncMock(return_value=note)
 
     with patch(_PATCH_GET_ETF, new_callable=AsyncMock):
-        result = await upsert_thesis(db, etf_id=1, content="New thesis")
+        result = await upsert_note(db, etf_id=1, content="New note")
 
-    mock_repo.upsert_thesis.assert_awaited_once_with(1, "New thesis")
-    assert result.content == "New thesis"
+    mock_repo.upsert_note.assert_awaited_once_with(1, "New note")
+    assert result.content == "New note"
 
 
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")

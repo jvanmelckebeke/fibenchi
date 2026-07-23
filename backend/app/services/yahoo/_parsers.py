@@ -9,13 +9,44 @@ import datetime
 import logging
 import math
 from datetime import datetime as _datetime
+from datetime import timezone as _timezone
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
 from app.services.yahoo.currency import resolve_currency
 
 logger = logging.getLogger(__name__)
+
+
+def _quote_session_date(info: dict) -> str | None:
+    """Exchange-local calendar date of the quote's current session (ISO string).
+
+    Derived from the /v7 quote's epoch ``regularMarketTime`` interpreted in the
+    exchange's own timezone. Lets price-sync tell a still-forming current-session
+    daily bar from a completed prior one when Yahoo's daily history lags the live
+    session (see ``drop_unsettled_last_bar``). Best-effort: ``None`` when either
+    field is absent or unparseable, in which case the sync falls back to its
+    close-reconciliation heuristic.
+    """
+    ts = info.get("regularMarketTime")
+    tz_name = info.get("exchangeTimezoneName")
+    if ts is None or not tz_name:
+        return None
+    try:
+        tz = ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+    try:
+        # Yahoo's /v7 quote gives epoch seconds; be tolerant of a datetime too.
+        if isinstance(ts, _datetime):
+            moment = ts if ts.tzinfo else ts.replace(tzinfo=_timezone.utc)
+        else:
+            moment = _datetime.fromtimestamp(int(ts), tz=_timezone.utc)
+    except (ValueError, OSError, OverflowError, TypeError):
+        return None
+    return moment.astimezone(tz).date().isoformat()
 
 
 # Period strings accepted by Yahoo's history endpoint.
@@ -118,6 +149,9 @@ def parse_quote_row(sym: str, info: dict) -> dict:
         "avg_volume": int(avg_volume) if avg_volume is not None else None,
         "currency": currency,
         "market_state": info.get("marketState"),
+        # Exchange-local session date (ISO str, best-effort). Internal reconciliation
+        # aid for price-sync; QuoteResponse ignores it, the SSE forwards it harmlessly.
+        "session_date": _quote_session_date(info),
     }
 
 

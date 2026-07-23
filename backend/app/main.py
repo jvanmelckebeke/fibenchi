@@ -1,9 +1,8 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
-
 from datetime import date
+from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -13,14 +12,33 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from app.config import settings as app_settings
-
 from app.database import async_session, engine
-from app.routers import annotations, assets, data, groups, holdings, portfolio, prices, pseudo_etfs, pseudo_etf_analysis, quotes, search, settings as settings_router, symbol_sources, tags, thesis
-from app.services.price_sync import sync_all_prices
+from app.routers import (
+    annotations,
+    assets,
+    companion,
+    data,
+    groups,
+    holdings,
+    indicators,
+    note,
+    portfolio,
+    prices,
+    pseudo_etf_analysis,
+    pseudo_etfs,
+    quotes,
+    search,
+    symbol_sources,
+    tags,
+    thesis,
+)
+from app.routers import settings as settings_router
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
+from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
+from app.services.price_heal import heal_unreconciled_prices
 from app.services.price_providers import init_price_provider
-from app.services.intraday import fetch_and_store_intraday, cleanup_old_intraday
+from app.services.price_sync import sync_all_prices
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
 logger = logging.getLogger(__name__)
@@ -102,6 +120,26 @@ async def _startup_warmup() -> None:
         logger.exception("Startup indicator warmup failed (non-fatal)")
 
 
+async def scheduled_price_heal():
+    """Background job: refresh symbols whose stored bars contradict live quotes."""
+    # No market is open anywhere on the weekend, so quotes are frozen and no
+    # stored bar can newly diverge — skip the full portfolio quote+DB scan
+    # entirely (~288 no-op fetches/weekend). Weekdays always have some market
+    # open across the Asia/EU/US rotation, so this is the practical "all markets
+    # closed" gate. Mirrors the intraday sync's weekend guard.
+    if date.today().weekday() >= 5:
+        return
+    async with async_session() as db:
+        try:
+            healed = await heal_unreconciled_prices(db)
+            if healed:
+                logger.info(
+                    f"Price heal: refreshed {len(healed)} symbol(s): {', '.join(sorted(healed))}"
+                )
+        except Exception:
+            logger.exception("Price heal failed")
+
+
 async def scheduled_symbol_sync():
     """Background job: sync all enabled symbol directory sources."""
     logger.info("Running scheduled symbol directory sync...")
@@ -168,6 +206,20 @@ async def lifespan(app: FastAPI):
         )
         scheduler.add_job(scheduled_refresh, trigger, id="price_refresh")
 
+        # Supplemental daytime refreshes. The primary run above fires once at
+        # REFRESH_CRON (23:00 UTC by default), but Yahoo publishes some markets'
+        # daily bars well after their close — notably KRX (``.KS``), whose bar
+        # for a session isn't in Yahoo's daily history until the *following* day.
+        # A single nightly run therefore leaves Asian markets a full day stale
+        # (a stale σ-Move/change sitting beside a live quote). Extra 08:00 and
+        # 16:00 UTC runs catch the prior Asian session (published overnight) and
+        # any late Yahoo publish, so no market stays stale longer than ~8h.
+        scheduler.add_job(
+            scheduled_refresh,
+            CronTrigger(minute="0", hour="8,16"),
+            id="price_refresh_supplemental",
+        )
+
         # Weekly symbol directory sync (Sundays at 02:00)
         scheduler.add_job(
             scheduled_symbol_sync,
@@ -180,6 +232,16 @@ async def lifespan(app: FastAPI):
             scheduled_intraday_sync,
             IntervalTrigger(seconds=60),
             id="intraday_sync",
+        )
+
+        # Self-heal stragglers the scheduled refreshes missed: when a symbol's
+        # latest stored bar reconciles with neither the live price nor the
+        # quote's previous close (the state that blanks σ-Move), refresh just
+        # that symbol instead of waiting for the next full run.
+        scheduler.add_job(
+            scheduled_price_heal,
+            IntervalTrigger(minutes=10),
+            id="price_heal",
         )
 
         scheduler.start()
@@ -257,8 +319,12 @@ app = FastAPI(
             "description": "Colored labels for categorizing assets (e.g. 'tech', 'growth', 'dividend'). Tags can be attached to assets and used for dashboard filtering.",
         },
         {
-            "name": "thesis",
-            "description": "Free-text investment thesis per asset. Supports Markdown content.",
+            "name": "note",
+            "description": "Free-text note per asset. Supports Markdown content.",
+        },
+        {
+            "name": "theses",
+            "description": "Global cross-cutting theses: thematic baskets of tickers tracked under one hypothesis, with a lifecycle status and open date. An asset can belong to many theses.",
         },
         {
             "name": "annotations",
@@ -275,11 +341,15 @@ app = FastAPI(
         },
         {
             "name": "pseudo-etfs",
-            "description": "User-created custom baskets (pseudo-ETFs) with equal-weight allocation and quarterly rebalancing. Includes constituent management, indexed performance with per-symbol breakdown, technical indicator snapshots, thesis, and annotations.",
+            "description": "User-created custom baskets (pseudo-ETFs) with equal-weight allocation and quarterly rebalancing. Includes constituent management, indexed performance with per-symbol breakdown, technical indicator snapshots, note, and annotations.",
         },
         {
             "name": "settings",
             "description": "User preference storage for indicator visibility, chart preferences, and display options.",
+        },
+        {
+            "name": "companion",
+            "description": "Versioned config bundle (groups + tickers + tags) for the mobile companion app — tells it what to track; live data is fetched on-device.",
         },
         {
             "name": "system",
@@ -291,11 +361,14 @@ app = FastAPI(
 app.include_router(assets.router)
 app.include_router(data.router)
 app.include_router(groups.router)
+app.include_router(companion.router)
 app.include_router(tags.router)
 app.include_router(tags.asset_tag_router)
 app.include_router(portfolio.router)
 app.include_router(prices.router)
 app.include_router(holdings.router)
+app.include_router(indicators.router)
+app.include_router(note.router)
 app.include_router(thesis.router)
 app.include_router(annotations.router)
 app.include_router(pseudo_etfs.router)

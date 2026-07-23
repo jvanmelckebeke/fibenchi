@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "indicators": [
+    {
+      "key": "rsi",
+      "kernel": "rsi",
+      "params": {
+        "period": 14
+      },
+      "outputFields": [
+        "rsi"
+      ],
+      "deltaFields": [
+        "rsi_delta",
+        "rsi_delta_sigma"
+      ],
+      "decimals": 2,
+      "fieldDecimals": {
+        "rsi_delta": 1,
+        "rsi_delta_sigma": 1
+      },
+      "warmup": 14,
+      "usesOhlc": false,
+      "snapshotDerived": null,
+      "platforms": [
+        "web",
+        "app"
+      ]
+    },
+    {
+      "key": "sma_20",
+      "kernel": "sma",
+      "params": {
+        "period": 20
+      },
+      "outputFields": [
+        "sma_20"
+      ],
+      "deltaFields": [],
+      "decimals": 4,
+      "fieldDecimals": {},
+      "warmup": 20,
+      "usesOhlc": false,
+      "snapshotDerived": null,
+      "platforms": [
+        "web",
+        "app"
+      ]
+    },
+    {
+      "key": "sma_50",
+      "kernel": "sma",
+      "params": {
+        "period": 50
+      },
+      "outputFields": [
+        "sma_50"
+      ],
+      "deltaFields": [],
+      "decimals": 4,
+      "fieldDecimals": {},
+      "warmup": 50,
+      "usesOhlc": false,
+      "snapshotDerived": null,
+      "platforms": [
+        "web",
+        "app"
+      ]
+    },
+    {
+      "key": "bb",
+      "kernel": "bollinger_bands",
+      "params": {
+        "period": 20,
+        "std_dev": 2.0
+      },
+      "outputFields": [
+        "bb_upper",
+        "bb_middle",
+        "bb_lower"
+      ],
+      "deltaFields": [],
+      "decimals": 4,
+      "fieldDecimals": {},
+      "warmup": 20,
+      "usesOhlc": false,
+      "snapshotDerived": "bb",
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "key": "macd",
+      "kernel": "macd",
+      "params": {
+        "fast": 12,
+        "slow": 26,
+        "signal": 9
+      },
+      "outputFields": [
+        "macd",
+        "macd_signal",
+        "macd_hist"
+      ],
+      "deltaFields": [
+        "macd_hist_delta",
+        "macd_hist_delta_sigma",
+        "macd_delta",
+        "macd_delta_sigma"
+      ],
+      "decimals": 4,
+      "fieldDecimals": {
+        "macd_hist_delta": 2,
+        "macd_hist_delta_sigma": 1,
+        "macd_delta": 2,
+        "macd_delta_sigma": 1
+      },
+      "warmup": 35,
+      "usesOhlc": false,
+      "snapshotDerived": "macd",
+      "platforms": [
+        "web",
+        "app"
+      ]
+    },
+    {
+      "key": "atr",
+      "kernel": "atr",
+      "params": {
+        "period": 14
+      },
+      "outputFields": [
+        "atr"
+      ],
+      "deltaFields": [
+        "atr_pct"
+      ],
+      "decimals": 4,
+      "fieldDecimals": {
+        "atr_pct": 2
+      },
+      "warmup": 14,
+      "usesOhlc": true,
+      "snapshotDerived": "atr",
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "key": "adx",
+      "kernel": "adx",
+      "params": {
+        "period": 14
+      },
+      "outputFields": [
+        "adx",
+        "plus_di",
+        "minus_di"
+      ],
+      "deltaFields": [],
+      "decimals": 2,
+      "fieldDecimals": {},
+      "warmup": 28,
+      "usesOhlc": true,
+      "snapshotDerived": "adx",
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "key": "volume",
+      "kernel": "volume_stats",
+      "params": {
+        "period": 20
+      },
+      "outputFields": [
+        "volume",
+        "avg_volume"
+      ],
+      "deltaFields": [],
+      "decimals": 0,
+      "fieldDecimals": {},
+      "warmup": 20,
+      "usesOhlc": true,
+      "snapshotDerived": null,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "key": "nefi",
+      "kernel": "normalized_force_index",
+      "params": {
+        "ema_period": 13,
+        "short_vol": 20,
+        "long_vol": 200
+      },
+      "outputFields": [
+        "nefi_short",
+        "nefi_long"
+      ],
+      "deltaFields": [],
+      "decimals": 2,
+      "fieldDecimals": {},
+      "warmup": 200,
+      "usesOhlc": true,
+      "snapshotDerived": "nefi",
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "key": "cmf",
+      "kernel": "chaikin_money_flow",
+      "params": {
+        "period": 20
+      },
+      "outputFields": [
+        "cmf"
+      ],
+      "deltaFields": [],
+      "decimals": 3,
+      "fieldDecimals": {},
+      "warmup": 20,
+      "usesOhlc": true,
+      "snapshotDerived": "cmf",
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "key": "chop",
+      "kernel": "choppiness_index",
+      "params": {
+        "period": 14
+      },
+      "outputFields": [
+        "chop"
+      ],
+      "deltaFields": [],
+      "decimals": 1,
+      "fieldDecimals": {},
+      "warmup": 14,
+      "usesOhlc": true,
+      "snapshotDerived": "chop",
+      "platforms": [
+        "web"
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import pytest
 from app.services.compute.group import (
     _indicator_cache,
     compute_and_cache_indicators,
+    compute_indicators_for_symbols,
     get_batch_sparklines,
 )
 
@@ -183,5 +184,92 @@ class TestComputeAndCacheIndicators:
         # Second call should use cache
         await compute_and_cache_indicators(db, group_id=1)
         assert mock_compute_ind.call_count == call_count_1  # No additional calls
+
+        _indicator_cache._data.clear()
+
+
+class TestComputeIndicatorsForSymbols:
+    @patch("app.services.compute.group.merge_fundamentals_from_cache")
+    @patch("app.services.compute.group.build_indicator_snapshot")
+    @patch("app.services.compute.group.compute_indicators")
+    @patch("app.services.compute.group.prices_to_df")
+    @patch("app.services.compute.group.PriceRepository")
+    @patch("app.services.compute.group.AssetRepository")
+    async def test_computes_snapshots_for_symbols(
+        self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
+        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
+    ):
+        _indicator_cache._data.clear()
+
+        # Only the tracked symbol resolves to a row; "GHOST" is dropped by the repo.
+        rows = [_make_asset_row(1, "AAPL")]
+        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols = AsyncMock(return_value=rows)
+
+        today = date.today()
+        prices = [_make_price(1, today - timedelta(days=i), 150.0 + i) for i in range(30)]
+        mock_price_repo_cls.return_value.list_by_assets_since = AsyncMock(return_value=prices)
+        mock_price_repo_cls.return_value.get_latest_date = AsyncMock(return_value=today)
+
+        mock_prices_to_df.return_value = MagicMock()
+        mock_compute_ind.return_value = MagicMock()
+        mock_build_snap.return_value = {"values": {"rsi": 55.0}}
+        mock_merge_fund.side_effect = _mock_merge_fundamentals({})
+
+        result = await compute_indicators_for_symbols(db, ["AAPL", "GHOST"])
+
+        assert set(result) == {"AAPL"}
+        assert result["AAPL"]["values"]["rsi"] == 55.0
+        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols.assert_awaited_once_with(
+            ["AAPL", "GHOST"]
+        )
+
+        _indicator_cache._data.clear()
+
+    @patch("app.services.compute.group.AssetRepository")
+    async def test_empty_symbols_short_circuits(self, mock_asset_repo_cls, db):
+        result = await compute_indicators_for_symbols(db, [])
+
+        assert result == {}
+        # No DB work for an empty symbol set.
+        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols.assert_not_called()
+
+    @patch("app.services.compute.group.merge_fundamentals_from_cache")
+    @patch("app.services.compute.group.build_indicator_snapshot")
+    @patch("app.services.compute.group.compute_indicators")
+    @patch("app.services.compute.group.prices_to_df")
+    @patch("app.services.compute.group.PriceRepository")
+    @patch("app.services.compute.group.AssetRepository")
+    async def test_cache_shared_across_scopes(
+        self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
+        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
+    ):
+        """Regression for #529: the cache key is scope-independent, so a group
+        page (group_id) and the symbol-addressed endpoint (None) share the entry
+        when the symbol set + latest date match — no redundant recompute."""
+        _indicator_cache._data.clear()
+
+        row = _make_asset_row(1, "AAPL")
+        # Both entry points resolve the same symbol set to the same (id, symbol) row.
+        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=[row])
+        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols = AsyncMock(return_value=[row])
+
+        today = date.today()
+        prices = [_make_price(1, today - timedelta(days=i), 150.0 + i) for i in range(30)]
+        mock_price_repo_cls.return_value.list_by_assets_since = AsyncMock(return_value=prices)
+        mock_price_repo_cls.return_value.get_latest_date = AsyncMock(return_value=today)
+
+        mock_prices_to_df.return_value = MagicMock()
+        mock_compute_ind.return_value = MagicMock()
+        mock_build_snap.return_value = {"values": {"rsi": 55.0}}
+        mock_merge_fund.side_effect = _mock_merge_fundamentals({})
+
+        # Group call populates the cache.
+        await compute_and_cache_indicators(db, group_id=1)
+        calls_after_group = mock_compute_ind.call_count
+        assert calls_after_group > 0
+
+        # Symbol-addressed call for the same symbol set must hit that entry, not recompute.
+        await compute_indicators_for_symbols(db, ["AAPL"])
+        assert mock_compute_ind.call_count == calls_after_group
 
         _indicator_cache._data.clear()

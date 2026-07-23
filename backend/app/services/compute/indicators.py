@@ -84,6 +84,48 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return _wilder_smooth(tr, period)
 
 
+# RiskMetrics daily decay; shared by the vnr indicator and its live forecast.
+VNR_LAMBDA = 0.94
+
+
+def _ewma_daily_vol(closes: pd.Series, lam: float) -> pd.Series:
+    """Forward EWMA volatility forecast (RiskMetrics zero-mean).
+
+    Returns the sqrt of the EWMA variance built from returns *through each bar*
+    — i.e. the volatility with which to normalize the *next* bar's return. Flat
+    stretches (variance 0) become NaN to guard division. This is the un-shifted
+    counterpart of the ``sigma_forecast`` inside :func:`volatility_normalized_return`;
+    the value at the last bar is the forecast for the in-progress day, which the
+    live snapshot uses to score today's move before its bar is written.
+    """
+    returns = closes.pct_change()
+    # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
+    ewma_var = (returns**2).ewm(alpha=1 - lam, adjust=False).mean()
+    return np.sqrt(ewma_var).replace(0, float("nan"))
+
+
+def volatility_normalized_return(closes: pd.Series, lam: float = VNR_LAMBDA) -> pd.Series:
+    """Volatility-normalized daily return — a "sigma move" / return z-score.
+
+    Expresses each day's close-to-close return in units of the asset's own
+    recent volatility, so moves become comparable across assets regardless of
+    how volatile each one usually is: a +3% day in a calm name can be a bigger
+    event (larger sigma move) than a +6% day in a high-beta name. A value of
+    +2.0 means "today's up-move was twice the size recent volatility predicted".
+
+    Volatility is a RiskMetrics-style zero-mean EWMA forecast built from returns
+    through the *previous* day (``shift(1)``), so a large move does not deflate
+    its own score. ``lam`` is the EWMA decay (RiskMetrics daily default 0.94);
+    a larger lam means longer memory. Unlike a fixed rolling window, the EWMA
+    has no hard edge, so an old shock decays smoothly instead of dropping out
+    abruptly and stepping the score ("ghosting").
+    """
+    returns = closes.pct_change()
+    # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
+    sigma_forecast = _ewma_daily_vol(closes, lam).shift(1)
+    return returns / sigma_forecast
+
+
 def adx(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
     """Average Directional Index with +DI and -DI using Wilder's smoothing.
 
@@ -191,6 +233,25 @@ def volume_stats(df: pd.DataFrame, period: int = 20) -> dict[str, pd.Series]:
     return {"volume": df["volume"], "avg_volume": df["volume"].rolling(window=period).mean()}
 
 
+def relative_volume(df: pd.DataFrame, period: int = 20) -> pd.Series:
+    """Relative Volume (RVOL) — a session's volume vs its recent normal.
+
+    RVOL = volume / SMA(volume over the *prior* ``period`` sessions).
+
+    Puts volume on a cross-asset scale: 1.0 is an average day, >1.5 elevated,
+    >2 unusually heavy (news / breakout / capitulation), <0.5 quiet. The
+    baseline is shifted by one bar so the current session is excluded from its
+    own average — a volume spike therefore doesn't inflate the reference it is
+    measured against. A flat/zero baseline becomes NaN to guard the division.
+
+    Note: this is the daily-over-N-days RVOL. An intraday "volume so far vs
+    average volume at this time of day" measure would need minute bars the
+    daily pipeline doesn't carry.
+    """
+    baseline = df["volume"].shift(1).rolling(window=period).mean().replace(0, float("nan"))
+    return df["volume"] / baseline
+
+
 def bb_position(close: float, upper: float, middle: float, lower: float) -> str:
     """Classify where price sits relative to Bollinger Bands."""
     if close > upper:
@@ -262,6 +323,31 @@ def _cmf_snapshot_derived(row: pd.Series) -> dict:
     if pd.notna(row.get("cmf")):
         return {"cmf_signal": "buying" if row["cmf"] > 0 else "selling"}
     return {"cmf_signal": None}
+
+
+def _vnr_post_compute(result: pd.DataFrame) -> None:
+    """Attach the forward EWMA vol forecast used to score an in-progress day.
+
+    ``vnr`` itself normalizes the *last completed* bar's return; ``vnr_sigma`` is
+    the vol (a return fraction) to divide a live intraday return by so the UI can
+    show today's σ-move before today's bar has been written to the DB. Flat
+    stretches yield NaN, which ``build_indicator_snapshot`` renders as None.
+    """
+    result["vnr_sigma"] = _ewma_daily_vol(result["close"], VNR_LAMBDA)
+
+
+def _rvol_snapshot_derived(row: pd.Series) -> dict:
+    """Derive a qualitative relative-volume state from the latest row."""
+    val = row.get("rvol")
+    if pd.notna(val):
+        if val >= 2:
+            return {"rvol_state": "high"}
+        elif val >= 1.5:
+            return {"rvol_state": "elevated"}
+        elif val < 0.5:
+            return {"rvol_state": "quiet"}
+        return {"rvol_state": "normal"}
+    return {"rvol_state": None}
 
 
 def _chop_snapshot_derived(row: pd.Series) -> dict:
@@ -374,6 +460,16 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         warmup_periods=20,
         uses_ohlc=True,
     ),
+    "rvol": IndicatorDef(
+        func=relative_volume,
+        params={"period": 20},
+        output_fields=["rvol"],
+        decimals=2,
+        # 20-session baseline + 1 shifted bar before the first finite value.
+        warmup_periods=21,
+        uses_ohlc=True,
+        snapshot_derived=_rvol_snapshot_derived,
+    ),
     "nefi": IndicatorDef(
         func=normalized_force_index,
         params={"ema_period": 13, "short_vol": 20, "long_vol": 200},
@@ -401,6 +497,15 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         warmup_periods=14,
         uses_ohlc=True,
         snapshot_derived=_chop_snapshot_derived,
+    ),
+    "vnr": IndicatorDef(
+        func=volatility_normalized_return,
+        params={"lam": VNR_LAMBDA},
+        output_fields=["vnr", "vnr_sigma"],
+        decimals=2,
+        warmup_periods=60,
+        post_compute=_vnr_post_compute,
+        field_decimals={"vnr_sigma": 6},
     ),
 }
 
@@ -474,12 +579,12 @@ def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
       - {field}_delta_sigma = |Δ| expressed in rolling σ units, only when
         the absolute delta exceeds mean + 2σ of the rolling window (else NaN).
     """
-    for field in _get_delta_fields():
-        if field not in result.columns:
+    for field_name in _get_delta_fields():
+        if field_name not in result.columns:
             continue
-        series = result[field]
+        series = result[field_name]
         delta = series.diff()
-        result[f"{field}_delta"] = delta
+        result[f"{field_name}_delta"] = delta
 
         abs_delta = delta.abs()
         rolling_mean = abs_delta.rolling(window=window, min_periods=window).mean()
@@ -487,7 +592,7 @@ def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
 
         sigma = (abs_delta - rolling_mean) / rolling_std
         # Only keep sigma when |Δ| exceeds the 2σ threshold
-        result[f"{field}_delta_sigma"] = sigma.where(
+        result[f"{field_name}_delta_sigma"] = sigma.where(
             abs_delta > rolling_mean + 2 * rolling_std
         )
 

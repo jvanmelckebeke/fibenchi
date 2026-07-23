@@ -59,18 +59,15 @@ async def get_batch_sparklines(
     return out
 
 
-async def compute_and_cache_indicators(
-    db: AsyncSession, group_id: int | None = None,
+async def _compute_snapshots_for_rows(
+    db: AsyncSession, asset_rows,
 ) -> dict[str, dict]:
-    """Compute indicator snapshots for assets in a group, with caching.
+    """Compute DB-backed indicator snapshots for (id, symbol) rows, with caching.
 
-    If group_id is None, uses the default group.
+    The snapshot *values* depend purely on (symbols, latest price date), so the
+    cache is keyed by exactly that — identical symbol sets share entries across
+    callers (group pages and the symbol-addressed indicators endpoint alike).
     """
-    if group_id is not None:
-        asset_rows = await AssetRepository(db).list_in_group_id_symbol_pairs(group_id)
-    else:
-        asset_rows = await _get_default_group_pairs(db)
-
     if not asset_rows:
         return {}
 
@@ -79,9 +76,9 @@ async def compute_and_cache_indicators(
 
     price_repo = PriceRepository(db)
 
-    # Build cache key: symbols + latest price date + group context
+    # Build cache key: symbols + latest price date (scope-independent by design)
     latest_date = await price_repo.get_latest_date(asset_ids)
-    cache_key = (frozenset(id_to_symbol.values()), latest_date, group_id)
+    cache_key = (frozenset(id_to_symbol.values()), latest_date)
 
     cached = _indicator_cache.get_value(cache_key)
     if cached is not None:
@@ -116,3 +113,33 @@ async def compute_and_cache_indicators(
     _indicator_cache.set_value(cache_key, out)
 
     return out
+
+
+async def compute_and_cache_indicators(
+    db: AsyncSession, group_id: int | None = None,
+) -> dict[str, dict]:
+    """Compute indicator snapshots for assets in a group, with caching.
+
+    If group_id is None, uses the default group.
+    """
+    if group_id is not None:
+        asset_rows = await AssetRepository(db).list_in_group_id_symbol_pairs(group_id)
+    else:
+        asset_rows = await _get_default_group_pairs(db)
+
+    return await _compute_snapshots_for_rows(db, asset_rows)
+
+
+async def compute_indicators_for_symbols(
+    db: AsyncSession, symbols: list[str],
+) -> dict[str, dict]:
+    """Compute indicator snapshots for specific tracked symbols (DB-backed).
+
+    Mirrors the per-group snapshot shape but is addressable by symbol set rather
+    than by group — used to fill indicator columns for thesis members that live in
+    other groups. Unknown/untracked symbols are omitted (no DB price history).
+    """
+    if not symbols:
+        return {}
+    asset_rows = await AssetRepository(db).list_id_symbol_pairs_by_symbols(symbols)
+    return await _compute_snapshots_for_rows(db, asset_rows)

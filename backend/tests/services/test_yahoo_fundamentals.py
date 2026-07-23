@@ -1,6 +1,5 @@
 """Tests for Yahoo Finance fundamental metrics fetching."""
 
-import math
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,6 +7,8 @@ import pytest
 from app.services.yahoo import yahoo_client
 from app.services.yahoo._parsers import (
     FUNDAMENTAL_FIELDS,
+)
+from app.services.yahoo._parsers import (
     safe_float as _safe_float,
 )
 

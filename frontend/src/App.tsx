@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react"
 import { Routes, Route } from "react-router-dom"
-import { Layout } from "@/components/layout"
+import { Layout } from "@/components/layout/layout"
 import { WatchlistRedirect } from "@/pages/watchlist-redirect"
 
 const PortfolioPage = lazy(() =>
@@ -19,6 +19,9 @@ const PseudoEtfDetailPage = lazy(() =>
   import("@/pages/pseudo-etf-detail").then((m) => ({
     default: m.PseudoEtfDetailPage,
   })),
+)
+const ThesesPage = lazy(() =>
+  import("@/pages/theses").then((m) => ({ default: m.ThesesPage })),
 )
 const SettingsPage = lazy(() =>
   import("@/pages/settings").then((m) => ({ default: m.SettingsPage })),
@@ -66,6 +69,14 @@ export default function App() {
           element={
             <Suspense>
               <PseudoEtfDetailPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/theses"
+          element={
+            <Suspense>
+              <ThesesPage />
             </Suspense>
           }
         />

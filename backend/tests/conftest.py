@@ -1,5 +1,6 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database import Base, get_db
@@ -13,6 +14,18 @@ TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
 engine = create_async_engine(TEST_DB_URL, echo=False)
 TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+# SQLite ignores foreign-key constraints (and so ON DELETE CASCADE) unless asked
+# per connection. Enable it so tests exercise the same cascade Postgres enforces
+# in production — letting hard_delete_asset rely on the DB cascade the FKs
+# already declare instead of hand-deleting every dependent table.
+@event.listens_for(engine.sync_engine, "connect")
+def _enable_sqlite_fk(dbapi_conn, _record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 
 # Currencies to seed in tests — subunits + common test currencies
 _SEED_CURRENCIES = [
@@ -100,6 +113,36 @@ async def setup_db():
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest.fixture(autouse=True)
+def _clear_thesis_perf_cache():
+    """The thesis-performance TTLCache is module-level and outlives the per-test
+    in-memory DB (whose ids reset each test); clear it so one test can't read a
+    colliding cache key written by another."""
+    from app.services import thesis_service
+    thesis_service._thesis_perf_cache.clear()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _isolate_fundamentals_cache(monkeypatch):
+    """Keep the fundamentals cache from leaking across tests.
+
+    ``merge_fundamentals_*`` fire a background ``asyncio.create_task`` that hits
+    the real Yahoo client on a cache miss. Left to run, that fire-and-forget
+    task outlives the per-test event loop (``Task was destroyed but it is
+    pending``) and its result lands in a module-level cache the next test can
+    read — a nondeterministic cross-test coupling. Clear the module state and
+    stub the scheduler to a no-op; tests that care about the merge behaviour
+    patch the merge functions at their call sites instead."""
+    from app.services import fundamentals_cache
+    fundamentals_cache._fundamentals_cache.clear()
+    fundamentals_cache._pending_symbols.clear()
+    monkeypatch.setattr(fundamentals_cache, "_schedule_background_fetch", lambda *_a, **_k: None)
+    yield
+    fundamentals_cache._fundamentals_cache.clear()
+    fundamentals_cache._pending_symbols.clear()
 
 
 @pytest.fixture

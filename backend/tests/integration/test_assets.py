@@ -5,7 +5,6 @@ import pytest
 
 from app.services import asset_service
 
-
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
@@ -117,6 +116,128 @@ async def test_delete_asset(client):
 async def test_delete_nonexistent_asset(client):
     resp = await client.delete("/api/assets/NOPE")
     assert resp.status_code == 404
+
+
+async def test_asset_attachments_summary(client, db):
+    """#536: the remove dialog reads this to warn before an orphan / hard delete."""
+    from app.models import Asset, AssetType, Note
+    from app.repositories.group_repo import GroupRepository
+
+    asset = Asset(symbol="COFF.L", name="Coffee", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    default_group = await GroupRepository(db).get_default()
+    assert default_group is not None
+    default_group.assets.append(asset)
+    db.add(Note(asset_id=asset.id, content="hold through El Niño"))
+    await db.commit()
+
+    tid = (await client.post("/api/theses", json={"name": "El Niño"})).json()["id"]
+    await client.post(f"/api/theses/{tid}/assets", json={"asset_ids": [asset.id]})
+
+    body = (await client.get("/api/assets/COFF.L/attachments")).json()
+    assert body["symbol"] == "COFF.L"
+    assert body["groups"] == ["Watchlist"]
+    assert body["theses"] == ["El Niño"]
+    assert body["has_note"] is True
+    assert body["annotation_count"] == 0
+    assert body["pseudo_etfs"] == []
+
+
+async def test_soft_delete_leaves_other_attachments(client, db):
+    """Soft delete only detaches from the default group — thesis membership and the
+    row survive (the exact orphan state #536 warns about)."""
+    from app.models import Asset, AssetType
+    from app.repositories.group_repo import GroupRepository
+
+    asset = Asset(symbol="COFF.L", name="Coffee", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    default_group = await GroupRepository(db).get_default()
+    assert default_group is not None
+    default_group.assets.append(asset)
+    await db.commit()
+    tid = (await client.post("/api/theses", json={"name": "El Niño"})).json()["id"]
+    await client.post(f"/api/theses/{tid}/assets", json={"asset_ids": [asset.id]})
+
+    assert (await client.delete("/api/assets/COFF.L")).status_code == 204
+
+    # Row + thesis membership preserved; only the group link is gone.
+    assert [a["symbol"] for a in (await client.get("/api/assets")).json()] == ["COFF.L"]
+    assert {a["symbol"] for a in (await client.get(f"/api/theses/{tid}")).json()["assets"]} == {"COFF.L"}
+    assert (await client.get("/api/assets/COFF.L/attachments")).json()["groups"] == []
+
+
+async def test_hard_delete_cascades(client, db):
+    """#536: hard delete removes the asset and every attachment — group / pseudo-ETF
+    / thesis links, tag, note, annotation, prices, intraday bars — while the group /
+    thesis / pseudo-ETF entities themselves survive. Relies on the DB ON DELETE
+    CASCADE (tests enforce SQLite FK cascade, mirroring Postgres)."""
+    from datetime import date, datetime, timezone
+
+    from sqlalchemy import func, select
+
+    from app.models import (
+        Annotation,
+        Asset,
+        AssetType,
+        IntradayPrice,
+        Note,
+        PriceHistory,
+        PseudoETF,
+        Tag,
+        group_assets,
+        pseudo_etf_constituents,
+        tag_assets,
+        thesis_assets,
+    )
+    from app.repositories.group_repo import GroupRepository
+    from tests.conftest import TestSession
+
+    asset = Asset(symbol="COFF.L", name="Coffee", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    aid = asset.id
+
+    default_group = await GroupRepository(db).get_default()
+    assert default_group is not None
+    default_group.assets.append(asset)
+    tag = Tag(name="softs", color="#3b82f6")
+    db.add(tag)
+    petf = PseudoETF(name="Softs Basket", base_date=date(2026, 1, 1))
+    petf.constituents.append(asset)
+    db.add(petf)
+    db.add(Note(asset_id=aid, content="thesis note"))
+    db.add(Annotation(asset_id=aid, date=date(2026, 1, 1), title="entry"))
+    db.add(PriceHistory(asset_id=aid, date=date(2026, 1, 1), open=1, high=1, low=1, close=1, volume=1))
+    db.add(IntradayPrice(
+        asset_id=aid, timestamp=datetime(2026, 1, 1, 15, 0, tzinfo=timezone.utc), price=1.0, volume=10,
+    ))
+    await db.commit()
+
+    tid = (await client.post("/api/theses", json={"name": "El Niño"})).json()["id"]
+    await client.post(f"/api/theses/{tid}/assets", json={"asset_ids": [aid]})
+
+    assert (await client.delete("/api/assets/COFF.L?hard=true")).status_code == 204
+
+    # Verify with a fresh session so we read the committed state cleanly.
+    async with TestSession() as check:
+        async def count(selectable, where):
+            return (await check.execute(select(func.count()).select_from(selectable).where(where))).scalar_one()
+
+        assert await count(Asset, Asset.id == aid) == 0
+        for table in (group_assets, tag_assets, thesis_assets, pseudo_etf_constituents):
+            assert await count(table, table.c.asset_id == aid) == 0
+        for model in (Note, Annotation, PriceHistory, IntradayPrice):
+            assert await count(model, model.asset_id == aid) == 0
+        # Parent entities survive the cascade.
+        assert await count(PseudoETF, PseudoETF.id == petf.id) == 1
+        assert await count(Tag, Tag.id == tag.id) == 1
+    assert (await client.get(f"/api/theses/{tid}")).status_code == 200
+
+
+async def test_hard_delete_nonexistent_asset(client):
+    assert (await client.delete("/api/assets/NOPE?hard=true")).status_code == 404
 
 
 async def test_list_assets_returns_created(client):

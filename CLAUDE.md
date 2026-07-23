@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Companion App
+
+Fibenchi has a **mobile companion app** — a separate repo (`jvanmelckebeke/fibenchi-app`, checked out locally at `../fibenchi-app`). It's a native React Native / Expo (Android-first) app for glanceable market data on the phone. Its own `CLAUDE.md` has the full architecture.
+
+The split of responsibilities, so backend changes don't break it:
+
+- **The app gets live market data and computes indicators itself** — it calls Yahoo Finance directly on-device (native, so not CORS-bound) and ports `movement-stats.ts` / `indicators.py` to TypeScript. Fibenchi does **not** serve quotes or charts to the app.
+- **Fibenchi is only the "config plane":** it tells the app *what to track* (groups / tickers / tags) via `GET /api/companion/config`. That endpoint (added in PR #519/#520) is the **only** coupling between the two codebases.
+- **The contract is a single source of truth:** `backend/app/schemas/companion.py` (`CompanionConfig`) is the one definition. `backend/scripts/export_companion_schema.py` emits `backend/companion.schema.json`, which feeds the app's Zod codegen — so the contract can't drift between Python and TypeScript. The model carries a `version: Literal[1]` field the app gates on; any breaking shape change is a version bump (v1 is intentionally minimal: groups/tickers/tags; pseudo-ETFs/settings would be a later version).
+
+**When touching `app/schemas/companion.py`, `app/services/companion_service.py`, `app/routers/companion.py`, or `companion.schema.json`: remember the consumer is the separate app.** Re-export the schema after model changes, bump `version` on breaking changes, and keep the contract explicit. (Note: `claudedocs/mobile-companion-pwa-design.md` is an earlier PWA/AWS-proxy design that the native app superseded — it's obsolete.)
+
 ## Development Environment
 
 The entire stack runs via Docker Compose:
@@ -129,7 +141,7 @@ On startup (`main.py` lifespan):
 - **Generic components:** `ThesisEditor` and `AnnotationsList` accept data + callbacks as props, reused across asset detail and pseudo-ETF detail pages.
 - **Price warmup:** Indicator endpoint fetches `WARMUP_DAYS` extra calendar days before the display period to warm up SMA50/Bollinger Bands. Derived from `max_warmup_periods * 2.3`.
 - **SSE quote stream:** Backend pushes quotes for assets in any group via SSE (`AssetRepository.list_in_any_group_id_symbol_pairs`) with adaptive intervals (15s during market hours, 60s pre/post, 300s closed). Frontend reconnects with exponential backoff (1s→30s) on disconnect.
-- **Stale price animation:** Group table falls back to DB-cached indicator prices when no live SSE quote is available. During market hours, stale values show a pulsing opacity animation (`.stale-price` CSS class). Suppressed when `market_state` is `CLOSED` or `POSTMARKET`.
+- **Stale price animation:** Group table falls back to DB-cached indicator prices when no live SSE quote is available. During market hours, stale values show a pulsing opacity animation (`.stale-price` CSS class). Suppressed when `market_state` is `CLOSED` or `POSTPOST` (post-market ended).
 - **Price flash:** `usePriceFlash` hook triggers green/red background fade animation (1.8s) on price tick changes, using a reflow trick to restart CSS animations on repeated same-direction ticks.
 - **SPA fallback:** In production, the root `Dockerfile` copies the built SPA into `static/`. `main.py` mounts it and serves `index.html` for all non-API, non-asset routes. In dev, this directory doesn't exist so the mount is skipped.
 

@@ -83,11 +83,11 @@ export function useGroup(id: number) {
   })
 }
 
-export function useGroupSparklines(id: number, period?: string) {
+export function useGroupSparklines(id: number, period?: string, enabled = true) {
   return useQuery({
     queryKey: keys.groupSparklines(id, period),
     queryFn: () => api.groups.sparklines(id, period),
-    enabled: !!id,
+    enabled: !!id && enabled,
     staleTime: STALE_5MIN,
   })
 }
@@ -97,6 +97,18 @@ export function useGroupIndicators(id: number) {
     queryKey: keys.groupIndicators(id),
     queryFn: () => api.groups.indicators(id),
     enabled: !!id,
+    staleTime: STALE_5MIN,
+  })
+}
+
+/** Indicator snapshots for an arbitrary set of tracked symbols, keyed by symbol.
+ * Used to fill indicator columns for thesis members living in other groups —
+ * the per-group batch only covers the current group. */
+export function useIndicators(symbols: string[], enabled = true) {
+  return useQuery({
+    queryKey: keys.indicators(symbols),
+    queryFn: () => api.indicators.batch(symbols),
+    enabled: enabled && symbols.length > 0,
     staleTime: STALE_5MIN,
   })
 }

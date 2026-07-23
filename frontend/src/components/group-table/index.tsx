@@ -1,35 +1,66 @@
-import { useCallback, useMemo, useState } from "react"
-import { ChevronsUpDown, ChevronsDownUp } from "lucide-react"
+import { useCallback, useMemo, useState, type ReactNode } from "react"
+import { ChevronsUpDown, ChevronsDownUp, ChevronRight, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { GroupSortBy, SortDir } from "@/lib/settings"
 import { getSeriesByField } from "@/lib/indicator-registry"
 import { toggleSetItem } from "@/lib/utils"
 import { useSettings } from "@/lib/settings"
+import { useAddAssetToThesis } from "@/lib/queries"
+import { NewThesisDialog } from "@/components/thesis/new-thesis-dialog"
 const noop = () => {}
 
 import { SortableHeader } from "./sortable-header"
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
-import { TableRow } from "./table-row"
-import { SORTABLE_FIELDS, BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden } from "./shared"
+import { TableRow, type RowMenuRenderer } from "./table-row"
+export type { RowMenuContext, RowMenuRenderer } from "./table-row"
+import { BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden, useOrderedIndicatorFields } from "./shared"
 import { useColumnResize } from "./use-column-resize"
 
 
 interface GroupTableProps {
-  groupId: number
   assets: Asset[]
   quotes: Record<string, Quote>
   indicators?: Record<string, IndicatorSummary>
-  onDelete: (symbol: string) => void
+  /** Caller-supplied row context menu (group-scoped, thesis-scoped, or none). */
+  renderContextMenu?: RowMenuRenderer
   compactMode: boolean
   onHover?: (symbol: string) => void
   sortBy?: GroupSortBy
   sortDir?: SortDir
   onSort?: (key: GroupSortBy) => void
+  /**
+   * Secondary rows appended below the main rows behind a collapsible in-table
+   * footer toggle (e.g. thesis members that live in other groups). Rendered with
+   * the same columns — no second header.
+   */
+  moreAssets?: Asset[]
+  /** Label for the "more" footer toggle (e.g. "+2 more in hotlist, Watchlist"). */
+  moreLabel?: ReactNode
+  /** Controlled open state for the "more" footer. Falls back to internal state. */
+  moreOpen?: boolean
+  /** Controlled toggle handler for the "more" footer. */
+  onToggleMore?: () => void
+  /**
+   * Per-symbol left-border accent colour (thesis colour) for the "inline" thesis
+   * grouping mode. Rows without an entry render no accent.
+   */
+  accentColors?: Record<string, string>
+  /** Per-symbol tooltip for the accent bar (the thesis name[s]). */
+  accentTitles?: Record<string, string>
+  /** Per-symbol Lucide icon name (the thesis icon) revealed when hovering the accent bar. */
+  accentIcons?: Record<string, string>
 }
 
-export function GroupTable({ groupId, assets, quotes, indicators, onDelete, compactMode, onHover, sortBy, sortDir, onSort }: GroupTableProps) {
+export function GroupTable({ assets, quotes, indicators, renderContextMenu, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles, accentIcons }: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
+  // Single "new thesis for asset" dialog owned by the table, targeted by the
+  // active row — instead of every row mounting its own dialog + mutation.
+  const [newThesisFor, setNewThesisFor] = useState<Asset | null>(null)
+  const addToThesis = useAddAssetToThesis()
+  const [internalMoreOpen, setInternalMoreOpen] = useState(false)
+  const moreOpenState = moreOpen ?? internalMoreOpen
+  const toggleMore = onToggleMore ?? (() => setInternalMoreOpen((o) => !o))
   const { settings, updateSettings } = useSettings()
   const columnSettings = settings.group_table_columns
   const responsiveHidden = useResponsiveHidden()
@@ -46,6 +77,10 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
     })
   }
 
+  const reorderColumns = (nextOrder: string[]) => {
+    updateSettings({ group_table_column_order: nextOrder })
+  }
+
   const allExpanded = assets.length > 0 && assets.every((a) => expandedSymbols.has(a.symbol))
 
   const toggleExpandAll = () => {
@@ -56,15 +91,39 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
     }
   }
 
+  const orderedIndicatorFields = useOrderedIndicatorFields()
   const visibleIndicatorFields = useMemo(
-    () => SORTABLE_FIELDS.filter((f) => isColumnVisible(columnSettings, f) && !responsiveHidden.has(f)),
-    [columnSettings, responsiveHidden],
+    () => orderedIndicatorFields.filter((f) => isColumnVisible(columnSettings, f) && !responsiveHidden.has(f)),
+    [orderedIndicatorFields, columnSettings, responsiveHidden],
   )
 
   // Total visible columns: expand chevron (1) + symbol (1) + toggleable base + toggleable indicators
   const visibleBaseCount =
     BASE_COLUMN_DEFS.filter((c) => isColumnVisible(columnSettings, c.key)).length
   const totalColSpan = 1 + 1 + visibleBaseCount + visibleIndicatorFields.length
+
+  const hasMore = !!moreAssets && moreAssets.length > 0
+
+  const renderRow = (asset: Asset, keyPrefix = "") => (
+    <TableRow
+      key={`${keyPrefix}${asset.id}`}
+      asset={asset}
+      quote={quotes[asset.symbol]}
+      indicator={indicators?.[asset.symbol]}
+      expanded={expandedSymbols.has(asset.symbol)}
+      onToggle={toggleExpand}
+      onHover={onHover ?? noop}
+      compactMode={compactMode}
+      columnSettings={columnSettings}
+      visibleIndicatorFields={visibleIndicatorFields}
+      totalColSpan={totalColSpan}
+      renderContextMenu={renderContextMenu}
+      onNewThesis={setNewThesisFor}
+      accent={accentColors?.[asset.symbol]}
+      accentTitle={accentTitles?.[asset.symbol]}
+      accentIcon={accentIcons?.[asset.symbol]}
+    />
+  )
 
   return (
     <div className="rounded-md border border-border overflow-x-auto">
@@ -86,6 +145,8 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
           columnSettings={columnSettings}
           onToggle={toggleColumn}
           responsiveHidden={responsiveHidden}
+          orderedIndicatorFields={orderedIndicatorFields}
+          onReorder={reorderColumns}
         />
       </div>
       <table className="w-full table-fixed">
@@ -154,25 +215,34 @@ export function GroupTable({ groupId, assets, quotes, indicators, onDelete, comp
           </tr>
         </thead>
         <tbody>
-          {assets.map((asset) => (
-            <TableRow
-              key={asset.id}
-              groupId={groupId}
-              asset={asset}
-              quote={quotes[asset.symbol]}
-              indicator={indicators?.[asset.symbol]}
-              expanded={expandedSymbols.has(asset.symbol)}
-              onToggle={toggleExpand}
-              onDelete={onDelete}
-              onHover={onHover ?? noop}
-              compactMode={compactMode}
-              columnSettings={columnSettings}
-              visibleIndicatorFields={visibleIndicatorFields}
-              totalColSpan={totalColSpan}
-            />
-          ))}
+          {assets.map((asset) => renderRow(asset))}
+          {hasMore && (
+            <>
+              <tr className="border-b border-border bg-muted/20">
+                <td colSpan={totalColSpan} className="p-0">
+                  <button
+                    type="button"
+                    onClick={toggleMore}
+                    className="flex w-full items-center gap-1 px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors"
+                    aria-expanded={moreOpenState}
+                  >
+                    {moreOpenState ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+                    {moreLabel}
+                  </button>
+                </td>
+              </tr>
+              {moreOpenState && moreAssets!.map((asset) => renderRow(asset, "more-"))}
+            </>
+          )}
         </tbody>
       </table>
+      <NewThesisDialog
+        open={newThesisFor != null}
+        onOpenChange={(o) => { if (!o) setNewThesisFor(null) }}
+        onCreated={(thesis) => {
+          if (newThesisFor) addToThesis.mutate({ thesisId: thesis.id, assetId: newThesisFor.id })
+        }}
+      />
     </div>
   )
 }

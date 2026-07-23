@@ -1,7 +1,7 @@
 from datetime import date
 
 import pandas as pd
-from sqlalchemy import select, func
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import PriceHistory
@@ -81,6 +81,30 @@ class PriceRepository:
         )
         return {row.asset_id: row.last_date for row in result}
 
+    async def get_latest_closes(
+        self, asset_ids: list[int]
+    ) -> dict[int, tuple[date, float]]:
+        """Latest stored (date, close) per asset."""
+        if not asset_ids:
+            return {}
+        last_dates = (
+            select(
+                PriceHistory.asset_id,
+                func.max(PriceHistory.date).label("last_date"),
+            )
+            .where(PriceHistory.asset_id.in_(asset_ids))
+            .group_by(PriceHistory.asset_id)
+            .subquery()
+        )
+        result = await self.db.execute(
+            select(PriceHistory.asset_id, PriceHistory.date, PriceHistory.close).join(
+                last_dates,
+                (PriceHistory.asset_id == last_dates.c.asset_id)
+                & (PriceHistory.date == last_dates.c.last_date),
+            )
+        )
+        return {row.asset_id: (row.date, row.close) for row in result}
+
     async def get_prices_at_dates(
         self, asset_ids: list[int], dates: set[date]
     ) -> dict[tuple[int, date], float]:
@@ -97,6 +121,23 @@ class PriceRepository:
             (p.asset_id, p.date): p.close
             for p in result.scalars().all()
         }
+
+    async def delete_prices_after(self, asset_id: int, last_date: date) -> int:
+        """Delete stored bars strictly after ``last_date`` for one asset.
+
+        Purges a stale current-session partial that a re-sync dropped from its
+        fetched frame but left orphaned in the DB — an upsert can only update
+        the rows it received, never remove one it no longer has. Returns the
+        number of rows deleted.
+        """
+        result = await self.db.execute(
+            delete(PriceHistory).where(
+                PriceHistory.asset_id == asset_id,
+                PriceHistory.date > last_date,
+            )
+        )
+        await self.db.commit()
+        return result.rowcount or 0
 
     async def upsert_prices(self, asset_id: int, df: pd.DataFrame) -> int:
         """Upsert price rows from a DataFrame. Returns row count.

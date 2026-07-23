@@ -5,9 +5,9 @@ import pytest
 
 from app.services.yahoo import (
     EXCHANGE_CURRENCY_MAP,
+    _normalize_ohlcv_df,
     currency_from_suffix,
     resolve_currency,
-    _normalize_ohlcv_df,
 )
 
 

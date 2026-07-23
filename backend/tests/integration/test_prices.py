@@ -1,8 +1,9 @@
 """Tests for the prices router (GET /prices, GET /indicators, POST /refresh)."""
 
-import pytest
 from datetime import date, timedelta
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from tests.helpers import make_yahoo_df, seed_asset_with_prices
 

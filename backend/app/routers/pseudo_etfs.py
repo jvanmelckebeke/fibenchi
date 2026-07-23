@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.pseudo_etf import (
-    PseudoETFCreate,
-    PseudoETFUpdate,
-    PseudoETFAddConstituents,
-    PseudoETFResponse,
-)
-from app.schemas.thesis import ThesisResponse, ThesisUpdate
 from app.schemas.annotation import AnnotationCreate, AnnotationResponse
+from app.schemas.note import NoteResponse, NoteUpdate
+from app.schemas.pseudo_etf import (
+    PseudoETFAddConstituents,
+    PseudoETFCreate,
+    PseudoETFResponse,
+    PseudoETFUpdate,
+)
 from app.services import pseudo_etf_service
 
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
@@ -57,16 +57,16 @@ async def remove_constituent(
     return await pseudo_etf_service.remove_constituent(db, etf_id, asset_id)
 
 
-# --- Thesis ---
+# --- Note ---
 
-@router.get("/{etf_id}/thesis", response_model=ThesisResponse, summary="Get pseudo-ETF investment thesis")
-async def get_etf_thesis(etf_id: int, db: AsyncSession = Depends(get_db)):
-    return await pseudo_etf_service.get_thesis(db, etf_id)
+@router.get("/{etf_id}/note", response_model=NoteResponse, summary="Get pseudo-ETF note")
+async def get_etf_note(etf_id: int, db: AsyncSession = Depends(get_db)):
+    return await pseudo_etf_service.get_note(db, etf_id)
 
 
-@router.put("/{etf_id}/thesis", response_model=ThesisResponse, summary="Create or update pseudo-ETF thesis")
-async def update_etf_thesis(etf_id: int, data: ThesisUpdate, db: AsyncSession = Depends(get_db)):
-    return await pseudo_etf_service.upsert_thesis(db, etf_id, data.content)
+@router.put("/{etf_id}/note", response_model=NoteResponse, summary="Create or update pseudo-ETF note")
+async def update_etf_note(etf_id: int, data: NoteUpdate, db: AsyncSession = Depends(get_db)):
+    return await pseudo_etf_service.upsert_note(db, etf_id, data.content)
 
 
 # --- Annotations ---

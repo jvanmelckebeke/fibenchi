@@ -2,7 +2,6 @@
 
 import pytest
 
-from app.models.user_settings import UserSettings
 from app.repositories.settings_repo import SettingsRepository
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")

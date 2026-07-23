@@ -1,15 +1,56 @@
 """Tests for Yahoo Finance real-time quote fetching."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from app.services.yahoo import yahoo_client
 from app.services.yahoo._parsers import (
+    _quote_session_date,
+    parse_quote_row,
+)
+from app.services.yahoo._parsers import (
     parse_quotes as _parse_quotes,
+)
+from app.services.yahoo._parsers import (
     sanitize_float as _sanitize_float,
 )
 from app.services.yahoo.rate_limit import crumb_rejected
+
+
+class TestSessionDate:
+    """``session_date`` is the exchange-local calendar date of the live session,
+    used by price-sync to tell a forming bar from a completed prior one."""
+
+    def test_uses_exchange_timezone(self):
+        # 23:30 UTC is already the next calendar day in Tokyo but not in New York.
+        epoch = int(datetime(2024, 1, 1, 23, 30, tzinfo=timezone.utc).timestamp())
+        assert _quote_session_date(
+            {"regularMarketTime": epoch, "exchangeTimezoneName": "Asia/Tokyo"}
+        ) == "2024-01-02"
+        assert _quote_session_date(
+            {"regularMarketTime": epoch, "exchangeTimezoneName": "America/New_York"}
+        ) == "2024-01-01"
+
+    def test_missing_fields_return_none(self):
+        assert _quote_session_date({}) is None
+        assert _quote_session_date({"regularMarketTime": 1704151800}) is None
+        assert _quote_session_date({"exchangeTimezoneName": "Asia/Tokyo"}) is None
+
+    def test_bad_timezone_returns_none(self):
+        assert _quote_session_date(
+            {"regularMarketTime": 1704151800, "exchangeTimezoneName": "Not/AZone"}
+        ) is None
+
+    def test_parse_quote_row_includes_session_date(self):
+        epoch = int(datetime(2024, 1, 2, 15, 0, tzinfo=timezone.utc).timestamp())
+        row = parse_quote_row("AAPL", {
+            "currency": "USD", "regularMarketPrice": 100.0,
+            "regularMarketPreviousClose": 99.0, "marketState": "REGULAR",
+            "regularMarketTime": epoch, "exchangeTimezoneName": "America/New_York",
+        })
+        assert row["session_date"] == "2024-01-02"
 
 
 class TestSanitize:

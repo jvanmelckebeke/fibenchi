@@ -2,6 +2,7 @@ import type {
   Annotation,
   AnnotationCreate,
   Asset,
+  AssetAttachments,
   AssetCreate,
   AssetDetail,
   AssetUpdate,
@@ -29,7 +30,11 @@ import type {
   Tag,
   TagBrief,
   TagCreate,
+  Note,
   Thesis,
+  ThesisCreate,
+  ThesisUpdate,
+  ThesisPerformanceSeries,
 } from "./types"
 
 export type * from "./types"
@@ -75,6 +80,11 @@ export const api = {
       request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: AssetUpdate) =>
       request<Asset>(`/assets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    attachments: (symbol: string) =>
+      request<AssetAttachments>(`/assets/${encodeURIComponent(symbol)}/attachments`),
+    // Hard delete: removes the row + all memberships/note/tags/annotations/prices.
+    hardDelete: (symbol: string) =>
+      request<void>(`/assets/${encodeURIComponent(symbol)}?hard=true`, { method: "DELETE" }),
   },
   prices: {
     detail: (symbol: string, period?: string) =>
@@ -96,6 +106,21 @@ export const api = {
       request<TagBrief[]>(`/assets/${symbol}/tags/${tagId}`, { method: "POST" }),
     detach: (symbol: string, tagId: number) =>
       request<TagBrief[]>(`/assets/${symbol}/tags/${tagId}`, { method: "DELETE" }),
+  },
+  theses: {
+    list: () => request<Thesis[]>("/theses"),
+    performance: () => request<ThesisPerformanceSeries[]>("/theses/performance"),
+    get: (id: number) => request<Thesis>(`/theses/${id}`),
+    create: (data: ThesisCreate) =>
+      request<Thesis>("/theses", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: ThesisUpdate) =>
+      request<Thesis>(`/theses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    delete: (id: number) =>
+      request<void>(`/theses/${id}`, { method: "DELETE" }),
+    addAssets: (id: number, assetIds: number[]) =>
+      request<Thesis>(`/theses/${id}/assets`, { method: "POST", body: JSON.stringify({ asset_ids: assetIds }) }),
+    removeAsset: (id: number, assetId: number) =>
+      request<Thesis>(`/theses/${id}/assets/${assetId}`, { method: "DELETE" }),
   },
   groups: {
     list: () => request<Group[]>("/groups"),
@@ -120,10 +145,18 @@ export const api = {
     indicators: (id: number) =>
       request<Record<string, IndicatorSummary>>(`/groups/${id}/indicators`),
   },
-  thesis: {
-    get: (symbol: string) => request<Thesis>(`/assets/${symbol}/thesis`),
+  indicators: {
+    /** Batch indicator snapshots for arbitrary tracked symbols, keyed by symbol. */
+    batch: (symbols: string[]) => {
+      const params = new URLSearchParams()
+      for (const s of symbols) params.append("symbols", s)
+      return request<Record<string, IndicatorSummary>>(`/indicators?${params.toString()}`)
+    },
+  },
+  note: {
+    get: (symbol: string) => request<Note>(`/assets/${symbol}/note`),
     update: (symbol: string, content: string) =>
-      request<Thesis>(`/assets/${symbol}/thesis`, {
+      request<Note>(`/assets/${symbol}/note`, {
         method: "PUT",
         body: JSON.stringify({ content }),
       }),
@@ -180,10 +213,10 @@ export const api = {
       request<PseudoETF>(`/pseudo-etfs/${etfId}/constituents/${assetId}`, { method: "DELETE" }),
     performance: (id: number) => request<PerformanceBreakdownPoint[]>(`/pseudo-etfs/${id}/performance`),
     constituentsIndicators: (id: number) => request<ConstituentIndicator[]>(`/pseudo-etfs/${id}/constituents/indicators`),
-    thesis: {
-      get: (id: number) => request<Thesis>(`/pseudo-etfs/${id}/thesis`),
+    note: {
+      get: (id: number) => request<Note>(`/pseudo-etfs/${id}/note`),
       update: (id: number, content: string) =>
-        request<Thesis>(`/pseudo-etfs/${id}/thesis`, {
+        request<Note>(`/pseudo-etfs/${id}/note`, {
           method: "PUT",
           body: JSON.stringify({ content }),
         }),

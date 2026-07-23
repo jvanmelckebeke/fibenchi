@@ -34,6 +34,8 @@ from app.services.yahoo._validation import _ValidationMixin
 from app.services.yahoo.rate_limit import (
     CrumbRejected,
     YahooThrottle,
+)
+from app.services.yahoo.rate_limit import (
     yahoo_throttle as _shared_throttle,
 )
 from app.utils import TTLCache

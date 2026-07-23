@@ -1,10 +1,8 @@
 """Tests for symbol sync service (provider execution and symbol_directory upserts)."""
 
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy import select
 
 from app.models.symbol_source import SymbolSource
 from app.services.symbol_providers.base import SymbolEntry

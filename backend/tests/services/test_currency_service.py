@@ -1,10 +1,10 @@
 """Tests for the currency lookup service (cache + DB integration)."""
 
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from app.models.currency import Currency
-from app.services.currency_service import _cache, load_cache, lookup, ensure_currency
+from app.services.currency_service import _cache, ensure_currency, load_cache, lookup
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 

@@ -2,7 +2,6 @@ import pytest
 
 from tests.helpers import create_asset_via_api
 
-
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
@@ -48,7 +47,7 @@ async def test_duplicate_tag_name(client):
 
 
 async def test_attach_tag_to_asset(client):
-    asset = await create_asset_via_api(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     tag_resp = await client.post("/api/tags", json={"name": "tech"})
     tid = tag_resp.json()["id"]
 
@@ -60,7 +59,7 @@ async def test_attach_tag_to_asset(client):
 
 
 async def test_detach_tag_from_asset(client):
-    asset = await create_asset_via_api(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     t1 = (await client.post("/api/tags", json={"name": "tech"})).json()
     t2 = (await client.post("/api/tags", json={"name": "growth"})).json()
 
@@ -75,7 +74,7 @@ async def test_detach_tag_from_asset(client):
 
 
 async def test_tags_appear_in_asset_response(client):
-    asset = await create_asset_via_api(client, "AAPL", "Apple")
+    await create_asset_via_api(client, "AAPL", "Apple")
     tag_resp = await client.post("/api/tags", json={"name": "tech"})
     tid = tag_resp.json()["id"]
 
