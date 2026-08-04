@@ -14,6 +14,7 @@ from app.services.market_calendar import (
     INDEX_CALENDARS,
     SUFFIX_CALENDARS,
     Symbol,
+    any_venue_open,
 )
 
 
@@ -166,3 +167,31 @@ def test_phase_venue_without_extended_hours():
     assert venue.phase(_utc(2024, 4, 3, 10, 0)) == "open"
     assert venue.phase(_utc(2024, 4, 3, 16, 0)) == "closed"  # 18:00 CEST
     assert venue.phase(_utc(2024, 4, 3, 6, 0)) == "closed"   # 08:00 CEST
+
+
+def test_any_venue_open_all_closed_weekend():
+    """Saturday noon UTC: neither New York nor Amsterdam trades."""
+    assert any_venue_open(["AAPL", "MSFT", "IWDA.AS"], _utc(2024, 4, 6, 12, 0)) is False
+
+
+def test_any_venue_open_crypto_keeps_weekend_alive():
+    """The 24/7 calendar makes a crypto pair defeat the weekend gate — the old
+    weekday() guard wrongly skipped crypto all weekend."""
+    assert any_venue_open(["AAPL", "BTC-USD"], _utc(2024, 4, 6, 12, 0)) is True
+
+
+def test_any_venue_open_extended_hours_count():
+    """US aftermarket (Wed 21:00 UTC) is a tradeable phase even with XAMS closed."""
+    assert any_venue_open(["IWDA.AS", "AAPL"], _utc(2024, 4, 3, 21, 0)) is True
+
+
+def test_any_venue_open_us_holiday():
+    """July 4 2024 (Thursday) 15:00 UTC — normally mid-session, but a holiday.
+    The old weekday() gate would have run the jobs all day."""
+    assert any_venue_open(["AAPL"], _utc(2024, 7, 4, 15, 0)) is False
+
+
+def test_any_venue_open_fails_open_on_unknown_venue():
+    """An unresolvable symbol must never let the gate block real work."""
+    assert any_venue_open(["FOO.XX"], _utc(2024, 4, 6, 12, 0)) is True
+    assert any_venue_open([], _utc(2024, 4, 6, 12, 0)) is False

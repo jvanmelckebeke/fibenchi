@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from datetime import date
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -36,7 +35,7 @@ from app.routers import settings as settings_router
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
 from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
-from app.services.market_state import any_active
+from app.services.market_calendar import any_venue_open
 from app.services.price_heal import heal_interior_holes, heal_unreconciled_prices
 from app.services.price_providers import init_price_provider
 from app.services.price_sync import sync_all_prices
@@ -123,14 +122,17 @@ async def _startup_warmup() -> None:
 
 async def scheduled_price_heal():
     """Background job: refresh symbols whose stored bars contradict live quotes."""
-    # No market is open anywhere on the weekend, so quotes are frozen and no
-    # stored bar can newly diverge — skip the full portfolio quote+DB scan
-    # entirely (~288 no-op fetches/weekend). Weekdays always have some market
-    # open across the Asia/EU/US rotation, so this is the practical "all markets
-    # closed" gate. Mirrors the intraday sync's weekend guard.
-    if date.today().weekday() >= 5:
-        return
     async with async_session() as db:
+        # While every tracked venue is closed, quotes are frozen and no stored
+        # bar can newly diverge — skip the full portfolio quote scan. The venue
+        # schedule replaces the old weekday() proxy, which ran all day on
+        # global holidays, skipped crypto weekends, and used the server-local
+        # date (Monday morning in Tokyo is still Sunday here).
+        from app.repositories.asset_repo import AssetRepository
+
+        pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
+        if not pairs or not any_venue_open([sym for _, sym in pairs]):
+            return
         try:
             healed = await heal_unreconciled_prices(db)
             if healed:
@@ -165,11 +167,7 @@ async def scheduled_symbol_sync():
 
 async def scheduled_intraday_sync():
     """Background job: fetch 1m intraday bars for all grouped assets."""
-    if date.today().weekday() >= 5:
-        return
-
     from app.repositories.asset_repo import AssetRepository
-    from app.services.price_providers import get_price_provider
 
     async with async_session() as db:
         try:
@@ -180,15 +178,12 @@ async def scheduled_intraday_sync():
             symbols = [sym for _, sym in pairs]
             asset_map = {sym: aid for aid, sym in pairs}
 
-            # Sample across the list to detect market activity.
-            # Use a shuffled sample to avoid always picking the same symbols,
-            # which could miss active markets in different timezones.
-            import random
-            sample_size = min(15, len(symbols))
-            sample = random.sample(symbols, sample_size)
-            quotes = await get_price_provider().batch_fetch_quotes(sample)
-            market_states = {q.get("market_state") for q in quotes if q.get("market_state")}
-            if not any_active(market_states):
+            # Venue-schedule gate. This replaces quoting 15 *random* symbols
+            # per tick to sniff for an active market — a Yahoo round-trip
+            # every 60s that could still miss the one open venue (3 Tokyo
+            # listings in a 200-symbol portfolio → ~80% miss). The calendar
+            # answer is deterministic, holiday-aware, and free.
+            if not any_venue_open(symbols):
                 return
 
             count = await fetch_and_store_intraday(db, symbols, asset_map)
