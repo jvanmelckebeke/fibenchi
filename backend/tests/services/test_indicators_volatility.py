@@ -560,3 +560,68 @@ def test_vnr_hole_still_suppressed_with_sessions():
     result = compute_indicators(df, session_dates=sessions)
     assert pd.isna(result["vnr"].iloc[-1])
     assert result["vnr_gap_sessions"].iloc[-1] == 2
+
+
+# ---------------------------------------------------------------------------
+# Gap guard, part 2 — the denominator/delta/change_pct family (issue #559)
+# ---------------------------------------------------------------------------
+
+
+def _trending_gapped_df(n: int = 100, drop_offset: int = 10) -> pd.DataFrame:
+    """Steady +0.6%/session series with one interior session removed.
+
+    Every stored return is +0.6% except the gap bar, whose stored return spans
+    two sessions (~+1.21%) — the exact shape that used to contaminate the EWMA.
+    """
+    dates = pd.bdate_range("2024-01-01", periods=n)
+    closes = pd.Series([100.0 * (1.006 ** i) for i in range(n)], index=dates)
+    df = pd.DataFrame({
+        "open": closes, "high": closes, "low": closes, "close": closes,
+        "volume": 1_000_000,
+    })
+    return df.drop(df.index[n - drop_offset])
+
+
+def test_vnr_sigma_not_contaminated_by_gap_return():
+    """The EWMA vol forecast must exclude the gap-spanning return.
+
+    On a constant +0.6%/session series, sigma converges to exactly 0.006. The
+    two-session ~+1.21% return at the gap bar used to be squared into the
+    variance (inflating sigma ~9% with an 11-day half-life), which understated
+    every subsequent σ-move. With the gap guard, sigma stays at 0.006 and the
+    very next ordinary move scores ~1σ again.
+    """
+    result = compute_indicators(_trending_gapped_df())
+    gap_pos = 100 - 10  # bar after the hole, in the shortened frame
+    assert pd.notna(result["vnr_gap_sessions"].iloc[gap_pos])
+    # The gap bar itself stays suppressed…
+    assert pd.isna(result["vnr"].iloc[gap_pos])
+    # …the denominator is undisturbed at and after the gap…
+    assert result["vnr_sigma"].iloc[gap_pos] == pytest.approx(0.006, rel=1e-2)
+    assert result["vnr_sigma"].iloc[-1] == pytest.approx(0.006, rel=1e-2)
+    # …so the ordinary +0.6% move right after the gap scores ~1σ, not ~0.9σ.
+    assert result["vnr"].iloc[gap_pos + 1] == pytest.approx(1.0, abs=0.02)
+
+
+def test_deltas_blanked_on_gap_bar():
+    """diff() across a hole is a multi-session move — no delta, no fake outlier."""
+    result = compute_indicators(_trending_gapped_df())
+    gap_pos = 100 - 10  # bar after the hole, in the shortened frame
+    assert pd.notna(result["vnr_gap_sessions"].iloc[gap_pos])
+    for field in ("rsi_delta", "macd_delta", "macd_hist_delta"):
+        assert pd.isna(result[field].iloc[gap_pos]), field
+    # Ordinary bars still carry deltas.
+    assert pd.notna(result["rsi_delta"].iloc[-1])
+
+
+def test_snapshot_change_pct_suppressed_on_gap_bar():
+    """change_pct is documented as a 1-day change; a gap-flagged latest bar
+    would make it a multi-session move, so it must be None — matching the
+    suppressed σ-Move next to it."""
+    df = _trending_gapped_df(drop_offset=2)  # hole right before the last bar
+    snapshot = build_indicator_snapshot(compute_indicators(df))
+    assert snapshot["values"]["vnr"] is None
+    assert snapshot["change_pct"] is None
+    # Contiguous series still reports a change.
+    full = _make_price_df(100)
+    assert build_indicator_snapshot(compute_indicators(full))["change_pct"] is not None
