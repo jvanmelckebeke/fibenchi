@@ -9,6 +9,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
+from app.services.market_calendar import Symbol
 from app.services.price_providers import get_price_provider
 
 
@@ -89,13 +90,17 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 VNR_LAMBDA = 0.94
 
 
-def session_gap_days(index: pd.Index) -> pd.Series:
-    """Business days elapsed between each bar and the previous stored bar.
+def session_gap_days(index: pd.Index, session_dates: set[date] | None = None) -> pd.Series:
+    """Sessions elapsed between each bar and the previous stored bar.
 
-    1 means the bars are adjacent sessions (weekends don't count); >1 means at
-    least one business day between them has no stored bar — either an upstream
-    feed hole or an exchange holiday. Without a per-venue trading calendar the
-    two are indistinguishable here, so callers must treat >1 conservatively
+    1 means the bars are adjacent sessions; >1 means at least one session
+    between them has no stored bar — a hole in the series.
+
+    With ``session_dates`` (the venue's actual trading sessions covering the
+    index range, from ``Symbol(...).venue``) the count is exact: holidays
+    are simply not sessions, so only genuine feed holes exceed 1. Without it,
+    business days (Mon–Fri) approximate sessions, and an exchange holiday is
+    indistinguishable from a hole — callers must treat >1 conservatively
     ("this is not a verified single-session step") rather than as proof of a
     data error.
 
@@ -109,7 +114,17 @@ def session_gap_days(index: pd.Index) -> pd.Series:
     if not isinstance(index[0], (date, datetime, np.datetime64)):
         return gaps
     d = pd.DatetimeIndex(index).values.astype("datetime64[D]")
-    gaps.iloc[1:] = np.busday_count(d[:-1], d[1:])
+    if session_dates:
+        # Exact mode: count venue sessions in (prev, cur] for each bar pair.
+        sessions = np.array(sorted(session_dates), dtype="datetime64[D]")
+        counts = np.searchsorted(sessions, d, side="right")
+        steps = counts[1:] - counts[:-1]
+        # 0 means the calendar doesn't know this bar's date as a session even
+        # though a bar exists — calendar and data disagree, so trust the data
+        # and treat the step as contiguous rather than suppress on bad info.
+        gaps.iloc[1:] = np.where(steps == 0, 1, steps)
+    else:
+        gaps.iloc[1:] = np.busday_count(d[:-1], d[1:])
     return gaps
 
 
@@ -129,7 +144,9 @@ def _ewma_daily_vol(closes: pd.Series, lam: float) -> pd.Series:
     return np.sqrt(ewma_var).replace(0, float("nan"))
 
 
-def volatility_normalized_return(closes: pd.Series, lam: float = VNR_LAMBDA) -> pd.Series:
+def volatility_normalized_return(
+    closes: pd.Series, lam: float = VNR_LAMBDA, gaps: pd.Series | None = None,
+) -> pd.Series:
     """Volatility-normalized daily return — a "sigma move" / return z-score.
 
     Expresses each day's close-to-close return in units of the asset's own
@@ -149,15 +166,19 @@ def volatility_normalized_return(closes: pd.Series, lam: float = VNR_LAMBDA) -> 
     the stored series the "daily" return actually spans several sessions while
     the denominator stays a one-day forecast — inflating the score by ~√N for
     an N-session hole (issue #559). Bars whose previous stored bar is more than
-    one business day back are therefore NaN'd rather than reported: the honest
+    one session back are therefore NaN'd rather than reported: the honest
     statement is "this is not a verified single-day return", not a fabricated
-    single-day figure. Exchange holidays trip the same guard (no calendar to
-    tell them apart), which conservatively blanks the bar after a holiday.
+    single-day figure. ``gaps`` is a precomputed :func:`session_gap_days`
+    series (``compute_indicators`` passes a venue-calendar-exact one); when
+    omitted, the business-day fallback is derived from the index, in which
+    case exchange holidays trip the guard too and conservatively blank the
+    bar after a holiday.
     """
     returns = closes.pct_change()
     # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
     sigma_forecast = _ewma_daily_vol(closes, lam).shift(1)
-    gaps = session_gap_days(closes.index)
+    if gaps is None:
+        gaps = session_gap_days(closes.index)
     return (returns / sigma_forecast).where(~(gaps > 1))
 
 
@@ -368,13 +389,10 @@ def _vnr_post_compute(result: pd.DataFrame) -> None:
     show today's σ-move before today's bar has been written to the DB. Flat
     stretches yield NaN, which ``build_indicator_snapshot`` renders as None.
 
-    ``vnr_gap_sessions`` marks the bars the gap guard suppressed: the number of
-    business days back to the previous stored bar, only where that exceeds 1
-    (NaN → None everywhere else). Lets the UI explain a blank σ-Move.
+    ``vnr_gap_sessions`` (the companion field flagging gap-suppressed bars) is
+    set by :func:`compute_indicators`, which owns the gap series.
     """
     result["vnr_sigma"] = _ewma_daily_vol(result["close"], VNR_LAMBDA)
-    gaps = session_gap_days(result.index)
-    result["vnr_gap_sessions"] = gaps.where(gaps > 1)
 
 
 def _rvol_snapshot_derived(row: pd.Series) -> dict:
@@ -420,6 +438,8 @@ class IndicatorDef:
     field_decimals: dict[str, int] = field(default_factory=dict)
     # Post-compute callback: receives the result DataFrame and adds derived columns.
     post_compute: Callable[[pd.DataFrame], None] | None = None
+    # When True, func receives the precomputed session-gap series as `gaps=`.
+    needs_gaps: bool = False
 
 
 INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
@@ -547,6 +567,7 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         warmup_periods=60,
         post_compute=_vnr_post_compute,
         field_decimals={"vnr_sigma": 6, "vnr_gap_sessions": 0},
+        needs_gaps=True,
     ),
 }
 
@@ -638,13 +659,23 @@ def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
         )
 
 
-def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def compute_indicators(
+    df: pd.DataFrame, session_dates: set[date] | None = None,
+) -> pd.DataFrame:
     """Compute all indicators and return a DataFrame with indicator columns.
 
     Input df must have a 'close' column (and 'high'/'low' for some indicators).
     Iterates the INDICATOR_REGISTRY to compute each indicator.
+
+    ``session_dates`` — the venue's trading sessions covering the index range
+    (from ``Symbol(...).venue``) — makes the σ-Move gap guard exact:
+    holidays are recognized as non-sessions instead of tripping the
+    business-day fallback (issue #559).
     """
     closes = df["close"]
+
+    # One gap series shared by the vnr guard and the vnr_gap_sessions flag.
+    gap_series = session_gap_days(df.index, session_dates)
 
     result = pd.DataFrame(index=df.index)
     result["close"] = closes
@@ -653,7 +684,8 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         # OHLC indicators (ATR, ADX) receive the full DataFrame;
         # close-only indicators receive just the close Series.
         input_data = df if defn.uses_ohlc else closes
-        output = defn.func(input_data, **defn.params)
+        kwargs = {**defn.params, "gaps": gap_series} if defn.needs_gaps else defn.params
+        output = defn.func(input_data, **kwargs)
 
         if isinstance(output, pd.Series):
             # Single-output indicator (e.g. rsi, sma, atr)
@@ -665,6 +697,10 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
         if defn.post_compute:
             defn.post_compute(result)
+
+    # Flag the bars the σ-Move gap guard suppressed with the gap width, so the
+    # UI can explain the blank (NaN everywhere else → None in responses).
+    result["vnr_gap_sessions"] = gap_series.where(gap_series > 1)
 
     _compute_deltas(result)
 
@@ -697,7 +733,9 @@ async def compute_batch_indicator_snapshots(
             results.append({"symbol": sym, "currency": currency})
             continue
 
-        snapshot = build_indicator_snapshot(compute_indicators(df))
+        venue = Symbol(sym).venue
+        sessions = venue.session_dates_for_index(df.index) if venue else None
+        snapshot = build_indicator_snapshot(compute_indicators(df, session_dates=sessions))
         results.append({"symbol": sym, "currency": currency, **snapshot})
 
     # Fundamentals are merged from cache by the caller (non-blocking).
