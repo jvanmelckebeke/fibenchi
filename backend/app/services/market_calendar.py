@@ -37,52 +37,79 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Yahoo suffix (the part after the last '.') → exchange_calendars name.
-# Deliberately limited to venues with an unambiguous mapping; anything else
-# resolves to None and downstream keeps its business-day fallback.
-SUFFIX_CALENDARS: dict[str, str] = {
+@dataclass(frozen=True)
+class Listing:
+    """Venue traits of a Yahoo exchange suffix: trading calendar + currency.
+
+    ``calendar`` is None for venues exchange_calendars doesn't model (their
+    symbols keep the business-day fallback); ``currency`` is the *venue*
+    currency, used only as a fallback when Yahoo doesn't report one (see
+    ``resolve_currency`` — subunits like GBp are Yahoo-side and handled there).
+    """
+
+    calendar: str | None
+    currency: str | None
+
+
+# The one venue table: Yahoo suffix (the part after the last '.') →
+# (exchange_calendars name, ISO 4217 currency). Formerly two independently
+# maintained tables (SUFFIX_CALENDARS here, EXCHANGE_CURRENCY_MAP in
+# yahoo/currency.py) over the same key space.
+SUFFIX_LISTINGS: dict[str, Listing] = {
     # Euronext
-    "AS": "XAMS",  # Amsterdam
-    "BR": "XBRU",  # Brussels
-    "PA": "XPAR",  # Paris
-    "LS": "XLIS",  # Lisbon
-    "IR": "XDUB",  # Dublin
+    "AS": Listing("XAMS", "EUR"),   # Amsterdam
+    "BR": Listing("XBRU", "EUR"),   # Brussels
+    "PA": Listing("XPAR", "EUR"),   # Paris
+    "LS": Listing("XLIS", "EUR"),   # Lisbon
+    "IR": Listing("XDUB", "EUR"),   # Dublin
     # Rest of Europe
-    "DE": "XETR",  # Xetra
-    "F": "XFRA",   # Frankfurt floor
-    "MI": "XMIL",  # Borsa Italiana
-    "L": "XLON",   # London
-    "SW": "XSWX",  # SIX Swiss
-    "MC": "XMAD",  # Madrid
-    "VI": "XWBO",  # Vienna
-    "ST": "XSTO",  # Stockholm
-    "HE": "XHEL",  # Helsinki
-    "OL": "XOSL",  # Oslo
-    "WA": "XWAR",  # Warsaw
-    "PR": "XPRA",  # Prague
-    "BD": "XBUD",  # Budapest
-    # (Copenhagen .CO and Athens .AT have no exchange_calendars calendar)
+    "DE": Listing("XETR", "EUR"),   # Xetra
+    "F": Listing("XFRA", "EUR"),    # Frankfurt floor
+    "MI": Listing("XMIL", "EUR"),   # Borsa Italiana
+    "L": Listing("XLON", "GBP"),    # London
+    "IL": Listing("XLON", "GBP"),   # London IOB
+    "SW": Listing("XSWX", "CHF"),   # SIX Swiss
+    "MC": Listing("XMAD", "EUR"),   # Madrid
+    "VI": Listing("XWBO", "EUR"),   # Vienna
+    "ST": Listing("XSTO", "SEK"),   # Stockholm
+    "HE": Listing("XHEL", "EUR"),   # Helsinki
+    "OL": Listing("XOSL", "NOK"),   # Oslo
+    "CO": Listing("XCSE", "DKK"),   # Copenhagen
+    "IC": Listing("XICE", "ISK"),   # Iceland
+    "WA": Listing("XWAR", "PLN"),   # Warsaw
+    "PR": Listing("XPRA", "CZK"),   # Prague
+    "BD": Listing("XBUD", "HUF"),   # Budapest
+    "AT": Listing("ASEX", "EUR"),   # Athens
+    "IS": Listing("XIST", "TRY"),   # Istanbul
+    # Middle East & Africa
+    "TA": Listing("XTAE", "ILS"),   # Tel Aviv
+    "SR": Listing("XSAU", "SAR"),   # Saudi (Tadawul)
+    "QA": Listing(None, "QAR"),     # Qatar — no exchange_calendars calendar
+    "JO": Listing("XJSE", "ZAR"),   # Johannesburg
     # Americas
-    "TO": "XTSE",  # Toronto
-    "MX": "XMEX",  # Mexico
-    "SA": "BVMF",  # São Paulo
-    "BA": "XBUE",  # Buenos Aires
-    "SN": "XSGO",  # Santiago
+    "TO": Listing("XTSE", "CAD"),   # Toronto
+    "V": Listing("XTSE", "CAD"),    # TSX Venture — shares Toronto's schedule
+    "MX": Listing("XMEX", "MXN"),   # Mexico
+    "SA": Listing("BVMF", "BRL"),   # São Paulo
+    "BA": Listing("XBUE", "ARS"),   # Buenos Aires
+    "SN": Listing("XSGO", "CLP"),   # Santiago
     # Asia-Pacific
-    "T": "XTKS",   # Tokyo
-    "HK": "XHKG",  # Hong Kong
-    "SS": "XSHG",  # Shanghai
-    "SZ": "XSHG",  # Shenzhen — no own calendar; shares national holidays
-    "KS": "XKRX",  # Korea
-    "KQ": "XKRX",  # KOSDAQ (same holidays)
-    "TW": "XTAI",  # Taiwan
-    "SI": "XSES",  # Singapore
-    "AX": "XASX",  # Australia
-    "NZ": "XNZE",  # New Zealand
-    # Other
-    "JO": "XJSE",  # Johannesburg
-    "NS": "XBOM",  # NSE India — XBOM (BSE) shares the national holiday set
-    "BO": "XBOM",  # BSE India
+    "T": Listing("XTKS", "JPY"),    # Tokyo
+    "HK": Listing("XHKG", "HKD"),   # Hong Kong
+    "SS": Listing("XSHG", "CNY"),   # Shanghai
+    "SZ": Listing("XSHG", "CNY"),   # Shenzhen — no own calendar; same holidays
+    "KS": Listing("XKRX", "KRW"),   # Korea (KOSPI)
+    "KQ": Listing("XKRX", "KRW"),   # KOSDAQ (same holidays)
+    "TW": Listing("XTAI", "TWD"),   # Taiwan (TWSE)
+    "TWO": Listing("XTAI", "TWD"),  # Taiwan OTC (same holidays)
+    "SI": Listing("XSES", "SGD"),   # Singapore
+    "AX": Listing("XASX", "AUD"),   # Australia
+    "NZ": Listing("XNZE", "NZD"),   # New Zealand
+    "JK": Listing("XIDX", "IDR"),   # Jakarta
+    "BK": Listing("XBKK", "THB"),   # Bangkok
+    # South Asia
+    "NS": Listing("XBOM", "INR"),   # NSE India — XBOM (BSE) shares holidays
+    "BO": Listing("XBOM", "INR"),   # BSE India
 }
 
 # Common Yahoo index symbols → calendar of the venue they track.
@@ -111,9 +138,13 @@ DEFAULT_US_CALENDAR = "XNYS"
 # Quote currencies Yahoo uses in crypto pair symbols (BTC-USD, ETH-EUR, SOL-BTC).
 # A hyphen alone is NOT crypto — US class shares (BRK-B, BF-B) and preferreds
 # (BAC-PL) are hyphenated too; those must fall through to the US default.
+# European share classes carry a suffix after the hyphenated part (NOVO-B.CO),
+# so the '.' branch resolves them before the hyphen could matter.
 CRYPTO_QUOTE_CURRENCIES = frozenset({
     "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "BTC", "ETH", "USDT", "USDC",
 })
+# The fiat subset — a BTC-quoted pair has no meaningful display currency.
+_FIAT_QUOTES = frozenset({"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF"})
 
 
 @dataclass(frozen=True)
@@ -286,25 +317,41 @@ class Symbol(str):
     """
 
     @cached_property
-    def calendar_name(self) -> str | None:
-        """The exchange_calendars name for this ticker, or None.
-
-        The single place where ticker shape is interpreted.
-        """
+    def _instrument(self) -> Listing:
+        """One-pass ticker-shape classification — the single place shape is
+        interpreted. Everything else reads the resulting traits."""
         sym = self.upper().strip()
         if not sym:
-            return None
+            return Listing(None, None)
         if sym in INDEX_CALENDARS:
-            return INDEX_CALENDARS[sym]
+            return Listing(INDEX_CALENDARS[sym], None)
         if sym.startswith("^"):
-            return None  # unknown index — don't guess a venue
+            return Listing(None, None)  # unknown index — don't guess a venue
         if sym.endswith("=X") or sym.endswith("=F"):
-            return None  # FX / futures — not exchange-session shaped
-        if "-" in sym and sym.rsplit("-", 1)[1] in CRYPTO_QUOTE_CURRENCIES:
-            return "24/7"  # crypto pairs (BTC-USD): every day is a session
+            return Listing(None, None)  # FX / futures — not exchange-session shaped
+        if "-" in sym:
+            quote = sym.rsplit("-", 1)[1]
+            if quote in CRYPTO_QUOTE_CURRENCIES:
+                # Crypto pairs (BTC-USD): every day is a session; the quote
+                # leg is the display currency when it's fiat.
+                return Listing("24/7", quote if quote in _FIAT_QUOTES else None)
         if "." in sym:
-            return SUFFIX_CALENDARS.get(sym.rsplit(".", 1)[1])
-        return DEFAULT_US_CALENDAR
+            return SUFFIX_LISTINGS.get(sym.rsplit(".", 1)[1], Listing(None, None))
+        return Listing(DEFAULT_US_CALENDAR, "USD")
+
+    @property
+    def calendar_name(self) -> str | None:
+        """The exchange_calendars name for this ticker, or None."""
+        return self._instrument.calendar
+
+    @property
+    def currency(self) -> str | None:
+        """The venue/pair currency inferred from ticker shape, or None.
+
+        A fallback only — Yahoo's own currency field wins when present (see
+        ``resolve_currency``); this answers when Yahoo doesn't.
+        """
+        return self._instrument.currency
 
     @cached_property
     def venue(self) -> Venue | None:
