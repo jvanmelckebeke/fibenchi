@@ -1,4 +1,4 @@
-"""Tests for MarketCalendarService — symbol→calendar resolution and session queries.
+"""Tests for market_calendar — Symbol→venue resolution and session/schedule queries.
 
 exchange_calendars ships its holiday data with the package, so these tests are
 fully offline. Historical fixtures (2024 holidays, the 2026-08 range from issue
@@ -13,10 +13,8 @@ from app.services.market_calendar import (
     DEFAULT_US_CALENDAR,
     INDEX_CALENDARS,
     SUFFIX_CALENDARS,
-    MarketCalendarService,
+    Symbol,
 )
-
-svc = MarketCalendarService()
 
 
 def test_every_mapped_calendar_exists():
@@ -29,29 +27,38 @@ def test_every_mapped_calendar_exists():
 
 
 def test_calendar_name_resolution():
-    assert svc.calendar_name("IWDA.AS") == "XAMS"
-    assert svc.calendar_name("EUNL.DE") == "XETR"
-    assert svc.calendar_name("SWDA.MI") == "XMIL"
-    assert svc.calendar_name("IWDA.L") == "XLON"
-    assert svc.calendar_name("AAPL") == "XNYS"
-    assert svc.calendar_name("^AEX") == "XAMS"
-    assert svc.calendar_name("^GSPC") == "XNYS"
-    assert svc.calendar_name("BTC-USD") == "24/7"
+    assert Symbol("IWDA.AS").calendar_name == "XAMS"
+    assert Symbol("EUNL.DE").calendar_name == "XETR"
+    assert Symbol("SWDA.MI").calendar_name == "XMIL"
+    assert Symbol("IWDA.L").calendar_name == "XLON"
+    assert Symbol("AAPL").calendar_name == "XNYS"
+    assert Symbol("^AEX").calendar_name == "XAMS"
+    assert Symbol("^GSPC").calendar_name == "XNYS"
+    assert Symbol("BTC-USD").calendar_name == "24/7"
 
 
 def test_calendar_name_unknowns_resolve_to_none():
     """Unknown suffixes/indices and non-session instruments must not guess."""
-    assert svc.calendar_name("FOO.XX") is None
-    assert svc.calendar_name("^UNKNOWNINDEX") is None
-    assert svc.calendar_name("EURUSD=X") is None
-    assert svc.calendar_name("ES=F") is None
-    assert svc.calendar_name("") is None
+    assert Symbol("FOO.XX").calendar_name is None
+    assert Symbol("^UNKNOWNINDEX").calendar_name is None
+    assert Symbol("EURUSD=X").calendar_name is None
+    assert Symbol("ES=F").calendar_name is None
+    assert Symbol("").calendar_name is None
+    assert Symbol("FOO.XX").venue is None
+
+
+def test_symbol_is_a_str():
+    """Symbol must stay a drop-in for plain ticker strings."""
+    sym = Symbol("IWDA.AS")
+    assert sym == "IWDA.AS"
+    assert {sym: 1}["IWDA.AS"] == 1
+    assert {"IWDA.AS": 1}[sym] == 1
 
 
 def test_session_dates_issue_559_range():
     """The exact #559 window: 2026-08-03 was an XAMS session (the feed hole),
     and the weekend days are not."""
-    sessions = svc.session_dates("IWDA.AS", date(2026, 7, 29), date(2026, 8, 4))
+    sessions = Symbol("IWDA.AS").venue.session_dates(date(2026, 7, 29), date(2026, 8, 4))
     assert sessions == {
         date(2026, 7, 29), date(2026, 7, 30), date(2026, 7, 31),
         date(2026, 8, 3), date(2026, 8, 4),
@@ -60,35 +67,29 @@ def test_session_dates_issue_559_range():
 
 def test_session_dates_knows_holidays():
     """Easter Monday 2024 (Apr 1) closed Euronext but is a plain business day."""
-    sessions = svc.session_dates("IWDA.AS", date(2024, 3, 28), date(2024, 4, 2))
+    xams = Symbol("IWDA.AS").venue
+    sessions = xams.session_dates(date(2024, 3, 28), date(2024, 4, 2))
     assert sessions == {date(2024, 3, 28), date(2024, 4, 2)}  # Good Friday + Easter Monday closed
-    assert svc.is_session("IWDA.AS", date(2024, 4, 1)) is False
+    assert xams.is_session(date(2024, 4, 1)) is False
     # The same Monday was a session in New York.
-    assert svc.is_session("AAPL", date(2024, 4, 1)) is True
-
-
-def test_session_dates_unknown_symbol_is_none():
-    assert svc.session_dates("FOO.XX", date(2024, 1, 1), date(2024, 1, 31)) is None
+    assert Symbol("AAPL").venue.is_session(date(2024, 4, 1)) is True
 
 
 def test_session_dates_for_index_handles_dates_and_timestamps():
     import pandas as pd
 
-    by_date = svc.session_dates_for_index(
-        "AAPL", pd.Index([date(2024, 4, 1), date(2024, 4, 5)])
-    )
-    by_ts = svc.session_dates_for_index(
-        "AAPL", pd.bdate_range("2024-04-01", "2024-04-05")
-    )
+    xnys = Symbol("AAPL").venue
+    by_date = xnys.session_dates_for_index(pd.Index([date(2024, 4, 1), date(2024, 4, 5)]))
+    by_ts = xnys.session_dates_for_index(pd.bdate_range("2024-04-01", "2024-04-05"))
     assert by_date == by_ts
     assert by_date is not None and date(2024, 4, 2) in by_date
     # Non-date index → no calendar info rather than an exception.
-    assert svc.session_dates_for_index("AAPL", pd.RangeIndex(5)) is None
-    assert svc.session_dates_for_index("AAPL", pd.Index([])) is None
+    assert xnys.session_dates_for_index(pd.RangeIndex(5)) is None
+    assert xnys.session_dates_for_index(pd.Index([])) is None
 
 
 def test_crypto_weekends_are_sessions():
-    sessions = svc.session_dates("BTC-USD", date(2026, 8, 1), date(2026, 8, 2))
+    sessions = Symbol("BTC-USD").venue.session_dates(date(2026, 8, 1), date(2026, 8, 2))
     assert sessions == {date(2026, 8, 1), date(2026, 8, 2)}  # Sat + Sun
 
 
@@ -96,19 +97,17 @@ def test_open_close_helpers():
     """Regular-hours schedule for a fixed historical instant (offline data)."""
     # Wednesday 2024-04-03, 15:00 UTC: NYSE regular session (13:30–20:00 UTC).
     at = datetime(2024, 4, 3, 15, 0, tzinfo=timezone.utc)
-    venue = svc.venue("AAPL")
+    venue = Symbol("AAPL").venue
     assert venue is not None
     assert venue.is_open(at) is True
     assert venue.is_open(datetime(2024, 4, 3, 21, 0, tzinfo=timezone.utc)) is False
     assert venue.next_close(at) == datetime(2024, 4, 3, 20, 0, tzinfo=timezone.utc)
-    # Unknown venue: resolution answers None, never raises.
-    assert svc.venue("FOO.XX") is None
 
 
 def test_venues_are_cached_and_shared():
     """Symbols on the same venue share one Venue instance."""
-    assert svc.venue("AAPL") is svc.venue("MSFT")
-    assert svc.venue("^GSPC") is svc.venue("AAPL")
+    assert Symbol("AAPL").venue is Symbol("MSFT").venue
+    assert Symbol("^GSPC").venue is Symbol("AAPL").venue
 
 
 def _utc(*args: int) -> datetime:
@@ -120,8 +119,7 @@ def test_phase_us_regular_day():
 
     Premarket = open − 5:30 (4:00 ET), aftermarket until close + 4:00 (20:00 ET).
     """
-    venue = svc.venue("AAPL")
-    assert venue is not None
+    venue = Symbol("AAPL").venue
     assert venue.phase(_utc(2024, 4, 3, 7, 0)) == "closed"       # 3:00 ET
     assert venue.phase(_utc(2024, 4, 3, 8, 0)) == "premarket"    # 4:00 ET sharp
     assert venue.phase(_utc(2024, 4, 3, 12, 0)) == "premarket"   # 8:00 ET
@@ -136,8 +134,7 @@ def test_phase_us_half_day():
     Because the extended window is anchored to the actual close, aftermarket
     ends 17:00 ET — a hardcoded 20:00 ET would misreport this.
     """
-    venue = svc.venue("AAPL")
-    assert venue is not None
+    venue = Symbol("AAPL").venue
     assert venue.phase(_utc(2023, 11, 24, 17, 0)) == "open"          # 12:00 ET
     assert venue.phase(_utc(2023, 11, 24, 20, 0)) == "aftermarket"   # 15:00 ET
     assert venue.phase(_utc(2023, 11, 24, 23, 0)) == "closed"        # 18:00 ET
@@ -147,15 +144,12 @@ def test_phase_us_half_day():
 
 def test_phase_weekend_is_closed():
     """Saturday sits between Friday's aftermarket and Monday's premarket."""
-    venue = svc.venue("AAPL")
-    assert venue is not None
-    assert venue.phase(_utc(2024, 4, 6, 15, 0)) == "closed"
+    assert Symbol("AAPL").venue.phase(_utc(2024, 4, 6, 15, 0)) == "closed"
 
 
 def test_phase_venue_without_extended_hours():
     """European venues have no retail extended session: open/closed only."""
-    venue = svc.venue("IWDA.AS")
-    assert venue is not None
+    venue = Symbol("IWDA.AS").venue
     assert venue.extended_hours is None
     # XAMS regular hours 09:00–17:30 CEST = 07:00–15:30 UTC on 2024-04-03.
     assert venue.phase(_utc(2024, 4, 3, 10, 0)) == "open"

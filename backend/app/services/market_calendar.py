@@ -1,18 +1,23 @@
-"""Venue trading-calendar resolution and session/schedule queries.
+"""Symbol → venue trading-calendar resolution and session/schedule queries.
 
-Maps Yahoo Finance symbols to their venue's trading calendar
-(``exchange_calendars``) and answers schedule questions: which dates are
-trading sessions, when the venue opens/closes, and which phase (premarket /
-open / aftermarket / closed) an instant falls in. The primary consumer is
-the σ-Move gap guard (issue #559) — with real session dates a missing bar
-can be distinguished from an exchange holiday. The schedule/phase side
-exists for market-state uses (pre/post-market markers, SSE polling cadence).
+The entry point is :class:`Symbol` — a ``str`` subclass, so it drops in
+anywhere a plain ticker string is used — whose ``.venue`` resolves the
+symbol's trading venue: ``Symbol("IWDA.AS").venue`` → the XAMS
+:class:`Venue`, shared by every symbol on that calendar. The venue answers
+session and schedule questions: which dates are trading sessions, when the
+venue opens/closes, and which phase (premarket / open / aftermarket /
+closed) an instant falls in.
 
-Structure: symbol parsing happens in exactly one place
-(``MarketCalendarService.calendar_name``); everything venue-specific beyond
-that is *data* (the suffix/index tables, the ``EXTENDED_HOURS`` table), and
-all schedule questions are answered by a :class:`Venue` object — callers
-never branch on ticker shape themselves.
+The primary consumer is the σ-Move gap guard (issue #559) — with real
+session dates (``exchange_calendars``) a missing bar can be distinguished
+from an exchange holiday. The schedule/phase side exists for market-state
+uses (pre/post-market markers, SSE polling cadence).
+
+Structure: ticker shape is only ever interpreted in
+``Symbol.calendar_name``; everything venue-specific beyond that is *data*
+(the suffix/index tables, the ``EXTENDED_HOURS`` table), and all schedule
+questions are answered by the :class:`Venue` object — callers never branch
+on ticker shape themselves.
 
 Everything here is fail-safe by design: an unmapped symbol, an unknown
 calendar, or a query outside the calendar's bounds returns ``None`` and the
@@ -25,6 +30,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from functools import cached_property
 from typing import Any
 
 import pandas as pd
@@ -140,14 +146,18 @@ class Venue:
 
     Bundles the exchange_calendars calendar with the venue's traits (extended
     hours) so callers ask the venue questions instead of re-deriving anything
-    from the symbol. All methods return ``None`` on out-of-range or otherwise
-    unanswerable queries — never raise.
+    from the symbol. One instance per calendar, shared by all symbols on that
+    venue (see :attr:`Symbol.venue`). All methods return ``None`` on
+    out-of-range or otherwise unanswerable queries — never raise.
     """
 
     def __init__(self, name: str, calendar: Any, extended_hours: ExtendedHours | None):
         self.name = name
         self.extended_hours = extended_hours
         self._cal = calendar
+
+    def __repr__(self) -> str:
+        return f"Venue({self.name!r})"
 
     # -- sessions -----------------------------------------------------------
 
@@ -167,6 +177,23 @@ class Venue:
                 "Session query failed for %s (%s..%s)", self.name, start, end, exc_info=True
             )
             return None
+
+    def session_dates_for_index(self, index) -> set[date] | None:
+        """Sessions covering a price DataFrame's date index (None if unusable).
+
+        Convenience for the indicator pipeline: accepts an index of dates,
+        datetimes, or Timestamps and clamps to its min/max range.
+        """
+        if index is None or len(index) == 0:
+            return None
+        first, last = index.min(), index.max()
+        if isinstance(first, datetime):
+            first = first.date()
+        if isinstance(last, datetime):
+            last = last.date()
+        if not isinstance(first, date) or not isinstance(last, date):
+            return None
+        return self.session_dates(first, last)
 
     def is_session(self, d: date) -> bool | None:
         sessions = self.session_dates(d, d)
@@ -223,27 +250,41 @@ class Venue:
         return "closed"
 
 
-class MarketCalendarService:
-    """Symbol-addressed access to venue trading calendars.
+# One Venue per calendar name, shared by every Symbol that resolves to it.
+_venues: dict[str, Venue | None] = {}
 
-    ``venue(symbol)`` resolves a Yahoo symbol to a cached :class:`Venue` (one
-    per calendar — venues are shared across symbols). The session-query
-    convenience methods below exist for the indicator pipeline; schedule and
-    phase questions go through the Venue object directly.
+
+def _venue_for(name: str) -> Venue | None:
+    if name not in _venues:
+        try:
+            import exchange_calendars as xcals
+
+            calendar = xcals.get_calendar(name)
+            _venues[name] = Venue(name, calendar, EXTENDED_HOURS.get(name))
+        except Exception:
+            logger.warning("Could not build trading calendar %r", name, exc_info=True)
+            _venues[name] = None
+    return _venues[name]
+
+
+class Symbol(str):
+    """A Yahoo ticker that knows its venue: ``Symbol("IWDA.AS").venue``.
+
+    A ``str`` subclass, so it drops in anywhere a plain symbol string is
+    used (dict keys, comparisons, serialization) — wrap at the point where
+    venue questions arise, no need to thread a new type through the app.
+    Venue resolution is cached on the instance; the Venue itself is shared
+    per calendar. Note that str operations (``.upper()`` etc.) return plain
+    ``str`` — re-wrap if you still need ``.venue`` afterwards.
     """
 
-    def __init__(self) -> None:
-        self._venues: dict[str, Venue | None] = {}
-
-    # -- resolution ---------------------------------------------------------
-
-    @staticmethod
-    def calendar_name(symbol: str) -> str | None:
-        """Resolve a Yahoo symbol to an exchange_calendars name, or None.
+    @cached_property
+    def calendar_name(self) -> str | None:
+        """The exchange_calendars name for this ticker, or None.
 
         The single place where ticker shape is interpreted.
         """
-        sym = symbol.upper().strip()
+        sym = self.upper().strip()
         if not sym:
             return None
         if sym in INDEX_CALENDARS:
@@ -258,50 +299,8 @@ class MarketCalendarService:
             return SUFFIX_CALENDARS.get(sym.rsplit(".", 1)[1])
         return DEFAULT_US_CALENDAR
 
-    def venue(self, symbol: str) -> Venue | None:
-        """The symbol's venue, or None when it can't be resolved/built."""
-        name = self.calendar_name(symbol)
-        if name is None:
-            return None
-        if name not in self._venues:
-            try:
-                import exchange_calendars as xcals
-
-                calendar = xcals.get_calendar(name)
-                self._venues[name] = Venue(name, calendar, EXTENDED_HOURS.get(name))
-            except Exception:
-                logger.warning("Could not build trading calendar %r", name, exc_info=True)
-                self._venues[name] = None
-        return self._venues[name]
-
-    # -- session conveniences (indicator pipeline) --------------------------
-
-    def session_dates(self, symbol: str, start: date, end: date) -> set[date] | None:
-        v = self.venue(symbol)
-        return v.session_dates(start, end) if v else None
-
-    def session_dates_for_index(self, symbol: str, index) -> set[date] | None:
-        """Sessions covering a price DataFrame's date index (None if unusable).
-
-        Accepts an index of dates, datetimes, or Timestamps and clamps to its
-        min/max range.
-        """
-        if index is None or len(index) == 0:
-            return None
-        first, last = index.min(), index.max()
-        if isinstance(first, datetime):
-            first = first.date()
-        if isinstance(last, datetime):
-            last = last.date()
-        if not isinstance(first, date) or not isinstance(last, date):
-            return None
-        return self.session_dates(symbol, first, last)
-
-    def is_session(self, symbol: str, d: date) -> bool | None:
-        v = self.venue(symbol)
-        return v.is_session(d) if v else None
-
-
-# Shared instance — calendar construction is expensive and venue calendars are
-# reusable across symbols and requests.
-market_calendar = MarketCalendarService()
+    @cached_property
+    def venue(self) -> Venue | None:
+        """This ticker's trading venue, or None when it can't be resolved."""
+        name = self.calendar_name
+        return _venue_for(name) if name else None

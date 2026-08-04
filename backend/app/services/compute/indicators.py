@@ -9,7 +9,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from app.services.market_calendar import market_calendar
+from app.services.market_calendar import Symbol
 from app.services.price_providers import get_price_provider
 
 
@@ -97,7 +97,7 @@ def session_gap_days(index: pd.Index, session_dates: set[date] | None = None) ->
     between them has no stored bar — a hole in the series.
 
     With ``session_dates`` (the venue's actual trading sessions covering the
-    index range, from ``MarketCalendarService``) the count is exact: holidays
+    index range, from ``Symbol(...).venue``) the count is exact: holidays
     are simply not sessions, so only genuine feed holes exceed 1. Without it,
     business days (Mon–Fri) approximate sessions, and an exchange holiday is
     indistinguishable from a hole — callers must treat >1 conservatively
@@ -668,7 +668,7 @@ def compute_indicators(
     Iterates the INDICATOR_REGISTRY to compute each indicator.
 
     ``session_dates`` — the venue's trading sessions covering the index range
-    (from ``MarketCalendarService``) — makes the σ-Move gap guard exact:
+    (from ``Symbol(...).venue``) — makes the σ-Move gap guard exact:
     holidays are recognized as non-sessions instead of tripping the
     business-day fallback (issue #559).
     """
@@ -733,7 +733,8 @@ async def compute_batch_indicator_snapshots(
             results.append({"symbol": sym, "currency": currency})
             continue
 
-        sessions = market_calendar.session_dates_for_index(sym, df.index)
+        venue = Symbol(sym).venue
+        sessions = venue.session_dates_for_index(df.index) if venue else None
         snapshot = build_indicator_snapshot(compute_indicators(df, session_dates=sessions))
         results.append({"symbol": sym, "currency": currency, **snapshot})
 
