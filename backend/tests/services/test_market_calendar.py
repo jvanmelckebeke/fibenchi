@@ -37,6 +37,17 @@ def test_calendar_name_resolution():
     assert Symbol("BTC-USD").calendar_name == "24/7"
 
 
+def test_hyphenated_us_listings_are_not_crypto():
+    """US class shares and preferreds are hyphenated but trade on XNYS —
+    routing them to the 24/7 calendar would flag every weekend as a data gap
+    and suppress their σ-Move each Monday."""
+    assert Symbol("BRK-B").calendar_name == "XNYS"
+    assert Symbol("BF-B").calendar_name == "XNYS"
+    assert Symbol("BAC-PL").calendar_name == "XNYS"
+    assert Symbol("ETH-EUR").calendar_name == "24/7"
+    assert Symbol("SOL-BTC").calendar_name == "24/7"
+
+
 def test_calendar_name_unknowns_resolve_to_none():
     """Unknown suffixes/indices and non-session instruments must not guess."""
     assert Symbol("FOO.XX").calendar_name is None

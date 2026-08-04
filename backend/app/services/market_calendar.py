@@ -108,6 +108,13 @@ INDEX_CALENDARS: dict[str, str] = {
 # Unsuffixed Yahoo symbols are US listings (NYSE/NASDAQ share the holiday set).
 DEFAULT_US_CALENDAR = "XNYS"
 
+# Quote currencies Yahoo uses in crypto pair symbols (BTC-USD, ETH-EUR, SOL-BTC).
+# A hyphen alone is NOT crypto — US class shares (BRK-B, BF-B) and preferreds
+# (BAC-PL) are hyphenated too; those must fall through to the US default.
+CRYPTO_QUOTE_CURRENCIES = frozenset({
+    "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "BTC", "ETH", "USDT", "USDC",
+})
+
 
 @dataclass(frozen=True)
 class ExtendedHours:
@@ -293,7 +300,7 @@ class Symbol(str):
             return None  # unknown index — don't guess a venue
         if sym.endswith("=X") or sym.endswith("=F"):
             return None  # FX / futures — not exchange-session shaped
-        if "-" in sym:
+        if "-" in sym and sym.rsplit("-", 1)[1] in CRYPTO_QUOTE_CURRENCIES:
             return "24/7"  # crypto pairs (BTC-USD): every day is a session
         if "." in sym:
             return SUFFIX_CALENDARS.get(sym.rsplit(".", 1)[1])
