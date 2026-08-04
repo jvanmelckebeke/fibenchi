@@ -1,11 +1,18 @@
-"""Venue trading-calendar resolution and session queries.
+"""Venue trading-calendar resolution and session/schedule queries.
 
 Maps Yahoo Finance symbols to their venue's trading calendar
 (``exchange_calendars``) and answers schedule questions: which dates are
-trading sessions, and when the venue opens/closes. The primary consumer is
+trading sessions, when the venue opens/closes, and which phase (premarket /
+open / aftermarket / closed) an instant falls in. The primary consumer is
 the σ-Move gap guard (issue #559) — with real session dates a missing bar
-can be distinguished from an exchange holiday. The open/close helpers exist
-for market-state uses (pre/post-market markers, SSE polling cadence).
+can be distinguished from an exchange holiday. The schedule/phase side
+exists for market-state uses (pre/post-market markers, SSE polling cadence).
+
+Structure: symbol parsing happens in exactly one place
+(``MarketCalendarService.calendar_name``); everything venue-specific beyond
+that is *data* (the suffix/index tables, the ``EXTENDED_HOURS`` table), and
+all schedule questions are answered by a :class:`Venue` object — callers
+never branch on ticker shape themselves.
 
 Everything here is fail-safe by design: an unmapped symbol, an unknown
 calendar, or a query outside the calendar's bounds returns ``None`` and the
@@ -16,7 +23,8 @@ module must never be worse than not having it.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
@@ -95,24 +103,146 @@ INDEX_CALENDARS: dict[str, str] = {
 DEFAULT_US_CALENDAR = "XNYS"
 
 
+@dataclass(frozen=True)
+class ExtendedHours:
+    """A venue's extended-trading window, anchored to the regular session.
+
+    ``pre_offset`` — how long before the regular open premarket starts;
+    ``post_offset`` — how long after the regular close aftermarket ends.
+    Anchoring to the *actual* schedule (not wall-clock constants) keeps
+    half-days correct: on a US early-close day (13:00 ET) aftermarket ends
+    17:00 ET, and DST is handled because the calendar's open/close move.
+    """
+
+    pre_offset: timedelta
+    post_offset: timedelta
+
+
+# Venues with a real extended-hours session, keyed by calendar name — a data
+# table, not per-ticker conditionals. US listings: premarket 4:00 ET
+# (= open − 5:30), aftermarket until 20:00 ET (= close + 4:00), matching the
+# window Yahoo's PRE/POST market states cover. European venues have auction
+# phases, not retail extended sessions, so they are deliberately absent.
+EXTENDED_HOURS: dict[str, ExtendedHours] = {
+    "XNYS": ExtendedHours(
+        pre_offset=timedelta(hours=5, minutes=30), post_offset=timedelta(hours=4)
+    ),
+}
+
+
+def _as_utc(at: datetime | None) -> pd.Timestamp:
+    ts = pd.Timestamp(at) if at is not None else pd.Timestamp.now(tz=timezone.utc)
+    return ts.tz_localize(timezone.utc) if ts.tzinfo is None else ts
+
+
+class Venue:
+    """Schedule facade for one trading venue.
+
+    Bundles the exchange_calendars calendar with the venue's traits (extended
+    hours) so callers ask the venue questions instead of re-deriving anything
+    from the symbol. All methods return ``None`` on out-of-range or otherwise
+    unanswerable queries — never raise.
+    """
+
+    def __init__(self, name: str, calendar: Any, extended_hours: ExtendedHours | None):
+        self.name = name
+        self.extended_hours = extended_hours
+        self._cal = calendar
+
+    # -- sessions -----------------------------------------------------------
+
+    def session_dates(self, start: date, end: date) -> set[date] | None:
+        """All trading sessions in [start, end] (clamped to calendar bounds).
+
+        None when the range can't be answered; an empty set is a real answer.
+        """
+        try:
+            first = max(pd.Timestamp(start), self._cal.first_session)
+            last = min(pd.Timestamp(end), self._cal.last_session)
+            if first > last:
+                return None
+            return {ts.date() for ts in self._cal.sessions_in_range(first, last)}
+        except Exception:
+            logger.warning(
+                "Session query failed for %s (%s..%s)", self.name, start, end, exc_info=True
+            )
+            return None
+
+    def is_session(self, d: date) -> bool | None:
+        sessions = self.session_dates(d, d)
+        if sessions is None:
+            return None
+        return d in sessions
+
+    # -- schedule -----------------------------------------------------------
+
+    def is_open(self, at: datetime | None = None) -> bool | None:
+        """Whether a *regular* session is running at ``at`` (UTC now default)."""
+        try:
+            return bool(self._cal.is_open_at_time(_as_utc(at)))
+        except Exception:
+            return None
+
+    def next_open(self, at: datetime | None = None) -> datetime | None:
+        return self._schedule_point("next_open", at)
+
+    def next_close(self, at: datetime | None = None) -> datetime | None:
+        return self._schedule_point("next_close", at)
+
+    def previous_close(self, at: datetime | None = None) -> datetime | None:
+        return self._schedule_point("previous_close", at)
+
+    def _schedule_point(self, method: str, at: datetime | None) -> datetime | None:
+        try:
+            return getattr(self._cal, method)(_as_utc(at)).to_pydatetime()
+        except Exception:
+            return None
+
+    def phase(self, at: datetime | None = None) -> str | None:
+        """Trading phase at ``at``: "premarket" | "open" | "aftermarket" | "closed".
+
+        Regular hours come from the calendar; the extended windows are the
+        venue's ``ExtendedHours`` offsets around them. Venues without extended
+        hours only ever report "open"/"closed". This is the *scheduled* phase —
+        the live authority for what a venue is actually doing right now is the
+        quote feed's own market_state; use this for prediction and fallback.
+        """
+        ts = _as_utc(at)
+        try:
+            if self._cal.is_open_at_time(ts):
+                return "open"
+            prev_close = self._cal.previous_close(ts)
+            nxt_open = self._cal.next_open(ts)
+        except Exception:
+            return None
+        if self.extended_hours is not None:
+            if ts < prev_close + self.extended_hours.post_offset:
+                return "aftermarket"
+            if ts >= nxt_open - self.extended_hours.pre_offset:
+                return "premarket"
+        return "closed"
+
+
 class MarketCalendarService:
     """Symbol-addressed access to venue trading calendars.
 
-    Calendar objects are built lazily and cached per calendar name (they are
-    shared across symbols on the same venue). All public methods return None
-    when no calendar can be resolved or the query falls outside the
-    calendar's known range — callers must treat None as "no calendar
-    information", not as an answer.
+    ``venue(symbol)`` resolves a Yahoo symbol to a cached :class:`Venue` (one
+    per calendar — venues are shared across symbols). The session-query
+    convenience methods below exist for the indicator pipeline; schedule and
+    phase questions go through the Venue object directly.
     """
 
     def __init__(self) -> None:
-        self._calendars: dict[str, Any] = {}
+        self._venues: dict[str, Venue | None] = {}
 
     # -- resolution ---------------------------------------------------------
 
     @staticmethod
     def calendar_name(symbol: str) -> str | None:
-        """Resolve a Yahoo symbol to an exchange_calendars name, or None."""
+        """Resolve a Yahoo symbol to an exchange_calendars name, or None.
+
+        The single place where ticker shape is interpreted.
+        """
         sym = symbol.upper().strip()
         if not sym:
             return None
@@ -128,51 +258,33 @@ class MarketCalendarService:
             return SUFFIX_CALENDARS.get(sym.rsplit(".", 1)[1])
         return DEFAULT_US_CALENDAR
 
-    def _calendar(self, name: str) -> Any:
-        """Get (and cache) a calendar instance; None if it can't be built."""
-        if name not in self._calendars:
+    def venue(self, symbol: str) -> Venue | None:
+        """The symbol's venue, or None when it can't be resolved/built."""
+        name = self.calendar_name(symbol)
+        if name is None:
+            return None
+        if name not in self._venues:
             try:
                 import exchange_calendars as xcals
 
-                self._calendars[name] = xcals.get_calendar(name)
+                calendar = xcals.get_calendar(name)
+                self._venues[name] = Venue(name, calendar, EXTENDED_HOURS.get(name))
             except Exception:
                 logger.warning("Could not build trading calendar %r", name, exc_info=True)
-                self._calendars[name] = None
-        return self._calendars[name]
+                self._venues[name] = None
+        return self._venues[name]
 
-    def _calendar_for(self, symbol: str) -> Any:
-        name = self.calendar_name(symbol)
-        return self._calendar(name) if name else None
-
-    # -- sessions -----------------------------------------------------------
+    # -- session conveniences (indicator pipeline) --------------------------
 
     def session_dates(self, symbol: str, start: date, end: date) -> set[date] | None:
-        """All trading sessions of the symbol's venue in [start, end].
-
-        Returns None when the venue is unknown or the range can't be answered
-        (outside calendar bounds after clamping). An empty set is a real
-        answer: "no sessions in this range".
-        """
-        cal = self._calendar_for(symbol)
-        if cal is None:
-            return None
-        try:
-            first = max(pd.Timestamp(start), cal.first_session)
-            last = min(pd.Timestamp(end), cal.last_session)
-            if first > last:
-                return None
-            return {ts.date() for ts in cal.sessions_in_range(first, last)}
-        except Exception:
-            logger.warning(
-                "Session query failed for %s (%s..%s)", symbol, start, end, exc_info=True
-            )
-            return None
+        v = self.venue(symbol)
+        return v.session_dates(start, end) if v else None
 
     def session_dates_for_index(self, symbol: str, index) -> set[date] | None:
         """Sessions covering a price DataFrame's date index (None if unusable).
 
-        Convenience for the indicator pipeline: accepts an index of dates,
-        datetimes, or Timestamps and clamps to its min/max range.
+        Accepts an index of dates, datetimes, or Timestamps and clamps to its
+        min/max range.
         """
         if index is None or len(index) == 0:
             return None
@@ -186,59 +298,8 @@ class MarketCalendarService:
         return self.session_dates(symbol, first, last)
 
     def is_session(self, symbol: str, d: date) -> bool | None:
-        """Whether the venue trades on date ``d`` (None = unknown venue/range)."""
-        sessions = self.session_dates(symbol, d, d)
-        if sessions is None:
-            return None
-        return d in sessions
-
-    # -- schedule (for market-state consumers) ------------------------------
-
-    @staticmethod
-    def _as_utc(at: datetime | None) -> pd.Timestamp:
-        ts = pd.Timestamp(at) if at is not None else pd.Timestamp.now(tz=timezone.utc)
-        return ts.tz_localize(timezone.utc) if ts.tzinfo is None else ts
-
-    def is_open(self, symbol: str, at: datetime | None = None) -> bool | None:
-        """Whether the venue is in a regular trading session at ``at`` (UTC now
-        by default). Regular hours only — pre/post-market is a venue-data
-        concept this calendar doesn't model; derive extended windows from
-        next_open/previous_close at the call site.
-        """
-        cal = self._calendar_for(symbol)
-        if cal is None:
-            return None
-        try:
-            return bool(cal.is_open_at_time(self._as_utc(at)))
-        except Exception:
-            return None
-
-    def next_open(self, symbol: str, at: datetime | None = None) -> datetime | None:
-        cal = self._calendar_for(symbol)
-        if cal is None:
-            return None
-        try:
-            return cal.next_open(self._as_utc(at)).to_pydatetime()
-        except Exception:
-            return None
-
-    def next_close(self, symbol: str, at: datetime | None = None) -> datetime | None:
-        cal = self._calendar_for(symbol)
-        if cal is None:
-            return None
-        try:
-            return cal.next_close(self._as_utc(at)).to_pydatetime()
-        except Exception:
-            return None
-
-    def previous_close(self, symbol: str, at: datetime | None = None) -> datetime | None:
-        cal = self._calendar_for(symbol)
-        if cal is None:
-            return None
-        try:
-            return cal.previous_close(self._as_utc(at)).to_pydatetime()
-        except Exception:
-            return None
+        v = self.venue(symbol)
+        return v.is_session(d) if v else None
 
 
 # Shared instance — calendar construction is expensive and venue calendars are

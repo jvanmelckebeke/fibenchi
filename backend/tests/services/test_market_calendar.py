@@ -96,10 +96,68 @@ def test_open_close_helpers():
     """Regular-hours schedule for a fixed historical instant (offline data)."""
     # Wednesday 2024-04-03, 15:00 UTC: NYSE regular session (13:30–20:00 UTC).
     at = datetime(2024, 4, 3, 15, 0, tzinfo=timezone.utc)
-    assert svc.is_open("AAPL", at) is True
-    assert svc.is_open("AAPL", datetime(2024, 4, 3, 21, 0, tzinfo=timezone.utc)) is False
-    next_close = svc.next_close("AAPL", at)
-    assert next_close == datetime(2024, 4, 3, 20, 0, tzinfo=timezone.utc)
-    # Unknown venue: all schedule helpers answer None, never raise.
-    assert svc.is_open("FOO.XX", at) is None
-    assert svc.next_open("FOO.XX", at) is None
+    venue = svc.venue("AAPL")
+    assert venue is not None
+    assert venue.is_open(at) is True
+    assert venue.is_open(datetime(2024, 4, 3, 21, 0, tzinfo=timezone.utc)) is False
+    assert venue.next_close(at) == datetime(2024, 4, 3, 20, 0, tzinfo=timezone.utc)
+    # Unknown venue: resolution answers None, never raises.
+    assert svc.venue("FOO.XX") is None
+
+
+def test_venues_are_cached_and_shared():
+    """Symbols on the same venue share one Venue instance."""
+    assert svc.venue("AAPL") is svc.venue("MSFT")
+    assert svc.venue("^GSPC") is svc.venue("AAPL")
+
+
+def _utc(*args: int) -> datetime:
+    return datetime(*args, tzinfo=timezone.utc)
+
+
+def test_phase_us_regular_day():
+    """US venue phases across Wednesday 2024-04-03 (regular 13:30–20:00 UTC).
+
+    Premarket = open − 5:30 (4:00 ET), aftermarket until close + 4:00 (20:00 ET).
+    """
+    venue = svc.venue("AAPL")
+    assert venue is not None
+    assert venue.phase(_utc(2024, 4, 3, 7, 0)) == "closed"       # 3:00 ET
+    assert venue.phase(_utc(2024, 4, 3, 8, 0)) == "premarket"    # 4:00 ET sharp
+    assert venue.phase(_utc(2024, 4, 3, 12, 0)) == "premarket"   # 8:00 ET
+    assert venue.phase(_utc(2024, 4, 3, 15, 0)) == "open"
+    assert venue.phase(_utc(2024, 4, 3, 21, 0)) == "aftermarket"  # 17:00 ET
+    assert venue.phase(_utc(2024, 4, 4, 1, 0)) == "closed"       # 21:00 ET Apr 3
+
+
+def test_phase_us_half_day():
+    """Early-close day (day after Thanksgiving 2023: close 13:00 ET / 18:00 UTC).
+
+    Because the extended window is anchored to the actual close, aftermarket
+    ends 17:00 ET — a hardcoded 20:00 ET would misreport this.
+    """
+    venue = svc.venue("AAPL")
+    assert venue is not None
+    assert venue.phase(_utc(2023, 11, 24, 17, 0)) == "open"          # 12:00 ET
+    assert venue.phase(_utc(2023, 11, 24, 20, 0)) == "aftermarket"   # 15:00 ET
+    assert venue.phase(_utc(2023, 11, 24, 23, 0)) == "closed"        # 18:00 ET
+    # A normal close+4h instant on a *regular* day is still aftermarket.
+    assert venue.phase(_utc(2023, 11, 27, 23, 0)) == "aftermarket"
+
+
+def test_phase_weekend_is_closed():
+    """Saturday sits between Friday's aftermarket and Monday's premarket."""
+    venue = svc.venue("AAPL")
+    assert venue is not None
+    assert venue.phase(_utc(2024, 4, 6, 15, 0)) == "closed"
+
+
+def test_phase_venue_without_extended_hours():
+    """European venues have no retail extended session: open/closed only."""
+    venue = svc.venue("IWDA.AS")
+    assert venue is not None
+    assert venue.extended_hours is None
+    # XAMS regular hours 09:00–17:30 CEST = 07:00–15:30 UTC on 2024-04-03.
+    assert venue.phase(_utc(2024, 4, 3, 10, 0)) == "open"
+    assert venue.phase(_utc(2024, 4, 3, 16, 0)) == "closed"  # 18:00 CEST
+    assert venue.phase(_utc(2024, 4, 3, 6, 0)) == "closed"   # 08:00 CEST
