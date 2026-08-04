@@ -13,6 +13,7 @@ from app.services.compute.indicators import (
     choppiness_index,
     compute_indicators,
     get_all_output_fields,
+    session_gap_days,
     volatility_normalized_return,
 )
 from tests.helpers import (
@@ -368,3 +369,106 @@ def test_vnr_sigma_reconstructs_live_move():
 
     full = compute_indicators(df)
     assert live_vnr == pytest.approx(full["vnr"].iloc[-1], rel=1e-4)
+
+
+# ---------------------------------------------------------------------------
+# Gap guard — issue #559 (σ-Move inflated by √N across missing sessions)
+# ---------------------------------------------------------------------------
+
+
+def test_session_gap_days_basic():
+    """1 for adjacent sessions (weekends free), >1 across a missing business day."""
+    # Thu, Fri, Mon (weekend — fine), Wed (Tuesday missing)
+    idx = pd.Index([
+        pd.Timestamp("2026-07-30"), pd.Timestamp("2026-07-31"),
+        pd.Timestamp("2026-08-03"), pd.Timestamp("2026-08-05"),
+    ])
+    gaps = session_gap_days(idx)
+    assert pd.isna(gaps.iloc[0])
+    assert gaps.iloc[1] == 1
+    assert gaps.iloc[2] == 1  # Fri -> Mon: the weekend is not a gap
+    assert gaps.iloc[3] == 2  # Mon -> Wed: Tuesday has no bar
+
+
+def test_session_gap_days_non_date_index():
+    """A synthetic (non-date) index yields all-NaN — treated as contiguous."""
+    gaps = session_gap_days(pd.RangeIndex(5))
+    assert gaps.isna().all()
+
+
+def _gapped_df(n: int = 100, drop_offset: int = 5) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """A business-day price df and a copy with one interior session removed.
+
+    ``drop_offset`` counts back from the end; the dropped row is guaranteed to
+    leave a >1-business-day hole between its neighbours.
+    """
+    full = _make_price_df(n)
+    gapped = full.drop(full.index[n - drop_offset])
+    return full, gapped
+
+
+def test_vnr_gap_bar_is_nan():
+    """The bar after a missing session must not report a σ-move at all."""
+    full, gapped = _gapped_df()
+    vnr = volatility_normalized_return(gapped["close"])
+    # The bar right after the hole is suppressed…
+    assert pd.isna(vnr.iloc[-4])
+    # …while bars before the hole are untouched (identical to the full series).
+    pd.testing.assert_series_equal(
+        vnr.iloc[10:-4], volatility_normalized_return(full["close"]).iloc[10:-5],
+        check_freq=False,
+    )
+
+
+def test_vnr_gap_sessions_flag_in_output():
+    """compute_indicators exposes vnr_gap_sessions only on suppressed bars."""
+    _, gapped = _gapped_df()
+    result = compute_indicators(gapped)
+    assert "vnr_gap_sessions" in result.columns
+    flagged = result["vnr_gap_sessions"].dropna()
+    assert len(flagged) == 1
+    assert flagged.iloc[0] == 2
+    assert "vnr_gap_sessions" in get_all_output_fields()
+
+
+def test_vnr_no_gap_no_flag():
+    """A contiguous business-day series carries no gap flags and no suppression."""
+    full = _make_price_df(100)
+    result = compute_indicators(full)
+    assert result["vnr_gap_sessions"].isna().all()
+    assert result["vnr"].iloc[10:].notna().all()
+
+
+def test_vnr_regression_issue_559():
+    """The observed IWDA.AS case: closes 124.23 -> 127.65 across a two-session
+    gap (2026-08-03 missing) must not report the inflated 4.48σ figure.
+
+    With a contiguous index the same closes score >4σ; with the real gapped
+    dates the bar must be suppressed and flagged instead.
+    """
+    n = 80
+    warmup_dates = pd.bdate_range(end="2026-07-31", periods=n)
+    # Alternating ±0.6%-ish closes ending exactly at the observed 124.23.
+    closes = [124.23 if (n - 1 - i) % 2 == 0 else 123.50 for i in range(n)]
+
+    contiguous = pd.Series(
+        closes + [127.65], index=list(warmup_dates) + [pd.Timestamp("2026-08-03")]
+    )
+    inflated = volatility_normalized_return(contiguous).iloc[-1]
+    assert inflated > 4  # what the bug displayed (4.48 on the live data)
+
+    gapped = pd.Series(
+        closes + [127.65], index=list(warmup_dates) + [pd.Timestamp("2026-08-04")]
+    )
+    vnr = volatility_normalized_return(gapped)
+    assert pd.isna(vnr.iloc[-1])
+
+    df = pd.DataFrame({
+        "open": gapped, "high": gapped, "low": gapped, "close": gapped,
+        "volume": 1_000_000,
+    })
+    result = compute_indicators(df)
+    assert result["vnr_gap_sessions"].iloc[-1] == 2
+    snapshot = build_indicator_snapshot(result)
+    assert snapshot["values"]["vnr"] is None
+    assert snapshot["values"]["vnr_gap_sessions"] == 2

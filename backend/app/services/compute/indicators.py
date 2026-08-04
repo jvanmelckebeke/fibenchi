@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Callable
 
 import numpy as np
@@ -88,6 +89,30 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 VNR_LAMBDA = 0.94
 
 
+def session_gap_days(index: pd.Index) -> pd.Series:
+    """Business days elapsed between each bar and the previous stored bar.
+
+    1 means the bars are adjacent sessions (weekends don't count); >1 means at
+    least one business day between them has no stored bar — either an upstream
+    feed hole or an exchange holiday. Without a per-venue trading calendar the
+    two are indistinguishable here, so callers must treat >1 conservatively
+    ("this is not a verified single-session step") rather than as proof of a
+    data error.
+
+    The first bar — and every bar of a non-date index (synthetic test series) —
+    is NaN, meaning "no gap information": comparisons like ``gaps > 1`` are
+    False there, so such rows are treated as contiguous.
+    """
+    gaps = pd.Series(np.nan, index=index)
+    if len(index) < 2:
+        return gaps
+    if not isinstance(index[0], (date, datetime, np.datetime64)):
+        return gaps
+    d = pd.DatetimeIndex(index).values.astype("datetime64[D]")
+    gaps.iloc[1:] = np.busday_count(d[:-1], d[1:])
+    return gaps
+
+
 def _ewma_daily_vol(closes: pd.Series, lam: float) -> pd.Series:
     """Forward EWMA volatility forecast (RiskMetrics zero-mean).
 
@@ -119,11 +144,21 @@ def volatility_normalized_return(closes: pd.Series, lam: float = VNR_LAMBDA) -> 
     a larger lam means longer memory. Unlike a fixed rolling window, the EWMA
     has no hard edge, so an old shock decays smoothly instead of dropping out
     abruptly and stepping the score ("ghosting").
+
+    Gap guard: ``pct_change`` is positional, so when a session is missing from
+    the stored series the "daily" return actually spans several sessions while
+    the denominator stays a one-day forecast — inflating the score by ~√N for
+    an N-session hole (issue #559). Bars whose previous stored bar is more than
+    one business day back are therefore NaN'd rather than reported: the honest
+    statement is "this is not a verified single-day return", not a fabricated
+    single-day figure. Exchange holidays trip the same guard (no calendar to
+    tell them apart), which conservatively blanks the bar after a holiday.
     """
     returns = closes.pct_change()
     # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
     sigma_forecast = _ewma_daily_vol(closes, lam).shift(1)
-    return returns / sigma_forecast
+    gaps = session_gap_days(closes.index)
+    return (returns / sigma_forecast).where(~(gaps > 1))
 
 
 def adx(df: pd.DataFrame, period: int = 14) -> dict[str, pd.Series]:
@@ -332,8 +367,14 @@ def _vnr_post_compute(result: pd.DataFrame) -> None:
     the vol (a return fraction) to divide a live intraday return by so the UI can
     show today's σ-move before today's bar has been written to the DB. Flat
     stretches yield NaN, which ``build_indicator_snapshot`` renders as None.
+
+    ``vnr_gap_sessions`` marks the bars the gap guard suppressed: the number of
+    business days back to the previous stored bar, only where that exceeds 1
+    (NaN → None everywhere else). Lets the UI explain a blank σ-Move.
     """
     result["vnr_sigma"] = _ewma_daily_vol(result["close"], VNR_LAMBDA)
+    gaps = session_gap_days(result.index)
+    result["vnr_gap_sessions"] = gaps.where(gaps > 1)
 
 
 def _rvol_snapshot_derived(row: pd.Series) -> dict:
@@ -501,11 +542,11 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     "vnr": IndicatorDef(
         func=volatility_normalized_return,
         params={"lam": VNR_LAMBDA},
-        output_fields=["vnr", "vnr_sigma"],
+        output_fields=["vnr", "vnr_sigma", "vnr_gap_sessions"],
         decimals=2,
         warmup_periods=60,
         post_compute=_vnr_post_compute,
-        field_decimals={"vnr_sigma": 6},
+        field_decimals={"vnr_sigma": 6, "vnr_gap_sessions": 0},
     ),
 }
 
