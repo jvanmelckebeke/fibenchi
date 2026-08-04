@@ -276,7 +276,12 @@ class Venue:
         try:
             if self._cal.is_open_at_time(ts):
                 return "open"
-            prev_close = self._cal.previous_close(ts)
+            # previous_close is strictly exclusive: at the exact close instant
+            # it returns the *prior* session's close, which would misfile the
+            # first moment of aftermarket as closed. Nudging the query point
+            # one minute forward makes a close at ts count as "just closed";
+            # mid-session instants can't reach here (is_open returned above).
+            prev_close = self._cal.previous_close(ts + pd.Timedelta(minutes=1))
             nxt_open = self._cal.next_open(ts)
         except Exception:
             return None

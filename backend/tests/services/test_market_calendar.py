@@ -137,6 +137,7 @@ def test_phase_us_regular_day():
     assert venue.phase(_utc(2024, 4, 3, 8, 0)) == "premarket"    # 4:00 ET sharp
     assert venue.phase(_utc(2024, 4, 3, 12, 0)) == "premarket"   # 8:00 ET
     assert venue.phase(_utc(2024, 4, 3, 15, 0)) == "open"
+    assert venue.phase(_utc(2024, 4, 3, 20, 0)) == "aftermarket"  # 16:00 ET sharp
     assert venue.phase(_utc(2024, 4, 3, 21, 0)) == "aftermarket"  # 17:00 ET
     assert venue.phase(_utc(2024, 4, 4, 1, 0)) == "closed"       # 21:00 ET Apr 3
 
