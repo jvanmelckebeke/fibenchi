@@ -311,3 +311,35 @@ class Symbol(str):
         """This ticker's trading venue, or None when it can't be resolved."""
         name = self.calendar_name
         return _venue_for(name) if name else None
+
+
+def any_venue_open(symbols, at: datetime | None = None) -> bool:
+    """Whether any symbol's venue is in a tradeable phase (incl. extended hours).
+
+    The scheduler gate: background jobs that only matter while something can
+    trade (intraday bar sync, price heal) ask this instead of weekday guesses
+    or sampling live quotes. Symbols sharing a venue are checked once — a big
+    portfolio collapses to a handful of cached Venue objects and zero API
+    calls.
+
+    Fail-open by design: an unresolvable venue or a failed schedule query
+    counts as tradeable. The gate exists to skip certainly-dead ticks, never
+    to block real work — a wrong True costs one harmless fetch, a wrong False
+    silently stalls data.
+    """
+    seen: set[str] = set()
+    for sym in symbols:
+        s = Symbol(sym)
+        name = s.calendar_name
+        if name is None:
+            return True  # unknown venue — trading can't be ruled out
+        if name in seen:
+            continue
+        seen.add(name)
+        venue = s.venue
+        if venue is None:
+            return True  # calendar failed to build — same fail-open rule
+        phase = venue.phase(at)
+        if phase is None or phase != "closed":
+            return True
+    return False
