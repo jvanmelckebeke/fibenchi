@@ -1,6 +1,8 @@
 """Tests for volatility / range indicators: ATR, ATR%, ADX, Choppiness, and the
 volatility-normalized return (sigma-move)."""
 
+from datetime import date
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -472,3 +474,89 @@ def test_vnr_regression_issue_559():
     snapshot = build_indicator_snapshot(result)
     assert snapshot["values"]["vnr"] is None
     assert snapshot["values"]["vnr_gap_sessions"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Calendar-exact gap guard — session_dates distinguishes holidays from holes
+# ---------------------------------------------------------------------------
+
+
+def _dates(*days: str) -> pd.Index:
+    return pd.Index([pd.Timestamp(d) for d in days])
+
+
+def test_session_gap_days_exact_holiday_is_not_a_gap():
+    """With real venue sessions, the bar after a holiday is a normal 1-step."""
+    # Thu 2024-03-28 -> Tue 2024-04-02: Good Friday + Easter Monday closed.
+    idx = _dates("2024-03-27", "2024-03-28", "2024-04-02")
+    sessions = {date(2024, 3, 27), date(2024, 3, 28), date(2024, 4, 2)}
+    gaps = session_gap_days(idx, sessions)
+    assert gaps.iloc[1] == 1
+    assert gaps.iloc[2] == 1  # busday fallback would say 3 here
+    # Without the calendar the same index is conservatively flagged.
+    fallback = session_gap_days(idx)
+    assert fallback.iloc[2] == 3
+
+
+def test_session_gap_days_exact_hole_is_flagged():
+    """A missing scheduled session still counts as a gap in exact mode."""
+    # Fri 2026-07-31 -> Tue 2026-08-04 with Mon 2026-08-03 a scheduled session.
+    idx = _dates("2026-07-30", "2026-07-31", "2026-08-04")
+    sessions = {
+        date(2026, 7, 30), date(2026, 7, 31), date(2026, 8, 3), date(2026, 8, 4),
+    }
+    gaps = session_gap_days(idx, sessions)
+    assert gaps.iloc[1] == 1
+    assert gaps.iloc[2] == 2
+
+
+def test_session_gap_days_bar_unknown_to_calendar_is_contiguous():
+    """A stored bar on a date the calendar doesn't list as a session means the
+    calendar and the data disagree — trust the data, don't suppress."""
+    idx = _dates("2026-07-30", "2026-07-31", "2026-08-01")  # Saturday bar
+    sessions = {date(2026, 7, 30), date(2026, 7, 31)}
+    gaps = session_gap_days(idx, sessions)
+    assert gaps.iloc[2] == 1
+
+
+def test_vnr_holiday_bar_keeps_value_with_sessions():
+    """The calendar restores the holiday bar the busday fallback would blank."""
+    n = 80
+    dates = list(pd.bdate_range(end="2024-03-28", periods=n))  # ends Thu pre-Easter
+    dates.append(pd.Timestamp("2024-04-02"))  # Tue after Easter Monday
+    closes = pd.Series(
+        [100 + (i % 2) for i in range(n)] + [103.0], index=pd.Index(dates)
+    )
+
+    # Fallback: Thu -> Tue looks like a 3-business-day gap and is blanked.
+    assert pd.isna(volatility_normalized_return(closes).iloc[-1])
+
+    # Exact sessions: every stored date is a session and they are adjacent.
+    sessions = {d.date() for d in dates}
+    df = pd.DataFrame({
+        "open": closes, "high": closes, "low": closes, "close": closes,
+        "volume": 1_000_000,
+    })
+    result = compute_indicators(df, session_dates=sessions)
+    assert np.isfinite(result["vnr"].iloc[-1])
+    assert result["vnr_gap_sessions"].isna().all()
+
+
+def test_vnr_hole_still_suppressed_with_sessions():
+    """Exact mode must keep flagging true feed holes (the #559 case)."""
+    n = 80
+    dates = list(pd.bdate_range(end="2026-07-31", periods=n))
+    dates.append(pd.Timestamp("2026-08-04"))  # 2026-08-03 session missing
+    closes = pd.Series(
+        [124.23 if (n - 1 - i) % 2 == 0 else 123.50 for i in range(n)] + [127.65],
+        index=pd.Index(dates),
+    )
+    sessions = {d.date() for d in dates} | {date(2026, 8, 3)}
+
+    df = pd.DataFrame({
+        "open": closes, "high": closes, "low": closes, "close": closes,
+        "volume": 1_000_000,
+    })
+    result = compute_indicators(df, session_dates=sessions)
+    assert pd.isna(result["vnr"].iloc[-1])
+    assert result["vnr_gap_sessions"].iloc[-1] == 2

@@ -12,6 +12,7 @@ from app.repositories.price_repo import PriceRepository
 from app.services.compute.indicators import build_indicator_snapshot, compute_indicators
 from app.services.compute.utils import prices_to_df
 from app.services.fundamentals_cache import merge_fundamentals_from_cache
+from app.services.market_calendar import market_calendar
 from app.utils import TTLCache
 
 # In-memory cache for batch indicator snapshots.
@@ -103,7 +104,8 @@ async def _compute_snapshots_for_rows(
 
         df = prices_to_df(prices)
 
-        snapshot = build_indicator_snapshot(compute_indicators(df))
+        sessions = market_calendar.session_dates_for_index(symbol, df.index)
+        snapshot = build_indicator_snapshot(compute_indicators(df, session_dates=sessions))
         out[symbol] = snapshot
 
     # Merge cached fundamental metrics; background-fetch any misses

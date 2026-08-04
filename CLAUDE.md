@@ -83,6 +83,7 @@ Two long-lived branches: `main` (production, `fibenchi:latest`) and `dev` (stagi
   - `pseudo_etf.py` — Equal-weight performance with quarterly rebalancing. Two modes: `_calc_static` (all constituents from day 1) and `_calc_dynamic` (assets join when price ≥ threshold, prevents penny-stock distortion).
   - `portfolio.py` — Portfolio index using dynamic entry with `min_entry_price=10.0`.
   - `utils.py` — Shared `prices_to_df()` converting ORM objects to indexed DataFrame.
+- `services/market_calendar.py` — `MarketCalendarService` (singleton `market_calendar`): maps Yahoo symbols to `exchange_calendars` venue calendars (suffix table + index table; unmapped → `None`). Supplies exact session dates to the σ-Move gap guard (`compute_indicators(df, session_dates=...)`) so holidays aren't mistaken for feed holes, plus `is_open`/`next_open`/`next_close`/`previous_close` schedule helpers for market-state uses. Fail-safe: any unknown venue or out-of-range query returns `None` and callers fall back to business-day heuristics.
 - `services/entity_lookups.py` — Canonical lookup helpers: `find_asset()` returns `None` (for ephemeral price fetches of untracked symbols like ETF holdings), `get_asset()`/`get_group()`/`get_pseudo_etf()` raise HTTP 404.
 - `utils.py` — `async_threadable` decorator (wraps sync functions for `asyncio.to_thread`), `TTLCache` class.
 - `constants.py` — `PERIOD_DAYS` (period string → calendar days), `WARMUP_DAYS` (derived from max indicator warmup periods).

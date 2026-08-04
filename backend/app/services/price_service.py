@@ -13,6 +13,7 @@ from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceRespo
 from app.services.compute.indicators import INDICATOR_REGISTRY, compute_indicators, safe_round
 from app.services.compute.utils import prices_to_df
 from app.services.fundamentals_cache import merge_fundamentals_into_rows
+from app.services.market_calendar import market_calendar
 from app.services.price_providers import get_price_provider
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
 from app.utils import TTLCache
@@ -200,7 +201,8 @@ async def _compute_or_cached_indicators(
         cache_key = None
         df = await _fetch_ephemeral(symbol, period, warmup=True)
 
-    rows = _df_to_indicator_rows(compute_indicators(df), start)
+    sessions = market_calendar.session_dates_for_index(symbol, df.index)
+    rows = _df_to_indicator_rows(compute_indicators(df, session_dates=sessions), start)
 
     # Merge cached fundamentals; background-fetch on miss (non-blocking)
     merge_fundamentals_into_rows(symbol, rows)
