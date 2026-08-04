@@ -19,10 +19,15 @@ def test_covers_canonical_states():
     assert set(MARKET_STATES) == {"PREPRE", "PRE", "REGULAR", "POST", "POSTPOST", "CLOSED"}
 
 
-def test_active_set_matches_historical_predicates():
-    """quote_service/main.py both used {REGULAR, PRE, POST, PREPRE, POSTPOST}."""
+def test_active_states_are_the_trading_ones():
+    """Only states in which something can actually trade count as active.
+
+    PREPRE (overnight — lasts all night for European venues) and POSTPOST
+    (after-hours ended) are deliberately inactive so the SSE stream and
+    intraday gates idle instead of polling settled prices.
+    """
     active = {s for s, info in MARKET_STATES.items() if info.active}
-    assert active == {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}
+    assert active == {"REGULAR", "PRE", "POST"}
 
 
 def test_only_regular_forms_a_session():
@@ -34,10 +39,10 @@ def test_only_regular_forms_a_session():
 
 
 def test_settled_states_read_as_closed_phase():
-    """The frontend's stale-pulse suppression treated CLOSED and POSTPOST as
-    closed; phase encodes the same split."""
+    """Prices are settled in CLOSED, POSTPOST, and the overnight PREPRE —
+    the stale-price pulse must not fire in any of them."""
     closed = {s for s, info in MARKET_STATES.items() if info.phase == "closed"}
-    assert closed == {"CLOSED", "POSTPOST"}
+    assert closed == {"CLOSED", "POSTPOST", "PREPRE"}
 
 
 def test_phase_speaks_venue_vocabulary():
@@ -59,4 +64,6 @@ def test_unknown_states_are_conservative():
 def test_any_active():
     assert any_active({"CLOSED", "POST"}) is True
     assert any_active({"CLOSED"}) is False
+    # The overnight pair alone must not keep pollers awake.
+    assert any_active({"PREPRE", "POSTPOST"}) is False
     assert any_active(set()) is False

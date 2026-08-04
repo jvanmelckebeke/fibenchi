@@ -10,19 +10,20 @@ export interface MarketStateInfo {
   label: string
   /**
    * Scheduled-phase equivalent — same vocabulary as the backend venue
-   * calendar's phase(). "closed" means prices are settled: POSTPOST is
-   * "after-hours has *ended*", so it is closed here even though its label
-   * still reads After-hours ("POSTMARKET" is not a thing Yahoo emits).
+   * calendar's phase(). "closed" means prices are settled. PREPRE is Yahoo's
+   * overnight state (POST→POSTPOST→PREPRE→PRE): for European venues it lasts
+   * the whole night, so it must not masquerade as pre-market. POSTPOST is
+   * "after-hours has *ended*" ("POSTMARKET" is not a thing Yahoo emits).
    */
   phase: "premarket" | "open" | "aftermarket" | "closed"
 }
 
 const MARKET_STATES: Record<string, MarketStateInfo> = {
   PRE: { dotColor: "bg-blue-500", label: "Pre-market", phase: "premarket" },
-  PREPRE: { dotColor: "bg-blue-500", label: "Pre-market", phase: "premarket" },
+  PREPRE: { dotColor: "bg-zinc-500", label: "Overnight", phase: "closed" },
   REGULAR: { dotColor: "bg-emerald-500", label: "Market open", phase: "open" },
   POST: { dotColor: "bg-orange-500", label: "After-hours", phase: "aftermarket" },
-  POSTPOST: { dotColor: "bg-orange-500", label: "After-hours", phase: "closed" },
+  POSTPOST: { dotColor: "bg-red-500", label: "Closed", phase: "closed" },
   CLOSED: { dotColor: "bg-red-500", label: "Closed", phase: "closed" },
 }
 
