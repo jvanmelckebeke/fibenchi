@@ -174,3 +174,111 @@ async def test_heal_caps_per_run_and_defers_rest(db):
     assert len(first) == MAX_HEALS_PER_RUN
     assert len(second) == 2  # deferred symbols healed next run, not lost
     assert mock_sync.await_count == n
+
+
+# ---------------------------------------------------------------------------
+# Interior-hole heal (issue #559 fix 3)
+# ---------------------------------------------------------------------------
+
+from datetime import date, timedelta  # noqa: E402
+
+from sqlalchemy import delete  # noqa: E402
+
+from app.models import PriceHistory  # noqa: E402
+from app.services.market_calendar import Symbol  # noqa: E402
+from app.services.price_heal import find_interior_holes, heal_interior_holes  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _reset_hole_state():
+    price_heal._hole_attempts.clear()
+    price_heal._last_hole_scan = None
+    yield
+    price_heal._hole_attempts.clear()
+    price_heal._last_hole_scan = None
+
+
+def test_find_interior_holes_strictly_inside():
+    """Only mid-series misses count — leading/trailing gaps are other jobs'."""
+    d = date(2026, 8, 3)
+    stored = {d, d + timedelta(days=2), d + timedelta(days=4)}
+    sessions = {d + timedelta(days=i) for i in range(-2, 7)}
+    holes = find_interior_holes(stored, sessions)
+    assert holes == {d + timedelta(days=1), d + timedelta(days=3)}
+
+
+def test_find_interior_holes_empty_inputs():
+    assert find_interior_holes(set(), {date(2026, 8, 3)}) == set()
+    assert find_interior_holes({date(2026, 8, 3)}, set()) == set()
+
+
+async def _seed_with_hole(db, symbol="AAPL"):
+    """Seed a US asset and delete one real mid-window session's bar."""
+    asset = await seed_asset_with_prices(db, symbol, n_days=60)
+    stored = {p.date for p in await PriceRepository(db).list_by_asset(asset.id)}
+    sessions = sorted(Symbol(symbol).venue.session_dates(min(stored), max(stored)))
+    hole = sessions[len(sessions) // 2]
+    await db.execute(delete(PriceHistory).where(
+        PriceHistory.asset_id == asset.id, PriceHistory.date == hole,
+    ))
+    await db.commit()
+    return asset, hole
+
+
+async def test_hole_heal_detects_and_refetches(db):
+    """A deleted mid-series session is detected and its range re-fetched."""
+    asset, hole = await _seed_with_hole(db)
+    with patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync:
+        sync.return_value = 1
+        healed = await heal_interior_holes(db, force=True)
+    assert healed == {asset.symbol: 1}
+    sync.assert_awaited_once()
+    _, called_asset, start, end = sync.await_args.args
+    assert called_asset.id == asset.id
+    assert start == end == hole
+
+
+async def test_hole_heal_clean_series_no_fetch(db):
+    """Seeded weekday bars (holidays included as extra rows) yield no holes —
+    an exchange holiday must never be treated as missing data."""
+    await seed_asset_with_prices(db, "AAPL", n_days=60)
+    with patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync:
+        healed = await heal_interior_holes(db, force=True)
+    assert healed == {}
+    sync.assert_not_awaited()
+
+
+async def test_hole_heal_cooldown_same_holes(db):
+    """The same unfilled hole set is not re-fetched within the retry cooldown."""
+    await _seed_with_hole(db)
+    with patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync:
+        sync.return_value = 0
+        first = await heal_interior_holes(db, force=True)
+        second = await heal_interior_holes(db, force=True)
+    assert first and second == {}
+    sync.assert_awaited_once()
+
+
+async def test_hole_heal_scan_interval_throttles(db):
+    """Without force, a scan only runs once per HOLE_SCAN_INTERVAL_SECONDS."""
+    await _seed_with_hole(db)
+    with patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync:
+        sync.return_value = 1
+        first = await heal_interior_holes(db)
+        second = await heal_interior_holes(db)
+    assert first != {} and second == {}
+    sync.assert_awaited_once()
+
+
+async def test_hole_heal_skips_unknown_venue(db):
+    """No venue calendar → holes and holidays are indistinguishable → skip."""
+    asset = await seed_asset_with_prices(db, "FOO.XX", n_days=60)
+    stored = sorted({p.date for p in await PriceRepository(db).list_by_asset(asset.id)})
+    await db.execute(delete(PriceHistory).where(
+        PriceHistory.asset_id == asset.id, PriceHistory.date == stored[len(stored) // 2],
+    ))
+    await db.commit()
+    with patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync:
+        healed = await heal_interior_holes(db, force=True)
+    assert healed == {}
+    sync.assert_not_awaited()

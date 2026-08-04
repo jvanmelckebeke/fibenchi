@@ -36,7 +36,7 @@ from app.routers import settings as settings_router
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
 from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
-from app.services.price_heal import heal_unreconciled_prices
+from app.services.price_heal import heal_interior_holes, heal_unreconciled_prices
 from app.services.price_providers import init_price_provider
 from app.services.price_sync import sync_all_prices
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
@@ -138,6 +138,16 @@ async def scheduled_price_heal():
                 )
         except Exception:
             logger.exception("Price heal failed")
+        try:
+            # Mid-series holes (issue #559): self-throttled to one scan per
+            # HOLE_SCAN_INTERVAL, so piggybacking on this job costs nothing.
+            filled = await heal_interior_holes(db)
+            if filled:
+                logger.info(
+                    f"Hole heal: refreshed {len(filled)} symbol(s): {', '.join(sorted(filled))}"
+                )
+        except Exception:
+            logger.exception("Hole heal failed")
 
 
 async def scheduled_symbol_sync():
