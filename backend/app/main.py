@@ -36,6 +36,7 @@ from app.routers import settings as settings_router
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.currency_service import load_cache as load_currency_cache
 from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
+from app.services.market_state import any_active
 from app.services.price_heal import heal_unreconciled_prices
 from app.services.price_providers import init_price_provider
 from app.services.price_sync import sync_all_prices
@@ -177,8 +178,7 @@ async def scheduled_intraday_sync():
             sample = random.sample(symbols, sample_size)
             quotes = await get_price_provider().batch_fetch_quotes(sample)
             market_states = {q.get("market_state") for q in quotes if q.get("market_state")}
-            active_states = {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}
-            if not market_states & active_states:
+            if not any_active(market_states):
                 return
 
             count = await fetch_and_store_intraday(db, symbols, asset_map)

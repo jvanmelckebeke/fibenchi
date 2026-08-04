@@ -20,6 +20,7 @@ import {
   computeLiveVnr,
   isStoredVnrStale,
 } from "@/lib/indicator-registry"
+import { marketState as marketStateInfo } from "@/lib/market-state"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 import { resolveIcon } from "@/lib/icon-utils"
@@ -113,10 +114,9 @@ export const TableRow = memo(function TableRow({
   const hasDbFallback = !hasLiveQuote && displayPrice != null
   // Suppress stale indicator when market is closed — DB prices are already current.
   // When no quote yet, market_state is unknown so we assume market hours (show stale).
+  // The POSTPOST-counts-as-closed knowledge lives in the shared trait table.
   const marketState = quote?.market_state
-  // "POSTPOST" = post-market session ended (prices settled); Yahoo never emits
-  // "POSTMARKET". "POST" is still active after-hours, so stale stays meaningful.
-  const isMarketClosed = marketState === "CLOSED" || marketState === "POSTPOST"
+  const isMarketClosed = marketState != null && marketStateInfo(marketState).phase === "closed"
   const showStale = hasDbFallback && !isMarketClosed
 
   const { settings } = useSettings()
