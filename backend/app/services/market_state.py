@@ -21,10 +21,11 @@ from dataclasses import dataclass
 class MarketStateInfo:
     # Scheduled-phase equivalent — the join key to Venue.phase().
     phase: str  # "premarket" | "open" | "aftermarket" | "closed"
-    # Quotes are worth polling in this state. Note POSTPOST ("after-hours has
-    # ended") is kept active — the historical behavior of every consumer —
-    # even though prices are settled by then; revisit deliberately, not as a
-    # refactor side effect.
+    # Quotes are worth polling in this state. PREPRE ("overnight, pre-market
+    # hasn't started") and POSTPOST ("after-hours has ended") are NOT active:
+    # nothing trades in either, and for European venues PREPRE lasts the whole
+    # night — polling fast there only burned API calls. (They historically
+    # counted as active; changed deliberately, see PR #568.)
     active: bool
     # The current session's daily bar is still building, so the trailing bar
     # Yahoo returns is a live partial (see drop_unsettled_last_bar).
@@ -32,11 +33,11 @@ class MarketStateInfo:
 
 
 MARKET_STATES: dict[str, MarketStateInfo] = {
-    "PREPRE": MarketStateInfo(phase="premarket", active=True, session_forming=False),
+    "PREPRE": MarketStateInfo(phase="closed", active=False, session_forming=False),
     "PRE": MarketStateInfo(phase="premarket", active=True, session_forming=False),
     "REGULAR": MarketStateInfo(phase="open", active=True, session_forming=True),
     "POST": MarketStateInfo(phase="aftermarket", active=True, session_forming=False),
-    "POSTPOST": MarketStateInfo(phase="closed", active=True, session_forming=False),
+    "POSTPOST": MarketStateInfo(phase="closed", active=False, session_forming=False),
     "CLOSED": MarketStateInfo(phase="closed", active=False, session_forming=False),
 }
 
