@@ -8,6 +8,7 @@ import time as _time
 from app.database import async_session
 from app.repositories.asset_repo import AssetRepository
 from app.services.intraday import get_intraday_bars
+from app.services.market_calendar import schedule_poll_hint
 from app.services.market_state import any_active, state_info
 from app.services.price_providers import get_price_provider
 
@@ -22,6 +23,41 @@ def _reset_asset_list_cache() -> None:
     """Reset the asset list cache (useful for testing)."""
     global _asset_list_cache
     _asset_list_cache = (0.0, [])
+
+
+def _poll_interval(market_states: set[str], symbols: list[str], at=None) -> int:
+    """Seconds until the next quote poll.
+
+    The live market states pick the cadence whenever they exist — they know
+    about halts, special sessions, and closures a stale calendar wouldn't, so
+    an explicit CLOSED must never be overridden by the schedule. The venue
+    schedule steps in two ways:
+
+    - when the quote batch is degraded (no states at all), the scheduled
+      phase substitutes for the missing live answer, so a dead feed during
+      regular hours doesn't drop the stream to the 300s closed cadence;
+    - an all-closed stream sleeps until the next opening bell instead of up
+      to 5 minutes past it (one cheap poll at the bell discovers the flip).
+    """
+    if any(state_info(s).phase == "open" for s in market_states):
+        live = 15
+    elif any_active(market_states):
+        live = 60
+    else:
+        live = 300
+
+    phase, next_open_secs = schedule_poll_hint(symbols, at)
+
+    if market_states:
+        interval = live
+    else:
+        scheduled = 15 if phase == "open" else 60 if phase in ("premarket", "aftermarket") else 300
+        interval = min(live, scheduled)
+    if next_open_secs is not None:
+        # Wake just after the earliest bell (floor 15s so a bell moments away
+        # can't busy-loop the stream).
+        interval = min(interval, max(15, int(next_open_secs) + 1))
+    return interval
 
 
 async def get_quotes(symbols: str) -> list[dict]:
@@ -122,16 +158,7 @@ async def quote_event_generator():
                         if bars:
                             last_intraday_ts[sym] = max(b["time"] for b in bars)
 
-            # Adapt interval based on market state: fast while any session runs,
-            # medium in extended hours, slow when everything is closed.
-            if any(state_info(s).phase == "open" for s in market_states):
-                interval = 15
-            elif any_active(market_states):
-                interval = 60
-            else:
-                interval = 300
-
-            await asyncio.sleep(interval)
+            await asyncio.sleep(_poll_interval(market_states, symbols))
 
         except asyncio.CancelledError:
             break

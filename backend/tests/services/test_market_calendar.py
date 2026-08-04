@@ -195,3 +195,21 @@ def test_any_venue_open_fails_open_on_unknown_venue():
     """An unresolvable symbol must never let the gate block real work."""
     assert any_venue_open(["FOO.XX"], _utc(2024, 4, 6, 12, 0)) is True
     assert any_venue_open([], _utc(2024, 4, 6, 12, 0)) is False
+
+
+def test_schedule_poll_hint_phases_and_next_open():
+    from app.services.market_calendar import schedule_poll_hint
+
+    # Wednesday 15:00 UTC: XNYS session running.
+    phase, _ = schedule_poll_hint(["AAPL", "IWDA.AS"], _utc(2024, 4, 3, 15, 0))
+    assert phase == "open"
+    # Saturday: everything closed; next open is Monday, far away.
+    phase, secs = schedule_poll_hint(["AAPL"], _utc(2024, 4, 6, 12, 0))
+    assert phase == "closed"
+    assert secs is not None and secs > 3600
+    # Two minutes before the Amsterdam bell: closed, but the bell is near.
+    phase, secs = schedule_poll_hint(["IWDA.AS"], _utc(2024, 4, 8, 6, 58))
+    assert phase == "closed"
+    assert secs is not None and 0 < secs <= 130
+    # Unresolvable symbols contribute nothing (no fail-open here).
+    assert schedule_poll_hint(["FOO.XX"], _utc(2024, 4, 6, 12, 0)) == ("closed", None)
