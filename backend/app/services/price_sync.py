@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Asset
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
+from app.services.market_state import is_session_forming
 from app.services.price_providers import PriceProvider, get_price_provider
 
 logger = logging.getLogger(__name__)
@@ -19,11 +20,11 @@ logger = logging.getLogger(__name__)
 # with ``SESSION_MATCH_TOL`` in ``frontend/src/lib/indicator-registry.ts``.
 SESSION_MATCH_TOL = 0.005  # 0.5%
 
-# Market states in which the current session's daily bar is still forming, so
-# the trailing bar Yahoo returns is a live partial regardless of whether it
-# momentarily matches the live price. Other states (PRE/PREPRE before the open,
-# POST/POSTPOST/CLOSED after it) leave a settled daily bar we reconcile instead.
-_ACTIVE_SESSION_STATES = frozenset({"REGULAR"})
+# "Is the current session's daily bar still forming?" now comes from the
+# shared market-state trait table (is_session_forming): in REGULAR the trailing
+# bar Yahoo returns is a live partial regardless of whether it momentarily
+# matches the live price; every other state (PRE/PREPRE before the open,
+# POST/POSTPOST/CLOSED after it) leaves a settled daily bar we reconcile.
 
 
 def _reconciles(a: float | None, b: float | None, tol: float = SESSION_MATCH_TOL) -> bool:
@@ -94,7 +95,7 @@ def drop_unsettled_last_bar(
 
     # An open session's bar is always a live partial — drop it even though it
     # matches the live price right now, because it will drift as trading goes on.
-    if market_state in _ACTIVE_SESSION_STATES:
+    if is_session_forming(market_state):
         logger.debug(
             "%s: dropping trailing %s bar (session open; close=%s, live=%s)",
             symbol or "?", df.index[-1], last_close, price,

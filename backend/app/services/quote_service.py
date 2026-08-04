@@ -8,6 +8,7 @@ import time as _time
 from app.database import async_session
 from app.repositories.asset_repo import AssetRepository
 from app.services.intraday import get_intraday_bars
+from app.services.market_state import any_active, state_info
 from app.services.price_providers import get_price_provider
 
 logger = logging.getLogger(__name__)
@@ -93,8 +94,7 @@ async def quote_event_generator():
             last_payload = full_payload
 
             # Push intraday bars (full on first push, delta after)
-            active_states = {"REGULAR", "PRE", "POST", "PREPRE", "POSTPOST"}
-            has_active_market = bool(market_states & active_states)
+            has_active_market = any_active(market_states)
 
             # Always push intraday on first iteration or when markets are active
             if has_active_market or not last_intraday_ts:
@@ -122,10 +122,11 @@ async def quote_event_generator():
                         if bars:
                             last_intraday_ts[sym] = max(b["time"] for b in bars)
 
-            # Adapt interval based on market state
-            if "REGULAR" in market_states:
+            # Adapt interval based on market state: fast while any session runs,
+            # medium in extended hours, slow when everything is closed.
+            if any(state_info(s).phase == "open" for s in market_states):
                 interval = 15
-            elif market_states & {"PRE", "POST", "PREPRE", "POSTPOST"}:
+            elif any_active(market_states):
                 interval = 60
             else:
                 interval = 300

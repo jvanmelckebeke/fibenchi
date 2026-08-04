@@ -8,18 +8,25 @@ export interface MarketStateInfo {
   dotColor: string
   /** Human-readable label. */
   label: string
+  /**
+   * Scheduled-phase equivalent — same vocabulary as the backend venue
+   * calendar's phase(). "closed" means prices are settled: POSTPOST is
+   * "after-hours has *ended*", so it is closed here even though its label
+   * still reads After-hours ("POSTMARKET" is not a thing Yahoo emits).
+   */
+  phase: "premarket" | "open" | "aftermarket" | "closed"
 }
 
 const MARKET_STATES: Record<string, MarketStateInfo> = {
-  PRE: { dotColor: "bg-blue-500", label: "Pre-market" },
-  PREPRE: { dotColor: "bg-blue-500", label: "Pre-market" },
-  REGULAR: { dotColor: "bg-emerald-500", label: "Market open" },
-  POST: { dotColor: "bg-orange-500", label: "After-hours" },
-  POSTPOST: { dotColor: "bg-orange-500", label: "After-hours" },
-  CLOSED: { dotColor: "bg-red-500", label: "Closed" },
+  PRE: { dotColor: "bg-blue-500", label: "Pre-market", phase: "premarket" },
+  PREPRE: { dotColor: "bg-blue-500", label: "Pre-market", phase: "premarket" },
+  REGULAR: { dotColor: "bg-emerald-500", label: "Market open", phase: "open" },
+  POST: { dotColor: "bg-orange-500", label: "After-hours", phase: "aftermarket" },
+  POSTPOST: { dotColor: "bg-orange-500", label: "After-hours", phase: "closed" },
+  CLOSED: { dotColor: "bg-red-500", label: "Closed", phase: "closed" },
 }
 
-const DEFAULT_STATE: MarketStateInfo = { dotColor: "bg-red-500", label: "Closed" }
+const DEFAULT_STATE: MarketStateInfo = { dotColor: "bg-red-500", label: "Closed", phase: "closed" }
 
 /** Resolve a raw market-state code to its dot colour + label (falls back to Closed). */
 export function marketState(state: string | null | undefined): MarketStateInfo {
