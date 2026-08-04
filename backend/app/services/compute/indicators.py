@@ -128,7 +128,7 @@ def session_gap_days(index: pd.Index, session_dates: set[date] | None = None) ->
     return gaps
 
 
-def _ewma_daily_vol(closes: pd.Series, lam: float) -> pd.Series:
+def _ewma_daily_vol(closes: pd.Series, lam: float, gaps: pd.Series | None = None) -> pd.Series:
     """Forward EWMA volatility forecast (RiskMetrics zero-mean).
 
     Returns the sqrt of the EWMA variance built from returns *through each bar*
@@ -137,10 +137,20 @@ def _ewma_daily_vol(closes: pd.Series, lam: float) -> pd.Series:
     counterpart of the ``sigma_forecast`` inside :func:`volatility_normalized_return`;
     the value at the last bar is the forecast for the in-progress day, which the
     live snapshot uses to score today's move before its bar is written.
+
+    ``gaps`` (a :func:`session_gap_days` series) excludes gap-spanning returns
+    from the variance: a return across an N-session hole is √N-inflated, and
+    squaring it into the EWMA (λ=0.94 → ~11-day half-life) would overstate σ
+    for weeks after the gap — *understating* every subsequent σ-move. Dropped
+    (not zeroed) returns leave the variance carried across the gap; with
+    ``ignore_na=False`` the skipped position still ages the older observations,
+    approximating one extra decay step for the missing stretch.
     """
     returns = closes.pct_change()
+    if gaps is not None:
+        returns = returns.where(~(gaps > 1))
     # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
-    ewma_var = (returns**2).ewm(alpha=1 - lam, adjust=False).mean()
+    ewma_var = (returns**2).ewm(alpha=1 - lam, adjust=False, ignore_na=False).mean()
     return np.sqrt(ewma_var).replace(0, float("nan"))
 
 
@@ -174,11 +184,13 @@ def volatility_normalized_return(
     case exchange holidays trip the guard too and conservatively blank the
     bar after a holiday.
     """
-    returns = closes.pct_change()
-    # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
-    sigma_forecast = _ewma_daily_vol(closes, lam).shift(1)
     if gaps is None:
         gaps = session_gap_days(closes.index)
+    returns = closes.pct_change()
+    # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
+    # The forecast gets the same gap series so gap-spanning returns can't
+    # contaminate the denominator either (they would understate later σ-moves).
+    sigma_forecast = _ewma_daily_vol(closes, lam, gaps).shift(1)
     return (returns / sigma_forecast).where(~(gaps > 1))
 
 
@@ -381,20 +393,6 @@ def _cmf_snapshot_derived(row: pd.Series) -> dict:
     return {"cmf_signal": None}
 
 
-def _vnr_post_compute(result: pd.DataFrame) -> None:
-    """Attach the forward EWMA vol forecast used to score an in-progress day.
-
-    ``vnr`` itself normalizes the *last completed* bar's return; ``vnr_sigma`` is
-    the vol (a return fraction) to divide a live intraday return by so the UI can
-    show today's σ-move before today's bar has been written to the DB. Flat
-    stretches yield NaN, which ``build_indicator_snapshot`` renders as None.
-
-    ``vnr_gap_sessions`` (the companion field flagging gap-suppressed bars) is
-    set by :func:`compute_indicators`, which owns the gap series.
-    """
-    result["vnr_sigma"] = _ewma_daily_vol(result["close"], VNR_LAMBDA)
-
-
 def _rvol_snapshot_derived(row: pd.Series) -> dict:
     """Derive a qualitative relative-volume state from the latest row."""
     val = row.get("rvol")
@@ -562,10 +560,11 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
     "vnr": IndicatorDef(
         func=volatility_normalized_return,
         params={"lam": VNR_LAMBDA},
+        # vnr_sigma and vnr_gap_sessions are gap-aware companions set directly
+        # by compute_indicators, which owns the session-gap series.
         output_fields=["vnr", "vnr_sigma", "vnr_gap_sessions"],
         decimals=2,
         warmup_periods=60,
-        post_compute=_vnr_post_compute,
         field_decimals={"vnr_sigma": 6, "vnr_gap_sessions": 0},
         needs_gaps=True,
     ),
@@ -602,7 +601,12 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     prev_close = indicators.iloc[-2]["close"]
 
     change_pct = None
-    if prev_close and prev_close != 0:
+    # A gap-flagged latest bar means the previous *row* is not the previous
+    # *session* — the difference would be a multi-session move mislabelled as
+    # a 1-day change (schema documents change_pct as daily). Leave it None,
+    # matching the suppressed σ-Move beside it.
+    latest_is_gap = pd.notna(latest.get("vnr_gap_sessions"))
+    if prev_close and prev_close != 0 and not latest_is_gap:
         change_pct = round((latest["close"] - prev_close) / prev_close * 100, 2)
 
     result: dict = {
@@ -633,19 +637,28 @@ def _get_delta_fields() -> list[str]:
     return delta_fields
 
 
-def _compute_deltas(result: pd.DataFrame, window: int = 20) -> None:
+def _compute_deltas(result: pd.DataFrame, window: int = 20, gaps: pd.Series | None = None) -> None:
     """Add daily deltas and outlier sigma flags for selected indicator fields.
 
     For each target field:
       - {field}_delta = day-over-day difference
       - {field}_delta_sigma = |Δ| expressed in rolling σ units, only when
         the absolute delta exceeds mean + 2σ of the rolling window (else NaN).
+
+    ``gaps`` (a :func:`session_gap_days` series) blanks the delta on bars whose
+    previous stored bar is more than one session back — ``diff()`` there is a
+    multi-session move, which would both earn a fake outlier badge and inflate
+    the rolling σ baseline (suppressing genuine outliers for the next
+    ``window`` bars). The NaN also makes the rolling stats undersized for the
+    affected windows (``min_periods=window``), so no flag fires on bad data.
     """
     for field_name in _get_delta_fields():
         if field_name not in result.columns:
             continue
         series = result[field_name]
         delta = series.diff()
+        if gaps is not None:
+            delta = delta.where(~(gaps > 1))
         result[f"{field_name}_delta"] = delta
 
         abs_delta = delta.abs()
@@ -698,11 +711,15 @@ def compute_indicators(
         if defn.post_compute:
             defn.post_compute(result)
 
-    # Flag the bars the σ-Move gap guard suppressed with the gap width, so the
-    # UI can explain the blank (NaN everywhere else → None in responses).
+    # σ-Move companions, both gap-aware. vnr_sigma is the forward vol forecast
+    # the UI divides a live intraday return by (see _ewma_daily_vol — the gap
+    # series keeps hole-spanning returns out of the variance). vnr_gap_sessions
+    # flags the bars the gap guard suppressed with the gap width, so the UI can
+    # explain the blank (NaN everywhere else → None in responses).
+    result["vnr_sigma"] = _ewma_daily_vol(closes, VNR_LAMBDA, gap_series)
     result["vnr_gap_sessions"] = gap_series.where(gap_series > 1)
 
-    _compute_deltas(result)
+    _compute_deltas(result, gaps=gap_series)
 
     return result
 
