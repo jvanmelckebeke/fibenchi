@@ -50,3 +50,35 @@ describe("computeMovementStats — max daily gain/loss sign guards", () => {
     expect(stats.downDays).toBe(0)
   })
 })
+
+describe("computeMovementStats — gap awareness (issue #559)", () => {
+  it("excludes a multi-session step from daily extremes and counts", () => {
+    // Fri 2026-07-31 -> Tue 2026-08-04 with Mon 2026-08-03 missing: the +2.75%
+    // step spans two sessions and must not be filed as the max daily gain.
+    const prices: Price[] = [
+      { date: "2026-07-29", open: 0, high: 0, low: 0, close: 124.33, volume: 1 },
+      { date: "2026-07-30", open: 0, high: 0, low: 0, close: 123.69, volume: 1 },
+      { date: "2026-07-31", open: 0, high: 0, low: 0, close: 124.23, volume: 1 },
+      { date: "2026-08-04", open: 0, high: 0, low: 0, close: 127.65, volume: 1 },
+    ]
+    const stats = computeMovementStats(prices)!
+    // The only single-session up-move is Jul 30 -> Jul 31 (+0.44%).
+    expect(stats.maxDailyGain!.date).toBe("2026-07-31")
+    expect(stats.maxDailyGain!.pct).toBeCloseTo(0.437, 2)
+    expect(stats.upDays).toBe(1)
+    expect(stats.downDays).toBe(1)
+    expect(stats.tradingDays).toBe(2)
+    // Path metrics still use the full window, gap included.
+    expect(stats.periodReturnPct).toBeCloseTo((127.65 / 124.33 - 1) * 100, 4)
+  })
+
+  it("treats a weekend step as a single session", () => {
+    const prices: Price[] = [
+      { date: "2026-07-31", open: 0, high: 0, low: 0, close: 100, volume: 1 }, // Fri
+      { date: "2026-08-03", open: 0, high: 0, low: 0, close: 105, volume: 1 }, // Mon
+    ]
+    const stats = computeMovementStats(prices)!
+    expect(stats.maxDailyGain!.pct).toBeCloseTo(5, 5)
+    expect(stats.tradingDays).toBe(1)
+  })
+})

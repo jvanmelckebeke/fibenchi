@@ -294,6 +294,12 @@ export const TableRow = memo(function TableRow({
             // it. Blank the cell rather than render a wrong-signed number.
             const vnrStale = field === "vnr" && liveVnr == null
               && isStoredVnrStale(quote, indicator?.close)
+            // The backend NaN's the stored σ-Move when the bar's return spans a
+            // gap in price_history (missing session or holiday) and reports the
+            // gap width instead — explain the blank rather than leave it mute.
+            const vnrGap = field === "vnr" && liveVnr == null
+              ? getNumericValue(indicator?.values, "vnr_gap_sessions")
+              : null
             const values = liveVnr != null
               ? { ...indicator?.values, vnr: liveVnr }
               : indicator?.values
@@ -316,7 +322,13 @@ export const TableRow = memo(function TableRow({
                 ) : (
                   <span
                     className="text-muted-foreground"
-                    title={vnrStale ? "σ-Move unavailable — price data is behind the live quote" : undefined}
+                    title={
+                      vnrStale
+                        ? "σ-Move unavailable — price data is behind the live quote"
+                        : vnrGap != null
+                          ? `σ-Move unavailable — the last return spans ${vnrGap} business days (missing session or market holiday in stored data)`
+                          : undefined
+                    }
                   >
                     &mdash;
                   </span>
