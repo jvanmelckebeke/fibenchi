@@ -7,9 +7,9 @@ import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import AssetRef
+from app.domain.market_state import is_session_forming
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
-from app.services.market_state import is_session_forming
 from app.services.price_providers import PriceProvider, get_price_provider
 
 logger = logging.getLogger(__name__)

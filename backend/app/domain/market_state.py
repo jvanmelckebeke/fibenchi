@@ -8,7 +8,7 @@ count as "active" with its own inline set — six sites, five different
 predicates. All predicates now come from here.
 
 ``phase`` speaks the same vocabulary as ``Venue.phase()``
-(``app/services/market_calendar.py``), so a consumer can fall back from the
+(``app/services/market_calendar``), so a consumer can fall back from the
 live per-symbol state to the venue's scheduled phase with no translation:
 the live feed is the authority (it knows about halts), the schedule is the
 backstop when the feed is absent.

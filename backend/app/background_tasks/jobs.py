@@ -11,13 +11,13 @@ import logging
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from app.background_tasks.price_heal import heal_interior_holes, heal_unreconciled_prices
 from app.background_tasks.registry import background_task
 from app.config import settings as app_settings
 from app.database import async_session
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
 from app.services.market_calendar import any_venue_open
-from app.services.price_heal import heal_interior_holes, heal_unreconciled_prices
 from app.services.price_sync import sync_all_prices
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
