@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -9,7 +9,12 @@ from app.database import Base
 class IntradayPrice(Base):
     __tablename__ = "intraday_prices"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    # BIGINT: the upsert burns a sequence value per attempted row (conflicts
+    # included), ~20M/day — int32 ran out after ~3 months (migration 0018).
+    # SQLite (tests) keeps INTEGER for rowid autoincrement.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"))
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     price: Mapped[float] = mapped_column(Numeric(12, 4, asdecimal=False))
