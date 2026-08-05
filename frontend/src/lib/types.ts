@@ -339,6 +339,8 @@ export interface DataHealth {
   total_missing_sessions: number
   /** Scheduled session bars in the scan window — completeness denominator */
   expected_session_bars: number
+  /** Symbols the coverage scan can check — affected-count denominator */
+  covered_symbols: number
   next_scan_in_seconds: number
   heals_per_scan: number
   scan_window_days: number
