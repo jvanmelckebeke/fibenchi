@@ -41,6 +41,17 @@ from app.services.price_providers import init_price_provider
 from app.services.price_sync import sync_all_prices
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
 
+# App loggers write through the root logger, which neither uvicorn nor docker
+# configures — so every logger.info() (price heal, hole heal, refresh
+# summaries, dropped-bar notices) was silently discarded and only WARNING+
+# reached `docker logs`. That cost real diagnostic time in the 2026-08-05
+# incident. basicConfig is a no-op when handlers already exist (pytest, etc.),
+# and uvicorn's own loggers don't propagate to root, so nothing is duplicated.
+logging.basicConfig(
+    level=getattr(logging, app_settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 
