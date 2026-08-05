@@ -92,6 +92,7 @@ export function HoldingRow({
                     values={indicator?.values}
                     close={indicator?.close ?? null}
                     suffix={desc.suffix}
+                    decimals={desc.decimals}
                   />
                 </td>
               )

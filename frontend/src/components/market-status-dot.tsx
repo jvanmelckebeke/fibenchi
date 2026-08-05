@@ -4,13 +4,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { marketState } from "@/lib/market-state"
+import { marketState, type MarketState } from "@/lib/market-state"
 
 export function MarketStatusDot({
   marketState: state,
   className,
 }: {
-  marketState: string | null | undefined
+  marketState: MarketState | null | undefined
   className?: string
 }) {
   const { dotColor, label } = marketState(state)

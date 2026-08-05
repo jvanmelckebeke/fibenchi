@@ -8,6 +8,7 @@ export function HoldingSummaryCell({
   values,
   close,
   suffix,
+  decimals,
 }: {
   format: "numeric" | "compare_close" | "string_map"
   field: string
@@ -15,10 +16,11 @@ export function HoldingSummaryCell({
   values?: Record<string, number | string | null>
   close: number | null
   suffix?: string
+  decimals?: number
 }) {
   if (format === "numeric") {
     const val = getNumericValue(values, field)
-    return <IndicatorCell value={val != null ? `${val.toFixed(0)}${suffix ?? ""}` : null} />
+    return <IndicatorCell value={val != null ? `${val.toFixed(decimals ?? 0)}${suffix ?? ""}` : null} />
   }
 
   if (format === "compare_close") {
