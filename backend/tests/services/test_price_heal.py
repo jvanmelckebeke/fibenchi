@@ -193,9 +193,11 @@ from app.services.price_heal import find_interior_holes, heal_interior_holes  # 
 def _reset_hole_state():
     price_heal._hole_attempts.clear()
     price_heal._last_hole_scan = None
+    price_heal._hole_backlog = False
     yield
     price_heal._hole_attempts.clear()
     price_heal._last_hole_scan = None
+    price_heal._hole_backlog = False
 
 
 def test_find_interior_holes_strictly_inside():
@@ -212,12 +214,16 @@ def test_find_interior_holes_empty_inputs():
     assert find_interior_holes({date(2026, 8, 3)}, set()) == set()
 
 
-async def _seed_with_hole(db, symbol="AAPL"):
-    """Seed a US asset and delete one real mid-window session's bar."""
+async def _seed_with_hole(db, symbol="AAPL", frac=0.5):
+    """Seed a US asset and delete one real interior session's bar.
+
+    ``frac`` places the hole within the stored range (0 = oldest end,
+    1 = newest end); always strictly interior.
+    """
     asset = await seed_asset_with_prices(db, symbol, n_days=60)
     stored = {p.date for p in await PriceRepository(db).list_by_asset(asset.id)}
     sessions = sorted(AssetRef(symbol).venue.session_dates(min(stored), max(stored)))
-    hole = sessions[len(sessions) // 2]
+    hole = sessions[max(1, min(len(sessions) - 2, int(len(sessions) * frac)))]
     await db.execute(delete(PriceHistory).where(
         PriceHistory.asset_id == asset.id, PriceHistory.date == hole,
     ))
@@ -295,6 +301,52 @@ async def test_hole_heal_failure_does_not_abort_batch(db):
     assert healed.get("BBBB") == 1
     # The failed symbol still lands on cooldown so it isn't retried every scan.
     assert "AAAA" in price_heal._hole_attempts
+
+
+async def test_hole_heal_prioritizes_newest_holes(db):
+    """When the per-scan cap forces a choice, the symbol whose hole is most
+    recent goes first — a hole at yesterday's session blanks σ-Move *today*,
+    an old interior hole only dents historical charts."""
+    await _seed_with_hole(db, "OLDH", frac=0.2)
+    await _seed_with_hole(db, "NEWH", frac=0.8)
+    with (
+        patch.object(price_heal, "MAX_HOLE_HEALS_PER_SCAN", 1),
+        patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync,
+    ):
+        sync.return_value = 1
+        healed = await heal_interior_holes(db, force=True)
+    assert list(healed) == ["NEWH"]
+    assert price_heal._hole_backlog is True
+
+
+async def test_hole_heal_backlog_rescans_sooner(db):
+    """A capped scan leaves unattempted symbols; the next scan then runs after
+    the short backlog interval instead of the full one, and the backlog flag
+    clears once nothing is deferred (2026-08-05: a feed-wide NaN session hit
+    dozens of symbols at once — at the old fixed 6h cadence the tail waited
+    days)."""
+    await _seed_with_hole(db, "AAAA")
+    await _seed_with_hole(db, "BBBB")
+    with (
+        patch.object(price_heal, "MAX_HOLE_HEALS_PER_SCAN", 1),
+        patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync,
+    ):
+        sync.return_value = 1
+        first = await heal_interior_holes(db)
+        assert len(first) == 1
+        assert price_heal._hole_backlog is True
+
+        # Immediately after: still throttled, even in backlog mode.
+        assert await heal_interior_holes(db) == {}
+
+        # Past the backlog interval (but far inside the normal 6h one): the
+        # deferred symbol is attempted. The first symbol sits on the retry
+        # cooldown (its mocked "heal" filled nothing), so it doesn't recount.
+        price_heal._last_hole_scan -= price_heal.HOLE_BACKLOG_RESCAN_SECONDS + 1
+        second = await heal_interior_holes(db)
+        assert len(second) == 1
+        assert set(first) != set(second)
+        assert price_heal._hole_backlog is False
 
 
 async def test_hole_heal_skips_unknown_venue(db):
