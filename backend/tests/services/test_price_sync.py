@@ -102,6 +102,73 @@ async def test_sync_range_passes_dates(db):
     assert count == 5
 
 
+async def test_sync_range_past_skips_quote_roundtrip(db):
+    """A purely historical range contains only settled bars — no anchor fetch."""
+    asset = Asset(symbol="RNG", name="Range", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+
+    mock_prov = _mock_provider()
+    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
+         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
+        await sync_asset_prices_range(db, asset, date(2025, 1, 1), date(2025, 6, 30))
+
+    mock_prov.batch_fetch_quotes.assert_not_awaited()
+
+
+async def test_sync_range_to_today_drops_unsettled_bar(db):
+    """A range reaching today goes through the same drop guard as period syncs.
+
+    Regression for the σ-Move blanking incident: a 1y detail-view backfill
+    during EU market hours stored the live partial bar raw, which then drifted
+    from the quote and blanked σ-Move for every affected symbol.
+    """
+    asset = Asset(symbol="MT.AS", name="ArcelorMittal", type=AssetType.STOCK, currency="EUR")
+    db.add(asset)
+    await db.flush()
+
+    # Last close is today's live partial; its predecessor equals previous_close.
+    df = _df_from_closes([60.0, 64.44, 63.10])
+    quotes = [{"symbol": "MT.AS", "price": 64.28, "previous_close": 64.44,
+               "market_state": "REGULAR"}]
+    mock_prov = _mock_provider(fetch_history=df, batch_fetch_quotes=quotes)
+
+    captured = {}
+
+    async def _capture(*args):
+        captured["len"] = len(args[-1])
+        return len(args[-1])
+
+    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
+         patch("app.services.price_sync._upsert_prices", side_effect=_capture):
+        await sync_asset_prices_range(db, asset, date(2026, 1, 1), date.today())
+
+    assert captured["len"] == 2  # partial dropped
+    mock_prov.batch_fetch_quotes.assert_awaited_once()
+
+
+async def test_sync_range_to_today_without_quote_stores_all(db):
+    """Anchor unavailable → degrade to storing every bar (prior behavior)."""
+    asset = Asset(symbol="MT.AS", name="ArcelorMittal", type=AssetType.STOCK, currency="EUR")
+    db.add(asset)
+    await db.flush()
+
+    df = _df_from_closes([60.0, 64.44, 63.10])
+    mock_prov = _mock_provider(fetch_history=df, batch_fetch_quotes=[])
+
+    captured = {}
+
+    async def _capture(*args):
+        captured["len"] = len(args[-1])
+        return len(args[-1])
+
+    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
+         patch("app.services.price_sync._upsert_prices", side_effect=_capture):
+        await sync_asset_prices_range(db, asset, date(2026, 1, 1), date.today())
+
+    assert captured["len"] == 3
+
+
 # --- _upsert_prices ---
 
 async def test_upsert_empty_dataframe(db):
