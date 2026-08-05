@@ -3,15 +3,30 @@ import datetime
 from pydantic import BaseModel, Field
 
 
-class PriceResponse(BaseModel):
-    date: datetime.date = Field(description="Trading date")
+class OHLCV(BaseModel):
+    """One bar of open/high/low/close/volume."""
+
     open: float = Field(description="Opening price")
     high: float = Field(description="Highest price of the day")
     low: float = Field(description="Lowest price of the day")
     close: float = Field(description="Closing price")
     volume: int = Field(description="Trading volume")
 
+
+class DatedOHLCV(OHLCV):
+    """An OHLCV bar bound to its trading date.
+
+    Validates from anything bar-shaped (``PriceHistory`` ORM rows,
+    ``PriceResponse`` models) via ``from_attributes``.
+    """
+
+    date: datetime.date = Field(description="Trading date")
+
     model_config = {"from_attributes": True}
+
+
+class PriceResponse(DatedOHLCV):
+    """A daily price bar as served by the price endpoints."""
 
 
 class IndicatorResponse(BaseModel):
