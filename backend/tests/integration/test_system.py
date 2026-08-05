@@ -29,6 +29,7 @@ async def test_data_health_clean(client, db):
     data = resp.json()
     assert data["hole_symbols"] == []
     assert data["total_missing_sessions"] == 0
+    assert data["covered_symbols"] == 1
     assert data["next_scan_in_seconds"] == 0  # never scanned yet
     assert data["heals_per_scan"] == price_heal.MAX_HOLE_HEALS_PER_SCAN
 

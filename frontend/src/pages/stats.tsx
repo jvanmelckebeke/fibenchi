@@ -91,10 +91,9 @@ function StatTile({ label, value, detail }: { label: string; value: ReactNode; d
 }
 
 /**
- * Session-bar completeness donut + self-heal status. The percentage is
- * stored-vs-scheduled session bars over the heal's scan window; symbols
- * listed under it show a blank σ-Move until the background heal repairs
- * them.
+ * Ticker-health donut + self-heal status: of the tickers the coverage scan
+ * can check, how many currently have missing session bars (and therefore a
+ * blank σ-Move). Bar-level completeness stays as a secondary line.
  */
 function DataQualityCard() {
   const { data, isPending, isError } = useDataHealth()
@@ -112,12 +111,12 @@ function DataQualityCard() {
     )
   }
 
-  const expected = data.expected_session_bars
+  const covered = data.covered_symbols
+  const affected = data.hole_symbols.length
   const missing = data.total_missing_sessions
-  const pct = expected > 0 ? ((expected - missing) / expected) * 100 : 100
-  // Never show a rounded "100%" while bars are missing.
-  const pctLabel = missing > 0 ? Math.min(pct, 99.9).toFixed(1) : "100"
-  const healthy = missing === 0
+  const expected = data.expected_session_bars
+  const pct = covered > 0 ? ((covered - affected) / covered) * 100 : 100
+  const healthy = affected === 0
 
   return (
     <Card>
@@ -129,33 +128,36 @@ function DataQualityCard() {
           className="relative h-36 w-36 shrink-0 rounded-full"
           style={{
             background: `conic-gradient(${healthy ? "#10b981" : "#f97316"} ${pct}%, ${
-              healthy ? "#10b981" : "rgba(249, 115, 22, 0.2)"
+              healthy ? "#10b981" : "rgba(249, 115, 22, 0.25)"
             } 0)`,
           }}
           role="img"
-          aria-label={`${pctLabel}% of expected session bars present`}
+          aria-label={`${covered - affected} of ${covered} tickers healthy`}
         >
           <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-card">
-            <span className="text-2xl font-bold tabular-nums">{pctLabel}%</span>
-            <span className="text-xs text-muted-foreground">complete</span>
+            <span className="text-2xl font-bold tabular-nums">
+              {num(covered - affected)}/{num(covered)}
+            </span>
+            <span className="text-xs text-muted-foreground">tickers healthy</span>
           </div>
         </div>
 
         <div className="space-y-2 text-sm">
           {healthy ? (
             <p>
-              All {num(expected)} expected session bars of the last {data.scan_window_days} days
-              are present. Nothing to heal.
+              All {num(covered)} tickers have their full {num(expected)} expected session bars
+              for the last {data.scan_window_days} days. Nothing to heal.
             </p>
           ) : (
             <>
               <p>
-                {num(expected - missing)} of {num(expected)} expected session bars present —{" "}
                 <span className="font-medium">
-                  {missing} missing across {data.hole_symbols.length}{" "}
-                  {data.hole_symbols.length === 1 ? "symbol" : "symbols"}
-                </span>
-                . Their σ-Move shows "—" until repaired.
+                  {affected} of {num(covered)} tickers {affected === 1 ? "is" : "are"} missing
+                  data
+                </span>{" "}
+                — {missing} session {missing === 1 ? "bar" : "bars"} in total (
+                {num(expected - missing)} of {num(expected)} expected bars present). Their
+                σ-Move shows "—" until repaired.
               </p>
               <p className="text-muted-foreground">
                 Self-heals automatically: next scan {formatEta(data.next_scan_in_seconds)}, up to{" "}

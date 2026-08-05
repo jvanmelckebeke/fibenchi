@@ -126,6 +126,7 @@ async def collect_data_health(db: AsyncSession) -> DataHealthResponse:
         ],
         total_missing_sessions=sum(len(holes) for _, holes in with_holes),
         expected_session_bars=sum(n for _, n, _ in coverage),
+        covered_symbols=len(coverage),
         next_scan_in_seconds=next_hole_scan_in_seconds(),
         heals_per_scan=MAX_HOLE_HEALS_PER_SCAN,
         scan_window_days=HOLE_SCAN_WINDOW_DAYS,

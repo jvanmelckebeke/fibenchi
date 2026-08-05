@@ -25,6 +25,10 @@ class DataHealthResponse(BaseModel):
         description="Scheduled session bars in the scan window across all covered symbols "
         "(denominator for a completeness percentage)"
     )
+    covered_symbols: int = Field(
+        description="Symbols the coverage scan can check (grouped, with a resolvable venue "
+        "calendar) — denominator for the affected-symbol count"
+    )
     next_scan_in_seconds: int = Field(
         description="Approximate seconds until the next self-heal scan is eligible to run"
     )
