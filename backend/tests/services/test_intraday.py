@@ -1,6 +1,6 @@
 """Tests for intraday price fetching and session classification."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -161,6 +161,29 @@ class TestClientIntraday:
 
     async def test_empty_symbols_returns_empty(self):
         assert await yahoo_client.intraday([]) == {}
+
+    async def test_omitted_symbol_is_padded_not_keyerror(self):
+        """#593: a symbol absent from Yahoo's chart response is padded with an
+        empty payload before frame-building, so one omission can't abort the
+        whole batch (staging 2026-08-05: KeyError '2914.T' killed a full
+        82-symbol intraday sync)."""
+        ts_list = [datetime(2026, 2, 25, 15, 0, tzinfo=timezone.utc)]
+        hist = _make_hist_df("AAPL", ts_list, [100.0])
+
+        mock_ticker = MagicMock()
+        mock_ticker.price = {"AAPL": {"currency": "USD",
+                                      "exchangeTimezoneName": "America/New_York"}}
+        # Raw chart response contains AAPL but omits 2914.T entirely.
+        mock_ticker._get_data.return_value = {"AAPL": {"timestamp": [1]}}
+        mock_ticker._historical_data_to_dataframe.return_value = hist
+
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            result = await yahoo_client.intraday(["AAPL", "2914.T"])
+
+        assert "AAPL" in result
+        assert "2914.T" not in result
+        padded = mock_ticker._historical_data_to_dataframe.call_args[0][0]
+        assert padded["2914.T"] == {}
 
     async def test_applies_currency_divisor(self):
         """Subunit currencies (e.g. GBp) should divide prices."""

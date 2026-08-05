@@ -190,6 +190,23 @@ class TestPeriodMap:
         assert PERIOD_MAP["1w"] == "5d"
 
 
+def _batch_ticker(symbols, df, quotes=None, data=None):
+    """Mock Ticker for the batch path: raw chart response + built frame.
+
+    ``batch_history`` calls the chart endpoint directly and builds the frame
+    via ``padded_history_frame`` (#593), so the mock provides ``_get_data``
+    (the raw per-symbol response — key presence is what padding checks) and
+    ``_historical_data_to_dataframe`` (the resulting frame).
+    """
+    ticker = MagicMock()
+    ticker._get_data.return_value = (
+        data if data is not None else {s: {"timestamp": [1]} for s in symbols}
+    )
+    ticker._historical_data_to_dataframe.return_value = df
+    ticker.quotes = quotes or {}
+    return ticker
+
+
 class TestBatchHistory:
     @patch("app.services.yahoo.client.Ticker")
     async def test_empty_symbols_returns_empty(self, mock_ticker_cls):
@@ -197,32 +214,26 @@ class TestBatchHistory:
 
     @patch("app.services.yahoo.client.Ticker")
     async def test_empty_history_returns_empty(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.history.return_value = pd.DataFrame()
-        ticker.quotes = {}
-        mock_ticker_cls.return_value = ticker
+        mock_ticker_cls.return_value = _batch_ticker(["AAPL"], pd.DataFrame())
 
         assert await yahoo_client.batch_history(["AAPL"]) == {}
 
     @patch("app.services.yahoo.client.Ticker")
-    async def test_dict_history_returns_empty(self, mock_ticker_cls):
-        ticker = MagicMock()
-        ticker.history.return_value = {"error": "no data"}
-        ticker.quotes = {}
-        mock_ticker_cls.return_value = ticker
+    async def test_error_payload_returns_empty(self, mock_ticker_cls):
+        """Per-symbol error strings build into an empty frame → {}."""
+        mock_ticker_cls.return_value = _batch_ticker(
+            ["AAPL"], pd.DataFrame(), data={"AAPL": "No data found"},
+        )
 
         assert await yahoo_client.batch_history(["AAPL"]) == {}
 
     @patch("app.services.yahoo.client.Ticker")
     async def test_returns_dataframes_per_symbol(self, mock_ticker_cls):
         df = _make_multi_index_df(["AAPL", "MSFT"], n=5)
-        ticker = MagicMock()
-        ticker.history.return_value = df
-        ticker.quotes = {
-            "AAPL": {"currency": "USD"},
-            "MSFT": {"currency": "USD"},
-        }
-        mock_ticker_cls.return_value = ticker
+        mock_ticker_cls.return_value = _batch_ticker(
+            ["AAPL", "MSFT"], df,
+            quotes={"AAPL": {"currency": "USD"}, "MSFT": {"currency": "USD"}},
+        )
 
         result = await yahoo_client.batch_history(["AAPL", "MSFT"])
         assert "AAPL" in result
@@ -237,10 +248,9 @@ class TestBatchHistory:
             {"open": [100], "high": [101], "low": [99], "close": [100.5], "volume": [1_000_000]},
             index=pd.MultiIndex.from_tuples([("AAPL", dates[0])], names=["symbol", "date"]),
         )
-        ticker = MagicMock()
-        ticker.history.return_value = df
-        ticker.quotes = {"AAPL": {"currency": "USD"}}
-        mock_ticker_cls.return_value = ticker
+        mock_ticker_cls.return_value = _batch_ticker(
+            ["AAPL"], df, quotes={"AAPL": {"currency": "USD"}},
+        )
 
         result = await yahoo_client.batch_history(["AAPL"])
         assert result == {}
@@ -256,10 +266,9 @@ class TestBatchHistory:
                 [("AAPL", d) for d in dates], names=["symbol", "date"]
             ),
         )
-        ticker = MagicMock()
-        ticker.history.return_value = df
-        ticker.quotes = {"AAPL": {"currency": "USD"}}
-        mock_ticker_cls.return_value = ticker
+        mock_ticker_cls.return_value = _batch_ticker(
+            ["AAPL", "MISSING"], df, quotes={"AAPL": {"currency": "USD"}},
+        )
 
         result = await yahoo_client.batch_history(["AAPL", "MISSING"])
         assert "AAPL" in result
@@ -277,11 +286,46 @@ class TestBatchHistory:
                 [("HSBA.L", d) for d in dates], names=["symbol", "date"]
             ),
         )
-        ticker = MagicMock()
-        ticker.history.return_value = df
-        ticker.quotes = {"HSBA.L": {"currency": "GBp"}}
-        mock_ticker_cls.return_value = ticker
+        mock_ticker_cls.return_value = _batch_ticker(
+            ["HSBA.L"], df, quotes={"HSBA.L": {"currency": "GBp"}},
+        )
 
         result = await yahoo_client.batch_history(["HSBA.L"])
         assert "HSBA.L" in result
         assert result["HSBA.L"]["close"].iloc[0] == 150.50
+
+
+class TestOmittedSymbolPadding:
+    """#593: a symbol Yahoo omits from its chart response entirely used to
+    KeyError inside yahooquery's frame builder and take the whole batch down
+    (staging 2026-08-05: 2914.T aborted an 82-symbol intraday sync; IWDA.AS
+    500'd holdings-indicators)."""
+
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_batch_pads_omitted_symbol(self, mock_ticker_cls):
+        """The omitted symbol is padded into the raw response as an empty
+        payload, so yahooquery filters it instead of KeyError-ing."""
+        df = _make_multi_index_df(["AAPL"], n=5)
+        ticker = _batch_ticker(
+            ["AAPL", "2914.T"], df,
+            quotes={"AAPL": {"currency": "USD"}},
+            data={"AAPL": {"timestamp": [1]}},  # 2914.T absent entirely
+        )
+        mock_ticker_cls.return_value = ticker
+
+        result = await yahoo_client.batch_history(["AAPL", "2914.T"])
+
+        assert "AAPL" in result
+        assert "2914.T" not in result
+        padded = ticker._historical_data_to_dataframe.call_args[0][0]
+        assert padded["2914.T"] == {}
+
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_single_history_omitted_symbol_is_no_data(self, mock_ticker_cls):
+        """A single-symbol fetch maps the KeyError to the normal no-data error."""
+        ticker = MagicMock()
+        ticker.history.side_effect = KeyError("IWDA.AS")
+        mock_ticker_cls.return_value = ticker
+
+        with pytest.raises(ValueError, match="No data found for IWDA.AS"):
+            await yahoo_client.history("IWDA.AS")

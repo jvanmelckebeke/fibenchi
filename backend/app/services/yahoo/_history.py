@@ -14,6 +14,29 @@ from app.services.yahoo.rate_limit import check_crumb
 logger = logging.getLogger(__name__)
 
 
+def padded_history_frame(ticker, data, params: dict, symbols: list[str]) -> pd.DataFrame:
+    """``Ticker._historical_data_to_dataframe`` minus the KeyError (#593).
+
+    yahooquery indexes ``data[symbol]`` for every requested symbol, so a
+    symbol Yahoo omitted *entirely* from the chart response — distinct from
+    the handled case of an error payload under the symbol's key — raises
+    KeyError and takes the whole batch down with it (staging 2026-08-05: an
+    omitted 2914.T aborted a full 82-symbol intraday sync; an omitted
+    IWDA.AS 500'd holdings-indicators). Padding the omitted symbols with an
+    empty payload makes yahooquery filter them like any other no-data
+    symbol, degrading one omission to one missing symbol.
+    """
+    if isinstance(data, dict):
+        missing = [s for s in symbols if s not in data]
+        if missing:
+            logger.warning(
+                "Yahoo chart response omitted %d/%d symbol(s): %s",
+                len(missing), len(symbols), ", ".join(sorted(missing)),
+            )
+            data = {**data, **{s: {} for s in missing}}
+    return ticker._historical_data_to_dataframe(data, params, True)
+
+
 class _HistoryMixin(_YahooBase):
     async def history(
         self,
@@ -31,11 +54,16 @@ class _HistoryMixin(_YahooBase):
         """
         def _fetch() -> pd.DataFrame:
             ticker = self._ticker(symbol)
-            if start and end:
-                df = ticker.history(start=str(start), end=str(end), interval=interval)
-            else:
-                normalized = PERIOD_MAP.get(period.lower(), period)
-                df = ticker.history(period=normalized, interval=interval)
+            try:
+                if start and end:
+                    df = ticker.history(start=str(start), end=str(end), interval=interval)
+                else:
+                    normalized = PERIOD_MAP.get(period.lower(), period)
+                    df = ticker.history(period=normalized, interval=interval)
+            except KeyError:
+                # Yahoo omitted the (only) symbol from its own chart response
+                # (#593) — for a single-symbol fetch that simply is "no data".
+                raise ValueError(f"No data found for {symbol}") from None
 
             if isinstance(df, dict):
                 # Yahoo returns a per-symbol dict on error; check for crumb
@@ -76,11 +104,16 @@ class _HistoryMixin(_YahooBase):
             # ``price`` which fans out per symbol via quoteSummary.
             price_data = ticker.quotes
             normalized = PERIOD_MAP.get(period.lower(), period)
-            hist = ticker.history(period=normalized, interval="1d")
+            # The chart endpoint is called directly (what ``ticker.history``
+            # does internally for a period fetch) so the raw response can be
+            # padded before frame-building — one symbol Yahoo omitted must
+            # degrade to that symbol missing, not a KeyError that costs the
+            # whole batch (#593).
+            params = {"range": normalized.lower(), "interval": "1d"}
+            data = ticker._get_data("chart", params)
+            check_crumb(data)
+            hist = padded_history_frame(ticker, data, params, symbols)
 
-            if isinstance(hist, dict):
-                check_crumb(hist)
-                return {}
             if hist.empty:
                 return {}
 
