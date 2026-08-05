@@ -1,5 +1,7 @@
 // TypeScript types matching backend Pydantic schemas
 
+import type { MarketState } from "./market-state"
+
 export type AssetType = "stock" | "etf" | "index"
 
 export interface TagBrief {
@@ -307,7 +309,7 @@ export interface Quote {
   volume: number | null
   avg_volume: number | null
   currency: string
-  market_state: string | null
+  market_state: MarketState | null
 }
 
 export interface IntradayPoint {
