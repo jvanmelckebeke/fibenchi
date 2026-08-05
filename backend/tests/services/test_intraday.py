@@ -1,6 +1,6 @@
 """Tests for intraday price fetching and session classification."""
 
-from datetime import datetime, time
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 
 from app.services.intraday import (
-    _EXCHANGE_HOURS,
     _classify_session,
     fetch_and_store_intraday,
 )
@@ -24,98 +23,71 @@ CPH = ZoneInfo("Europe/Copenhagen")
 
 
 class TestClassifySession:
-    """Session classification logic for pre/regular/post."""
+    """Session classification: venue schedule first, wall-clock fallback."""
 
     async def test_us_premarket(self):
         ts = datetime(2026, 2, 25, 7, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "pre"
+        assert _classify_session(ts, "AAPL") == "pre"
 
     async def test_us_regular(self):
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "regular"
+        assert _classify_session(ts, "AAPL") == "regular"
 
     async def test_us_regular_at_open(self):
         ts = datetime(2026, 2, 25, 9, 30, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "regular"
+        assert _classify_session(ts, "AAPL") == "regular"
 
     async def test_us_post_at_close(self):
         ts = datetime(2026, 2, 25, 16, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "post"
+        assert _classify_session(ts, "AAPL") == "post"
 
     async def test_us_postmarket(self):
         ts = datetime(2026, 2, 25, 18, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "post"
+        assert _classify_session(ts, "AAPL") == "post"
+
+    async def test_us_half_day_post_after_early_close(self):
+        """Day after Thanksgiving 2023: 13:00 ET close. 14:00 ET is post —
+        the old wall-clock table filed it as regular."""
+        ts = datetime(2023, 11, 24, 14, 0, tzinfo=ET)
+        assert _classify_session(ts, "AAPL") == "post"
 
     async def test_copenhagen_regular(self):
-        """NKT.CO: 10:00 CET is regular Copenhagen hours (9:00-17:00)."""
+        """NKT.CO: 10:00 CET is inside XCSE regular hours."""
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
-        assert _classify_session(ts, "Europe/Copenhagen") == "regular"
+        assert _classify_session(ts, "NKT.CO") == "regular"
 
-    async def test_copenhagen_pre(self):
-        """NKT.CO: 8:30 CET is before Copenhagen open (9:00)."""
+    async def test_copenhagen_morning_auction_files_as_pre(self):
+        """XCSE has no extended hours; an 8:30 bar is a closed-phase print
+        filed to the nearer boundary — the upcoming open."""
         ts = datetime(2026, 2, 25, 8, 30, tzinfo=CPH)
-        assert _classify_session(ts, "Europe/Copenhagen") == "pre"
+        assert _classify_session(ts, "NKT.CO") == "pre"
 
-    async def test_copenhagen_post(self):
-        ts = datetime(2026, 2, 25, 17, 0, tzinfo=CPH)
-        assert _classify_session(ts, "Europe/Copenhagen") == "post"
+    async def test_copenhagen_evening_files_as_post(self):
+        ts = datetime(2026, 2, 25, 17, 30, tzinfo=CPH)
+        assert _classify_session(ts, "NKT.CO") == "post"
 
-    async def test_copenhagen_fallback_to_et_misclassifies(self):
-        """Without timezone info, 10:00 CET falls back to ET (4:00 AM) → 'pre'.
-
-        This documents the bug that the tz_name extraction fixes.
-        """
+    async def test_unknown_venue_uses_tz_fallback(self):
+        """No venue but a bar timezone: generic local hours beat assuming ET."""
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
-        assert _classify_session(ts, None) == "pre"  # wrong! should be regular
+        assert _classify_session(ts, "FOO.XX", "Europe/Copenhagen") == "regular"
 
-    async def test_unknown_timezone_falls_back_to_et(self):
+    async def test_unknown_venue_and_tz_falls_back_to_et(self):
+        """Nothing to go on: 10:00 CET reads as 4:00 ET → 'pre'. Documents the
+        residual fallback limitation for fully unresolvable symbols."""
+        ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
+        assert _classify_session(ts, "FOO.XX", None) == "pre"
+
+    async def test_unknown_venue_bad_tz_string_falls_back_to_et(self):
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=ET)
-        assert _classify_session(ts, "Unknown/Timezone") == "regular"
+        assert _classify_session(ts, "FOO.XX", "Unknown/Timezone") == "regular"
 
     async def test_london_regular(self):
         ts = datetime(2026, 2, 25, 12, 0, tzinfo=ZoneInfo("Europe/London"))
-        assert _classify_session(ts, "Europe/London") == "regular"
+        assert _classify_session(ts, "HSBA.L") == "regular"
 
-    async def test_london_pre(self):
+    async def test_london_before_open_files_as_pre(self):
         ts = datetime(2026, 2, 25, 7, 30, tzinfo=ZoneInfo("Europe/London"))
-        assert _classify_session(ts, "Europe/London") == "pre"
-
-
-# ---------- _EXCHANGE_HOURS completeness ----------
-
-
-class TestExchangeHours:
-    """Verify key exchanges are present in the lookup."""
-
-    @pytest.mark.parametrize("tz", [
-        "Europe/Copenhagen",
-        "Europe/Oslo",
-        "Europe/Brussels",
-        "Europe/Dublin",
-        "Europe/Lisbon",
-        "Europe/Warsaw",
-        "Europe/Athens",
-        "Europe/Istanbul",
-    ])
-    async def test_newly_added_timezones_present(self, tz):
-        assert tz in _EXCHANGE_HOURS
-
-    @pytest.mark.parametrize("tz", [
-        "America/New_York",
-        "Europe/London",
-        "Europe/Berlin",
-        "Europe/Stockholm",
-        "Asia/Tokyo",
-        "Australia/Sydney",
-    ])
-    async def test_core_timezones_present(self, tz):
-        assert tz in _EXCHANGE_HOURS
-
-    async def test_hours_are_time_tuples(self):
-        for tz, (open_t, close_t) in _EXCHANGE_HOURS.items():
-            assert isinstance(open_t, time), f"{tz} open is not a time"
-            assert isinstance(close_t, time), f"{tz} close is not a time"
-            assert open_t < close_t, f"{tz} open >= close"
+        assert _classify_session(ts, "HSBA.L") == "pre"
 
 
 # ---------- YahooClient.intraday ----------

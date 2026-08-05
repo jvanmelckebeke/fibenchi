@@ -1,14 +1,37 @@
-"""Tests for Yahoo Finance currency detection and OHLCV normalization."""
+"""Tests for Yahoo Finance currency detection and OHLCV normalization.
+
+Suffix→currency inference migrated to Symbol.currency (the one venue table in
+market_calendar); the parity test below pins every pair the old
+EXCHANGE_CURRENCY_MAP carried.
+"""
 
 import pandas as pd
 import pytest
 
+from app.services.market_calendar import SUFFIX_LISTINGS, Symbol
 from app.services.yahoo import (
-    EXCHANGE_CURRENCY_MAP,
     _normalize_ohlcv_df,
-    currency_from_suffix,
     resolve_currency,
 )
+
+# The retired EXCHANGE_CURRENCY_MAP, kept verbatim as the migration reference:
+# every suffix it knew must resolve identically through Symbol.currency.
+_LEGACY_SUFFIX_CURRENCIES = {
+    "KS": "KRW", "KQ": "KRW", "T": "JPY", "HK": "HKD", "SS": "CNY",
+    "SZ": "CNY", "TW": "TWD", "TWO": "TWD", "SI": "SGD", "AX": "AUD",
+    "NZ": "NZD", "NS": "INR", "BO": "INR", "JK": "IDR", "BK": "THB",
+    "L": "GBP", "IL": "GBP", "PA": "EUR", "DE": "EUR", "F": "EUR",
+    "MI": "EUR", "MC": "EUR", "AS": "EUR", "BR": "EUR", "LS": "EUR",
+    "HE": "EUR", "AT": "EUR", "VI": "EUR", "IR": "EUR", "OL": "NOK",
+    "ST": "SEK", "CO": "DKK", "IC": "ISK", "WA": "PLN", "PR": "CZK",
+    "BD": "HUF", "SW": "CHF", "IS": "TRY", "TA": "ILS", "SR": "SAR",
+    "QA": "QAR", "JO": "ZAR", "TO": "CAD", "V": "CAD", "SA": "BRL",
+    "MX": "MXN", "SN": "CLP", "BA": "ARS",
+}
+
+
+def currency_from_suffix(symbol: str):
+    return Symbol(symbol).currency
 
 
 class TestCurrencyFromSuffix:
@@ -60,7 +83,7 @@ class TestCurrencyFromSuffix:
         assert currency_from_suffix("VOLV-B.ST") == "SEK"
 
     def test_no_suffix_returns_none(self):
-        assert currency_from_suffix("AAPL") is None
+        assert currency_from_suffix("AAPL") == "USD"  # unsuffixed = US listing
 
     def test_unknown_suffix_returns_none(self):
         assert currency_from_suffix("FOO.ZZ") is None
@@ -70,10 +93,13 @@ class TestCurrencyFromSuffix:
         assert currency_from_suffix("006260.ks") == "KRW"
 
     def test_all_map_entries_are_iso_4217_length(self):
-        """All currency codes in the exchange map are 3 characters (ISO 4217)."""
-        for suffix, currency in EXCHANGE_CURRENCY_MAP.items():
-            assert len(currency) == 3, f"{suffix} maps to non-ISO code: {currency}"
-            assert currency == currency.upper(), f"{suffix} maps to non-uppercase: {currency}"
+        """Every pair the retired EXCHANGE_CURRENCY_MAP knew resolves identically
+        through the consolidated table, and all codes stay ISO 4217 shaped."""
+        for suffix, currency in _LEGACY_SUFFIX_CURRENCIES.items():
+            assert Symbol(f"XXX.{suffix}").currency == currency, suffix
+        for suffix, listing in SUFFIX_LISTINGS.items():
+            assert listing.currency and len(listing.currency) == 3, suffix
+            assert listing.currency == listing.currency.upper(), suffix
 
 
 class TestResolveCurrency:

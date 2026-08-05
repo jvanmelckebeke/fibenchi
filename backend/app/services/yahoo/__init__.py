@@ -18,9 +18,7 @@ from app.services.yahoo.client import (
     yahoo_client,
 )
 from app.services.yahoo.currency import (
-    EXCHANGE_CURRENCY_MAP,
     _normalize_ohlcv_df,
-    currency_from_suffix,
     resolve_currency,
 )
 
@@ -28,8 +26,6 @@ __all__ = [
     "YahooClient",
     "yahoo_client",
     "PERIOD_MAP",
-    "EXCHANGE_CURRENCY_MAP",
-    "currency_from_suffix",
     "resolve_currency",
     "_normalize_ohlcv_df",
 ]

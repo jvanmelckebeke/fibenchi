@@ -1,7 +1,7 @@
 """Intraday price fetching, storage, and cleanup for live day view."""
 
 import logging
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select
@@ -9,62 +9,62 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.intraday import IntradayPrice
+from app.services.market_calendar import Symbol
 from app.services.yahoo import yahoo_client
 
 logger = logging.getLogger(__name__)
 
 ET = ZoneInfo("America/New_York")
 
-# Exchange regular hours by timezone — (open, close) in local time.
-# Used to classify intraday bars as pre/regular/post per exchange.
-_EXCHANGE_HOURS: dict[str, tuple[time, time]] = {
-    "America/New_York": (time(9, 30), time(16, 0)),
-    "America/Chicago": (time(8, 30), time(15, 0)),
-    "America/Toronto": (time(9, 30), time(16, 0)),
-    "America/Sao_Paulo": (time(10, 0), time(17, 0)),
-    "Europe/London": (time(8, 0), time(16, 30)),
-    "Europe/Berlin": (time(9, 0), time(17, 30)),
-    "Europe/Paris": (time(9, 0), time(17, 30)),
-    "Europe/Amsterdam": (time(9, 0), time(17, 30)),
-    "Europe/Brussels": (time(9, 0), time(17, 30)),
-    "Europe/Zurich": (time(9, 0), time(17, 30)),
-    "Europe/Madrid": (time(9, 0), time(17, 30)),
-    "Europe/Milan": (time(9, 0), time(17, 30)),
-    "Europe/Lisbon": (time(8, 0), time(16, 30)),
-    "Europe/Dublin": (time(8, 0), time(16, 30)),
-    "Europe/Copenhagen": (time(9, 0), time(17, 0)),
-    "Europe/Oslo": (time(9, 0), time(16, 30)),
-    "Europe/Stockholm": (time(9, 0), time(17, 30)),
-    "Europe/Helsinki": (time(10, 0), time(18, 30)),
-    "Europe/Warsaw": (time(9, 0), time(17, 0)),
-    "Europe/Athens": (time(10, 0), time(17, 20)),
-    "Europe/Istanbul": (time(10, 0), time(18, 0)),
-    "Asia/Tokyo": (time(9, 0), time(15, 0)),
-    "Asia/Hong_Kong": (time(9, 30), time(16, 0)),
-    "Asia/Shanghai": (time(9, 30), time(15, 0)),
-    "Asia/Seoul": (time(9, 0), time(15, 30)),
-    "Asia/Kolkata": (time(9, 15), time(15, 30)),
-    "Australia/Sydney": (time(10, 0), time(16, 0)),
-}
+# Venue phase → the 3-value session vocabulary the intraday chart stores/reads.
+_PHASE_TO_SESSION = {"premarket": "pre", "open": "regular", "aftermarket": "post"}
 
 
-def _classify_session(ts: datetime, tz_name: str | None = None) -> str:
-    """Classify a timestamp into pre/regular/post based on exchange hours.
+def _classify_session(ts: datetime, symbol: str, tz_name: str | None = None) -> str:
+    """Classify a bar timestamp as pre/regular/post.
 
-    Uses the exchange's timezone and regular trading hours when available,
-    falls back to US Eastern Time for unknown exchanges.
+    Venue-schedule based (``Symbol(symbol).venue.phase``): holiday- and
+    half-day-aware — the old hand-maintained wall-clock table filed bars
+    after a 13:00 ET early close as "regular". Venues without extended hours
+    can still print auction/late bars outside regular sessions; those
+    "closed" instants are filed to the nearer session boundary (evening →
+    post, next morning → pre) to preserve the 3-value storage.
+
+    Fallback when no venue resolves: wall-clock against the bar's own
+    exchange timezone with generic 09:00–17:30 hours, or US Eastern regular
+    hours when even the timezone is unknown.
     """
-    if tz_name and tz_name in _EXCHANGE_HOURS:
-        tz = ZoneInfo(tz_name)
-        local_time = ts.astimezone(tz).time()
-        open_time, close_time = _EXCHANGE_HOURS[tz_name]
-    else:
-        local_time = ts.astimezone(ET).time()
-        open_time, close_time = time(9, 30), time(16, 0)
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
 
-    if local_time < open_time:
+    venue = Symbol(symbol).venue
+    if venue is not None:
+        phase = venue.phase(ts)
+        if phase in _PHASE_TO_SESSION:
+            return _PHASE_TO_SESSION[phase]
+        if phase == "closed":
+            prev_close = venue.previous_close(ts)
+            next_open = venue.next_open(ts)
+            if prev_close is not None and next_open is not None:
+                return "post" if ts - prev_close <= next_open - ts else "pre"
+            return "post"
+
+    if tz_name:
+        try:
+            local = ts.astimezone(ZoneInfo(tz_name)).time()
+        except Exception:
+            local = None
+        if local is not None:
+            if local < time(9, 0):
+                return "pre"
+            if local >= time(17, 30):
+                return "post"
+            return "regular"
+
+    local = ts.astimezone(ET).time()
+    if local < time(9, 30):
         return "pre"
-    if local_time >= close_time:
+    if local >= time(16, 0):
         return "post"
     return "regular"
 
@@ -89,7 +89,7 @@ async def fetch_and_store_intraday(
     total = 0
     for sym, raw_bars in raw.items():
         bars = [
-            {**b, "session": _classify_session(b["timestamp"], b.get("tz_name"))}
+            {**b, "session": _classify_session(b["timestamp"], sym, b.get("tz_name"))}
             for b in raw_bars
         ]
         asset_id = asset_map.get(sym)

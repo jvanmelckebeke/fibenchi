@@ -12,7 +12,7 @@ import exchange_calendars as xcals
 from app.services.market_calendar import (
     DEFAULT_US_CALENDAR,
     INDEX_CALENDARS,
-    SUFFIX_CALENDARS,
+    SUFFIX_LISTINGS,
     Symbol,
     any_venue_open,
 )
@@ -21,7 +21,8 @@ from app.services.market_calendar import (
 def test_every_mapped_calendar_exists():
     """Every name in the mapping tables must be a real exchange_calendars
     calendar — a typo here would silently disable the venue's gap detection."""
-    names = set(SUFFIX_CALENDARS.values()) | set(INDEX_CALENDARS.values())
+    names = {li.calendar for li in SUFFIX_LISTINGS.values() if li.calendar}
+    names |= set(INDEX_CALENDARS.values())
     names |= {DEFAULT_US_CALENDAR, "24/7"}
     for name in sorted(names):
         xcals.get_calendar(name)  # raises on unknown names
@@ -136,6 +137,7 @@ def test_phase_us_regular_day():
     assert venue.phase(_utc(2024, 4, 3, 8, 0)) == "premarket"    # 4:00 ET sharp
     assert venue.phase(_utc(2024, 4, 3, 12, 0)) == "premarket"   # 8:00 ET
     assert venue.phase(_utc(2024, 4, 3, 15, 0)) == "open"
+    assert venue.phase(_utc(2024, 4, 3, 20, 0)) == "aftermarket"  # 16:00 ET sharp
     assert venue.phase(_utc(2024, 4, 3, 21, 0)) == "aftermarket"  # 17:00 ET
     assert venue.phase(_utc(2024, 4, 4, 1, 0)) == "closed"       # 21:00 ET Apr 3
 
@@ -195,3 +197,47 @@ def test_any_venue_open_fails_open_on_unknown_venue():
     """An unresolvable symbol must never let the gate block real work."""
     assert any_venue_open(["FOO.XX"], _utc(2024, 4, 6, 12, 0)) is True
     assert any_venue_open([], _utc(2024, 4, 6, 12, 0)) is False
+
+
+def test_schedule_poll_hint_phases_and_next_open():
+    from app.services.market_calendar import schedule_poll_hint
+
+    # Wednesday 15:00 UTC: XNYS session running.
+    phase, _ = schedule_poll_hint(["AAPL", "IWDA.AS"], _utc(2024, 4, 3, 15, 0))
+    assert phase == "open"
+    # Saturday: everything closed; next open is Monday, far away.
+    phase, secs = schedule_poll_hint(["AAPL"], _utc(2024, 4, 6, 12, 0))
+    assert phase == "closed"
+    assert secs is not None and secs > 3600
+    # Two minutes before the Amsterdam bell: closed, but the bell is near.
+    phase, secs = schedule_poll_hint(["IWDA.AS"], _utc(2024, 4, 8, 6, 58))
+    assert phase == "closed"
+    assert secs is not None and 0 < secs <= 130
+    # Unresolvable symbols contribute nothing (no fail-open here).
+    assert schedule_poll_hint(["FOO.XX"], _utc(2024, 4, 6, 12, 0)) == ("closed", None)
+
+
+def test_symbol_currency_shapes():
+    """Currency inference per ticker shape (fallback for absent Yahoo data)."""
+    assert Symbol("IWDA.AS").currency == "EUR"
+    assert Symbol("NOVO-B.CO").currency == "DKK"  # hyphenated class + suffix
+    assert Symbol("AAPL").currency == "USD"
+    assert Symbol("BRK-B").currency == "USD"
+    assert Symbol("BTC-EUR").currency == "EUR"  # fiat quote leg
+    assert Symbol("SOL-BTC").currency is None   # crypto-quoted: no display fiat
+    assert Symbol("^GSPC").currency is None
+    assert Symbol("EURUSD=X").currency is None
+    assert Symbol("FOO.ZZ").currency is None
+
+
+def test_new_calendar_coverage():
+    """Suffixes that had currency-but-no-calendar now resolve venues too."""
+    assert Symbol("NOVO-B.CO").calendar_name == "XCSE"
+    assert Symbol("OPAP.AT").calendar_name == "ASEX"
+    assert Symbol("TEVA.TA").calendar_name == "XTAE"
+    # Tadawul trades Sunday–Thursday: a plain Sunday is a session, Friday not.
+    assert Symbol("2222.SR").venue.is_session(date(2024, 1, 7)) is True
+    assert Symbol("2222.SR").venue.is_session(date(2024, 1, 5)) is False
+    # Qatar has a currency but no exchange_calendars calendar.
+    assert Symbol("QNBK.QA").calendar_name is None
+    assert Symbol("QNBK.QA").currency == "QAR"
