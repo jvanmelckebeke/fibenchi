@@ -1,4 +1,7 @@
 import type {
+  DataHealth,
+  OrphanAsset,
+  Stats,
   Annotation,
   AnnotationCreate,
   Asset,
@@ -231,5 +234,12 @@ export const api = {
       delete: (id: number, annotationId: number) =>
         request<void>(`/pseudo-etfs/${id}/annotations/${annotationId}`, { method: "DELETE" }),
     },
+  },
+  system: {
+    dataHealth: () => request<DataHealth>("/system/data-health"),
+    stats: () => request<Stats>("/system/stats"),
+    orphans: () => request<OrphanAsset[]>("/system/orphans"),
+    deleteOrphan: (assetId: number) =>
+      request<void>(`/system/orphans/${assetId}`, { method: "DELETE" }),
   },
 }

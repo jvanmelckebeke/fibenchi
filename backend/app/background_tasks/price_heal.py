@@ -174,23 +174,19 @@ def find_interior_holes(stored: set[date], sessions: set[date]) -> set[date]:
     return {d for d in sessions if first < d < last and d not in stored}
 
 
-async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str, int]:
-    """Detect and re-fetch mid-series session holes for grouped assets.
+async def scan_session_coverage(db: AsyncSession) -> list[tuple[AssetRef, int, set[date]]]:
+    """Per grouped symbol: ``(ref, scheduled_session_count, interior_holes)``
+    over the stored range within the scan window.
 
-    Returns ``{symbol: rows_upserted}`` for the symbols refreshed this scan.
-    Symbols without a resolvable venue calendar are skipped — without the
-    session list a hole cannot be told apart from a holiday.
+    Detection only — no cooldown filtering, no side effects. The single
+    source for both the heal scan and the data-health/stats endpoints, so
+    what gets reported and what gets repaired can't disagree. Symbols
+    without a resolvable venue calendar are skipped — without the session
+    list a hole cannot be told apart from a holiday.
     """
-    global _last_hole_scan, _hole_backlog
-    now = time.monotonic()
-    interval = HOLE_BACKLOG_RESCAN_SECONDS if _hole_backlog else HOLE_SCAN_INTERVAL_SECONDS
-    if not force and _last_hole_scan is not None and now - _last_hole_scan < interval:
-        return {}
-    _last_hole_scan = now
-
     assets = await AssetRepository(db).list_in_any_group()
     if not assets:
-        return {}
+        return []
 
     window_start = date.today() - timedelta(days=HOLE_SCAN_WINDOW_DAYS)
     all_prices = await PriceRepository(db).list_by_assets_since(
@@ -200,13 +196,13 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
     for p in all_prices:
         stored_by_asset.setdefault(p.asset_id, set()).add(p.date)
 
-    candidates = []
+    coverage = []
     for asset in assets:
         stored = stored_by_asset.get(asset.id)
         if not stored or len(stored) < 2:
             continue  # initial fill is the sync's job
-        # Detached ref, not the ORM object: a rollback in the heal loop below
-        # expires every live instance in the session, and touching an expired
+        # Detached ref, not the ORM object: rollbacks in the heal loop expire
+        # every live instance in the session, and touching an expired
         # attribute outside a greenlet context raises MissingGreenlet.
         ref = AssetRef.of(asset)
         if ref.venue is None:
@@ -214,9 +210,49 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
         sessions = ref.venue.session_dates(min(stored), max(stored))
         if not sessions:
             continue
-        holes = find_interior_holes(stored, sessions)
-        if not holes:
-            continue
+        coverage.append((ref, len(sessions), find_interior_holes(stored, sessions)))
+    return coverage
+
+
+async def detect_hole_candidates(db: AsyncSession) -> list[tuple[AssetRef, set[date]]]:
+    """Every grouped symbol with interior holes in the scan window, newest
+    hole first (the heal's priority order, and the order worth showing users).
+    """
+    candidates = [(ref, holes) for ref, _, holes in await scan_session_coverage(db) if holes]
+    # Newest hole first: a hole at yesterday's session blanks σ-Move *today*,
+    # while an old interior hole only dents historical charts — when the cap
+    # forces a choice, heal what the user is currently looking at.
+    candidates.sort(key=lambda c: max(c[1]), reverse=True)
+    return candidates
+
+
+def next_hole_scan_in_seconds() -> int:
+    """Approximate seconds until the next hole scan is *eligible* to run.
+
+    The scan piggybacks on the 10-minute heal job, so the real start is this
+    value rounded up to the next job tick — close enough for display.
+    """
+    if _last_hole_scan is None:
+        return 0
+    interval = HOLE_BACKLOG_RESCAN_SECONDS if _hole_backlog else HOLE_SCAN_INTERVAL_SECONDS
+    return max(0, int(interval - (time.monotonic() - _last_hole_scan)))
+
+
+async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str, int]:
+    """Detect and re-fetch mid-series session holes for grouped assets.
+
+    Returns ``{symbol: rows_upserted}`` for the symbols refreshed this scan.
+    """
+    global _last_hole_scan, _hole_backlog
+    now = time.monotonic()
+    interval = HOLE_BACKLOG_RESCAN_SECONDS if _hole_backlog else HOLE_SCAN_INTERVAL_SECONDS
+    if not force and _last_hole_scan is not None and now - _last_hole_scan < interval:
+        return {}
+    _last_hole_scan = now
+
+    detected = await detect_hole_candidates(db)
+    candidates = []
+    for ref, holes in detected:
         signature = frozenset(holes)
         last = _hole_attempts.get(ref)
         if last and last[1] == signature and now - last[0] < HOLE_RETRY_COOLDOWN_SECONDS:
@@ -226,11 +262,6 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
     if not candidates:
         _hole_backlog = False
         return {}
-
-    # Newest hole first: a hole at yesterday's session blanks σ-Move *today*,
-    # while an old interior hole only dents historical charts — when the cap
-    # forces a choice, heal what the user is currently looking at.
-    candidates.sort(key=lambda c: max(c[1]), reverse=True)
 
     deferred = candidates[MAX_HOLE_HEALS_PER_SCAN:]
     candidates = candidates[:MAX_HOLE_HEALS_PER_SCAN]

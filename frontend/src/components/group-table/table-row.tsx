@@ -325,9 +325,9 @@ export const TableRow = memo(function TableRow({
                     className="text-muted-foreground"
                     title={
                       vnrStale
-                        ? "σ-Move unavailable — price data is behind the live quote"
+                        ? "σ-Move unavailable — price data is behind the live quote. A background job reconciles this automatically (usually within ~10 min)."
                         : vnrGap != null
-                          ? `σ-Move unavailable — the last return spans ${vnrGap} trading sessions (gap in stored price history)`
+                          ? `σ-Move unavailable — the last return spans ${vnrGap} trading sessions (gap in stored price history). A background job backfills missing sessions automatically; see the Stats page.`
                           : undefined
                     }
                   >

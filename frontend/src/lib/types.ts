@@ -324,3 +324,60 @@ export interface EarningsInfo {
   is_estimate: boolean
   last_reported_date: string | null
 }
+
+// --- System / data health ---
+
+export interface HoleSymbol {
+  symbol: string
+  /** ISO dates of scheduled sessions with no stored bar */
+  missing_sessions: string[]
+}
+
+/** Price-history self-heal status (GET /api/system/data-health). */
+export interface DataHealth {
+  hole_symbols: HoleSymbol[]
+  total_missing_sessions: number
+  /** Scheduled session bars in the scan window — completeness denominator */
+  expected_session_bars: number
+  next_scan_in_seconds: number
+  heals_per_scan: number
+  scan_window_days: number
+}
+
+/** Collection-size numbers (GET /api/system/stats). */
+export interface Stats {
+  assets_total: number
+  assets_tracked: number
+  /** Ungrouped but kept because a thesis or pseudo-ETF references them */
+  assets_thesis_or_etf_only: number
+  /** Ungrouped and referenced by nothing — leftovers of removals */
+  assets_orphaned: number
+  stocks: number
+  etfs: number
+  indexes: number
+  crypto: number
+  futures: number
+  fx: number
+  price_bars: number
+  earliest_bar: string | null
+  latest_bar: string | null
+  collected_days: number
+  intraday_bars: number
+  groups: number
+  pseudo_etfs: number
+  theses: number
+  tags: number
+  annotations: number
+  symbol_directory_entries: number
+}
+
+/** An asset row referenced by nothing (GET /api/system/orphans). */
+export interface OrphanAsset {
+  id: number
+  symbol: string
+  name: string
+  type: string
+  /** stored daily bars that would be deleted with it */
+  price_bars: number
+  latest_bar: string | null
+}
