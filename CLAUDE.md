@@ -133,7 +133,7 @@ The charting layer has four architectural tiers:
 
 On startup (`main.py` lifespan):
 1. `load_currency_cache(db)` — populates in-memory currency lookup to avoid per-request DB hits
-2. APScheduler starts with cron trigger from `REFRESH_CRON`
+2. APScheduler schedules everything in `app/background_tasks/` — jobs live in `jobs.py` and self-register via the `@background_task(id=..., trigger=...)` decorator (registry pattern, like `INDICATOR_REGISTRY`); adding a job never touches `main.py`. A trigger may be a factory returning `None` to disable just that job (e.g. malformed `REFRESH_CRON` disables `price_refresh` with a warning; everything else still runs).
 3. `scheduled_refresh()` job: `sync_all_prices` → `compute_and_cache_indicators` (pre-warms cache so first group page load is instant)
 
 ## Key Patterns
