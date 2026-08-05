@@ -3,7 +3,11 @@
 // separately and had drifted ("Market open" vs "Regular", "After-hours" vs
 // "Post-Market"). Both now consume this.
 
-export interface MarketStateInfo {
+// Presentation traits for a market state. Deliberately NOT the same thing
+// as the backend's MarketStateInfo (app/services/market_state.py): that one
+// carries data traits (active, session_forming); this one carries display
+// traits. They share only the six-state vocabulary and the `phase` join key.
+export interface MarketStateDisplay {
   /** Tailwind background class for a status dot. */
   dotColor: string
   /** Human-readable label. */
@@ -25,7 +29,7 @@ const MARKET_STATES = {
   POST: { dotColor: "bg-orange-500", label: "After-hours", phase: "aftermarket" },
   POSTPOST: { dotColor: "bg-red-500", label: "Closed", phase: "closed" },
   CLOSED: { dotColor: "bg-red-500", label: "Closed", phase: "closed" },
-} as const satisfies Record<string, MarketStateInfo>
+} as const satisfies Record<string, MarketStateDisplay>
 
 /**
  * The market-state vocabulary the backend emits (Yahoo's, hand-mirrored from
@@ -35,10 +39,10 @@ const MARKET_STATES = {
  */
 export type MarketState = keyof typeof MARKET_STATES
 
-const DEFAULT_STATE: MarketStateInfo = { dotColor: "bg-red-500", label: "Closed", phase: "closed" }
+const DEFAULT_STATE: MarketStateDisplay = { dotColor: "bg-red-500", label: "Closed", phase: "closed" }
 
 /** Resolve a market-state code to its dot colour + label (falls back to Closed). */
-export function marketState(state: MarketState | null | undefined): MarketStateInfo {
+export function marketState(state: MarketState | null | undefined): MarketStateDisplay {
   // Runtime guard stays: the API cast is unchecked, so a novel Yahoo state
   // must still degrade to Closed instead of exploding.
   return (state && MARKET_STATES[state]) || DEFAULT_STATE
