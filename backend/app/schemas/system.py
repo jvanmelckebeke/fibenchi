@@ -60,8 +60,9 @@ class StatsResponse(BaseModel):
     assets_orphaned: int = Field(
         description="Ungrouped assets referenced by nothing — leftovers of removals"
     )
-    # Asset mix: one bucket per asset — ticker-shape classification
-    # (AssetRef.kind) refined by the stored Yahoo type for the stock/ETF split.
+    # Asset mix: one bucket per *tracked* asset (in ≥1 group) — sums to
+    # assets_tracked. Ticker-shape classification (AssetRef.kind) refined by
+    # the stored Yahoo type for the stock/ETF split.
     stocks: int = Field(description="Exchange-listed stocks")
     etfs: int = Field(description="ETFs")
     indexes: int = Field(description="Indexes")

@@ -3,7 +3,7 @@
 from collections import Counter
 
 from fastapi import HTTPException
-from sqlalchemy import distinct, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.background_tasks.price_heal import (
@@ -55,12 +55,18 @@ def _mix_bucket(symbol: str, asset_type: AssetType) -> str:
 
 async def collect_stats(db: AsyncSession) -> StatsResponse:
     """Collection-size numbers: how much data the instance has accumulated."""
-    asset_rows = (await db.execute(select(Asset.symbol, Asset.type))).all()
-    mix = Counter(_mix_bucket(sym, typ) for sym, typ in asset_rows)
-
-    tracked = (
-        await db.execute(select(func.count(distinct(group_assets.c.asset_id))))
-    ).scalar_one()
+    # Mix buckets cover tracked assets only (in ≥1 group) so the breakdown
+    # bar sums to the "tracked" headline it sits under — orphans and
+    # thesis-kept rows are reported separately, not mixed in.
+    tracked_rows = (
+        await db.execute(
+            select(Asset.symbol, Asset.type)
+            .join(group_assets, group_assets.c.asset_id == Asset.id)
+            .distinct()
+        )
+    ).all()
+    mix = Counter(_mix_bucket(sym, typ) for sym, typ in tracked_rows)
+    tracked = len(tracked_rows)
 
     # Ungrouped assets split by *why* their row still exists: referenced by a
     # thesis or pseudo-ETF (the soft delete keeps these on purpose) vs
@@ -89,7 +95,7 @@ async def collect_stats(db: AsyncSession) -> StatsResponse:
     ).one()
 
     return StatsResponse(
-        assets_total=len(asset_rows),
+        assets_total=await _count(db, Asset),
         assets_tracked=tracked,
         assets_thesis_or_etf_only=ungrouped_referenced,
         assets_orphaned=ungrouped_orphaned,

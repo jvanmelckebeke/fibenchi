@@ -135,6 +135,8 @@ async def test_stats_splits_ungrouped_by_reason(client, db):
     assert data["assets_tracked"] == 1
     assert data["assets_thesis_or_etf_only"] == 1
     assert data["assets_orphaned"] == 1
+    # The mix bar sums to assets_tracked: ungrouped rows stay out of it.
+    assert data["stocks"] == 1
 
 
 async def test_orphans_listed_and_hard_deletable(client, db):
