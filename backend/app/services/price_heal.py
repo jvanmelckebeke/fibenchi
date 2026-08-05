@@ -27,6 +27,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models import Asset
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.services.market_calendar import Symbol
@@ -205,7 +206,10 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
         last = _hole_attempts.get(asset.symbol)
         if last and last[1] == signature and now - last[0] < HOLE_RETRY_COOLDOWN_SECONDS:
             continue  # same holes, recently attempted — wait for Yahoo to backfill
-        candidates.append((asset, holes, signature))
+        # Plain scalars, not the ORM object: a rollback in the heal loop below
+        # expires every instance in the session, and touching an expired
+        # attribute outside a greenlet context raises MissingGreenlet.
+        candidates.append((asset.id, asset.symbol, holes, signature))
 
     if not candidates:
         return {}
@@ -219,27 +223,38 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
         )
 
     healed: dict[str, int] = {}
-    for asset, holes, signature in candidates:
-        _hole_attempts[asset.symbol] = (now, signature)
+    for asset_id, symbol, holes, signature in candidates:
+        _hole_attempts[symbol] = (now, signature)
         try:
+            # Re-get inside the try: a previous iteration's rollback expired
+            # the session, and Session.get refreshes an expired identity-map
+            # instance in a context where that IO is legal.
+            asset = await db.get(Asset, asset_id)
+            if asset is None:
+                continue  # deleted since the scan
             count = await sync_asset_prices_range(db, asset, min(holes), max(holes))
-            healed[asset.symbol] = count
-            refreshed = await PriceRepository(db).list_by_asset_since(asset.id, min(holes))
+            healed[symbol] = count
+            refreshed = await PriceRepository(db).list_by_asset_since(asset_id, min(holes))
             remaining = holes - {p.date for p in refreshed}
             if remaining:
                 logger.info(
                     "%s: %d of %d interior hole(s) persist after re-fetch "
                     "(Yahoo may backfill later): %s",
-                    asset.symbol, len(remaining), len(holes),
+                    symbol, len(remaining), len(holes),
                     ", ".join(d.isoformat() for d in sorted(remaining)),
                 )
             else:
                 logger.info(
                     "%s: healed %d interior hole(s): %s",
-                    asset.symbol, len(holes),
+                    symbol, len(holes),
                     ", ".join(d.isoformat() for d in sorted(holes)),
                 )
+        except ValueError as e:
+            # Expected: Yahoo has no history for the range (delisted symbol,
+            # feed gap). The cooldown above keeps it from retrying every scan.
+            logger.info("Hole heal for %s: %s", symbol, e)
+            await db.rollback()
         except Exception:
-            logger.warning("Hole heal for %s failed", asset.symbol, exc_info=True)
+            logger.warning("Hole heal for %s failed", symbol, exc_info=True)
             await db.rollback()
     return healed
