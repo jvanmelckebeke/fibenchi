@@ -6,6 +6,7 @@ import logging
 import pandas as pd
 
 from app.services.yahoo._base import _YahooBase
+from app.services.yahoo._history import padded_history_frame
 from app.services.yahoo.currency import resolve_currency
 from app.services.yahoo.rate_limit import check_crumb
 
@@ -40,8 +41,8 @@ class _IntradayMixin(_YahooBase):
                     if isinstance(sym_data, str):
                         logger.debug("Yahoo intraday error for %s: %s", sym, sym_data)
 
-            hist = ticker._historical_data_to_dataframe(data, params, adj_timezone=True)
-            if isinstance(hist, dict) or hist.empty:
+            hist = padded_history_frame(ticker, data, params, symbols)
+            if hist.empty:
                 return {}
 
             available = (
