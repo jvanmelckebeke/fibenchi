@@ -225,10 +225,22 @@ async def sync_asset_prices(
 async def sync_asset_prices_range(
     db: AsyncSession, asset: Asset, start: date, end: date
 ) -> int:
-    """Fetch and upsert price data for a date range. Returns number of rows upserted."""
+    """Fetch and upsert price data for a date range. Returns number of rows upserted.
+
+    A range that reaches today can include the current session's still-forming
+    bar, exactly like a period fetch — this path used to upsert it raw, so any
+    display/warmup backfill during market hours stored a live partial that
+    drifted from the quote and blanked σ-Move for the rest of the session.
+    Routing through the same anchor + drop + purge as ``sync_asset_prices``
+    closes that hole. Purely historical ranges (interior hole heals, bounded
+    backfills) skip the quote round-trip: every bar in them is settled.
+    """
     provider = get_price_provider()
     df = await provider.fetch_history(asset.symbol, start=start, end=end)
-    return await _upsert_prices(db, asset.id, df)
+    if end < date.today():
+        return await _upsert_prices(db, asset.id, df)
+    anchor = (await _quote_anchors(provider, [asset.symbol])).get(asset.symbol, _NO_ANCHOR)
+    return await _drop_and_persist(db, asset.id, df, anchor, asset.symbol)
 
 
 async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int]:
