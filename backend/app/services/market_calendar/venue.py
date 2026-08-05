@@ -81,6 +81,18 @@ class Venue:
             return None
         return d in sessions
 
+    def local_date(self, at: datetime | None = None) -> date | None:
+        """The venue's local calendar date at ``at`` (UTC now by default).
+
+        The most recent date a daily bar can possibly be *for* — a bar dated
+        this or later cannot be a settled prior session. Used by the anchorless
+        sync guard to spot a possibly-forming trailing bar without a quote.
+        """
+        try:
+            return _as_utc(at).tz_convert(self._cal.tz).date()
+        except Exception:
+            return None
+
     # -- schedule -----------------------------------------------------------
 
     def is_open(self, at: datetime | None = None) -> bool | None:

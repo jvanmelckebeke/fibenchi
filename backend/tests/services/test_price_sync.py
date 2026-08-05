@@ -11,7 +11,9 @@ from app.domain import AssetRef
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.services.price_sync import (
+    _NO_ANCHOR,
     _drop_and_persist,
+    _drop_unanchored_trailing_bar,
     _upsert_prices,
     drop_unsettled_last_bar,
     sync_all_prices,
@@ -148,8 +150,12 @@ async def test_sync_range_to_today_drops_unsettled_bar(db):
     mock_prov.batch_fetch_quotes.assert_awaited_once()
 
 
-async def test_sync_range_to_today_without_quote_stores_all(db):
-    """Anchor unavailable → degrade to storing every bar (prior behavior)."""
+async def test_sync_range_to_today_without_quote_stores_settled_bars(db):
+    """Anchor unavailable → settled (historical) bars still store in full.
+
+    The anchorless guard (#586) only withholds a trailing bar dated on the
+    current session; this frame ends in Jan 2025, so nothing is withheld.
+    """
     asset = Asset(symbol="MT.AS", name="ArcelorMittal", type=AssetType.STOCK, currency="EUR")
     db.add(asset)
     await db.flush()
@@ -460,6 +466,79 @@ async def test_drop_unsettled_drops_forming_bar_on_session_date():
     )
     assert len(out) == len(df) - 1
     assert float(out.iloc[-1]["close"]) == 290.23
+
+
+# --- anchorless guard (#586): no quote → withhold a possible live partial ---
+#
+# Observed 2026-08-05 on staging: a failed quote batch during EU market hours
+# made every open-market symbol store its live forming bar as that session's
+# close. Without an anchor the trailing bar dated on the venue's current local
+# date is withheld; everything earlier is settled and stores as usual.
+
+def _df_ending(end, closes):
+    """OHLCV frame whose last bar is dated ``end`` (consecutive calendar days)."""
+    n = len(closes)
+    dates = pd.DatetimeIndex([pd.Timestamp(end) - pd.Timedelta(days=n - 1 - i)
+                              for i in range(n)])
+    return pd.DataFrame({
+        "open": closes,
+        "high": [c + 1 for c in closes],
+        "low": [c - 1 for c in closes],
+        "close": closes,
+        "volume": [1_000_000] * n,
+    }, index=dates)
+
+
+async def test_anchorless_withholds_current_session_bar():
+    """A trailing bar dated today (no venue → server date) is withheld."""
+    # A plain str ref has no venue, so the guard falls back to date.today().
+    df = _df_ending(date.today(), [100.0, 101.0, 102.0])
+    out = _drop_unanchored_trailing_bar(df, "NOVENUE")
+    assert len(out) == len(df) - 1
+    assert float(out.iloc[-1]["close"]) == 101.0
+
+
+async def test_anchorless_keeps_settled_bars():
+    """A frame ending before today is all settled — nothing withheld."""
+    # Two days back: behind "today" in every venue timezone, so the assertion
+    # can't flake around midnight for a venue-resolved ref either.
+    df = _df_ending(date.today() - pd.Timedelta(days=2), [100.0, 101.0, 102.0])
+    assert len(_drop_unanchored_trailing_bar(df, "NOVENUE")) == len(df)
+    assert len(_drop_unanchored_trailing_bar(df, AssetRef("AAPL"))) == len(df)
+
+
+async def test_anchorless_empty_frame():
+    assert _drop_unanchored_trailing_bar(pd.DataFrame(), "NOVENUE").empty
+
+
+async def test_anchorless_persist_withholds_and_never_purges(db):
+    """_drop_and_persist without an anchor drops today's bar from the upsert but
+    leaves stored rows alone — without a quote a later stored row can't be
+    proven stale, and purging on every quote outage would destroy verified data."""
+    asset = Asset(symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    # A stored row dated after everything the anchorless upsert will keep.
+    db.add(PriceHistory(asset_id=asset.id, date=date.today(),
+                        open=1, high=1, low=1, close=500.0, volume=0))
+    await db.commit()
+
+    # Bar dated the server's today is >= the venue-local (NY) date, so the
+    # withhold fires regardless of the hour the test runs at.
+    df = _df_ending(date.today(), [305.0, 290.23, 224.14])
+
+    captured = {}
+
+    async def _capture(*args):
+        captured["len"] = len(args[2])
+        return len(args[2])
+
+    with patch("app.services.price_sync._upsert_prices", side_effect=_capture):
+        await _drop_and_persist(db, AssetRef.of(asset), df, _NO_ANCHOR)
+
+    assert captured["len"] == 2  # today's bar withheld
+    latest = await PriceRepository(db).get_latest_closes([asset.id])
+    assert latest[asset.id][0] == date.today()  # stored row untouched
 
 
 # --- _drop_and_persist: purge an orphaned partial a re-sync can't upsert away ---
