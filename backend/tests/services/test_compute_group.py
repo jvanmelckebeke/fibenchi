@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.domain import AssetRef
 from app.services.compute.group import (
     _indicator_cache,
     compute_and_cache_indicators,
@@ -13,14 +14,6 @@ from app.services.compute.group import (
 )
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
-
-
-def _make_asset_row(id: int, symbol: str):
-    """Create a mock asset row with .id and .symbol attributes."""
-    row = MagicMock()
-    row.id = id
-    row.symbol = symbol
-    return row
 
 
 def _make_price(asset_id: int, d: date, close: float):
@@ -50,8 +43,8 @@ class TestGetBatchSparklines:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_returns_sparklines_for_group(self, mock_asset_repo_cls, mock_price_repo_cls, db):
-        rows = [_make_asset_row(1, "AAPL"), _make_asset_row(2, "MSFT")]
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=rows)
+        refs = [AssetRef("AAPL", 1), AssetRef("MSFT", 2)]
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=refs)
 
         d1, d2 = date.today() - timedelta(days=2), date.today() - timedelta(days=1)
         prices = [
@@ -74,7 +67,7 @@ class TestGetBatchSparklines:
         default_group = MagicMock()
         default_group.id = 1
         mock_group_repo_cls.return_value.get_default = AsyncMock(return_value=default_group)
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=[])
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=[])
 
         result = await get_batch_sparklines(db, period="3mo", group_id=None)
         assert result == {}
@@ -82,7 +75,7 @@ class TestGetBatchSparklines:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_empty_assets_returns_empty(self, mock_asset_repo_cls, mock_price_repo_cls, db):
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=[])
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=[])
 
         result = await get_batch_sparklines(db, period="3mo", group_id=1)
         assert result == {}
@@ -101,8 +94,8 @@ class TestComputeAndCacheIndicators:
     ):
         _indicator_cache._data.clear()
 
-        rows = [_make_asset_row(1, "AAPL")]
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=rows)
+        refs = [AssetRef("AAPL", 1)]
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=refs)
 
         today = date.today()
         prices = [_make_price(1, today - timedelta(days=i), 150.0 + i) for i in range(30)]
@@ -131,8 +124,8 @@ class TestComputeAndCacheIndicators:
     ):
         _indicator_cache._data.clear()
 
-        rows = [_make_asset_row(1, "NEW")]
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=rows)
+        refs = [AssetRef("NEW", 1)]
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=refs)
 
         # Only 10 prices — less than 26 needed for MACD
         prices = [_make_price(1, date.today() - timedelta(days=i), 50.0) for i in range(10)]
@@ -148,7 +141,7 @@ class TestComputeAndCacheIndicators:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_empty_assets_returns_empty(self, mock_asset_repo_cls, mock_price_repo_cls, db):
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=[])
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=[])
 
         result = await compute_and_cache_indicators(db, group_id=1)
         assert result == {}
@@ -165,8 +158,8 @@ class TestComputeAndCacheIndicators:
     ):
         _indicator_cache._data.clear()
 
-        rows = [_make_asset_row(1, "AAPL")]
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=rows)
+        refs = [AssetRef("AAPL", 1)]
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=refs)
 
         today = date.today()
         prices = [_make_price(1, today - timedelta(days=i), 150.0 + i) for i in range(30)]
@@ -201,9 +194,9 @@ class TestComputeIndicatorsForSymbols:
     ):
         _indicator_cache._data.clear()
 
-        # Only the tracked symbol resolves to a row; "GHOST" is dropped by the repo.
-        rows = [_make_asset_row(1, "AAPL")]
-        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols = AsyncMock(return_value=rows)
+        # Only the tracked symbol resolves to a ref; "GHOST" is dropped by the repo.
+        refs = [AssetRef("AAPL", 1)]
+        mock_asset_repo_cls.return_value.list_refs_by_symbols = AsyncMock(return_value=refs)
 
         today = date.today()
         prices = [_make_price(1, today - timedelta(days=i), 150.0 + i) for i in range(30)]
@@ -219,7 +212,7 @@ class TestComputeIndicatorsForSymbols:
 
         assert set(result) == {"AAPL"}
         assert result["AAPL"]["values"]["rsi"] == 55.0
-        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols.assert_awaited_once_with(
+        mock_asset_repo_cls.return_value.list_refs_by_symbols.assert_awaited_once_with(
             ["AAPL", "GHOST"]
         )
 
@@ -231,7 +224,7 @@ class TestComputeIndicatorsForSymbols:
 
         assert result == {}
         # No DB work for an empty symbol set.
-        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols.assert_not_called()
+        mock_asset_repo_cls.return_value.list_refs_by_symbols.assert_not_called()
 
     @patch("app.services.compute.group.merge_fundamentals_from_cache")
     @patch("app.services.compute.group.build_indicator_snapshot")
@@ -248,10 +241,10 @@ class TestComputeIndicatorsForSymbols:
         when the symbol set + latest date match — no redundant recompute."""
         _indicator_cache._data.clear()
 
-        row = _make_asset_row(1, "AAPL")
-        # Both entry points resolve the same symbol set to the same (id, symbol) row.
-        mock_asset_repo_cls.return_value.list_in_group_id_symbol_pairs = AsyncMock(return_value=[row])
-        mock_asset_repo_cls.return_value.list_id_symbol_pairs_by_symbols = AsyncMock(return_value=[row])
+        ref = AssetRef("AAPL", 1)
+        # Both entry points resolve the same symbol set to the same ref.
+        mock_asset_repo_cls.return_value.list_in_group_refs = AsyncMock(return_value=[ref])
+        mock_asset_repo_cls.return_value.list_refs_by_symbols = AsyncMock(return_value=[ref])
 
         today = date.today()
         prices = [_make_price(1, today - timedelta(days=i), 150.0 + i) for i in range(30)]

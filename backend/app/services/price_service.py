@@ -7,13 +7,13 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
+from app.domain import AssetRef
 from app.models import Asset, PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.schemas.price import AssetDetailResponse, IndicatorResponse, PriceResponse
 from app.services.compute.indicators import INDICATOR_REGISTRY, compute_indicators, safe_round
 from app.services.compute.utils import prices_to_df
 from app.services.fundamentals_cache import merge_fundamentals_into_rows
-from app.services.market_calendar import Symbol
 from app.services.price_providers import get_price_provider
 from app.services.price_sync import sync_asset_prices, sync_asset_prices_range
 from app.utils import TTLCache
@@ -86,7 +86,7 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
     needed_start = _display_start(period)
 
     if not prices:
-        count = await sync_asset_prices(db, asset, period=period)
+        count = await sync_asset_prices(db, AssetRef.of(asset), period=period)
         if count == 0:
             raise HTTPException(404, f"No price data available for {asset.symbol}")
         prices = await price_repo.list_by_asset(asset.id)
@@ -95,7 +95,7 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
     elif prices[0].date > needed_start:
         if not _backfill_already_attempted(asset.id, needed_start):
             earliest_before = prices[0].date
-            await sync_asset_prices_range(db, asset, needed_start, date.today())
+            await sync_asset_prices_range(db, AssetRef.of(asset), needed_start, date.today())
             prices = await price_repo.list_by_asset(asset.id)
             # If the earliest date didn't move, Yahoo has no data for the gap.
             # Cache this so future requests skip the fetch.
@@ -119,7 +119,7 @@ async def _ensure_warmup_prices(
     if prices and prices[0].date > warmup_start:
         if not _backfill_already_attempted(asset.id, warmup_start):
             earliest_before = prices[0].date
-            await sync_asset_prices_range(db, asset, warmup_start, date.today())
+            await sync_asset_prices_range(db, AssetRef.of(asset), warmup_start, date.today())
             prices = await PriceRepository(db).list_by_asset(asset.id)
             if prices and prices[0].date >= earliest_before:
                 _earliest_date_cache.set_value(asset.id, prices[0].date)
@@ -201,7 +201,7 @@ async def _compute_or_cached_indicators(
         cache_key = None
         df = await _fetch_ephemeral(symbol, period, warmup=True)
 
-    venue = Symbol(symbol).venue
+    venue = AssetRef(symbol).venue
     sessions = venue.session_dates_for_index(df.index) if venue else None
     rows = _df_to_indicator_rows(compute_indicators(df, session_dates=sessions), start)
 
@@ -240,5 +240,5 @@ async def get_detail(db: AsyncSession, asset: Asset | None, symbol: str, period:
 
 
 async def refresh_prices(db: AsyncSession, asset: Asset, period: str):
-    count = await sync_asset_prices(db, asset, period=period)
+    count = await sync_asset_prices(db, AssetRef.of(asset), period=period)
     return {"symbol": asset.symbol, "synced": count}

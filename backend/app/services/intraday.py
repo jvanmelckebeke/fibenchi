@@ -8,8 +8,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain import AssetRef
 from app.models.intraday import IntradayPrice
-from app.services.market_calendar import Symbol
 from app.services.yahoo import yahoo_client
 
 logger = logging.getLogger(__name__)
@@ -20,15 +20,15 @@ ET = ZoneInfo("America/New_York")
 _PHASE_TO_SESSION = {"premarket": "pre", "open": "regular", "aftermarket": "post"}
 
 
-def _classify_session(ts: datetime, symbol: str, tz_name: str | None = None) -> str:
+def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -> str:
     """Classify a bar timestamp as pre/regular/post.
 
-    Venue-schedule based (``Symbol(symbol).venue.phase``): holiday- and
-    half-day-aware — the old hand-maintained wall-clock table filed bars
-    after a 13:00 ET early close as "regular". Venues without extended hours
-    can still print auction/late bars outside regular sessions; those
-    "closed" instants are filed to the nearer session boundary (evening →
-    post, next morning → pre) to preserve the 3-value storage.
+    Venue-schedule based (``ref.venue.phase``): holiday- and half-day-aware
+    — the old hand-maintained wall-clock table filed bars after a 13:00 ET
+    early close as "regular". Venues without extended hours can still print
+    auction/late bars outside regular sessions; those "closed" instants are
+    filed to the nearer session boundary (evening → post, next morning →
+    pre) to preserve the 3-value storage.
 
     Fallback when no venue resolves: wall-clock against the bar's own
     exchange timezone with generic 09:00–17:30 hours, or US Eastern regular
@@ -37,7 +37,7 @@ def _classify_session(ts: datetime, symbol: str, tz_name: str | None = None) -> 
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=timezone.utc)
 
-    venue = Symbol(symbol).venue
+    venue = ref.venue
     if venue is not None:
         phase = venue.phase(ts)
         if phase in _PHASE_TO_SESSION:
@@ -71,8 +71,7 @@ def _classify_session(ts: datetime, symbol: str, tz_name: str | None = None) -> 
 
 async def fetch_and_store_intraday(
     db: AsyncSession,
-    symbols: list[str],
-    asset_map: dict[str, int],
+    refs: list[AssetRef],
 ) -> int:
     """Fetch 1m intraday bars and upsert into the database. Returns row count.
 
@@ -84,17 +83,19 @@ async def fetch_and_store_intraday(
     :meth:`YahooClient.intraday`; this function adds session classification
     (which depends on per-exchange trading hours) and persists.
     """
-    raw = await yahoo_client.intraday(symbols)
+    raw = await yahoo_client.intraday(list(refs))
+    by_symbol = {ref.symbol: ref for ref in refs}
 
     total = 0
     for sym, raw_bars in raw.items():
+        ref = by_symbol.get(sym)
+        if ref is None or ref.id is None or not raw_bars:
+            continue
+        asset_id = ref.id
         bars = [
-            {**b, "session": _classify_session(b["timestamp"], sym, b.get("tz_name"))}
+            {**b, "session": _classify_session(b["timestamp"], ref, b.get("tz_name"))}
             for b in raw_bars
         ]
-        asset_id = asset_map.get(sym)
-        if not asset_id or not bars:
-            continue
 
         # Remove bars from previous sessions that Yahoo no longer returns
         oldest_ts = min(bar["timestamp"] for bar in bars)
@@ -134,11 +135,11 @@ async def fetch_and_store_intraday(
 
 async def get_intraday_bars(
     db: AsyncSession,
-    asset_ids: list[int],
-    symbol_map: dict[int, str],
+    refs: list[AssetRef],
 ) -> dict[str, list[dict]]:
     """Read today's intraday bars from DB, keyed by symbol."""
-    if not asset_ids:
+    by_id = {ref.id: ref for ref in refs if ref.id is not None}
+    if not by_id:
         return {}
 
     # Fetch bars from last 2 days (covers pre-market + previous close)
@@ -147,7 +148,7 @@ async def get_intraday_bars(
     result = await db.execute(
         select(IntradayPrice)
         .where(
-            IntradayPrice.asset_id.in_(asset_ids),
+            IntradayPrice.asset_id.in_(by_id),
             IntradayPrice.timestamp >= cutoff,
         )
         .order_by(IntradayPrice.asset_id, IntradayPrice.timestamp)
@@ -156,9 +157,10 @@ async def get_intraday_bars(
 
     bars_by_symbol: dict[str, list[dict]] = {}
     for row in rows:
-        sym = symbol_map.get(row.asset_id)
-        if not sym:
+        ref = by_id.get(row.asset_id)
+        if ref is None:
             continue
+        sym = ref.symbol
         bars_by_symbol.setdefault(sym, []).append({
             "time": int(row.timestamp.timestamp()),
             "price": float(row.price),

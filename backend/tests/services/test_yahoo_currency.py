@@ -8,7 +8,8 @@ EXCHANGE_CURRENCY_MAP carried.
 import pandas as pd
 import pytest
 
-from app.services.market_calendar import SUFFIX_LISTINGS, Symbol
+from app.domain import AssetRef
+from app.services.market_calendar import SUFFIX_LISTINGS
 from app.services.yahoo import (
     _normalize_ohlcv_df,
     resolve_currency,
@@ -31,7 +32,7 @@ _LEGACY_SUFFIX_CURRENCIES = {
 
 
 def currency_from_suffix(symbol: str):
-    return Symbol(symbol).currency
+    return AssetRef(symbol).currency
 
 
 class TestCurrencyFromSuffix:
@@ -96,7 +97,7 @@ class TestCurrencyFromSuffix:
         """Every pair the retired EXCHANGE_CURRENCY_MAP knew resolves identically
         through the consolidated table, and all codes stay ISO 4217 shaped."""
         for suffix, currency in _LEGACY_SUFFIX_CURRENCIES.items():
-            assert Symbol(f"XXX.{suffix}").currency == currency, suffix
+            assert AssetRef(f"XXX.{suffix}").currency == currency, suffix
         for suffix, listing in SUFFIX_LISTINGS.items():
             assert listing.currency and len(listing.currency) == 3, suffix
             assert listing.currency == listing.currency.upper(), suffix

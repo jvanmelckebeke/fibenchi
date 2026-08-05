@@ -5,6 +5,7 @@ import logging
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain import AssetRef
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.repositories.pseudo_etf_repo import PseudoEtfRepository
@@ -63,7 +64,7 @@ async def add_constituents(db: AsyncSession, etf_id: int, asset_ids: list[int]):
         for asset in new_assets:
             if asset.id not in last_dates:
                 logger.info("Syncing prices for new constituent %s", asset.symbol)
-                await sync_asset_prices(db, asset, period="5y")
+                await sync_asset_prices(db, AssetRef.of(asset), period="5y")
 
     return result
 

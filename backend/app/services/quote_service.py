@@ -6,6 +6,7 @@ import logging
 import time as _time
 
 from app.database import async_session
+from app.domain import AssetRef
 from app.repositories.asset_repo import AssetRepository
 from app.services.intraday import get_intraday_bars
 from app.services.market_calendar import schedule_poll_hint
@@ -15,7 +16,7 @@ from app.services.price_providers import get_price_provider
 logger = logging.getLogger(__name__)
 
 # Cache asset list to avoid opening a DB session every SSE iteration
-_asset_list_cache: tuple[float, list[tuple[int, str]]] = (0.0, [])
+_asset_list_cache: tuple[float, list[AssetRef]] = (0.0, [])
 _ASSET_LIST_TTL = 30  # seconds
 
 
@@ -87,23 +88,19 @@ async def quote_event_generator():
             now = _time.monotonic()
             if now - _asset_list_cache[0] > _ASSET_LIST_TTL:
                 async with async_session() as db:
-                    pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
-                _asset_list_cache = (now, pairs)
+                    refs = await AssetRepository(db).list_in_any_group_refs()
+                _asset_list_cache = (now, refs)
             else:
-                pairs = _asset_list_cache[1]
+                refs = _asset_list_cache[1]
 
-            symbols = [sym for _, sym in pairs]
-            asset_map_id_to_sym = {aid: sym for aid, sym in pairs}
-            asset_ids = [aid for aid, _ in pairs]
-
-            if not symbols:
+            if not refs:
                 yield "event: quotes\ndata: {}\n\n"
                 last_payload = {}
                 last_intraday_ts = {}
                 await asyncio.sleep(60)
                 continue
 
-            quotes = await get_price_provider().batch_fetch_quotes(symbols)
+            quotes = await get_price_provider().batch_fetch_quotes(list(refs))
 
             # Build keyed payload
             full_payload: dict[str, dict] = {}
@@ -135,7 +132,7 @@ async def quote_event_generator():
             # Always push intraday on first iteration or when markets are active
             if has_active_market or not last_intraday_ts:
                 async with async_session() as db:
-                    all_bars = await get_intraday_bars(db, asset_ids, asset_map_id_to_sym)
+                    all_bars = await get_intraday_bars(db, refs)
 
                 if all_bars:
                     if not last_intraday_ts:
@@ -158,7 +155,7 @@ async def quote_event_generator():
                         if bars:
                             last_intraday_ts[sym] = max(b["time"] for b in bars)
 
-            await asyncio.sleep(_poll_interval(market_states, symbols))
+            await asyncio.sleep(_poll_interval(market_states, refs))
 
         except asyncio.CancelledError:
             break

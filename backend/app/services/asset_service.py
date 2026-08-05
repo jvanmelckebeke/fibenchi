@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain import AssetRef
 from app.models import (
     Annotation,
     Asset,
@@ -17,7 +18,6 @@ from app.repositories.group_repo import GroupRepository
 from app.schemas.asset import AssetAttachments
 from app.services.currency_service import ensure_currency
 from app.services.entity_lookups import get_asset
-from app.services.market_calendar import Symbol
 from app.services.yahoo import yahoo_client
 
 
@@ -45,7 +45,7 @@ async def create_asset(
     if not info:
         if not name:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
-        currency = Symbol(symbol).currency or "USD"
+        currency = AssetRef(symbol).currency or "USD"
     else:
         currency = info.get("currency_code") or info.get("currency", "USD")
         if not name:

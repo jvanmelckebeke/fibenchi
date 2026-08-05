@@ -5,6 +5,7 @@ import pandas as pd
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain import AssetRef
 from app.models import PriceHistory
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ class PriceRepository:
         return result.rowcount or 0
 
     @staticmethod
-    def build_price_rows(asset_id: int, df: pd.DataFrame) -> list[dict]:
+    def build_price_rows(ref: AssetRef, df: pd.DataFrame) -> list[dict]:
         """Convert a price DataFrame to insertable row dicts.
 
         Rows with a NaN in any OHLC column are skipped — but never silently:
@@ -164,7 +165,7 @@ class PriceRepository:
                 continue
 
             rows.append({
-                "asset_id": asset_id,
+                "asset_id": ref.id,
                 "date": dt,
                 "open": round(float(row["open"]), 4),
                 "high": round(float(row["high"]), 4),
@@ -175,13 +176,14 @@ class PriceRepository:
 
         if skipped:
             logger.warning(
-                "Skipped %d price bar(s) with NaN OHLC for asset_id=%d "
+                "Skipped %d price bar(s) with NaN OHLC for %s (asset_id=%d) "
                 "(dates: %s) — this leaves a gap in price_history",
-                len(skipped), asset_id, ", ".join(d.isoformat() for d in skipped),
+                len(skipped), ref, ref.id,
+                ", ".join(d.isoformat() for d in skipped),
             )
         return rows
 
-    async def upsert_prices(self, asset_id: int, df: pd.DataFrame) -> int:
+    async def upsert_prices(self, ref: AssetRef, df: pd.DataFrame) -> int:
         """Upsert price rows from a DataFrame. Returns row count.
 
         Uses PostgreSQL ON CONFLICT DO UPDATE. For SQLite (tests), this
@@ -192,7 +194,7 @@ class PriceRepository:
 
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-        rows = self.build_price_rows(asset_id, df)
+        rows = self.build_price_rows(ref, df)
         if not rows:
             return 0
 

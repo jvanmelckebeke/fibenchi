@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.domain import AssetRef
 from app.services.quote_service import get_quotes, quote_event_generator
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -68,7 +69,7 @@ async def test_stream_emits_full_payload_first():
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL")])
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
 
         events = []
         async for event in quote_event_generator():
@@ -112,7 +113,7 @@ async def test_stream_delta_only_changed():
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL"), (2, "MSFT")])
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1), AssetRef("MSFT", 2)])
 
         events = []
         async for event in quote_event_generator():
@@ -149,7 +150,7 @@ async def test_stream_adaptive_interval_regular():
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL")])
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
         async for _ in quote_event_generator():
             pass
 
@@ -179,7 +180,7 @@ async def test_stream_adaptive_interval_closed():
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_id_symbol_pairs = AsyncMock(return_value=[(1, "AAPL")])
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
         async for _ in quote_event_generator():
             pass
 

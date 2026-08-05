@@ -6,7 +6,7 @@ from datetime import date
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Asset
+from app.domain import AssetRef
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.services.market_state import is_session_forming
@@ -160,7 +160,7 @@ async def _quote_anchors(
 
 
 async def _drop_and_persist(
-    db: AsyncSession, asset_id: int, df: pd.DataFrame, anchor: Anchor, symbol: str,
+    db: AsyncSession, ref: AssetRef, df: pd.DataFrame, anchor: Anchor,
 ) -> int:
     """Drop the trailing unsettled bar (if any), upsert the rest, and purge any
     stale copy left behind. Returns the number of rows upserted.
@@ -174,18 +174,18 @@ async def _drop_and_persist(
     """
     price, previous_close, market_state, session_date = anchor
     kept = drop_unsettled_last_bar(
-        df, price, previous_close, market_state, symbol=symbol, session_date=session_date,
+        df, price, previous_close, market_state, symbol=ref, session_date=session_date,
     )
-    count = await _upsert_prices(db, asset_id, kept)
+    count = await _upsert_prices(db, ref, kept)
     if not kept.empty and len(kept) < len(df):
         last_kept = kept.index[-1]
         last_kept = last_kept.date() if hasattr(last_kept, "date") else last_kept
-        await PriceRepository(db).delete_prices_after(asset_id, last_kept)
+        await PriceRepository(db).delete_prices_after(ref.id, last_kept)
     return count
 
 
 async def _persist_symbol(
-    db: AsyncSession, asset_id: int, df: pd.DataFrame, anchor: Anchor, symbol: str,
+    db: AsyncSession, ref: AssetRef, df: pd.DataFrame, anchor: Anchor,
 ) -> int | None:
     """Persist one symbol's frame, isolating its failure from the rest of the run.
 
@@ -199,15 +199,15 @@ async def _persist_symbol(
     already committed) and return ``None`` to skip it.
     """
     try:
-        return await _drop_and_persist(db, asset_id, df, anchor, symbol)
+        return await _drop_and_persist(db, ref, df, anchor)
     except Exception:
-        logger.warning("Persisting prices for %s failed; skipping", symbol, exc_info=True)
+        logger.warning("Persisting prices for %s failed; skipping", ref, exc_info=True)
         await db.rollback()
         return None
 
 
 async def sync_asset_prices(
-    db: AsyncSession, asset: Asset, period: str = "3mo", anchor: Anchor | None = None,
+    db: AsyncSession, ref: AssetRef, period: str = "3mo", anchor: Anchor | None = None,
 ) -> int:
     """Fetch and upsert price data for a single asset. Returns number of rows upserted.
 
@@ -216,14 +216,14 @@ async def sync_asset_prices(
     in, avoiding a redundant per-symbol quote round-trip.
     """
     provider = get_price_provider()
-    df = await provider.fetch_history(asset.symbol, period=period)
+    df = await provider.fetch_history(ref, period=period)
     if anchor is None:
-        anchor = (await _quote_anchors(provider, [asset.symbol])).get(asset.symbol, _NO_ANCHOR)
-    return await _drop_and_persist(db, asset.id, df, anchor, asset.symbol)
+        anchor = (await _quote_anchors(provider, [ref])).get(ref, _NO_ANCHOR)
+    return await _drop_and_persist(db, ref, df, anchor)
 
 
 async def sync_asset_prices_range(
-    db: AsyncSession, asset: Asset, start: date, end: date
+    db: AsyncSession, ref: AssetRef, start: date, end: date
 ) -> int:
     """Fetch and upsert price data for a date range. Returns number of rows upserted.
 
@@ -236,11 +236,11 @@ async def sync_asset_prices_range(
     backfills) skip the quote round-trip: every bar in them is settled.
     """
     provider = get_price_provider()
-    df = await provider.fetch_history(asset.symbol, start=start, end=end)
+    df = await provider.fetch_history(ref, start=start, end=end)
     if end < date.today():
-        return await _upsert_prices(db, asset.id, df)
-    anchor = (await _quote_anchors(provider, [asset.symbol])).get(asset.symbol, _NO_ANCHOR)
-    return await _drop_and_persist(db, asset.id, df, anchor, asset.symbol)
+        return await _upsert_prices(db, ref, df)
+    anchor = (await _quote_anchors(provider, [ref])).get(ref, _NO_ANCHOR)
+    return await _drop_and_persist(db, ref, df, anchor)
 
 
 async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int]:
@@ -250,17 +250,19 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
     if not assets:
         return {}
 
-    symbols = [a.symbol for a in assets]
-    asset_map = {a.symbol: a.id for a in assets}
+    # Detached refs, captured while the rows are live: the per-symbol loop
+    # below commits and may roll back, either of which expires ORM instances.
+    refs = {a.symbol: AssetRef.of(a) for a in assets}
+    symbols = list(refs)
     provider = get_price_provider()
     data = await provider.batch_fetch_history(symbols, period=period)
     anchors = await _quote_anchors(provider, symbols)
 
     counts = {}
     for sym, df in data.items():
-        asset_id = asset_map.get(sym)
-        if asset_id:
-            count = await _persist_symbol(db, asset_id, df, anchors.get(sym, _NO_ANCHOR), sym)
+        ref = refs.get(sym)
+        if ref:
+            count = await _persist_symbol(db, ref, df, anchors.get(sym, _NO_ANCHOR))
             if count is not None:
                 counts[sym] = count
 
@@ -286,13 +288,13 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
             if df is None or df.empty:
                 logger.warning("Retry fetch for %s returned no data", sym)
                 continue
-            count = await _persist_symbol(db, asset_map[sym], df, anchors.get(sym, _NO_ANCHOR), sym)
+            count = await _persist_symbol(db, refs[sym], df, anchors.get(sym, _NO_ANCHOR))
             if count is not None:
                 counts[sym] = count
 
     return counts
 
 
-async def _upsert_prices(db: AsyncSession, asset_id: int, df: pd.DataFrame) -> int:
+async def _upsert_prices(db: AsyncSession, ref: AssetRef, df: pd.DataFrame) -> int:
     """Upsert price rows from a DataFrame. Returns row count."""
-    return await PriceRepository(db).upsert_prices(asset_id, df)
+    return await PriceRepository(db).upsert_prices(ref, df)

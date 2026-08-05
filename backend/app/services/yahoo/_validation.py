@@ -2,8 +2,8 @@
 
 import asyncio
 
+from app.domain import AssetRef
 from app.services.currency_service import lookup as currency_lookup
-from app.services.market_calendar import Symbol
 from app.services.yahoo._base import _YahooBase
 
 
@@ -27,7 +27,7 @@ class _ValidationMixin(_YahooBase):
                 if isinstance(detail, dict):
                     raw_code = detail.get("currency")
             if not raw_code:
-                raw_code = Symbol(symbol).currency or "USD"
+                raw_code = AssetRef(symbol).currency or "USD"
 
             display_code, _ = currency_lookup(raw_code)
             return {

@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
+from app.domain import AssetRef
 from app.models import PriceHistory
 from app.repositories.price_repo import PriceRepository
 from tests.helpers import create_test_asset as _create_asset
@@ -155,7 +156,7 @@ async def test_upsert_prices_mocked(db):
     """upsert_prices uses pg_insert which is PostgreSQL-only, so we verify the
     empty-DataFrame shortcut works and mock the rest."""
     repo = PriceRepository(db)
-    count = await repo.upsert_prices(1, pd.DataFrame())
+    count = await repo.upsert_prices(AssetRef("AAPL", 1), pd.DataFrame())
     assert count == 0
 
 
@@ -172,13 +173,14 @@ async def test_build_price_rows_logs_nan_skips(caplog):
     }, index=idx)
 
     with caplog.at_level("WARNING", logger="app.repositories.price_repo"):
-        rows = PriceRepository.build_price_rows(1, df)
+        rows = PriceRepository.build_price_rows(AssetRef("MT.AS", 1), df)
 
     assert len(rows) == 2
     assert [r["date"] for r in rows] == [idx[0].date(), idx[2].date()]
     assert len(caplog.records) == 1
     assert idx[1].date().isoformat() in caplog.records[0].getMessage()
     assert "gap" in caplog.records[0].getMessage()
+    assert "MT.AS" in caplog.records[0].getMessage()
 
 
 async def test_build_price_rows_clean_df_no_warning(caplog):
@@ -189,6 +191,6 @@ async def test_build_price_rows_clean_df_no_warning(caplog):
         "close": [100.5] * 3, "volume": [1_000] * 3,
     }, index=idx)
     with caplog.at_level("WARNING", logger="app.repositories.price_repo"):
-        rows = PriceRepository.build_price_rows(1, df)
+        rows = PriceRepository.build_price_rows(AssetRef("AAPL", 1), df)
     assert len(rows) == 3
     assert not caplog.records
