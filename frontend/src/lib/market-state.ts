@@ -4,7 +4,7 @@
 // "Post-Market"). Both now consume this.
 
 // Presentation traits for a market state. Deliberately NOT the same thing
-// as the backend's MarketStateInfo (app/services/market_state.py): that one
+// as the backend's MarketStateInfo (app/domain/market_state.py): that one
 // carries data traits (active, session_forming); this one carries display
 // traits. They share only the six-state vocabulary and the `phase` join key.
 export interface MarketStateDisplay {

@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.background_tasks import price_heal
+from app.background_tasks.price_heal import MAX_HEALS_PER_RUN, heal_unreconciled_prices
 from app.repositories.price_repo import PriceRepository
-from app.services import price_heal
-from app.services.price_heal import MAX_HEALS_PER_RUN, heal_unreconciled_prices
 from tests.helpers import seed_asset_with_prices
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -49,8 +49,8 @@ async def test_heal_refreshes_unreconciled_asset(db):
 
     # Quote two sessions ahead of the stored bar: nothing reconciles.
     provider = _provider_with_quotes([_quote("PRY.MI", close * 0.90, close * 0.95)])
-    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
-         patch("app.services.price_heal.sync_asset_prices",
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices",
                new_callable=AsyncMock, return_value=22) as mock_sync:
         healed = await heal_unreconciled_prices(db)
 
@@ -83,8 +83,8 @@ async def test_heal_failure_is_non_fatal_and_rolls_back(db):
             raise RuntimeError("boom")
         return 22
 
-    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
-         patch("app.services.price_heal.sync_asset_prices", side_effect=fake_sync), \
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices", side_effect=fake_sync), \
          patch.object(db, "rollback", new_callable=AsyncMock) as mock_rollback:
         healed = await heal_unreconciled_prices(db)
 
@@ -106,8 +106,8 @@ async def test_heal_skips_reconciling_assets(db):
         # Current session already stored (settled close equals the price).
         _quote("CURR", c2, c2 * 1.05),
     ])
-    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
-         patch("app.services.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {}
@@ -119,8 +119,8 @@ async def test_heal_skips_assets_without_stored_bars(db):
     await seed_asset_with_prices(db, "NEWB", n_days=0)
 
     provider = _provider_with_quotes([_quote("NEWB", 100.0, 99.0)])
-    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
-         patch("app.services.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {}
@@ -132,8 +132,8 @@ async def test_heal_skips_dead_quotes(db):
     await seed_asset_with_prices(db, "DEAD", n_days=30)
 
     provider = _provider_with_quotes([_quote("DEAD", None, None)])
-    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
-         patch("app.services.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {}
@@ -147,8 +147,8 @@ async def test_heal_cooldown_prevents_hammering(db):
 
     # Still unreconcilable after the heal (Yahoo keeps serving lagged data).
     provider = _provider_with_quotes([_quote("LAG.MI", close * 0.90, close * 0.95)])
-    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
-         patch("app.services.price_heal.sync_asset_prices",
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices",
                new_callable=AsyncMock, return_value=0) as mock_sync:
         await heal_unreconciled_prices(db)
         await heal_unreconciled_prices(db)
@@ -165,8 +165,8 @@ async def test_heal_caps_per_run_and_defers_rest(db):
     provider = _provider_with_quotes(
         [_quote(s, c * 0.90, c * 0.95) for s, c in closes.items()]
     )
-    with patch("app.services.price_heal.get_price_provider", return_value=provider), \
-         patch("app.services.price_heal.sync_asset_prices",
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices",
                new_callable=AsyncMock, return_value=1) as mock_sync:
         first = await heal_unreconciled_prices(db)
         second = await heal_unreconciled_prices(db)
@@ -184,9 +184,9 @@ from datetime import date, timedelta  # noqa: E402
 
 from sqlalchemy import delete  # noqa: E402
 
+from app.background_tasks.price_heal import find_interior_holes, heal_interior_holes  # noqa: E402
 from app.domain import AssetRef  # noqa: E402
 from app.models import PriceHistory  # noqa: E402
-from app.services.price_heal import find_interior_holes, heal_interior_holes  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

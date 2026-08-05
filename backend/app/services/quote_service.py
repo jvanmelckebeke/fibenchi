@@ -7,10 +7,10 @@ import time as _time
 
 from app.database import async_session
 from app.domain import AssetRef
+from app.domain.market_state import any_active, state_info
 from app.repositories.asset_repo import AssetRepository
 from app.services.intraday import get_intraday_bars
 from app.services.market_calendar import schedule_poll_hint
-from app.services.market_state import any_active, state_info
 from app.services.price_providers import get_price_provider
 
 logger = logging.getLogger(__name__)

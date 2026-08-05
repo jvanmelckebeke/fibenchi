@@ -5,7 +5,7 @@ vocabulary; these tests pin the traits to the historical behavior of those
 sites so the consolidation stays a pure refactor.
 """
 
-from app.services.market_state import (
+from app.domain.market_state import (
     MARKET_STATES,
     any_active,
     is_active,
