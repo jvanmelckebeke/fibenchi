@@ -232,7 +232,11 @@ async def _seed_with_hole(db, symbol="AAPL", frac=0.5):
 
 
 async def test_hole_heal_detects_and_refetches(db):
-    """A deleted mid-series session is detected and its range re-fetched."""
+    """A deleted mid-series session is detected and re-fetched with a padded
+    range: Yahoo's exclusive ``end`` means the newest hole must sit strictly
+    inside the requested window (staging regression 2026-08-05: fetching
+    exactly ``min(holes)..max(holes)`` never requested the newest hole, and
+    single-hole symbols asked for an empty range — "No data found")."""
     asset, hole = await _seed_with_hole(db)
     with patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync:
         sync.return_value = 1
@@ -241,7 +245,8 @@ async def test_hole_heal_detects_and_refetches(db):
     sync.assert_awaited_once()
     _, called_asset, start, end = sync.await_args.args
     assert called_asset.id == asset.id
-    assert start == end == hole
+    assert start == hole - timedelta(days=5)
+    assert end == hole + timedelta(days=1)
 
 
 async def test_hole_heal_clean_series_no_fetch(db):
