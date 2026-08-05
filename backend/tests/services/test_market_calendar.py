@@ -117,6 +117,15 @@ def test_open_close_helpers():
     assert venue.next_close(at) == datetime(2024, 4, 3, 20, 0, tzinfo=timezone.utc)
 
 
+def test_local_date_is_venue_timezone_date():
+    """local_date answers in the venue's timezone, not the server's."""
+    # 2024-04-03 02:00 UTC: still Tuesday evening in New York, but already
+    # Wednesday morning in Seoul.
+    at = datetime(2024, 4, 3, 2, 0, tzinfo=timezone.utc)
+    assert AssetRef("AAPL").venue.local_date(at) == date(2024, 4, 2)
+    assert AssetRef("005930.KS").venue.local_date(at) == date(2024, 4, 3)
+
+
 def test_venues_are_cached_and_shared():
     """Symbols on the same venue share one Venue instance."""
     assert AssetRef("AAPL").venue is AssetRef("MSFT").venue

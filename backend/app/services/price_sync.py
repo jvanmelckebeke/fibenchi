@@ -139,15 +139,19 @@ async def _quote_anchors(
 ) -> dict[str, Anchor]:
     """Fetch ``{symbol: (price, previous_close, market_state, session_date)}``.
 
-    Best-effort: a quote-fetch failure degrades to storing every bar (the prior
-    behaviour) rather than aborting the sync.
+    Best-effort: a quote-fetch failure degrades to the anchorless guard in
+    ``_drop_and_persist`` (store settled bars, withhold a possible live
+    partial) rather than aborting the sync.
     """
     if not symbols:
         return {}
     try:
         quotes = await provider.batch_fetch_quotes(symbols)
     except Exception:
-        logger.warning("Quote fetch for settlement check failed; storing all bars", exc_info=True)
+        logger.warning(
+            "Quote fetch for settlement check failed; storing settled bars only",
+            exc_info=True,
+        )
         return {}
     return {
         q["symbol"]: (
@@ -157,6 +161,33 @@ async def _quote_anchors(
         for q in quotes
         if q.get("symbol")
     }
+
+
+def _drop_unanchored_trailing_bar(df: pd.DataFrame, ref: AssetRef) -> pd.DataFrame:
+    """Anchorless fallback for ``drop_unsettled_last_bar``: drop a trailing bar
+    that *could* be the current session's live partial.
+
+    Without a quote there is nothing to reconcile against, so the one bar that
+    can be partial — the trailing bar dated on the venue's current local date
+    (or later, for a stray future-dated row) — is not persisted. Every earlier
+    bar is a settled prior session and stores as usual. The withheld bar is
+    picked up by a later sync or heal once an anchor is available or the
+    session has long closed. Venue unknown → the server's own date, which can
+    only over-withhold by a few hours around midnight.
+    """
+    if df.empty:
+        return df
+    last_dt = df.index[-1]
+    last_date = last_dt.date() if hasattr(last_dt, "date") else last_dt
+    venue = getattr(ref, "venue", None)
+    today = (venue.local_date() if venue is not None else None) or date.today()
+    if last_date < today:
+        return df
+    logger.info(
+        "%s: withholding trailing %s bar (no quote anchor; may be a live partial)",
+        ref, df.index[-1],
+    )
+    return df.iloc[:-1]
 
 
 async def _drop_and_persist(
@@ -173,6 +204,13 @@ async def _drop_and_persist(
     kept bar so the settled data is authoritative.
     """
     price, previous_close, market_state, session_date = anchor
+    if price is None or previous_close is None:
+        # No anchor (quote batch failed / symbol missing from it). Failing
+        # fully open here once stored every open market's live partial as that
+        # session's close, portfolio-wide (#586). Persist the settled bars but
+        # withhold a trailing current-session bar — and never purge: without a
+        # quote, a stored later row can't be proven stale.
+        return await _upsert_prices(db, ref, _drop_unanchored_trailing_bar(df, ref))
     kept = drop_unsettled_last_bar(
         df, price, previous_close, market_state, symbol=ref, session_date=session_date,
     )
