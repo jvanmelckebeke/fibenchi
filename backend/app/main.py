@@ -27,6 +27,7 @@ from app.routers import (
     quotes,
     search,
     symbol_sources,
+    system,
     tags,
     thesis,
 )
@@ -202,6 +203,7 @@ app.include_router(quotes.router)
 app.include_router(settings_router.router)
 app.include_router(search.router)
 app.include_router(symbol_sources.router)
+app.include_router(system.router)
 
 
 @app.get("/api/health", summary="Health check", tags=["system"])
