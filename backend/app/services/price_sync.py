@@ -227,6 +227,9 @@ async def sync_asset_prices_range(
 ) -> int:
     """Fetch and upsert price data for a date range. Returns number of rows upserted.
 
+    ``end`` is exclusive (Yahoo range semantics): a bar dated ``end`` itself
+    is not fetched — callers that need it must pass the day after.
+
     A range that reaches today can include the current session's still-forming
     bar, exactly like a period fetch — this path used to upsert it raw, so any
     display/warmup backfill during market hours stored a live partial that

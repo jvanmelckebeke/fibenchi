@@ -278,8 +278,15 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
     for ref, holes, signature in candidates:
         symbol = ref
         _hole_attempts[symbol] = (now, signature)
+        # Yahoo's range end is exclusive, so a fetch ending at max(holes)
+        # would never request the newest hole — pad one day past it. The
+        # start is padded back a few days so the range always contains
+        # sessions Yahoo *does* have bars for: a range covering only the
+        # missing day comes back empty and reads as "No data found".
+        fetch_start = min(holes) - timedelta(days=5)
+        fetch_end = max(holes) + timedelta(days=1)
         try:
-            count = await sync_asset_prices_range(db, ref, min(holes), max(holes))
+            count = await sync_asset_prices_range(db, ref, fetch_start, fetch_end)
             healed[symbol] = count
             refreshed = await PriceRepository(db).list_by_asset_since(ref.id, min(holes))
             remaining = holes - {p.date for p in refreshed}
