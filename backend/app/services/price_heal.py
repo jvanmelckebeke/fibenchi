@@ -131,21 +131,31 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
 
 # The hole scan is cheap (one DB query + calendar lookups) but each detected
 # hole costs a Yahoo range fetch, and holes either fill on the first try or
-# need Yahoo to backfill upstream — rescanning faster gains nothing.
+# need Yahoo to backfill upstream — rescanning faster gains nothing *for a
+# symbol that was attempted*. Deferred symbols were never attempted, so a
+# scan that hit the per-scan cap schedules the next one much sooner: the
+# retry cooldown below already keeps attempted-but-unfillable holes from
+# being re-hammered.
 HOLE_SCAN_INTERVAL_SECONDS = 6 * 60 * 60
+HOLE_BACKLOG_RESCAN_SECONDS = 30 * 60
 
 # A hole that survived a re-fetch is data Yahoo doesn't have (yet). Retry
 # daily — backfills typically land within a day or two — instead of every scan.
 HOLE_RETRY_COOLDOWN_SECONDS = 24 * 60 * 60
 
-# Bound per-scan fetches; wider breakage is a sync-level outage.
-MAX_HOLE_HEALS_PER_SCAN = 5
+# Bound per-scan fetches; wider breakage is a sync-level outage. Sized for a
+# feed-wide event (2026-08-05: Yahoo served NaN OHLC for one session across
+# dozens of European symbols at once) to drain in hours, not days.
+MAX_HOLE_HEALS_PER_SCAN = 10
 
 # Only scan the window that feeds the group snapshot + display periods; ancient
 # holes beyond it don't blank anything a user currently sees.
 HOLE_SCAN_WINDOW_DAYS = 120
 
 _last_hole_scan: float | None = None
+# Whether the last scan hit the per-scan cap and left symbols unattempted —
+# if so the next scan runs after the short backlog interval.
+_hole_backlog: bool = False
 # symbol → (last attempt, the exact holes attempted). A changed hole set is a
 # new problem and bypasses the cooldown.
 _hole_attempts: dict[str, tuple[float, frozenset[date]]] = {}
@@ -171,9 +181,10 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
     Symbols without a resolvable venue calendar are skipped — without the
     session list a hole cannot be told apart from a holiday.
     """
-    global _last_hole_scan
+    global _last_hole_scan, _hole_backlog
     now = time.monotonic()
-    if not force and _last_hole_scan is not None and now - _last_hole_scan < HOLE_SCAN_INTERVAL_SECONDS:
+    interval = HOLE_BACKLOG_RESCAN_SECONDS if _hole_backlog else HOLE_SCAN_INTERVAL_SECONDS
+    if not force and _last_hole_scan is not None and now - _last_hole_scan < interval:
         return {}
     _last_hole_scan = now
 
@@ -213,14 +224,23 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
         candidates.append((ref, holes, signature))
 
     if not candidates:
+        _hole_backlog = False
         return {}
+
+    # Newest hole first: a hole at yesterday's session blanks σ-Move *today*,
+    # while an old interior hole only dents historical charts — when the cap
+    # forces a choice, heal what the user is currently looking at.
+    candidates.sort(key=lambda c: max(c[1]), reverse=True)
 
     deferred = candidates[MAX_HOLE_HEALS_PER_SCAN:]
     candidates = candidates[:MAX_HOLE_HEALS_PER_SCAN]
+    _hole_backlog = bool(deferred)
     if deferred:
         logger.info(
-            "Hole heal: %d symbol(s) with interior holes; healing %d, deferring %d",
+            "Hole heal: %d symbol(s) with interior holes; healing %d, deferring %d "
+            "(next scan in %d min)",
             len(candidates) + len(deferred), len(candidates), len(deferred),
+            HOLE_BACKLOG_RESCAN_SECONDS // 60,
         )
 
     healed: dict[str, int] = {}
