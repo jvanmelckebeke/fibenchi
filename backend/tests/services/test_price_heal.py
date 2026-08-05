@@ -270,6 +270,33 @@ async def test_hole_heal_scan_interval_throttles(db):
     sync.assert_awaited_once()
 
 
+async def test_hole_heal_failure_does_not_abort_batch(db):
+    """One symbol's failed re-fetch must not kill the rest of the scan.
+
+    Staging regression (2026-08-05): AIFS.DE raised "No data found", the
+    rollback in the except path expired every ORM instance in the session,
+    and the next candidate's attribute access crashed the whole job with
+    MissingGreenlet — remaining candidates were never attempted.
+    """
+    await _seed_with_hole(db, "AAAA")
+    await _seed_with_hole(db, "BBBB")
+
+    async def sync_side_effect(db_, asset, start, end):
+        if asset.symbol == "AAAA":
+            raise ValueError("No data found for AAAA")
+        return 1
+
+    with patch.object(price_heal, "sync_asset_prices_range",
+                      new=AsyncMock(side_effect=sync_side_effect)) as sync:
+        healed = await heal_interior_holes(db, force=True)
+
+    assert sync.await_count == 2
+    assert "AAAA" not in healed
+    assert healed.get("BBBB") == 1
+    # The failed symbol still lands on cooldown so it isn't retried every scan.
+    assert "AAAA" in price_heal._hole_attempts
+
+
 async def test_hole_heal_skips_unknown_venue(db):
     """No venue calendar → holes and holidays are indistinguishable → skip."""
     asset = await seed_asset_with_prices(db, "FOO.XX", n_days=60)
