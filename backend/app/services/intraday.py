@@ -118,7 +118,7 @@ async def fetch_and_store_intraday(
 
         stmt = pg_insert(IntradayPrice).values(rows)
         stmt = stmt.on_conflict_do_update(
-            constraint="uq_intraday_asset_ts",
+            index_elements=["asset_id", "timestamp"],
             set_={
                 "price": stmt.excluded.price,
                 "volume": stmt.excluded.volume,
