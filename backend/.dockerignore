@@ -1,0 +1,20 @@
+# Deps are pip-installed inside the image (from requirements.txt). Never ship the
+# host virtualenv into the build context — it's wrong-arch and huge, and `COPY . .`
+# would drag it into the image.
+.venv
+venv
+
+# Python bytecode / tool caches — regenerated, never needed in the image.
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Local/editor cruft.
+*.log
+.DS_Store
+.vscode
+.idea
+Dockerfile
+.dockerignore

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 import pytest
 
+from app.domain import AssetRef
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.services.price_sync import (
@@ -66,7 +67,7 @@ async def test_sync_calls_fetch_with_period(db):
     mock_prov = _mock_provider()
     with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
          patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10):
-        count = await sync_asset_prices(db, asset, period="6mo")
+        count = await sync_asset_prices(db, AssetRef.of(asset), period="6mo")
 
     mock_prov.fetch_history.assert_awaited_once_with("TEST", period="6mo")
     assert count == 10
@@ -96,7 +97,7 @@ async def test_sync_range_passes_dates(db):
     mock_prov = _mock_provider()
     with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
          patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=5):
-        count = await sync_asset_prices_range(db, asset, start, end)
+        count = await sync_asset_prices_range(db, AssetRef.of(asset), start, end)
 
     mock_prov.fetch_history.assert_awaited_once_with("RNG", start=start, end=end)
     assert count == 5
@@ -111,7 +112,7 @@ async def test_sync_range_past_skips_quote_roundtrip(db):
     mock_prov = _mock_provider()
     with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
          patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
-        await sync_asset_prices_range(db, asset, date(2025, 1, 1), date(2025, 6, 30))
+        await sync_asset_prices_range(db, AssetRef.of(asset), date(2025, 1, 1), date(2025, 6, 30))
 
     mock_prov.batch_fetch_quotes.assert_not_awaited()
 
@@ -136,12 +137,12 @@ async def test_sync_range_to_today_drops_unsettled_bar(db):
     captured = {}
 
     async def _capture(*args):
-        captured["len"] = len(args[-1])
-        return len(args[-1])
+        captured["len"] = len(args[2])
+        return len(args[2])
 
     with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
          patch("app.services.price_sync._upsert_prices", side_effect=_capture):
-        await sync_asset_prices_range(db, asset, date(2026, 1, 1), date.today())
+        await sync_asset_prices_range(db, AssetRef.of(asset), date(2026, 1, 1), date.today())
 
     assert captured["len"] == 2  # partial dropped
     mock_prov.batch_fetch_quotes.assert_awaited_once()
@@ -159,12 +160,12 @@ async def test_sync_range_to_today_without_quote_stores_all(db):
     captured = {}
 
     async def _capture(*args):
-        captured["len"] = len(args[-1])
-        return len(args[-1])
+        captured["len"] = len(args[2])
+        return len(args[2])
 
     with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
          patch("app.services.price_sync._upsert_prices", side_effect=_capture):
-        await sync_asset_prices_range(db, asset, date(2026, 1, 1), date.today())
+        await sync_asset_prices_range(db, AssetRef.of(asset), date(2026, 1, 1), date.today())
 
     assert captured["len"] == 3
 
@@ -285,8 +286,8 @@ async def test_sync_all_main_loop_failure_is_non_fatal(db):
     ])
     await db.commit()
 
-    async def fake_persist(_db, _asset_id, _df, _anchor, symbol):
-        if symbol == "BAD":
+    async def fake_persist(_db, ref, _df, _anchor):
+        if ref.symbol == "BAD":
             raise RuntimeError("boom")
         return 10
 
@@ -386,7 +387,7 @@ async def test_sync_all_drops_unsettled_bar(db):
     captured = {}
 
     async def _capture(*args):
-        df = args[-1]
+        df = args[2]
         captured["len"] = len(df)
         captured["last_close"] = float(df.iloc[-1]["close"])
         return len(df)
@@ -414,8 +415,8 @@ async def test_sync_all_keeps_settled_bar(db):
     captured = {}
 
     async def _capture(*args):
-        captured["len"] = len(args[-1])
-        return len(args[-1])
+        captured["len"] = len(args[2])
+        return len(args[2])
 
     with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
          patch("app.services.price_sync._upsert_prices", side_effect=_capture):
@@ -479,7 +480,7 @@ async def test_drop_and_persist_deletes_orphaned_partial(db):
     df = _df_from_closes([305.0, 290.23, 224.14])
     anchor = (220.84, 290.23, "REGULAR", None)
     with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=2):
-        await _drop_and_persist(db, asset.id, df, anchor, "ORPH")
+        await _drop_and_persist(db, AssetRef.of(asset), df, anchor)
 
     latest = await PriceRepository(db).get_latest_closes([asset.id])
     assert asset.id not in latest  # the orphaned 2025-06-30 partial was deleted
@@ -498,7 +499,7 @@ async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
     df = _df_from_closes([57.5, 58.04, 59.0])
     anchor = (58.72, 58.04, "POSTPOST", None)
     with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
-        await _drop_and_persist(db, asset.id, df, anchor, "KEEP")
+        await _drop_and_persist(db, AssetRef.of(asset), df, anchor)
 
     latest = await PriceRepository(db).get_latest_closes([asset.id])
     assert latest[asset.id][0] == date(2025, 6, 30)  # untouched

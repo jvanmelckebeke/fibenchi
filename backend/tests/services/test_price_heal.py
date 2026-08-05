@@ -58,7 +58,7 @@ async def test_heal_refreshes_unreconciled_asset(db):
     # The heal threads the already-fetched quote anchor into the sync so it
     # doesn't re-fetch the same quote (#5): (price, previous_close, state, date).
     mock_sync.assert_awaited_once_with(
-        db, asset, period="1mo", anchor=(close * 0.90, close * 0.95, "REGULAR", None),
+        db, AssetRef.of(asset), period="1mo", anchor=(close * 0.90, close * 0.95, "REGULAR", None),
     )
 
 
@@ -184,8 +184,8 @@ from datetime import date, timedelta  # noqa: E402
 
 from sqlalchemy import delete  # noqa: E402
 
+from app.domain import AssetRef  # noqa: E402
 from app.models import PriceHistory  # noqa: E402
-from app.services.market_calendar import Symbol  # noqa: E402
 from app.services.price_heal import find_interior_holes, heal_interior_holes  # noqa: E402
 
 
@@ -216,7 +216,7 @@ async def _seed_with_hole(db, symbol="AAPL"):
     """Seed a US asset and delete one real mid-window session's bar."""
     asset = await seed_asset_with_prices(db, symbol, n_days=60)
     stored = {p.date for p in await PriceRepository(db).list_by_asset(asset.id)}
-    sessions = sorted(Symbol(symbol).venue.session_dates(min(stored), max(stored)))
+    sessions = sorted(AssetRef(symbol).venue.session_dates(min(stored), max(stored)))
     hole = sessions[len(sessions) // 2]
     await db.execute(delete(PriceHistory).where(
         PriceHistory.asset_id == asset.id, PriceHistory.date == hole,

@@ -27,10 +27,9 @@ from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Asset
+from app.domain import AssetRef
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
-from app.services.market_calendar import Symbol
 from app.services.price_providers import get_price_provider
 from app.services.price_sync import (
     Anchor,
@@ -62,9 +61,11 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
     assets = await AssetRepository(db).list_in_any_group()
     if not assets:
         return {}
-    by_symbol = {a.symbol: a for a in assets}
+    # Detached refs: the heal loop below commits/rolls back per symbol, which
+    # expires live ORM instances mid-loop.
+    by_symbol = {a.symbol: AssetRef.of(a) for a in assets}
 
-    latest = await PriceRepository(db).get_latest_closes([a.id for a in assets])
+    latest = await PriceRepository(db).get_latest_closes([r.id for r in by_symbol.values()])
     quotes = await get_price_provider().batch_fetch_quotes(list(by_symbol))
 
     # Carry each stale symbol's reconciliation anchor so the per-symbol refresh
@@ -75,10 +76,10 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
         sym = q.get("symbol")
         if not sym:
             continue
-        asset = by_symbol.get(sym)
-        if asset is None:
+        ref = by_symbol.get(sym)
+        if ref is None:
             continue
-        stored = latest.get(asset.id)
+        stored = latest.get(ref.id)
         if stored is None:  # no bars yet — initial fill is the sync's job
             continue
         price, previous_close = q.get("price"), q.get("previous_close")
@@ -193,23 +194,23 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
         stored = stored_by_asset.get(asset.id)
         if not stored or len(stored) < 2:
             continue  # initial fill is the sync's job
-        venue = Symbol(asset.symbol).venue
-        if venue is None:
+        # Detached ref, not the ORM object: a rollback in the heal loop below
+        # expires every live instance in the session, and touching an expired
+        # attribute outside a greenlet context raises MissingGreenlet.
+        ref = AssetRef.of(asset)
+        if ref.venue is None:
             continue
-        sessions = venue.session_dates(min(stored), max(stored))
+        sessions = ref.venue.session_dates(min(stored), max(stored))
         if not sessions:
             continue
         holes = find_interior_holes(stored, sessions)
         if not holes:
             continue
         signature = frozenset(holes)
-        last = _hole_attempts.get(asset.symbol)
+        last = _hole_attempts.get(ref)
         if last and last[1] == signature and now - last[0] < HOLE_RETRY_COOLDOWN_SECONDS:
             continue  # same holes, recently attempted — wait for Yahoo to backfill
-        # Plain scalars, not the ORM object: a rollback in the heal loop below
-        # expires every instance in the session, and touching an expired
-        # attribute outside a greenlet context raises MissingGreenlet.
-        candidates.append((asset.id, asset.symbol, holes, signature))
+        candidates.append((ref, holes, signature))
 
     if not candidates:
         return {}
@@ -223,18 +224,13 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
         )
 
     healed: dict[str, int] = {}
-    for asset_id, symbol, holes, signature in candidates:
+    for ref, holes, signature in candidates:
+        symbol = ref
         _hole_attempts[symbol] = (now, signature)
         try:
-            # Re-get inside the try: a previous iteration's rollback expired
-            # the session, and Session.get refreshes an expired identity-map
-            # instance in a context where that IO is legal.
-            asset = await db.get(Asset, asset_id)
-            if asset is None:
-                continue  # deleted since the scan
-            count = await sync_asset_prices_range(db, asset, min(holes), max(holes))
+            count = await sync_asset_prices_range(db, ref, min(holes), max(holes))
             healed[symbol] = count
-            refreshed = await PriceRepository(db).list_by_asset_since(asset_id, min(holes))
+            refreshed = await PriceRepository(db).list_by_asset_since(ref.id, min(holes))
             remaining = holes - {p.date for p in refreshed}
             if remaining:
                 logger.info(

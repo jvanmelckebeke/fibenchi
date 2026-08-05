@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.services.market_calendar.symbol import Symbol
-from app.services.market_calendar.venue import _as_utc
+from app.domain.instrument import classify
+from app.services.market_calendar.venue import _as_utc, _venue_for
 
 
 def any_venue_open(symbols, at: datetime | None = None) -> bool:
@@ -30,14 +30,13 @@ def any_venue_open(symbols, at: datetime | None = None) -> bool:
     """
     seen: set[str] = set()
     for sym in symbols:
-        s = Symbol(sym)
-        name = s.calendar_name
+        name = classify(sym).calendar
         if name is None:
             return True  # unknown venue — trading can't be ruled out
         if name in seen:
             continue
         seen.add(name)
-        venue = s.venue
+        venue = _venue_for(name)
         if venue is None:
             return True  # calendar failed to build — same fail-open rule
         phase = venue.phase(at)
@@ -68,12 +67,11 @@ def schedule_poll_hint(symbols, at: datetime | None = None) -> tuple[str, float 
     ts = _as_utc(at).to_pydatetime()
     seen: set[str] = set()
     for sym in symbols:
-        s = Symbol(sym)
-        name = s.calendar_name
+        name = classify(sym).calendar
         if name is None or name in seen:
             continue
         seen.add(name)
-        venue = s.venue
+        venue = _venue_for(name)
         if venue is None:
             continue
         phase = venue.phase(ts)

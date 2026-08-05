@@ -141,8 +141,8 @@ async def scheduled_price_heal():
         # date (Monday morning in Tokyo is still Sunday here).
         from app.repositories.asset_repo import AssetRepository
 
-        pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
-        if not pairs or not any_venue_open([sym for _, sym in pairs]):
+        refs = await AssetRepository(db).list_in_any_group_refs()
+        if not refs or not any_venue_open(refs):
             return
         try:
             healed = await heal_unreconciled_prices(db)
@@ -182,24 +182,21 @@ async def scheduled_intraday_sync():
 
     async with async_session() as db:
         try:
-            pairs = await AssetRepository(db).list_in_any_group_id_symbol_pairs()
-            if not pairs:
+            refs = await AssetRepository(db).list_in_any_group_refs()
+            if not refs:
                 return
-
-            symbols = [sym for _, sym in pairs]
-            asset_map = {sym: aid for aid, sym in pairs}
 
             # Venue-schedule gate. This replaces quoting 15 *random* symbols
             # per tick to sniff for an active market — a Yahoo round-trip
             # every 60s that could still miss the one open venue (3 Tokyo
             # listings in a 200-symbol portfolio → ~80% miss). The calendar
             # answer is deterministic, holiday-aware, and free.
-            if not any_venue_open(symbols):
+            if not any_venue_open(refs):
                 return
 
-            count = await fetch_and_store_intraday(db, symbols, asset_map)
+            count = await fetch_and_store_intraday(db, refs)
             if count:
-                logger.info(f"Intraday sync: {count} bars for {len(symbols)} symbols")
+                logger.info(f"Intraday sync: {count} bars for {len(refs)} symbols")
         except Exception:
             logger.exception("Intraday sync failed")
 

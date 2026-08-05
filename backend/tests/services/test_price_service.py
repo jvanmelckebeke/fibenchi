@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 import pytest
 
+from app.domain import AssetRef
 from app.models import PriceHistory
 from app.services.price_service import (
     _backfill_already_attempted,
@@ -136,7 +137,7 @@ async def test_refresh_delegates_to_sync(mock_sync):
 
     result = await refresh_prices(db, asset, "3mo")
 
-    mock_sync.assert_awaited_once_with(db, asset, period="3mo")
+    mock_sync.assert_awaited_once_with(db, AssetRef.of(asset), period="3mo")
     assert result == {"symbol": "AAPL", "synced": 42}
 
 

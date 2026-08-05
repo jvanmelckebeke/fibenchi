@@ -2,13 +2,13 @@
 
 The suffix→currency table that used to live here merged into the one venue
 table in ``app.services.market_calendar`` (``SUFFIX_LISTINGS``); ticker-shape
-currency inference is ``Symbol(symbol).currency``.
+currency inference is ``AssetRef(symbol).currency``.
 """
 
 import pandas as pd
 
+from app.domain import AssetRef
 from app.services.currency_service import lookup as currency_lookup
-from app.services.market_calendar import Symbol
 
 
 def resolve_currency(info: dict, symbol: str) -> tuple[str, int]:
@@ -25,7 +25,7 @@ def resolve_currency(info: dict, symbol: str) -> tuple[str, int]:
     raw = info.get("currency") if isinstance(info, dict) else None
     if raw:
         return currency_lookup(raw)
-    venue_currency = Symbol(symbol).currency
+    venue_currency = AssetRef(symbol).currency
     if venue_currency:
         return (venue_currency, 1)
     return ("USD", 1)

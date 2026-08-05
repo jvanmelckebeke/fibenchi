@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.domain import AssetRef
 from app.models import Asset
 from app.models.pseudo_etf import PseudoETF, PseudoEtfAnnotation, PseudoEtfNote
 from app.services.pseudo_etf_service import (
@@ -102,7 +103,7 @@ async def test_add_constituents_syncs_prices_for_asset_without_data(
         await add_constituents(db, etf_id=1, asset_ids=[5])
 
     assert new_asset in etf.constituents
-    mock_sync.assert_awaited_once_with(db, new_asset, period="5y")
+    mock_sync.assert_awaited_once_with(db, AssetRef.of(new_asset), period="5y")
 
 
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")
