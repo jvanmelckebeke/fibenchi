@@ -10,16 +10,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import AssetRef
+from app.domain.phases import PHASE_TO_SESSION, Phase, Session
 from app.models.intraday import IntradayPrice
-from app.schemas.intraday import IntradayBar, Session
+from app.schemas.intraday import IntradayBar
 from app.services.yahoo import yahoo_client
 
 logger = logging.getLogger(__name__)
 
 ET = ZoneInfo("America/New_York")
-
-# Venue phase → the 3-value session vocabulary the intraday chart stores/reads.
-_PHASE_TO_SESSION: dict[str, Session] = {"premarket": "pre", "open": "regular", "aftermarket": "post"}
 
 
 def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -> Session:
@@ -42,14 +40,14 @@ def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -
     venue = ref.venue
     if venue is not None:
         phase = venue.phase(ts)
-        if phase in _PHASE_TO_SESSION:
-            return _PHASE_TO_SESSION[phase]
-        if phase == "closed":
+        if phase in PHASE_TO_SESSION:
+            return PHASE_TO_SESSION[phase]
+        if phase == Phase.CLOSED:
             prev_close = venue.previous_close(ts)
             next_open = venue.next_open(ts)
             if prev_close is not None and next_open is not None:
-                return "post" if ts - prev_close <= next_open - ts else "pre"
-            return "post"
+                return Session.POST if ts - prev_close <= next_open - ts else Session.PRE
+            return Session.POST
 
     if tz_name:
         try:
@@ -58,17 +56,17 @@ def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -
             local = None
         if local is not None:
             if local < time(9, 0):
-                return "pre"
+                return Session.PRE
             if local >= time(17, 30):
-                return "post"
-            return "regular"
+                return Session.POST
+            return Session.REGULAR
 
     local = ts.astimezone(ET).time()
     if local < time(9, 30):
-        return "pre"
+        return Session.PRE
     if local >= time(16, 0):
-        return "post"
-    return "regular"
+        return Session.POST
+    return Session.REGULAR
 
 
 async def fetch_and_store_intraday(

@@ -13,6 +13,7 @@ from typing import Any
 
 import pandas as pd
 
+from app.domain.phases import Phase
 from app.services.market_calendar.listings import EXTENDED_HOURS, ExtendedHours
 
 logger = logging.getLogger(__name__)
@@ -117,19 +118,19 @@ class Venue:
         except Exception:
             return None
 
-    def phase(self, at: datetime | None = None) -> str | None:
-        """Trading phase at ``at``: "premarket" | "open" | "aftermarket" | "closed".
+    def phase(self, at: datetime | None = None) -> Phase | None:
+        """Trading :class:`Phase` at ``at``.
 
         Regular hours come from the calendar; the extended windows are the
         venue's ``ExtendedHours`` offsets around them. Venues without extended
-        hours only ever report "open"/"closed". This is the *scheduled* phase —
+        hours only ever report OPEN/CLOSED. This is the *scheduled* phase —
         the live authority for what a venue is actually doing right now is the
         quote feed's own market_state; use this for prediction and fallback.
         """
         ts = _as_utc(at)
         try:
             if self._cal.is_open_at_time(ts):
-                return "open"
+                return Phase.OPEN
             # previous_close is strictly exclusive: at the exact close instant
             # it returns the *prior* session's close, which would misfile the
             # first moment of aftermarket as closed. Nudging the query point
@@ -141,10 +142,10 @@ class Venue:
             return None
         if self.extended_hours is not None:
             if ts < prev_close + self.extended_hours.post_offset:
-                return "aftermarket"
+                return Phase.AFTERMARKET
             if ts >= nxt_open - self.extended_hours.pre_offset:
-                return "premarket"
-        return "closed"
+                return Phase.PREMARKET
+        return Phase.CLOSED
 
 
 # One Venue per calendar name, shared by every Symbol that resolves to it.

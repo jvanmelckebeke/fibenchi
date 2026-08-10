@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.domain.instrument import classify
+from app.domain.phases import Phase
 from app.services.market_calendar.venue import _as_utc, _venue_for
 
 
@@ -40,15 +41,20 @@ def any_venue_open(symbols, at: datetime | None = None) -> bool:
         if venue is None:
             return True  # calendar failed to build — same fail-open rule
         phase = venue.phase(at)
-        if phase is None or phase != "closed":
+        if phase is None or phase != Phase.CLOSED:
             return True
     return False
 
 
-_PHASE_RANK = {"closed": 0, "premarket": 1, "aftermarket": 1, "open": 2}
+_PHASE_RANK: dict[Phase, int] = {
+    Phase.CLOSED: 0,
+    Phase.PREMARKET: 1,
+    Phase.AFTERMARKET: 1,
+    Phase.OPEN: 2,
+}
 
 
-def schedule_poll_hint(symbols, at: datetime | None = None) -> tuple[str, float | None]:
+def schedule_poll_hint(symbols, at: datetime | None = None) -> tuple[Phase, float | None]:
     """The most-active scheduled phase across the symbols' venues, plus the
     seconds until the earliest upcoming regular open.
 
@@ -60,9 +66,9 @@ def schedule_poll_hint(symbols, at: datetime | None = None) -> tuple[str, float 
     Unlike :func:`any_venue_open`, unresolvable symbols contribute nothing
     here rather than failing open: a wrong "open" would pin the fast poll
     forever, whereas contributing nothing merely falls back to the live-state
-    cadence. Returns ``("closed", None)`` when no venue resolves at all.
+    cadence. Returns ``(Phase.CLOSED, None)`` when no venue resolves at all.
     """
-    best = "closed"
+    best = Phase.CLOSED
     next_open_secs: float | None = None
     ts = _as_utc(at).to_pydatetime()
     seen: set[str] = set()
