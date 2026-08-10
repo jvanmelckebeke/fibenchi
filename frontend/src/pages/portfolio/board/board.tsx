@@ -19,14 +19,14 @@ export function Board({ sections, mode }: { sections: BoardSection[]; mode: Colo
       <div className="space-y-5">
         {sections.map((s) => (
           <section key={s.key}>
-            <h2 className="mb-2 flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
+            <h2 className="mb-1.5 flex items-center gap-2 text-xs font-medium 2xl:mb-2 2xl:text-[13px] text-muted-foreground">
               {s.accent && (
                 <span aria-hidden className="h-4 w-[3px] rounded-full" style={{ backgroundColor: s.accent }} />
               )}
               {s.title}
               <span className="opacity-60">{s.tiles.length}</span>
             </h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-1">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-[3px] 2xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] 2xl:gap-1">
               {s.tiles.map((t) => (
                 <BoardTile key={t.symbol} tile={t} mode={mode} span={span} />
               ))}

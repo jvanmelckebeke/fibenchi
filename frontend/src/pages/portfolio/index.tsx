@@ -37,9 +37,9 @@ export function PortfolioPage() {
           coverage={coverage}
         />
         {isLoading ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-1">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-[3px] 2xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] 2xl:gap-1">
             {Array.from({ length: 24 }, (_, i) => (
-              <div key={i} className="h-[80px] animate-pulse rounded-[3px] bg-muted/40" />
+              <div key={i} className="h-[62px] animate-pulse 2xl:h-[80px] rounded-[3px] bg-muted/40" />
             ))}
           </div>
         ) : sections.length === 0 ? (
@@ -50,7 +50,7 @@ export function PortfolioPage() {
           <Board sections={sections} mode={mode} />
         )}
       </div>
-      <aside className="w-full shrink-0 space-y-3 lg:w-[340px]">
+      <aside className="w-full shrink-0 space-y-3 lg:w-[300px] 2xl:w-[340px]">
         <IndexCard />
         <MoversCard tiles={allTiles} />
         <MostUnusualCard tiles={allTiles} />

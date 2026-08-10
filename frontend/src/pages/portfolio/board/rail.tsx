@@ -24,7 +24,7 @@ function RailCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-md border border-border bg-card p-5">
+    <section className="rounded-md border border-border bg-card p-4 2xl:p-5">
       <header className="mb-2.5 flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
         {control}
@@ -62,10 +62,10 @@ export function IndexCard() {
         <p className="text-xs text-muted-foreground">No data yet.</p>
       ) : (
         <div className="space-y-1.5">
-          <div className="text-4xl font-light tabular-nums">
+          <div className="text-3xl font-light tabular-nums 2xl:text-4xl">
             {data.current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className={`text-[15px] font-medium tabular-nums ${changeColor(data.change)}`}>
+          <div className={`text-sm font-medium tabular-nums 2xl:text-[15px] ${changeColor(data.change)}`}>
             {data.change >= 0 ? "+" : ""}
             {data.change.toFixed(2)} · {formatChangePct(data.change_pct).text}
           </div>
@@ -83,7 +83,7 @@ function MoverRow({ tile, pct, maxAbs }: { tile: Tile; pct: number; maxAbs: numb
   return (
     <Link
       to={`/asset/${tile.symbol}`}
-      className="relative flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/40"
+      className="relative flex items-center justify-between gap-2 rounded px-2 py-1 text-[13px] hover:bg-muted/40 2xl:py-1.5 2xl:text-sm"
     >
       <span
         aria-hidden
@@ -160,7 +160,7 @@ export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
             <Link
               key={t.symbol}
               to={`/asset/${t.symbol}`}
-              className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/40"
+              className="flex items-center justify-between gap-2 rounded px-2 py-1 text-[13px] hover:bg-muted/40 2xl:py-1.5 2xl:text-sm"
             >
               <span className="font-mono">{t.symbol}</span>
               <span className={`tabular-nums ${changeColor(t.sigma)}`}>

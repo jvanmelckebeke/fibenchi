@@ -26,17 +26,17 @@ export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: bo
           className="board-ping absolute inset-0.5 rounded-full bg-yellow-300"
           style={{ animationDelay: pingDelay() }}
         />
-        <Sun className="phase-icon relative h-4 w-4 text-yellow-300" />
+        <Sun className="phase-icon relative h-3.5 w-3.5 text-yellow-300 2xl:h-4 2xl:w-4" />
       </span>
     )
   }
   if (phase === "premarket") {
-    return <Sunrise className="phase-icon h-4 w-4 shrink-0 text-amber-400" aria-label="Pre-market" />
+    return <Sunrise className="phase-icon h-3.5 w-3.5 shrink-0 text-amber-400 2xl:h-4 2xl:w-4" aria-label="Pre-market" />
   }
   if (phase === "aftermarket") {
-    return <Sunset className="phase-icon h-4 w-4 shrink-0 text-orange-400" aria-label="After-hours" />
+    return <Sunset className="phase-icon h-3.5 w-3.5 shrink-0 text-orange-400 2xl:h-4 2xl:w-4" aria-label="After-hours" />
   }
-  return <Moon className="phase-icon h-4 w-4 shrink-0 text-current opacity-80" aria-label="Closed" />
+  return <Moon className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Closed" />
 }
 
 function reasonCopy(t: TileData): string | null {
@@ -104,14 +104,14 @@ export const BoardTile = memo(function BoardTile({
       <TooltipTrigger asChild>
         <Link
           to={`/asset/${tile.symbol}`}
-          className={`board-tile flex h-[80px] flex-col justify-between rounded-[3px] px-3 py-2.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${noReading ? "board-tile-unread" : ""}`}
+          className={`board-tile flex h-[62px] flex-col justify-between rounded-[3px] px-2 py-1.5 2xl:h-[80px] 2xl:px-3 2xl:py-2.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${noReading ? "board-tile-unread" : ""}`}
           style={stop ? { backgroundColor: stop.color, color: stop.ink } : undefined}
         >
           <span className="flex items-center justify-between gap-1">
-            <span className="truncate font-mono text-[14px] font-semibold leading-none">{tile.symbol}</span>
+            <span className="truncate font-mono text-[12px] font-semibold 2xl:text-[14px] leading-none">{tile.symbol}</span>
             <PhaseIcon phase={tile.phase} live={tile.liveState} />
           </span>
-          <span className="text-[13px] leading-none tabular-nums opacity-90">{valueEl}</span>
+          <span className="text-[11px] leading-none tabular-nums 2xl:text-[13px] opacity-90">{valueEl}</span>
         </Link>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-[260px]">
