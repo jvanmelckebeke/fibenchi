@@ -26,6 +26,8 @@ async def test_market_phases_lists_in_use_calendars(client, db):
     us = AssetRef("AAPL").calendar_name
     ams = AssetRef("IWDA.AS").calendar_name
     assert set(data) == {us, ams}
+    assert data[us]["symbols"] == ["AAPL", "MSFT"]
+    assert data[ams]["symbols"] == ["IWDA.AS"]
     for entry in data.values():
         assert entry["phase"] in PHASES
         if entry["next_change_at"] is not None:

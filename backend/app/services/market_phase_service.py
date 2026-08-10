@@ -17,18 +17,23 @@ async def collect_market_phases(db: AsyncSession) -> dict[str, CalendarPhase]:
     """
     refs = await AssetRepository(db).list_in_any_group_refs()
 
-    out: dict[str, CalendarPhase] = {}
-    seen: set[str] = set()
+    by_calendar: dict[str, list] = {}
     for ref in refs:
         name = ref.calendar_name
-        if name is None or name in seen:
-            continue
-        seen.add(name)
-        venue = ref.venue
+        if name is not None:
+            by_calendar.setdefault(name, []).append(ref)
+
+    out: dict[str, CalendarPhase] = {}
+    for name, cal_refs in by_calendar.items():
+        venue = cal_refs[0].venue
         if venue is None:
             continue
         phase = venue.phase()
         if phase is None:
             continue
-        out[name] = CalendarPhase(phase=phase, next_change_at=venue.next_phase_change())
+        out[name] = CalendarPhase(
+            phase=phase,
+            next_change_at=venue.next_phase_change(),
+            symbols=sorted(r.symbol for r in cal_refs),
+        )
     return out

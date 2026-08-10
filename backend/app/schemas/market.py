@@ -21,3 +21,8 @@ class CalendarPhase(BaseModel):
         description="When the scheduled phase next changes (UTC); the venue's next bell "
         "or extended-hours edge. None when the calendar can't answer."
     )
+    symbols: list[str] = Field(
+        description="Grouped symbols trading on this calendar — the symbol→venue mapping "
+        "lives backend-side (AssetRef), so clients get it here instead of re-deriving it "
+        "from ticker shapes."
+    )
