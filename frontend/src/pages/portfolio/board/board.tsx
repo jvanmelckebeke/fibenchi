@@ -49,7 +49,7 @@ function usePagedSections(sections: BoardSection[]) {
     return packSections(sections, { cols, rowPx: g.rowPx, headerPx: g.headerPx, availPx: metrics.availPx })
   }, [sections, metrics])
 
-  return { ref, pages }
+  return { ref, pages, availPx: metrics.availPx }
 }
 
 export function Board({ sections, mode }: { sections: BoardSection[]; mode: ColorMode }) {
@@ -62,7 +62,7 @@ export function Board({ sections, mode }: { sections: BoardSection[]; mode: Colo
     return pctSpan(tiles.map((t) => t.todayPct).filter((v): v is number => v != null))
   }, [sections, mode])
 
-  const { ref, pages } = usePagedSections(sections)
+  const { ref, pages, availPx } = usePagedSections(sections)
   const [page, setPage] = useState(0)
   const current = Math.min(page, Math.max(0, pages.length - 1))
   const visible = pages[current] ?? []
@@ -82,8 +82,11 @@ export function Board({ sections, mode }: { sections: BoardSection[]; mode: Colo
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div ref={ref} className="space-y-5">
-        {visible.map((s) => (
+      {/* The section area is pinned to the measured page height, so the
+          legend/pager row below it stays level across page flips. */}
+      <div ref={ref}>
+        <div className="space-y-5" style={pages.length > 1 ? { minHeight: availPx } : undefined}>
+          {visible.map((s) => (
           <section key={s.key}>
             <h2 className="mb-1.5 flex items-center gap-2 text-xs font-medium 2xl:mb-2 2xl:text-[13px] text-muted-foreground">
               {s.accent && (
@@ -98,8 +101,9 @@ export function Board({ sections, mode }: { sections: BoardSection[]; mode: Colo
               ))}
             </div>
           </section>
-        ))}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <Legend mode={mode} span={span} />
           {pages.length > 1 && (
             <Pager
