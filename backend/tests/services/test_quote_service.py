@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domain import AssetRef
+from app.schemas.intraday import IntradayBar
 from app.services.quote_service import get_quotes, quote_event_generator
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -125,6 +126,51 @@ async def test_stream_delta_only_changed():
     data2 = json.loads(quote_events[1].split("data: ")[1].split("\n")[0])
     assert "AAPL" in data2
     assert "MSFT" not in data2
+
+
+async def test_stream_intraday_event_serializes_bars():
+    """The ``intraday`` SSE event carries {symbol: [bar]} with the wire keys
+    time/price/volume/session (the frontend's ``IntradayPoint`` mirror)."""
+    mock_quotes = [{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"}]
+    bars = {
+        "AAPL": [
+            IntradayBar(time=1771000000, price=185.5, volume=1200, session="regular"),
+            IntradayBar(time=1771000060, price=185.6, volume=800, session="regular"),
+        ]
+    }
+
+    async def mock_sleep(seconds):
+        raise asyncio.CancelledError()
+
+    mock_session_ctx = AsyncMock()
+    mock_db = AsyncMock()
+    mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+
+    mock_prov = _mock_provider(quotes_return=mock_quotes)
+
+    with (
+        patch("app.services.quote_service.async_session", return_value=mock_session_ctx),
+        patch("app.services.quote_service.AssetRepository") as MockRepo,
+        patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
+        patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
+        patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value=bars),
+    ):
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
+
+        events = []
+        async for event in quote_event_generator():
+            events.append(event)
+
+    intraday_events = [e for e in events if e.startswith("event: intraday")]
+    assert len(intraday_events) == 1
+    data = json.loads(intraday_events[0].split("data: ")[1].split("\n")[0])
+    assert data == {
+        "AAPL": [
+            {"time": 1771000000, "price": 185.5, "volume": 1200, "session": "regular"},
+            {"time": 1771000060, "price": 185.6, "volume": 800, "session": "regular"},
+        ]
+    }
 
 
 async def test_stream_adaptive_interval_regular():

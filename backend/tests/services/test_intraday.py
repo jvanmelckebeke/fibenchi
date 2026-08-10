@@ -13,6 +13,7 @@ from app.services.intraday import (
     fetch_and_store_intraday,
 )
 from app.services.yahoo import yahoo_client
+from app.services.yahoo._intraday import ProviderIntradayBar
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -139,7 +140,7 @@ class TestClientIntraday:
 
         assert "NKT.CO" in result
         # Each bar carries tz_name so the caller can classify sessions later.
-        tz_names = {bar["tz_name"] for bar in result["NKT.CO"]}
+        tz_names = {bar.tz_name for bar in result["NKT.CO"]}
         assert all(tz and "Copenhagen" in tz for tz in tz_names)
 
     async def test_calls_get_data_with_include_prepost(self):
@@ -204,7 +205,7 @@ class TestClientIntraday:
             with patch("app.services.yahoo._intraday.resolve_currency", return_value=("GBP", 100)):
                 result = await yahoo_client.intraday(["VOD.L"])
 
-        assert result["VOD.L"][0]["price"] == 85.0
+        assert result["VOD.L"][0].price == 85.0
 
     async def test_filters_synthetic_non_minute_boundary_bars(self):
         """Yahoo echo bars at non-minute-boundary timestamps are dropped."""
@@ -230,7 +231,7 @@ class TestClientIntraday:
 
         assert "P911.DE" in result
         assert len(result["P911.DE"]) == 2  # synthetic bar dropped
-        prices = [bar["price"] for bar in result["P911.DE"]]
+        prices = [bar.price for bar in result["P911.DE"]]
         assert prices == [41.0, 42.0]
 
     async def test_skips_symbol_on_key_error(self):
@@ -261,8 +262,8 @@ class TestFetchAndStoreIntraday:
     async def test_deletes_stale_bars_before_upsert(self):
         """Bars older than the oldest fresh bar should be deleted."""
         fresh_bars = [
-            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "tz_name": "America/New_York"},
-            {"timestamp": datetime(2026, 2, 25, 10, 0, tzinfo=ET), "price": 31.0, "volume": 200, "tz_name": "America/New_York"},
+            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 9, 0, tzinfo=ET), price=30.0, volume=100, tz_name="America/New_York"),
+            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 10, 0, tzinfo=ET), price=31.0, volume=200, tz_name="America/New_York"),
         ]
 
         mock_db = AsyncMock()
@@ -292,7 +293,7 @@ class TestFetchAndStoreIntraday:
     async def test_skips_refs_without_stored_id(self):
         """Bars for refs not bound to a stored asset row are skipped."""
         fresh_bars = [
-            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "tz_name": "America/New_York"},
+            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 9, 0, tzinfo=ET), price=30.0, volume=100, tz_name="America/New_York"),
         ]
         mock_db = AsyncMock()
 

@@ -5,15 +5,21 @@ import json
 import logging
 import time as _time
 
+from pydantic import TypeAdapter
+
 from app.database import async_session
 from app.domain import AssetRef
 from app.domain.market_state import any_active, state_info
 from app.repositories.asset_repo import AssetRepository
+from app.schemas.intraday import IntradayBar
 from app.services.intraday import get_intraday_bars
 from app.services.market_calendar import schedule_poll_hint
 from app.services.price_providers import get_price_provider
 
 logger = logging.getLogger(__name__)
+
+# Serializer for the SSE ``intraday`` event payload ({symbol: [bars]}).
+_intraday_payload_adapter = TypeAdapter(dict[str, list[IntradayBar]])
 
 # Cache asset list to avoid opening a DB session every SSE iteration
 _asset_list_cache: tuple[float, list[AssetRef]] = (0.0, [])
@@ -143,17 +149,18 @@ async def quote_event_generator():
                         intraday_payload = {}
                         for sym, bars in all_bars.items():
                             last_ts = last_intraday_ts.get(sym, 0)
-                            new_bars = [b for b in bars if b["time"] > last_ts]
+                            new_bars = [b for b in bars if b.time > last_ts]
                             if new_bars:
                                 intraday_payload[sym] = new_bars
 
                     if intraday_payload:
-                        yield f"event: intraday\ndata: {json.dumps(intraday_payload)}\n\n"
+                        data = _intraday_payload_adapter.dump_json(intraday_payload).decode()
+                        yield f"event: intraday\ndata: {data}\n\n"
 
                     # Update last pushed timestamps
                     for sym, bars in all_bars.items():
                         if bars:
-                            last_intraday_ts[sym] = max(b["time"] for b in bars)
+                            last_intraday_ts[sym] = max(b.time for b in bars)
 
             await asyncio.sleep(_poll_interval(market_states, refs))
 
