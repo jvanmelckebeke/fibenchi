@@ -39,7 +39,7 @@ export function Board({
               {s.title}
               <span className="opacity-60">{s.tiles.length}</span>
             </h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-1">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-1">
               {s.tiles.map((t) => (
                 <BoardTile key={t.symbol} tile={t} mode={mode} window={window} unit={unit} />
               ))}

@@ -40,9 +40,9 @@ export function PortfolioPage() {
           coverage={coverage}
         />
         {isLoading ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-1">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-1">
             {Array.from({ length: 24 }, (_, i) => (
-              <div key={i} className="h-[66px] animate-pulse rounded-[3px] bg-muted/40" />
+              <div key={i} className="h-[80px] animate-pulse rounded-[3px] bg-muted/40" />
             ))}
           </div>
         ) : sections.length === 0 ? (
