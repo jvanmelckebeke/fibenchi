@@ -1,5 +1,23 @@
 import { describe, it, expect } from "vitest"
-import { RAMP, rampStop } from "./color-scale"
+import { RAMP, rampStop, sigmaUnit } from "./color-scale"
+
+describe("sigmaUnit — day-adaptive σ scale", () => {
+  it("tightens on quiet days but floors at a ±1.5σ range", () => {
+    expect(sigmaUnit([0.2, -0.3, 0.1])).toBe(0.5) // dead calm → floor
+    expect(sigmaUnit([2.1, -0.4])).toBeCloseTo(0.7)
+  })
+  it("caps at the canonical ±3σ on wild days", () => {
+    expect(sigmaUnit([4.2, -1.0])).toBe(1)
+  })
+  it("defaults to the canonical scale with no readings", () => {
+    expect(sigmaUnit([])).toBe(1)
+  })
+  it("spreads a quiet day across the ramp instead of all-neutral", () => {
+    // max |σ| = 1.5 → unit 0.5 → edges ±0.5/1/1.5: a +1.4σ day gets strong colour.
+    expect(rampStop(1.4, "sigma", undefined, 0.5)).toBe(RAMP[5])
+    expect(rampStop(1.4, "sigma", undefined, 1)).toBe(RAMP[4])
+  })
+})
 
 describe("rampStop — σ mode", () => {
   it("buckets on the fixed ±1/2/3 edges", () => {

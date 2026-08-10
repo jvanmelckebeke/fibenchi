@@ -1,5 +1,6 @@
+import { useMemo } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { RAMP } from "./color-scale"
+import { RAMP, sigmaUnit } from "./color-scale"
 import type { ColorMode, PctWindow } from "./color-scale"
 import { pctWindowDef } from "./color-scale"
 import { BoardTile } from "./tile"
@@ -14,35 +15,50 @@ export function Board({
   mode: ColorMode
   window: PctWindow
 }) {
+  // Day-adaptive σ scale: computed over the whole board so every section
+  // shares one ramp (per-section scales would make colours incomparable).
+  const unit = useMemo(
+    () =>
+      sigmaUnit(
+        sections
+          .flatMap((s) => s.tiles)
+          .map((t) => t.sigma)
+          .filter((v): v is number => v != null),
+      ),
+    [sections],
+  )
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-4">
+      <div className="space-y-5">
         {sections.map((s) => (
           <section key={s.key}>
-            <h2 className="mb-1.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <h2 className="mb-2 flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
               {s.accent && (
-                <span aria-hidden className="h-3.5 w-[3px] rounded-full" style={{ backgroundColor: s.accent }} />
+                <span aria-hidden className="h-4 w-[3px] rounded-full" style={{ backgroundColor: s.accent }} />
               )}
               {s.title}
               <span className="opacity-60">{s.tiles.length}</span>
             </h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-[3px]">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-1">
               {s.tiles.map((t) => (
-                <BoardTile key={t.symbol} tile={t} mode={mode} window={window} />
+                <BoardTile key={t.symbol} tile={t} mode={mode} window={window} unit={unit} />
               ))}
             </div>
           </section>
         ))}
-        <Legend mode={mode} window={window} />
+        <Legend mode={mode} window={window} unit={unit} />
       </div>
     </TooltipProvider>
   )
 }
 
-function Legend({ mode, window }: { mode: ColorMode; window: PctWindow }) {
+function Legend({ mode, window, unit: sigmaScale }: { mode: ColorMode; window: PctWindow; unit: number }) {
   const unit = mode === "sigma" ? "σ" : "%"
-  const scale = mode === "sigma" ? 1 : pctWindowDef(window).maxAbs / 3
-  const fmt = (n: number) => (scale === 1 ? `${n}` : `${(n * scale).toFixed(0)}`)
+  const scale = mode === "sigma" ? sigmaScale : pctWindowDef(window).maxAbs / 3
+  const fmt = (n: number) => {
+    const v = n * scale
+    return Number.isInteger(v) ? `${v}` : v.toFixed(1)
+  }
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-[11px] text-muted-foreground">
       <span className="flex items-center gap-1">

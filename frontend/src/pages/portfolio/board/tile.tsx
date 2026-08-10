@@ -65,15 +65,18 @@ export const BoardTile = memo(function BoardTile({
   tile,
   mode,
   window,
+  unit,
 }: {
   tile: TileData
   mode: ColorMode
   window: PctWindow
+  /** Day-adaptive σ ramp unit (see sigmaUnit). */
+  unit: number
 }) {
   const pct = tile.windowPct[window]
   const value = mode === "sigma" ? tile.sigma : pct
   const noReading = value == null
-  const stop = noReading ? null : rampStop(value, mode, window)
+  const stop = noReading ? null : rampStop(value, mode, window, unit)
 
   // Every tile prints its own value as text — nothing on the board is
   // encoded by colour alone. A no-reading tile still shows the raw % move.
@@ -95,14 +98,14 @@ export const BoardTile = memo(function BoardTile({
       <TooltipTrigger asChild>
         <Link
           to={`/asset/${tile.symbol}`}
-          className={`board-tile flex h-[52px] flex-col justify-between rounded-[3px] px-2 py-1.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${noReading ? "board-tile-unread" : ""}`}
+          className={`board-tile flex h-[66px] flex-col justify-between rounded-[3px] px-2.5 py-2 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${noReading ? "board-tile-unread" : ""}`}
           style={stop ? { backgroundColor: stop.color, color: stop.ink } : undefined}
         >
           <span className="flex items-center justify-between gap-1">
-            <span className="truncate font-mono text-[11px] font-semibold leading-none">{tile.symbol}</span>
+            <span className="truncate font-mono text-[13px] font-semibold leading-none">{tile.symbol}</span>
             <PhaseDot phase={tile.phase} live={tile.liveState} />
           </span>
-          <span className="text-[11px] leading-none tabular-nums opacity-90">{valueText}</span>
+          <span className="text-[12px] leading-none tabular-nums opacity-90">{valueText}</span>
         </Link>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-[260px]">

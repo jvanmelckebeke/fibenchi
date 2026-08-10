@@ -36,12 +36,29 @@ export function pctWindowDef(w: PctWindow) {
   return PCT_WINDOWS.find((d) => d.value === w) ?? PCT_WINDOWS[0]
 }
 
-/** Bucket a value into the 7-class ramp. σ mode uses fixed ±1/2/3 edges;
- * % mode rescales the same edges to the window's expected range (a fixed
- * scale would render a month as all-extremes). */
-export function rampStop(value: number, mode: ColorMode, window?: PctWindow): RampStop {
-  const unit = mode === "sigma" ? 1 : pctWindowDef(window ?? "1wk").maxAbs / 3
-  const edges = [-3, -2, -1, 1, 2, 3].map((e) => e * unit)
+/** σ-mode ramp unit adapted to the day's actual spread: on a quiet day the
+ * edges tighten so relative outliers still get colour, but never below a
+ * ±1.5σ full range (a dead-calm day must not scream) and never looser than
+ * the canonical ±3σ. The legend prints the resulting range, so the scale
+ * stays honest about what it's doing. */
+export function sigmaUnit(sigmas: number[]): number {
+  if (!sigmas.length) return 1
+  const maxAbs = Math.max(...sigmas.map(Math.abs))
+  return Math.min(1, Math.max(0.5, maxAbs / 3))
+}
+
+/** Bucket a value into the 7-class ramp. σ mode uses ±1/2/3 edges scaled by
+ * the day-adaptive `unit` (see sigmaUnit); % mode rescales the same edges to
+ * the window's expected range (a fixed scale would render a month as
+ * all-extremes). */
+export function rampStop(
+  value: number,
+  mode: ColorMode,
+  window?: PctWindow,
+  unit = 1,
+): RampStop {
+  const scale = mode === "sigma" ? unit : pctWindowDef(window ?? "1wk").maxAbs / 3
+  const edges = [-3, -2, -1, 1, 2, 3].map((e) => e * scale)
   let idx = 0
   while (idx < edges.length && value >= edges[idx]) idx++
   return RAMP[idx]
