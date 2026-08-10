@@ -154,12 +154,8 @@ async def _quote_anchors(
         )
         return {}
     return {
-        q["symbol"]: (
-            q.get("price"), q.get("previous_close"),
-            q.get("market_state"), _as_date(q.get("session_date")),
-        )
+        q.symbol: (q.price, q.previous_close, q.market_state, _as_date(q.session_date))
         for q in quotes
-        if q.get("symbol")
     }
 
 

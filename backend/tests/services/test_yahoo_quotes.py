@@ -50,7 +50,7 @@ class TestSessionDate:
             "regularMarketPreviousClose": 99.0, "marketState": "REGULAR",
             "regularMarketTime": epoch, "exchangeTimezoneName": "America/New_York",
         })
-        assert row["session_date"] == "2024-01-02"
+        assert row.session_date == "2024-01-02"
 
 
 class TestSanitize:
@@ -93,21 +93,22 @@ class TestParseQuotes:
 
         assert len(results) == 1
         q = results[0]
-        assert q["symbol"] == "AAPL"
-        assert q["price"] == 185.50
-        assert q["previous_close"] == 184.0
-        assert q["change"] == 1.50
-        assert q["change_percent"] == 0.82
-        assert q["volume"] == 50_000_000
-        assert q["avg_volume"] == 55_000_000
-        assert q["currency"] == "USD"
-        assert q["market_state"] == "REGULAR"
+        assert q.symbol == "AAPL"
+        assert q.price == 185.50
+        assert q.previous_close == 184.0
+        assert q.change == 1.50
+        assert q.change_percent == 0.82
+        assert q.volume == 50_000_000
+        assert q.avg_volume == 55_000_000
+        assert q.currency == "USD"
+        assert q.market_state == "REGULAR"
 
-    def test_non_dict_info_returns_symbol_only(self):
+    def test_non_dict_info_returns_placeholder(self):
         price_data = {"AAPL": "No data found"}
         results = _parse_quotes(["AAPL"], price_data)
         assert len(results) == 1
-        assert results[0] == {"symbol": "AAPL"}
+        assert results[0].symbol == "AAPL"
+        assert results[0].is_placeholder
 
     def test_nan_values_sanitized(self):
         price_data = {
@@ -124,18 +125,18 @@ class TestParseQuotes:
         }
         results = _parse_quotes(["AAPL"], price_data)
         q = results[0]
-        assert q["price"] is None
-        assert q["change"] is None
-        assert q["change_percent"] is None
+        assert q.price is None
+        assert q.change is None
+        assert q.change_percent is None
 
     def test_missing_symbol_in_price_data(self):
         results = _parse_quotes(["AAPL"], {})
 
         assert len(results) == 1
         q = results[0]
-        assert q["symbol"] == "AAPL"
-        assert q["price"] is None
-        assert q["currency"] == "USD"
+        assert q.symbol == "AAPL"
+        assert q.price is None
+        assert q.currency == "USD"
 
     def test_currency_normalization_gbp(self):
         price_data = {
@@ -152,10 +153,10 @@ class TestParseQuotes:
         }
         results = _parse_quotes(["HSBA.L"], price_data)
         q = results[0]
-        assert q["currency"] == "GBP"
-        assert q["price"] == 65.0
-        assert q["previous_close"] == 64.0
-        assert q["change"] == 1.0
+        assert q.currency == "GBP"
+        assert q.price == 65.0
+        assert q.previous_close == 64.0
+        assert q.change == 1.0
 
     def test_multiple_symbols(self):
         price_data = {
@@ -174,8 +175,8 @@ class TestParseQuotes:
         }
         results = _parse_quotes(["AAPL", "MSFT"], price_data)
         assert len(results) == 2
-        assert results[0]["symbol"] == "AAPL"
-        assert results[1]["symbol"] == "MSFT"
+        assert results[0].symbol == "AAPL"
+        assert results[1].symbol == "MSFT"
 
 
 class TestCrumbRejected:
@@ -228,7 +229,7 @@ class TestQuotes:
 
         result = await yahoo_client.quotes(["AAPL"])
         assert len(result) == 1
-        assert result[0]["price"] == 185.0
+        assert result[0].price == 185.0
         assert mock_ticker_cls.call_count == 2
 
 

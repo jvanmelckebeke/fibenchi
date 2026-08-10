@@ -3,6 +3,7 @@
 from pydantic import BaseModel, Field
 
 from app.schemas.price import DatedOHLCV, IndicatorResponse
+from app.schemas.quote import Quote
 
 
 class SymbolBatchData(BaseModel):
@@ -13,11 +14,11 @@ class SymbolBatchData(BaseModel):
     the JSON rather than emitted as ``null``. ``error`` replaces the data
     fields when the symbol failed entirely.
 
-    ``quote`` and ``snapshot`` stay provider-shaped dicts for now — typing
-    them is tracked in #580.
+    ``snapshot`` stays a provider-shaped dict for now — typing it is
+    tracked in #580.
     """
 
-    quote: dict | None = Field(
+    quote: Quote | None = Field(
         default=None, description="Real-time quote: price, change, volume, market state."
     )
     snapshot: dict | None = Field(

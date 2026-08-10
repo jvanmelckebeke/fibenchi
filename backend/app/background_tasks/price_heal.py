@@ -73,16 +73,14 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
     # Yahoo again for the same (price, previous_close, market_state) data.
     stale: list[tuple[str, Anchor]] = []
     for q in quotes:
-        sym = q.get("symbol")
-        if not sym:
-            continue
+        sym = q.symbol
         ref = by_symbol.get(sym)
         if ref is None:
             continue
         stored = latest.get(ref.id)
         if stored is None:  # no bars yet — initial fill is the sync's job
             continue
-        price, previous_close = q.get("price"), q.get("previous_close")
+        price, previous_close = q.price, q.previous_close
         if price is None and previous_close is None:  # dead quote, nothing to anchor on
             continue
         bar_date, bar_close = stored
@@ -92,7 +90,7 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
             "%s: stored %s close %s reconciles with neither price %s nor previous_close %s",
             sym, bar_date, bar_close, price, previous_close,
         )
-        anchor: Anchor = (price, previous_close, q.get("market_state"), _as_date(q.get("session_date")))
+        anchor: Anchor = (price, previous_close, q.market_state, _as_date(q.session_date))
         stale.append((sym, anchor))
 
     if not stale:

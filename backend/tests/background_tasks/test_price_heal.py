@@ -12,6 +12,7 @@ import pytest
 from app.background_tasks import price_heal
 from app.background_tasks.price_heal import MAX_HEALS_PER_RUN, heal_unreconciled_prices
 from app.repositories.price_repo import PriceRepository
+from app.schemas.quote import Quote
 from tests.helpers import seed_asset_with_prices
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -31,10 +32,7 @@ def _provider_with_quotes(quotes):
 
 
 def _quote(symbol, price, prev, state="REGULAR"):
-    return {
-        "symbol": symbol, "price": price,
-        "previous_close": prev, "market_state": state,
-    }
+    return Quote(symbol=symbol, price=price, previous_close=prev, market_state=state)
 
 
 async def _latest_close(db, asset) -> float:

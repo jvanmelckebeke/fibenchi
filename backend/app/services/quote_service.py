@@ -1,7 +1,6 @@
 """Quote business logic — REST + SSE stream generation."""
 
 import asyncio
-import json
 import logging
 import time as _time
 from collections.abc import Sequence
@@ -14,13 +13,15 @@ from app.domain.market_state import any_active, state_info
 from app.domain.phases import Phase
 from app.repositories.asset_repo import AssetRepository
 from app.schemas.intraday import IntradayBar
+from app.schemas.quote import Quote
 from app.services.intraday import get_intraday_bars
 from app.services.market_calendar import schedule_poll_hint
 from app.services.price_providers import get_price_provider
 
 logger = logging.getLogger(__name__)
 
-# Serializer for the SSE ``intraday`` event payload ({symbol: [bars]}).
+# Serializers for the SSE event payloads (both keyed by symbol).
+_quotes_payload_adapter = TypeAdapter(dict[str, Quote])
 _intraday_payload_adapter = TypeAdapter(dict[str, list[IntradayBar]])
 
 # Cache asset list to avoid opening a DB session every SSE iteration
@@ -69,7 +70,7 @@ def _poll_interval(market_states: set[str], symbols: Sequence[str], at=None) -> 
     return interval
 
 
-async def get_quotes(symbols: str) -> list[dict]:
+async def get_quotes(symbols: str) -> list[Quote]:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
@@ -86,7 +87,7 @@ async def quote_event_generator():
     Also pushes ``event: intraday`` with 1-minute bars for the live day view.
     First push sends full day data, subsequent pushes send only new bars (delta).
     """
-    last_payload: dict[str, dict] = {}
+    last_payload: dict[str, Quote] = {}
     # Track last pushed intraday bar timestamp per symbol
     last_intraday_ts: dict[str, int] = {}
 
@@ -111,12 +112,12 @@ async def quote_event_generator():
             quotes = await get_price_provider().batch_fetch_quotes(list(refs))
 
             # Build keyed payload
-            full_payload: dict[str, dict] = {}
+            full_payload: dict[str, Quote] = {}
             market_states: set[str] = set()
             for q in quotes:
-                full_payload[q["symbol"]] = q
-                if q.get("market_state"):
-                    market_states.add(q["market_state"])
+                full_payload[q.symbol] = q
+                if q.market_state:
+                    market_states.add(q.market_state)
 
             # Compute delta: only symbols that changed since last push
             if last_payload:
@@ -130,7 +131,8 @@ async def quote_event_generator():
                 delta = full_payload
 
             if delta:
-                yield f"event: quotes\ndata: {json.dumps(delta)}\n\n"
+                data = _quotes_payload_adapter.dump_json(delta).decode()
+                yield f"event: quotes\ndata: {data}\n\n"
 
             last_payload = full_payload
 

@@ -41,9 +41,8 @@ async def query_batch_data(
         try:
             quotes = await get_price_provider().batch_fetch_quotes(symbols)
             for q in quotes:
-                sym = q.get("symbol")
-                if sym and sym in results:
-                    results[sym]["quote"] = q
+                if q.symbol in results:
+                    results[q.symbol]["quote"] = q
         except Exception:
             logger.exception("Batch quote fetch failed")
 

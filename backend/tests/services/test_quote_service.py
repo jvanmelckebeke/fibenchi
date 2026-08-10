@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domain import AssetRef
+from app.schemas.quote import Quote
 from app.schemas.intraday import IntradayBar
 from app.services.quote_service import get_quotes, quote_event_generator
 
@@ -24,7 +25,7 @@ def _mock_provider(quotes_return=None, quotes_side_effect=None):
 
 
 async def test_get_quotes_parses_symbols():
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50})]
     mock_prov = _mock_provider(quotes_return=mock_quotes)
     with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
         result = await get_quotes("AAPL,MSFT")
@@ -46,7 +47,7 @@ async def test_get_quotes_empty_returns_empty():
 async def test_stream_emits_full_payload_first():
     """First SSE event should contain all symbols (full payload)."""
     mock_quotes = [
-        {"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"},
+        Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"}),
     ]
 
     call_count = 0
@@ -85,12 +86,12 @@ async def test_stream_emits_full_payload_first():
 async def test_stream_delta_only_changed():
     """After initial full payload, subsequent events only contain changed data."""
     quote_v1 = [
-        {"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"},
-        {"symbol": "MSFT", "price": 420.00, "market_state": "REGULAR"},
+        Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"}),
+        Quote(**{"symbol": "MSFT", "price": 420.00, "market_state": "REGULAR"}),
     ]
     quote_v2 = [
-        {"symbol": "AAPL", "price": 186.00, "market_state": "REGULAR"},  # changed
-        {"symbol": "MSFT", "price": 420.00, "market_state": "REGULAR"},  # unchanged
+        Quote(**{"symbol": "AAPL", "price": 186.00, "market_state": "REGULAR"}),  # changed
+        Quote(**{"symbol": "MSFT", "price": 420.00, "market_state": "REGULAR"}),  # unchanged
     ]
 
     call_count = 0
@@ -131,7 +132,7 @@ async def test_stream_delta_only_changed():
 async def test_stream_intraday_event_serializes_bars():
     """The ``intraday`` SSE event carries {symbol: [bar]} with the wire keys
     time/price/volume/session (the frontend's ``IntradayPoint`` mirror)."""
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"})]
     bars = {
         "AAPL": [
             IntradayBar(time=1771000000, price=185.5, volume=1200, session="regular"),
@@ -175,7 +176,7 @@ async def test_stream_intraday_event_serializes_bars():
 
 async def test_stream_adaptive_interval_regular():
     """During regular market hours, interval should be 15 seconds."""
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"})]
 
     sleep_intervals = []
     async def mock_sleep(seconds):
@@ -205,7 +206,7 @@ async def test_stream_adaptive_interval_regular():
 
 async def test_stream_adaptive_interval_closed():
     """When market is closed, interval should be 300 seconds."""
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50, "market_state": "CLOSED"}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "CLOSED"})]
 
     sleep_intervals = []
     async def mock_sleep(seconds):
