@@ -5,13 +5,9 @@ egress. The payload is ``{symbol: [IntradayBar, ...]}``; the frontend mirror
 is ``IntradayPoint`` in ``frontend/src/lib/types.ts``.
 """
 
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
-# The 3-value session vocabulary stored on ``IntradayPrice.session`` and
-# consumed by the live day view's session-colored chart segments.
-Session = Literal["pre", "regular", "post"]
+from app.domain.phases import Session
 
 
 class IntradayBar(BaseModel):

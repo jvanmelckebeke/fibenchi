@@ -16,11 +16,13 @@ backstop when the feed is absent.
 
 from dataclasses import dataclass
 
+from app.domain.phases import Phase
+
 
 @dataclass(frozen=True)
 class MarketStateInfo:
     # Scheduled-phase equivalent — the join key to Venue.phase().
-    phase: str  # "premarket" | "open" | "aftermarket" | "closed"
+    phase: Phase
     # Quotes are worth polling in this state. PREPRE ("overnight, pre-market
     # hasn't started") and POSTPOST ("after-hours has ended") are NOT active:
     # nothing trades in either, and for European venues PREPRE lasts the whole
@@ -33,18 +35,18 @@ class MarketStateInfo:
 
 
 MARKET_STATES: dict[str, MarketStateInfo] = {
-    "PREPRE": MarketStateInfo(phase="closed", active=False, session_forming=False),
-    "PRE": MarketStateInfo(phase="premarket", active=True, session_forming=False),
-    "REGULAR": MarketStateInfo(phase="open", active=True, session_forming=True),
-    "POST": MarketStateInfo(phase="aftermarket", active=True, session_forming=False),
-    "POSTPOST": MarketStateInfo(phase="closed", active=False, session_forming=False),
-    "CLOSED": MarketStateInfo(phase="closed", active=False, session_forming=False),
+    "PREPRE": MarketStateInfo(phase=Phase.CLOSED, active=False, session_forming=False),
+    "PRE": MarketStateInfo(phase=Phase.PREMARKET, active=True, session_forming=False),
+    "REGULAR": MarketStateInfo(phase=Phase.OPEN, active=True, session_forming=True),
+    "POST": MarketStateInfo(phase=Phase.AFTERMARKET, active=True, session_forming=False),
+    "POSTPOST": MarketStateInfo(phase=Phase.CLOSED, active=False, session_forming=False),
+    "CLOSED": MarketStateInfo(phase=Phase.CLOSED, active=False, session_forming=False),
 }
 
 # Unknown/missing states get the most conservative reading: nothing moving,
 # nothing forming. Callers that want "unknown ≠ closed" semantics should test
 # for None themselves before consulting traits.
-_UNKNOWN = MarketStateInfo(phase="closed", active=False, session_forming=False)
+_UNKNOWN = MarketStateInfo(phase=Phase.CLOSED, active=False, session_forming=False)
 
 
 def state_info(state: str | None) -> MarketStateInfo:

@@ -4,12 +4,14 @@ import asyncio
 import json
 import logging
 import time as _time
+from collections.abc import Sequence
 
 from pydantic import TypeAdapter
 
 from app.database import async_session
 from app.domain import AssetRef
 from app.domain.market_state import any_active, state_info
+from app.domain.phases import Phase
 from app.repositories.asset_repo import AssetRepository
 from app.schemas.intraday import IntradayBar
 from app.services.intraday import get_intraday_bars
@@ -32,7 +34,7 @@ def _reset_asset_list_cache() -> None:
     _asset_list_cache = (0.0, [])
 
 
-def _poll_interval(market_states: set[str], symbols: list[str], at=None) -> int:
+def _poll_interval(market_states: set[str], symbols: Sequence[str], at=None) -> int:
     """Seconds until the next quote poll.
 
     The live market states pick the cadence whenever they exist — they know
@@ -46,7 +48,7 @@ def _poll_interval(market_states: set[str], symbols: list[str], at=None) -> int:
     - an all-closed stream sleeps until the next opening bell instead of up
       to 5 minutes past it (one cheap poll at the bell discovers the flip).
     """
-    if any(state_info(s).phase == "open" for s in market_states):
+    if any(state_info(s).phase == Phase.OPEN for s in market_states):
         live = 15
     elif any_active(market_states):
         live = 60
@@ -58,7 +60,7 @@ def _poll_interval(market_states: set[str], symbols: list[str], at=None) -> int:
     if market_states:
         interval = live
     else:
-        scheduled = 15 if phase == "open" else 60 if phase in ("premarket", "aftermarket") else 300
+        scheduled = 15 if phase == Phase.OPEN else 60 if phase in (Phase.PREMARKET, Phase.AFTERMARKET) else 300
         interval = min(live, scheduled)
     if next_open_secs is not None:
         # Wake just after the earliest bell (floor 15s so a bell moments away
