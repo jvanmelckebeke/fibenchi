@@ -585,6 +585,21 @@ def get_max_warmup_periods() -> int:
     return max((d.warmup_periods for d in INDICATOR_REGISTRY.values()), default=0)
 
 
+def _batch_history_period() -> str:
+    """Smallest canonical fetch period whose calendar span covers WARMUP_DAYS.
+
+    The batch snapshot path fetches by provider period string, so the period
+    must cover the registry's largest warmup (NEFI's 200-bar volume baseline —
+    a shorter fetch leaves nefi_long/nefi_signal permanently null).
+    """
+    from app.constants import PERIOD_DAYS, WARMUP_DAYS
+
+    for period, days in sorted(PERIOD_DAYS.items(), key=lambda kv: kv[1]):
+        if days >= WARMUP_DAYS:
+            return period
+    return max(PERIOD_DAYS, key=lambda p: PERIOD_DAYS[p])
+
+
 # ---------------------------------------------------------------------------
 # Computation
 # ---------------------------------------------------------------------------
@@ -729,7 +744,8 @@ async def compute_batch_indicator_snapshots(
 ) -> list[SymbolIndicatorSnapshot]:
     """Compute indicator snapshots for multiple symbols in batch.
 
-    Fetches ~3 months of history and currencies via the configured price
+    Fetches enough history to cover indicator warmup (see
+    :func:`_batch_history_period`) and currencies via the configured price
     provider, then computes indicators and builds snapshots for each symbol.
 
     Returns one :class:`SymbolIndicatorSnapshot` per symbol; symbols without
@@ -739,7 +755,7 @@ async def compute_batch_indicator_snapshots(
         return []
 
     provider = get_price_provider()
-    histories = await provider.batch_fetch_history(symbols, period="3mo")
+    histories = await provider.batch_fetch_history(symbols, period=_batch_history_period())
     currencies = await provider.batch_fetch_currencies(symbols)
 
     results: list[SymbolIndicatorSnapshot] = []
