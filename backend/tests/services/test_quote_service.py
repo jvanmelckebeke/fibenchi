@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domain import AssetRef
-from app.schemas.quote import Quote
 from app.schemas.intraday import IntradayBar
+from app.schemas.quote import Quote
 from app.services.quote_service import get_quotes, quote_event_generator
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")

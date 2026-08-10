@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.schemas.price import SymbolIndicatorSnapshot
 from app.schemas.quote import Quote
 from tests.helpers import make_yahoo_df, seed_asset_with_prices
-from app.schemas.price import SymbolIndicatorSnapshot
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 

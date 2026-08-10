@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.holdings_service import get_holdings, get_holdings_indicators
 from app.schemas.price import SymbolIndicatorSnapshot
+from app.services.holdings_service import get_holdings, get_holdings_indicators
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
