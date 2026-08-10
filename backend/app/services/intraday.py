@@ -2,6 +2,7 @@
 
 import logging
 from datetime import date, datetime, time, timedelta, timezone
+from typing import cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import AssetRef
 from app.models.intraday import IntradayPrice
+from app.schemas.intraday import IntradayBar, Session
 from app.services.yahoo import yahoo_client
 
 logger = logging.getLogger(__name__)
@@ -17,10 +19,10 @@ logger = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
 
 # Venue phase → the 3-value session vocabulary the intraday chart stores/reads.
-_PHASE_TO_SESSION = {"premarket": "pre", "open": "regular", "aftermarket": "post"}
+_PHASE_TO_SESSION: dict[str, Session] = {"premarket": "pre", "open": "regular", "aftermarket": "post"}
 
 
-def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -> str:
+def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -> Session:
     """Classify a bar timestamp as pre/regular/post.
 
     Venue-schedule based (``ref.venue.phase``): holiday- and half-day-aware
@@ -92,13 +94,9 @@ async def fetch_and_store_intraday(
         if ref is None or ref.id is None or not raw_bars:
             continue
         asset_id = ref.id
-        bars = [
-            {**b, "session": _classify_session(b["timestamp"], ref, b.get("tz_name"))}
-            for b in raw_bars
-        ]
 
         # Remove bars from previous sessions that Yahoo no longer returns
-        oldest_ts = min(bar["timestamp"] for bar in bars)
+        oldest_ts = min(bar.timestamp for bar in raw_bars)
         await db.execute(
             delete(IntradayPrice).where(
                 IntradayPrice.asset_id == asset_id,
@@ -109,12 +107,12 @@ async def fetch_and_store_intraday(
         rows = [
             {
                 "asset_id": asset_id,
-                "timestamp": bar["timestamp"],
-                "price": bar["price"],
-                "volume": bar["volume"],
-                "session": bar["session"],
+                "timestamp": bar.timestamp,
+                "price": bar.price,
+                "volume": bar.volume,
+                "session": _classify_session(bar.timestamp, ref, bar.tz_name),
             }
-            for bar in bars
+            for bar in raw_bars
         ]
 
         stmt = pg_insert(IntradayPrice).values(rows)
@@ -136,8 +134,12 @@ async def fetch_and_store_intraday(
 async def get_intraday_bars(
     db: AsyncSession,
     refs: list[AssetRef],
-) -> dict[str, list[dict]]:
-    """Read today's intraday bars from DB, keyed by symbol."""
+) -> dict[str, list[IntradayBar]]:
+    """Read the current window of intraday bars from DB, keyed by symbol.
+
+    The window spans since yesterday's midnight ET (covers pre-market and
+    the previous close), not just today.
+    """
     by_id = {ref.id: ref for ref in refs if ref.id is not None}
     if not by_id:
         return {}
@@ -155,18 +157,20 @@ async def get_intraday_bars(
     )
     rows = result.scalars().all()
 
-    bars_by_symbol: dict[str, list[dict]] = {}
+    bars_by_symbol: dict[str, list[IntradayBar]] = {}
     for row in rows:
         ref = by_id.get(row.asset_id)
         if ref is None:
             continue
         sym = ref.symbol
-        bars_by_symbol.setdefault(sym, []).append({
-            "time": int(row.timestamp.timestamp()),
-            "price": float(row.price),
-            "volume": row.volume,
-            "session": row.session,
-        })
+        bars_by_symbol.setdefault(sym, []).append(IntradayBar(
+            time=int(row.timestamp.timestamp()),
+            price=row.price,
+            volume=row.volume,
+            # DB column is str-typed but only ever stores the 3 session values
+            # (written via _classify_session); Pydantic re-validates at runtime.
+            session=cast(Session, row.session),
+        ))
 
     return bars_by_symbol
 
