@@ -3,25 +3,32 @@ import type { IChartApi } from "lightweight-charts"
 import { useChartTheme, chartThemeOptions, type ChartTheme } from "@/lib/chart-utils"
 
 /**
- * Observe `container` and push its width to `chart` on resize, refitting the
- * time scale; returns a cleanup that disconnects the observer and removes the
- * chart. The option-agnostic primitive used by the bespoke sparkline / intraday
- * charts, which opt out of the full themed lifecycle below.
+ * Observe `container` and push its width to every chart on resize (refitting
+ * the time scale unless `refit: false`); returns a cleanup that disconnects
+ * the observer and removes the charts. The option-agnostic primitive used by
+ * the bespoke sparkline / intraday charts, which opt out of the full themed
+ * lifecycle below, and by `startLifecycle` itself — the single ResizeObserver
+ * implementation both lifecycles share.
  */
 export function attachResizeAndCleanup(
   container: HTMLElement,
-  chart: IChartApi,
+  charts: IChartApi[],
+  { refit = true }: { refit?: boolean } = {},
 ): () => void {
   const resizeObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
-      chart.applyOptions({ width: entry.contentRect.width })
-      chart.timeScale().fitContent()
+      for (const chart of charts) {
+        chart.applyOptions({ width: entry.contentRect.width })
+        if (refit) chart.timeScale().fitContent()
+      }
     }
   })
   resizeObserver.observe(container)
   return () => {
     resizeObserver.disconnect()
-    chart.remove()
+    for (const chart of charts) {
+      chart.remove()
+    }
   }
 }
 
@@ -57,21 +64,10 @@ export function useChartLifecycle(
     const container = containerRef.current
     if (!container) return () => {}
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width
-        for (const chart of charts) {
-          chart.applyOptions({ width: w })
-        }
-      }
-    })
-    resizeObserver.observe(container)
+    const detach = attachResizeAndCleanup(container, charts, { refit: false })
 
     return () => {
-      resizeObserver.disconnect()
-      for (const chart of charts) {
-        chart.remove()
-      }
+      detach()
       for (const ref of chartRefsRef.current) {
         ref.current = null
       }
