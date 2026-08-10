@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from app.domain import AssetRef
+from app.schemas.price import IndicatorSnapshotBase, SymbolIndicatorSnapshot
 from app.services.price_providers import get_price_provider
 
 
@@ -589,13 +590,14 @@ def get_max_warmup_periods() -> int:
 # ---------------------------------------------------------------------------
 
 
-def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
-    """Build a dict of latest indicator values from a computed indicators DataFrame.
+def build_indicator_snapshot(indicators: pd.DataFrame) -> IndicatorSnapshotBase:
+    """Build the latest-values snapshot from a computed indicators DataFrame.
 
-    Returns close, change_pct, and all registry indicator fields (with derived fields).
+    Returns close, change_pct, and all registry indicator fields (with derived
+    fields) in ``values``. Insufficient history yields an all-default snapshot.
     """
     if indicators.empty or len(indicators) < 2:
-        return {}
+        return IndicatorSnapshotBase()
 
     latest = indicators.iloc[-1]
     prev_close = indicators.iloc[-2]["close"]
@@ -609,13 +611,8 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
     if prev_close and prev_close != 0 and not latest_is_gap:
         change_pct = round((latest["close"] - prev_close) / prev_close * 100, 2)
 
-    result: dict = {
-        "close": round(latest["close"], 2),
-        "change_pct": change_pct,
-    }
-
     # Collect all indicator values from registry
-    values: dict[str, float | None] = {}
+    values: dict[str, float | str | None] = {}
     for defn in INDICATOR_REGISTRY.values():
         for col in defn.output_fields:
             decimals = defn.field_decimals.get(col, defn.decimals)
@@ -623,8 +620,11 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> dict:
         if defn.snapshot_derived:
             values.update(defn.snapshot_derived(latest))
 
-    result["values"] = values
-    return result
+    return IndicatorSnapshotBase(
+        close=round(latest["close"], 2),
+        change_pct=change_pct,
+        values=values,
+    )
 
 
 def _get_delta_fields() -> list[str]:
@@ -726,14 +726,14 @@ def compute_indicators(
 
 async def compute_batch_indicator_snapshots(
     symbols: list[str],
-) -> list[dict]:
+) -> list[SymbolIndicatorSnapshot]:
     """Compute indicator snapshots for multiple symbols in batch.
 
     Fetches ~3 months of history and currencies via the configured price
     provider, then computes indicators and builds snapshots for each symbol.
 
-    Returns a list of dicts (one per symbol) with keys:
-    symbol, currency, and all build_indicator_snapshot fields.
+    Returns one :class:`SymbolIndicatorSnapshot` per symbol; symbols without
+    usable history get a default snapshot carrying just symbol/currency.
     """
     if not symbols:
         return []
@@ -742,18 +742,21 @@ async def compute_batch_indicator_snapshots(
     histories = await provider.batch_fetch_history(symbols, period="3mo")
     currencies = await provider.batch_fetch_currencies(symbols)
 
-    results = []
+    results: list[SymbolIndicatorSnapshot] = []
     for sym in symbols:
         currency = currencies.get(sym, "USD")
         df = histories.get(sym)
         if df is None or df.empty or len(df) < 2:
-            results.append({"symbol": sym, "currency": currency})
+            results.append(SymbolIndicatorSnapshot(symbol=sym, currency=currency))
             continue
 
         venue = AssetRef(sym).venue
         sessions = venue.session_dates_for_index(df.index) if venue else None
         snapshot = build_indicator_snapshot(compute_indicators(df, session_dates=sessions))
-        results.append({"symbol": sym, "currency": currency, **snapshot})
+        results.append(SymbolIndicatorSnapshot(
+            symbol=sym, currency=currency,
+            close=snapshot.close, change_pct=snapshot.change_pct, values=snapshot.values,
+        ))
 
     # Fundamentals are merged from cache by the caller (non-blocking).
     # See fundamentals_cache.merge_fundamentals_into_batch().

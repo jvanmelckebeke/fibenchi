@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.holdings_service import get_holdings, get_holdings_indicators
+from app.schemas.price import SymbolIndicatorSnapshot
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -87,8 +88,8 @@ async def test_get_holdings_indicators_returns_snapshots(
     mock_get_asset.return_value = _make_etf_asset("SPY")
     mock_fetch.holdings = AsyncMock(); mock_fetch.holdings.return_value = _sample_holdings()
     snapshots = [
-        {"symbol": "AAPL", "currency": "USD", "close": 180.0, "change_pct": 1.0, "values": {"rsi": 55.0}},
-        {"symbol": "MSFT", "currency": "USD", "close": 400.0, "change_pct": 0.5, "values": {"rsi": 60.0}},
+        SymbolIndicatorSnapshot(**{"symbol": "AAPL", "currency": "USD", "close": 180.0, "change_pct": 1.0, "values": {"rsi": 55.0}}),
+        SymbolIndicatorSnapshot(**{"symbol": "MSFT", "currency": "USD", "close": 400.0, "change_pct": 0.5, "values": {"rsi": 60.0}}),
     ]
     mock_compute.return_value = snapshots
 

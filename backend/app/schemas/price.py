@@ -61,7 +61,18 @@ class EtfHoldingsResponse(BaseModel):
 
 
 class IndicatorSnapshotBase(BaseModel):
-    """Shared indicator fields for holding and constituent snapshot responses."""
+    """The indicator snapshot — service-level object AND response shape.
+
+    Built by ``build_indicator_snapshot`` and cached by the compute layer;
+    the group/symbol indicator endpoints serve it as-is. ``values`` is an
+    open map on purpose: its keys are driven by ``INDICATOR_REGISTRY``
+    (output fields + ``snapshot_derived``) and the fundamentals cache merges
+    more keys in *after* construction — instances must therefore stay
+    mutable (no ``frozen=True``), and a closed per-field model would lie
+    about the payload. A degenerate snapshot (insufficient history) is an
+    all-default instance, not a missing entry.
+    """
+
     close: float | None = Field(default=None, description="Latest closing price")
     change_pct: float | None = Field(default=None, description="1-day percentage change")
     values: dict[str, float | str | None] = Field(
@@ -70,9 +81,25 @@ class IndicatorSnapshotBase(BaseModel):
     )
 
 
-class HoldingIndicatorResponse(IndicatorSnapshotBase):
-    symbol: str = Field(description="Holding ticker symbol")
+class CurrencyIndicatorSnapshot(IndicatorSnapshotBase):
+    """A snapshot with its display currency but no symbol — the batch data
+    endpoint's ``snapshot`` field, where the symbol is already the payload
+    key. Serializing a :class:`SymbolIndicatorSnapshot` through a field of
+    this type strips ``symbol`` (declared-type serialization)."""
+
     currency: str = Field(default="USD", description="ISO 4217 currency code")
+
+
+class SymbolIndicatorSnapshot(CurrencyIndicatorSnapshot):
+    """A snapshot bound to its symbol — the shape
+    ``compute_batch_indicator_snapshots`` returns (holdings, pseudo-ETF
+    constituents, batch data)."""
+
+    symbol: str = Field(description="Ticker symbol")
+
+
+class HoldingIndicatorResponse(SymbolIndicatorSnapshot):
+    """Per-holding indicator snapshot as served by the holdings endpoint."""
 
 
 class SparklinePointResponse(BaseModel):

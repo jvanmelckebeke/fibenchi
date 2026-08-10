@@ -150,10 +150,9 @@ def test_adx_snapshot_derived():
     df = _make_price_df(200)
     indicators = compute_indicators(df)
     snapshot = build_indicator_snapshot(indicators)
-    assert "values" in snapshot
-    assert "adx_trend" in snapshot["values"]
+    assert "adx_trend" in snapshot.values
     # Should be one of the valid classifications or None
-    assert snapshot["values"]["adx_trend"] in ("strong", "weak", "absent", None)
+    assert snapshot.values["adx_trend"] in ("strong", "weak", "absent", None)
 
 
 def test_atr_pct_in_snapshot():
@@ -161,10 +160,9 @@ def test_atr_pct_in_snapshot():
     df = _make_price_df(200)
     indicators = compute_indicators(df)
     snapshot = build_indicator_snapshot(indicators)
-    assert "values" in snapshot
-    assert "atr_pct" in snapshot["values"]
-    assert snapshot["values"]["atr_pct"] is not None
-    assert snapshot["values"]["atr_pct"] > 0
+    assert "atr_pct" in snapshot.values
+    assert snapshot.values["atr_pct"] is not None
+    assert snapshot.values["atr_pct"] > 0
 
 
 def test_atr_pct_calculation():
@@ -172,10 +170,10 @@ def test_atr_pct_calculation():
     df = _make_price_df(200)
     indicators = compute_indicators(df)
     snapshot = build_indicator_snapshot(indicators)
-    atr_val = snapshot["values"]["atr"]
-    close_val = snapshot["close"]
+    atr_val = snapshot.values["atr"]
+    close_val = snapshot.close
     expected = round(atr_val / close_val * 100, 2)
-    assert snapshot["values"]["atr_pct"] == expected
+    assert snapshot.values["atr_pct"] == expected
 
 
 def test_atr_pct_none_when_close_zero():
@@ -259,9 +257,8 @@ def test_chop_snapshot_derived():
     df = _make_price_df(200)
     indicators = compute_indicators(df)
     snapshot = build_indicator_snapshot(indicators)
-    assert "values" in snapshot
-    assert "chop_state" in snapshot["values"]
-    assert snapshot["values"]["chop_state"] in ("choppy", "trending", "neutral", None)
+    assert "chop_state" in snapshot.values
+    assert snapshot.values["chop_state"] in ("choppy", "trending", "neutral", None)
 
 
 def test_vnr_length():
@@ -291,8 +288,7 @@ def test_vnr_in_snapshot():
     """vnr should appear in snapshot values."""
     df = _make_price_df(200)
     snapshot = build_indicator_snapshot(compute_indicators(df))
-    assert "values" in snapshot
-    assert "vnr" in snapshot["values"]
+    assert "vnr" in snapshot.values
 
 
 def test_vnr_in_all_output_fields():
@@ -349,8 +345,8 @@ def test_vnr_sigma_in_snapshot():
     """The forward vol forecast is exposed so the UI can score an in-progress day."""
     df = _make_price_df(200)
     snapshot = build_indicator_snapshot(compute_indicators(df))
-    assert "vnr_sigma" in snapshot["values"]
-    assert snapshot["values"]["vnr_sigma"] > 0
+    assert "vnr_sigma" in snapshot.values
+    assert snapshot.values["vnr_sigma"] > 0
 
 
 def test_vnr_sigma_reconstructs_live_move():
@@ -363,7 +359,7 @@ def test_vnr_sigma_reconstructs_live_move():
     df = _make_price_df(200)
     # DB state = everything up to but excluding the final ("today") bar.
     db_snapshot = build_indicator_snapshot(compute_indicators(df.iloc[:-1]))
-    vnr_sigma = db_snapshot["values"]["vnr_sigma"]
+    vnr_sigma = db_snapshot.values["vnr_sigma"]
 
     closes = df["close"]
     today_return = closes.iloc[-1] / closes.iloc[-2] - 1
@@ -472,8 +468,8 @@ def test_vnr_regression_issue_559():
     result = compute_indicators(df)
     assert result["vnr_gap_sessions"].iloc[-1] == 2
     snapshot = build_indicator_snapshot(result)
-    assert snapshot["values"]["vnr"] is None
-    assert snapshot["values"]["vnr_gap_sessions"] == 2
+    assert snapshot.values["vnr"] is None
+    assert snapshot.values["vnr_gap_sessions"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -620,8 +616,8 @@ def test_snapshot_change_pct_suppressed_on_gap_bar():
     suppressed σ-Move next to it."""
     df = _trending_gapped_df(drop_offset=2)  # hole right before the last bar
     snapshot = build_indicator_snapshot(compute_indicators(df))
-    assert snapshot["values"]["vnr"] is None
-    assert snapshot["change_pct"] is None
+    assert snapshot.values["vnr"] is None
+    assert snapshot.change_pct is None
     # Contiguous series still reports a change.
     full = _make_price_df(100)
-    assert build_indicator_snapshot(compute_indicators(full))["change_pct"] is not None
+    assert build_indicator_snapshot(compute_indicators(full)).change_pct is not None

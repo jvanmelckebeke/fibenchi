@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from app.schemas.price import DatedOHLCV, IndicatorResponse
+from app.schemas.price import CurrencyIndicatorSnapshot, DatedOHLCV, IndicatorResponse
 from app.schemas.quote import Quote
 
 
@@ -13,15 +13,14 @@ class SymbolBatchData(BaseModel):
     ``response_model_exclude_none=True``, so absent fields are dropped from
     the JSON rather than emitted as ``null``. ``error`` replaces the data
     fields when the symbol failed entirely.
-
-    ``snapshot`` stays a provider-shaped dict for now — typing it is
-    tracked in #580.
     """
 
     quote: Quote | None = Field(
         default=None, description="Real-time quote: price, change, volume, market state."
     )
-    snapshot: dict | None = Field(
+    # A SymbolIndicatorSnapshot is stored here; the declared type strips the
+    # redundant ``symbol`` on serialization (it's already the payload key).
+    snapshot: CurrencyIndicatorSnapshot | None = Field(
         default=None, description="Latest indicator values and derived signals."
     )
     prices: list[DatedOHLCV] | None = Field(

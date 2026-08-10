@@ -130,11 +130,10 @@ def _build_fixtures() -> dict:
     series = {f: [_clean(v) for v in computed[f]] for f in APP_SERIES_FIELDS}
 
     snap = build_indicator_snapshot(computed)
-    values = snap.get("values", {})
     snapshot = {
-        "close": snap.get("close"),
-        "changePct": snap.get("change_pct"),
-        "values": {f: values.get(f) for f in APP_SNAPSHOT_FIELDS},
+        "close": snap.close,
+        "changePct": snap.change_pct,
+        "values": {f: snap.values.get(f) for f in APP_SNAPSHOT_FIELDS},
     }
 
     return {"input": bars, "expected": {"series": series, "snapshot": snapshot}}

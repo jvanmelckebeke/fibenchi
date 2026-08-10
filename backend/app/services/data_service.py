@@ -51,12 +51,9 @@ async def query_batch_data(
         try:
             snapshots = await compute_batch_indicator_snapshots(symbols)
             for snap in snapshots:
-                sym = snap.get("symbol")
-                if sym and sym in results:
-                    snap_data = {k: v for k, v in snap.items() if k != "symbol"}
-                    # Only include if we got actual computed data
-                    if snap_data.get("close") is not None:
-                        results[sym]["snapshot"] = snap_data
+                # Only include if we got actual computed data
+                if snap.symbol in results and snap.close is not None:
+                    results[snap.symbol]["snapshot"] = snap
         except Exception:
             logger.exception("Batch snapshot fetch failed")
 
