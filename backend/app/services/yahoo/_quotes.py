@@ -3,6 +3,7 @@
 import asyncio
 import logging
 
+from app.schemas.quote import Quote
 from app.services.yahoo._base import _YahooBase
 from app.services.yahoo._parsers import parse_quotes
 from app.services.yahoo.currency import resolve_currency
@@ -12,13 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class _QuotesMixin(_YahooBase):
-    async def quotes(self, symbols: list[str]) -> list[dict]:
+    async def quotes(self, symbols: list[str]) -> list[Quote]:
         """Fetch real-time market quotes for ``symbols``.
 
-        Returns a list of dicts: ``symbol, price, previous_close, change,
-        change_percent, volume, avg_volume, currency, market_state``. When
-        the breaker is open or Yahoo blocks, returns symbol-only
-        placeholders so consumers can iterate without crashing.
+        Returns one :class:`Quote` per symbol. When the breaker is open or
+        Yahoo blocks, returns symbol-only placeholders
+        (``Quote.placeholder``) so consumers can iterate without crashing.
         """
         if not symbols:
             return []
@@ -28,7 +28,7 @@ class _QuotesMixin(_YahooBase):
         if cached is not None:
             return cached
 
-        def _fetch() -> list[dict]:
+        def _fetch() -> list[Quote]:
             ticker = self._ticker(symbols)
             # ``quotes`` hits the batched ``/v7/finance/quote?symbols=…``
             # endpoint (one HTTP call for all symbols), unlike ``price``
@@ -38,10 +38,10 @@ class _QuotesMixin(_YahooBase):
             return parse_quotes(symbols, data if isinstance(data, dict) else {})
 
         result = await asyncio.to_thread(
-            self._call, _fetch, lambda: [{"symbol": s} for s in symbols],
+            self._call, _fetch, lambda: [Quote.placeholder(s) for s in symbols],
         )
-        # Don't cache the empty fallback — we want a real result on the next try.
-        if any(set(r.keys()) != {"symbol"} for r in result):
+        # Don't cache a fully degraded batch — we want a real result next try.
+        if any(not q.is_placeholder for q in result):
             self._quote_cache.set_value(cache_key, result)
         return result
 

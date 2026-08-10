@@ -10,6 +10,7 @@ import pytest
 from app.domain import AssetRef
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.price_repo import PriceRepository
+from app.schemas.quote import Quote
 from app.services.price_sync import (
     _NO_ANCHOR,
     _drop_and_persist,
@@ -132,8 +133,8 @@ async def test_sync_range_to_today_drops_unsettled_bar(db):
 
     # Last close is today's live partial; its predecessor equals previous_close.
     df = _df_from_closes([60.0, 64.44, 63.10])
-    quotes = [{"symbol": "MT.AS", "price": 64.28, "previous_close": 64.44,
-               "market_state": "REGULAR"}]
+    quotes = [Quote(**{"symbol": "MT.AS", "price": 64.28, "previous_close": 64.44,
+               "market_state": "REGULAR"})]
     mock_prov = _mock_provider(fetch_history=df, batch_fetch_quotes=quotes)
 
     captured = {}
@@ -386,8 +387,8 @@ async def test_sync_all_drops_unsettled_bar(db):
 
     # 3 bars; last (224.14) is today's partial, predecessor (290.23) == prev close.
     mock_data = {"IBM": _df_from_closes([305.0, 290.23, 224.14])}
-    quotes = [{"symbol": "IBM", "price": 220.84, "previous_close": 290.23,
-               "market_state": "REGULAR"}]
+    quotes = [Quote(**{"symbol": "IBM", "price": 220.84, "previous_close": 290.23,
+               "market_state": "REGULAR"})]
     mock_prov = _mock_provider(batch_fetch_history=mock_data, batch_fetch_quotes=quotes)
 
     captured = {}
@@ -414,8 +415,8 @@ async def test_sync_all_keeps_settled_bar(db):
 
     # Market closed (POSTPOST), last bar within tolerance of the settled close.
     mock_data = {"MT.AS": _df_from_closes([57.5, 58.04, 59.0])}
-    quotes = [{"symbol": "MT.AS", "price": 58.72, "previous_close": 58.04,
-               "market_state": "POSTPOST"}]
+    quotes = [Quote(**{"symbol": "MT.AS", "price": 58.72, "previous_close": 58.04,
+               "market_state": "POSTPOST"})]
     mock_prov = _mock_provider(batch_fetch_history=mock_data, batch_fetch_quotes=quotes)
 
     captured = {}

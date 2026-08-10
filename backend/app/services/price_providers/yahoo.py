@@ -11,6 +11,7 @@ from datetime import date
 
 import pandas as pd
 
+from app.schemas.quote import Quote
 from app.services.price_providers.base import PriceProvider
 from app.services.yahoo import yahoo_client
 
@@ -35,7 +36,7 @@ class YahooPriceProvider(PriceProvider):
     ) -> dict[str, pd.DataFrame]:
         return await yahoo_client.batch_history(symbols, period=period)
 
-    async def batch_fetch_quotes(self, symbols: list[str]) -> list[dict]:
+    async def batch_fetch_quotes(self, symbols: list[str]) -> list[Quote]:
         return await yahoo_client.quotes(symbols)
 
     async def batch_fetch_currencies(self, symbols: list[str]) -> dict[str, str]:

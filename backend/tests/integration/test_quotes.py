@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.schemas.quote import Quote
 from app.services.quote_service import _reset_asset_list_cache
 from tests.conftest import TestSession
 
@@ -13,7 +14,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 _MOCK_QUOTES = [
-    {
+    Quote(**{
         "symbol": "AAPL",
         "price": 185.50,
         "previous_close": 184.00,
@@ -21,8 +22,8 @@ _MOCK_QUOTES = [
         "change_percent": 0.82,
         "currency": "USD",
         "market_state": "REGULAR",
-    },
-    {
+    }),
+    Quote(**{
         "symbol": "MSFT",
         "price": 420.00,
         "previous_close": 418.50,
@@ -30,7 +31,7 @@ _MOCK_QUOTES = [
         "change_percent": 0.36,
         "currency": "USD",
         "market_state": "REGULAR",
-    },
+    }),
 ]
 
 
