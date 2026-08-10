@@ -36,7 +36,7 @@ export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: bo
   if (phase === "aftermarket") {
     return <Sunset className="phase-icon h-4 w-4 shrink-0 text-orange-400" aria-label="After-hours" />
   }
-  return <Moon className="phase-icon h-4 w-4 shrink-0 fill-current text-current opacity-80" aria-label="Closed" />
+  return <Moon className="phase-icon h-4 w-4 shrink-0 text-current opacity-80" aria-label="Closed" />
 }
 
 function reasonCopy(t: TileData): string | null {
