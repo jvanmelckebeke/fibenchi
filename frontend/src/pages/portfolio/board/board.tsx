@@ -13,13 +13,16 @@ const GEOM = {
   compact: { minTile: 104, gap: 3, rowPx: 65, headerPx: 42 },
   full: { minTile: 140, gap: 4, rowPx: 84, headerPx: 48 },
 }
-// Legend + breathing room reserved under the last section.
-const FOOTER_PX = 56
+// Footer row top margin + page bottom padding + a small buffer, on top of
+// the *measured* legend/pager height (it wraps taller at narrow widths).
+const FOOTER_EXTRA_PX = 36
 
 /** Measure the pixel budget under the board's top edge and pack whole
- * sections into screen-sized pages. Re-packs on any resize. */
+ * sections into screen-sized pages. Re-packs on any resize. The footer
+ * (legend + pager) is measured, not assumed — at narrow widths it wraps. */
 function usePagedSections(sections: BoardSection[]) {
   const ref = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
   const [metrics, setMetrics] = useState({ width: 0, availPx: 0, full: false })
 
   useEffect(() => {
@@ -27,15 +30,17 @@ function usePagedSections(sections: BoardSection[]) {
     if (!el) return
     const measure = () => {
       const rect = el.getBoundingClientRect()
+      const footerH = footerRef.current?.offsetHeight ?? 32
       setMetrics({
         width: rect.width,
-        availPx: Math.max(240, window.innerHeight - rect.top - FOOTER_PX),
+        availPx: Math.max(240, window.innerHeight - rect.top - footerH - FOOTER_EXTRA_PX),
         full: window.matchMedia("(min-width: 1536px)").matches,
       })
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    if (footerRef.current) ro.observe(footerRef.current)
     window.addEventListener("resize", measure)
     return () => {
       ro.disconnect()
@@ -49,7 +54,7 @@ function usePagedSections(sections: BoardSection[]) {
     return packSections(sections, { cols, rowPx: g.rowPx, headerPx: g.headerPx, availPx: metrics.availPx })
   }, [sections, metrics])
 
-  return { ref, pages, availPx: metrics.availPx }
+  return { ref, footerRef, pages, availPx: metrics.availPx }
 }
 
 export function Board({ sections, mode }: { sections: BoardSection[]; mode: ColorMode }) {
@@ -62,7 +67,7 @@ export function Board({ sections, mode }: { sections: BoardSection[]; mode: Colo
     return pctSpan(tiles.map((t) => t.todayPct).filter((v): v is number => v != null))
   }, [sections, mode])
 
-  const { ref, pages, availPx } = usePagedSections(sections)
+  const { ref, footerRef, pages, availPx } = usePagedSections(sections)
   const [page, setPage] = useState(0)
   const current = Math.min(page, Math.max(0, pages.length - 1))
   const visible = pages[current] ?? []
@@ -103,7 +108,7 @@ export function Board({ sections, mode }: { sections: BoardSection[]; mode: Colo
           </section>
           ))}
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div ref={footerRef} className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <Legend mode={mode} span={span} />
           {pages.length > 1 && (
             <Pager
