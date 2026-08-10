@@ -108,9 +108,8 @@ def test_nefi_snapshot_crossover_signal():
     df = _make_price_df(300)
     indicators = compute_indicators(df)
     snapshot = build_indicator_snapshot(indicators)
-    assert "values" in snapshot
-    assert "nefi_signal" in snapshot["values"]
-    assert snapshot["values"]["nefi_signal"] in ("bullish", "bearish", None)
+    assert "nefi_signal" in snapshot.values
+    assert snapshot.values["nefi_signal"] in ("bullish", "bearish", None)
 
 
 def test_cmf_range():
@@ -167,9 +166,8 @@ def test_cmf_snapshot_derived():
     df = _make_price_df(200)
     indicators = compute_indicators(df)
     snapshot = build_indicator_snapshot(indicators)
-    assert "values" in snapshot
-    assert "cmf_signal" in snapshot["values"]
-    assert snapshot["values"]["cmf_signal"] in ("buying", "selling", None)
+    assert "cmf_signal" in snapshot.values
+    assert snapshot.values["cmf_signal"] in ("buying", "selling", None)
 
 
 def _make_volume_df(volumes: list[float]) -> pd.DataFrame:
@@ -233,8 +231,8 @@ def test_rvol_snapshot_derived():
     """RVOL snapshot should expose the numeric value and a qualitative state."""
     df = _make_volume_df([1_000_000.0] * 25 + [2_500_000.0])
     snapshot = build_indicator_snapshot(compute_indicators(df))
-    assert snapshot["values"]["rvol"] == pytest.approx(2.5)
-    assert snapshot["values"]["rvol_state"] == "high"
+    assert snapshot.values["rvol"] == pytest.approx(2.5)
+    assert snapshot.values["rvol_state"] == "high"
 
 
 def test_rvol_state_thresholds():

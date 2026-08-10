@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domain import AssetRef
+from app.schemas.price import IndicatorSnapshotBase
 from app.services.compute.group import (
     _indicator_cache,
     compute_and_cache_indicators,
@@ -134,7 +135,7 @@ class TestComputeAndCacheIndicators:
 
         result = await compute_and_cache_indicators(db, group_id=1)
 
-        assert result["NEW"] == {"values": {}}
+        assert result["NEW"] == IndicatorSnapshotBase()
 
         _indicator_cache._data.clear()
 

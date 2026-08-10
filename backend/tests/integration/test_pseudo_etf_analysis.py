@@ -7,6 +7,7 @@ import pytest
 
 from app.models import Asset, AssetType, PriceHistory
 from app.models.pseudo_etf import PseudoETF
+from app.schemas.price import SymbolIndicatorSnapshot
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -84,8 +85,8 @@ class TestGetConstituentIndicators:
     async def test_returns_indicator_data(self, mock_compute, mock_merge, client, db):
         etf = await _seed_pseudo_etf(db)
         mock_compute.return_value = [
-            {"symbol": "AAPL", "currency": "USD", "values": {"rsi": 55.0}},
-            {"symbol": "MSFT", "currency": "USD", "values": {"rsi": 48.0}},
+            SymbolIndicatorSnapshot(**{"symbol": "AAPL", "currency": "USD", "values": {"rsi": 55.0}}),
+            SymbolIndicatorSnapshot(**{"symbol": "MSFT", "currency": "USD", "values": {"rsi": 48.0}}),
         ]
 
         resp = await client.get(f"/api/pseudo-etfs/{etf.id}/constituents/indicators")
@@ -119,8 +120,8 @@ class TestGetConstituentIndicators:
     async def test_includes_weight_and_name(self, mock_compute, _mock_merge, client, db):
         etf = await _seed_pseudo_etf(db)
         mock_compute.return_value = [
-            {"symbol": "AAPL", "currency": "USD", "values": {"rsi": 55.0}},
-            {"symbol": "MSFT", "currency": "USD", "values": {"rsi": 48.0}},
+            SymbolIndicatorSnapshot(**{"symbol": "AAPL", "currency": "USD", "values": {"rsi": 55.0}}),
+            SymbolIndicatorSnapshot(**{"symbol": "MSFT", "currency": "USD", "values": {"rsi": 48.0}}),
         ]
 
         resp = await client.get(f"/api/pseudo-etfs/{etf.id}/constituents/indicators")

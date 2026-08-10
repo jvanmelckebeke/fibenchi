@@ -10,6 +10,7 @@ from app.models import PriceHistory
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
 from app.repositories.price_repo import PriceRepository
+from app.schemas.price import IndicatorSnapshotBase
 from app.services.compute.indicators import build_indicator_snapshot, compute_indicators
 from app.services.compute.utils import prices_to_df
 from app.services.fundamentals_cache import merge_fundamentals_from_cache
@@ -61,7 +62,7 @@ async def get_batch_sparklines(
 
 async def _compute_snapshots_for_refs(
     db: AsyncSession, refs: list[AssetRef],
-) -> dict[str, dict]:
+) -> dict[str, IndicatorSnapshotBase]:
     """Compute DB-backed indicator snapshots for the refs, with caching.
 
     The snapshot *values* depend purely on (symbols, latest price date), so the
@@ -92,11 +93,11 @@ async def _compute_snapshots_for_refs(
     for p in all_prices:
         grouped.setdefault(p.asset_id, []).append(p)
 
-    out: dict[str, dict] = {}
+    out: dict[str, IndicatorSnapshotBase] = {}
     for asset_id, ref in by_id.items():
         prices = grouped.get(asset_id, [])
         if len(prices) < 26:  # Need at least MACD slow period
-            out[ref.symbol] = {"values": {}}
+            out[ref.symbol] = IndicatorSnapshotBase()
             continue
 
         df = prices_to_df(prices)
@@ -109,6 +110,9 @@ async def _compute_snapshots_for_refs(
     # Merge cached fundamental metrics; background-fetch any misses
     merge_fundamentals_from_cache([ref.symbol for ref in by_id.values()], out)
 
+    # The cache hands out these model instances by reference, and the
+    # fundamentals merge mutates their ``values`` in place — snapshots must
+    # stay mutable (IndicatorSnapshotBase is deliberately not frozen).
     _indicator_cache.set_value(cache_key, out)
 
     return out
@@ -116,7 +120,7 @@ async def _compute_snapshots_for_refs(
 
 async def compute_and_cache_indicators(
     db: AsyncSession, group_id: int | None = None,
-) -> dict[str, dict]:
+) -> dict[str, IndicatorSnapshotBase]:
     """Compute indicator snapshots for assets in a group, with caching.
 
     If group_id is None, uses the default group.
@@ -131,7 +135,7 @@ async def compute_and_cache_indicators(
 
 async def compute_indicators_for_symbols(
     db: AsyncSession, symbols: list[str],
-) -> dict[str, dict]:
+) -> dict[str, IndicatorSnapshotBase]:
     """Compute indicator snapshots for specific tracked symbols (DB-backed).
 
     Mirrors the per-group snapshot shape but is addressable by symbol set rather

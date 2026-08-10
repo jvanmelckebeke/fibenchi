@@ -52,9 +52,9 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
     merge_fundamentals_into_batch(snapshots)
     return [
         ConstituentIndicatorResponse(
-            **s,
-            name=symbol_to_name.get(s["symbol"]),
-            weight_pct=weight_map.get(s["symbol"]),
+            **s.model_dump(),
+            name=symbol_to_name.get(s.symbol),
+            weight_pct=weight_map.get(s.symbol),
         )
         for s in snapshots
     ]

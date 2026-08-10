@@ -3,6 +3,7 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.schemas.price import SymbolIndicatorSnapshot
 from app.services.compute.indicators import compute_batch_indicator_snapshots
 from app.services.entity_lookups import get_asset
 from app.services.fundamentals_cache import merge_fundamentals_into_batch
@@ -20,7 +21,7 @@ async def get_holdings(db: AsyncSession, symbol: str) -> dict:
     return data
 
 
-async def get_holdings_indicators(db: AsyncSession, symbol: str) -> list[dict]:
+async def get_holdings_indicators(db: AsyncSession, symbol: str) -> list[SymbolIndicatorSnapshot]:
     """Return latest indicator snapshot for each of the ETF's top holdings."""
     asset = await get_asset(symbol, db)
     if asset.type.value != "etf":

@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.domain import AssetRef
-from app.schemas.quote import Quote
 from app.schemas.intraday import IntradayBar
+from app.schemas.quote import Quote
 from app.services.quote_service import get_quotes, quote_event_generator
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -196,6 +196,9 @@ async def test_stream_adaptive_interval_regular():
         patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
+        # Pin the venue schedule: the real hint is wall-clock dependent and
+        # caps the sleep to "seconds until the next bell" near an open.
+        patch("app.services.quote_service.schedule_poll_hint", return_value=("open", None)),
     ):
         MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
         async for _ in quote_event_generator():
@@ -226,6 +229,10 @@ async def test_stream_adaptive_interval_closed():
         patch("app.services.quote_service.get_price_provider", return_value=mock_prov),
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
+        # Pin the venue schedule: the real hint is wall-clock dependent and
+        # caps the sleep to "seconds until the next bell" near an open —
+        # this test failed for 5 real-world minutes before every NYSE open.
+        patch("app.services.quote_service.schedule_poll_hint", return_value=("closed", None)),
     ):
         MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
         async for _ in quote_event_generator():

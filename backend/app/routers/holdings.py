@@ -21,4 +21,4 @@ async def get_holdings(symbol: str, db: AsyncSession = Depends(get_db)):
 async def get_holdings_indicators(symbol: str, db: AsyncSession = Depends(get_db)):
     """Return latest indicator snapshot for each of the ETF's top holdings."""
     snapshots = await holdings_service.get_holdings_indicators(db, symbol)
-    return [HoldingIndicatorResponse(**s) for s in snapshots]
+    return [HoldingIndicatorResponse.model_validate(s, from_attributes=True) for s in snapshots]

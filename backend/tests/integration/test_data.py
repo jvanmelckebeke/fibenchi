@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.schemas.price import SymbolIndicatorSnapshot
 from app.schemas.quote import Quote
 from tests.helpers import make_yahoo_df, seed_asset_with_prices
 
@@ -85,7 +86,7 @@ async def test_quote_multiple_symbols(client):
 
 async def test_snapshot_field(client):
     mock_snapshots = [
-        {"symbol": "AAPL", "close": 185.5, "change_pct": 0.65, "currency": "USD", "values": {"rsi": 62.3}},
+        SymbolIndicatorSnapshot(**{"symbol": "AAPL", "close": 185.5, "change_pct": 0.65, "currency": "USD", "values": {"rsi": 62.3}}),
     ]
     with patch("app.services.data_service.compute_batch_indicator_snapshots", new_callable=AsyncMock, return_value=mock_snapshots):
         resp = await client.get("/api/data?symbols=AAPL&fields=snapshot")
@@ -157,7 +158,7 @@ async def test_indicators_tracked_asset(client, db):
 async def test_default_fields(client):
     """Omitting fields parameter returns quote + snapshot."""
     mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50})]
-    mock_snapshots = [{"symbol": "AAPL", "close": 185.5, "values": {"rsi": 55.0}}]
+    mock_snapshots = [SymbolIndicatorSnapshot(**{"symbol": "AAPL", "close": 185.5, "values": {"rsi": 55.0}})]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with (
@@ -180,7 +181,7 @@ async def test_default_fields(client):
 async def test_all_fields(client, db):
     await seed_asset_with_prices(db, symbol="TEST")
     mock_quotes = [Quote(**{"symbol": "TEST", "price": 150.0})]
-    mock_snapshots = [{"symbol": "TEST", "close": 150.0, "values": {"rsi": 55.0}}]
+    mock_snapshots = [SymbolIndicatorSnapshot(**{"symbol": "TEST", "close": 150.0, "values": {"rsi": 55.0}})]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with (
