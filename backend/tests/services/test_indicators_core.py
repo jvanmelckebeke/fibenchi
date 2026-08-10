@@ -8,6 +8,7 @@ import pytest
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
 from app.services.compute.indicators import (
     _batch_history_period,
+    build_indicator_snapshot,
     compute_batch_indicator_snapshots,
     compute_indicators,
     get_all_output_fields,
@@ -28,6 +29,16 @@ def test_compute_indicators_length():
     df = _make_price_df(100)
     result = compute_indicators(df)
     assert len(result) == 100
+
+
+def test_snapshot_reports_bar_count():
+    """Every snapshot carries the bars behind it — the numerator of the
+    "building baseline · N/60" copy on the dense board (#603)."""
+    snap = build_indicator_snapshot(compute_indicators(_make_price_df(100)))
+    assert snap.bars == 100
+    tiny = build_indicator_snapshot(compute_indicators(_make_price_df(1)))
+    assert tiny.bars == 1
+    assert tiny.close is None  # degenerate snapshot, but bars still reported
 
 
 def test_atr_adx_in_all_output_fields():
