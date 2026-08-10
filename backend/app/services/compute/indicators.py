@@ -612,7 +612,7 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> IndicatorSnapshotBase:
     fields) in ``values``. Insufficient history yields an all-default snapshot.
     """
     if indicators.empty or len(indicators) < 2:
-        return IndicatorSnapshotBase()
+        return IndicatorSnapshotBase(bars=len(indicators))
 
     latest = indicators.iloc[-1]
     prev_close = indicators.iloc[-2]["close"]
@@ -638,6 +638,7 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> IndicatorSnapshotBase:
     return IndicatorSnapshotBase(
         close=round(latest["close"], 2),
         change_pct=change_pct,
+        bars=len(indicators),
         values=values,
     )
 
@@ -763,15 +764,17 @@ async def compute_batch_indicator_snapshots(
         currency = currencies.get(sym, "USD")
         df = histories.get(sym)
         if df is None or df.empty or len(df) < 2:
-            results.append(SymbolIndicatorSnapshot(symbol=sym, currency=currency))
+            results.append(SymbolIndicatorSnapshot(
+                symbol=sym, currency=currency, bars=0 if df is None else len(df),
+            ))
             continue
 
         venue = AssetRef(sym).venue
         sessions = venue.session_dates_for_index(df.index) if venue else None
         snapshot = build_indicator_snapshot(compute_indicators(df, session_dates=sessions))
         results.append(SymbolIndicatorSnapshot(
-            symbol=sym, currency=currency,
-            close=snapshot.close, change_pct=snapshot.change_pct, values=snapshot.values,
+            symbol=sym, currency=currency, close=snapshot.close,
+            change_pct=snapshot.change_pct, bars=snapshot.bars, values=snapshot.values,
         ))
 
     # Fundamentals are merged from cache by the caller (non-blocking).

@@ -166,6 +166,7 @@ async def test_indicators_has_expected_fields(client, db):
     # Full snapshot has close, change_pct, and nested values
     assert "values" in ind
     assert "close" in ind
+    assert ind["bars"] > 26  # full seeded history behind the snapshot
     from app.services.compute.indicators import get_all_output_fields
     expected_fields = set(get_all_output_fields())
     assert expected_fields.issubset(set(ind["values"].keys()))
@@ -209,8 +210,10 @@ async def test_indicators_null_with_insufficient_data(client, db):
     resp = await client.get(f"/api/groups/{gid}/indicators")
     data = resp.json()
     ind = data["TINY"]
-    # With insufficient data, values dict should be empty
+    # With insufficient data, values dict should be empty — but the bar count
+    # still says how far the baseline has built (#603).
     assert ind["values"] == {}
+    assert ind["bars"] == 5
 
 
 async def test_indicators_empty_group(client, db):

@@ -97,7 +97,7 @@ async def _compute_snapshots_for_refs(
     for asset_id, ref in by_id.items():
         prices = grouped.get(asset_id, [])
         if len(prices) < 26:  # Need at least MACD slow period
-            out[ref.symbol] = IndicatorSnapshotBase()
+            out[ref.symbol] = IndicatorSnapshotBase(bars=len(prices))
             continue
 
         df = prices_to_df(prices)

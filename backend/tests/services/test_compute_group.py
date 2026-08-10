@@ -135,7 +135,9 @@ class TestComputeAndCacheIndicators:
 
         result = await compute_and_cache_indicators(db, group_id=1)
 
-        assert result["NEW"] == IndicatorSnapshotBase()
+        # Degenerate snapshot still reports how many bars it had — the
+        # "building baseline · N/60" copy needs the numerator (#603).
+        assert result["NEW"] == IndicatorSnapshotBase(bars=10)
 
         _indicator_cache._data.clear()
 

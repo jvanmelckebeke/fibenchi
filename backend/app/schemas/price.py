@@ -75,6 +75,12 @@ class IndicatorSnapshotBase(BaseModel):
 
     close: float | None = Field(default=None, description="Latest closing price")
     change_pct: float | None = Field(default=None, description="1-day percentage change")
+    bars: int | None = Field(
+        default=None,
+        description="Price bars behind this snapshot's computation. Lets clients tell "
+        "'building baseline' (fewer bars than an indicator's warmup, e.g. σ-Move's 60 "
+        "sessions) apart from other null-indicator causes. None when nothing was computed.",
+    )
     values: dict[str, float | str | None] = Field(
         default_factory=dict,
         description="Indicator values keyed by field name (includes derived fields like macd_signal_dir, bb_position)",
