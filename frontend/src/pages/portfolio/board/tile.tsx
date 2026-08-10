@@ -14,27 +14,27 @@ function pingDelay(): string {
   return `-${Date.now() % PING_CYCLE_MS}ms`
 }
 
-// Day-cycle icons for the venue phase — sun up = market open. Hues stay
-// outside the value ramp (yellow/amber/slate, never red or green) so a state
-// glyph can never be misread as a value.
+// Day-cycle icons for the venue phase — sun up = market open. All glyphs
+// render in the tile's own ink (currentColor): the shape carries the state,
+// so no hue competes with the value ramp.
 export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: boolean }) {
   if (phase == null) return null
   if (phase === "open") {
     return (
       <span className="relative shrink-0" title={live ? "Open (live)" : "Open (scheduled)"}>
         <span
-          className="board-ping absolute inset-0.5 rounded-full bg-yellow-300"
+          className="board-ping absolute inset-0.5 rounded-full bg-current"
           style={{ animationDelay: pingDelay() }}
         />
-        <Sun className="phase-icon relative h-3.5 w-3.5 text-yellow-300 2xl:h-4 2xl:w-4" />
+        <Sun className="phase-icon relative h-3.5 w-3.5 text-current 2xl:h-4 2xl:w-4" />
       </span>
     )
   }
   if (phase === "premarket") {
-    return <Sunrise className="phase-icon h-3.5 w-3.5 shrink-0 text-amber-400 2xl:h-4 2xl:w-4" aria-label="Pre-market" />
+    return <Sunrise className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Pre-market" />
   }
   if (phase === "aftermarket") {
-    return <Sunset className="phase-icon h-3.5 w-3.5 shrink-0 text-orange-400 2xl:h-4 2xl:w-4" aria-label="After-hours" />
+    return <Sunset className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="After-hours" />
   }
   return <Moon className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Closed" />
 }
