@@ -45,7 +45,7 @@ export function PerformanceOverlayChart({
     return { total: last.value, rebased }
   }, [data, sortedSymbols, baseValue])
 
-  const { hoverRef, setHover, displayData } = useCrosshairHover<OverlayHover>(lastRebased)
+  const { hoverRef, subscribe, displayData } = useCrosshairHover<OverlayHover>(lastRebased)
 
   useEffect(() => {
     if (!ref.current || !data.length || !sortedSymbols.length) return
@@ -112,22 +112,9 @@ export function PerformanceOverlayChart({
     baseLine.setData(data.map((p) => ({ time: p.date, value: baseValue })))
     baseLineRef.current = baseLine
 
-    // Crosshair: snap to total line, update legend with per-symbol rebased values
-    let snapping = false
-    chart.subscribeCrosshairMove((param) => {
-      if (param.time) {
-        const h = hoverRef.current.get(String(param.time))
-        if (h) {
-          setHover(h)
-          if (!snapping) {
-            snapping = true
-            chart.setCrosshairPosition(h.total, param.time, totalSeries)
-            snapping = false
-          }
-        }
-      } else {
-        setHover(null)
-      }
+    // Crosshair: legend updates via the hook; snap the crosshair to the total line
+    subscribe(chart, (h, time) => {
+      chart.setCrosshairPosition(h.total, time, totalSeries)
     })
 
     chart.timeScale().fitContent()
@@ -139,7 +126,7 @@ export function PerformanceOverlayChart({
       totalSeriesRef.current = null
       baseLineRef.current = null
     }
-  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle, theme.dark, hoverRef, setHover])
+  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle, theme.dark, hoverRef, subscribe])
 
   // Apply baseLine + totalLine theme colors on theme change
   useEffect(() => {

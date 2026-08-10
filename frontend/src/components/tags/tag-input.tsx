@@ -20,21 +20,6 @@ export function TagInput({
   const attachTag = useAttachTag()
   const detachTag = useDetachTag()
 
-  const handleCreate = (close: () => void) => {
-    const name = search.trim().toLowerCase()
-    if (!name) return
-    createTag.mutate(
-      { name, color: newColor },
-      {
-        onSuccess: (tag) => {
-          attachTag.mutate({ symbol, tagId: tag.id })
-          setSearch("")
-          close()
-        },
-      },
-    )
-  }
-
   return (
     <ComboCreateInput<TagBrief>
       label="Tags"
@@ -48,19 +33,20 @@ export function TagInput({
         attachTag.mutate({ symbol, tagId: t.id })
         setSearch("")
       }}
-      renderCreate={(s, close) => (
-        <div className="border-t p-2 space-y-2">
-          <ColorSwatchPicker value={newColor} onChange={setNewColor} size="sm" />
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent text-muted-foreground"
-            onClick={() => handleCreate(close)}
-          >
+      create={{
+        extras: <ColorSwatchPicker value={newColor} onChange={setNewColor} size="sm" />,
+        label: (s) => (
+          <>
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: newColor }} />
             Create &ldquo;{s}&rdquo;
-          </button>
-        </div>
-      )}
+          </>
+        ),
+        onCreate: (s) =>
+          createTag.mutateAsync({ name: s.toLowerCase(), color: newColor }).then((tag) => {
+            attachTag.mutate({ symbol, tagId: tag.id })
+            setSearch("")
+          }),
+      }}
     />
   )
 }
