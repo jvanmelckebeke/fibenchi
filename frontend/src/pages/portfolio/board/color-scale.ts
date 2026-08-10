@@ -54,17 +54,19 @@ function lerpHex(a: string, b: string, t: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`
 }
 
+/** Day-adaptive span for %-of-today mode: tightens to the day's biggest
+ * move but never below ±2% (a flat day must not scream) and never beyond
+ * ±7% (past that, more red doesn't add information). */
+export function pctSpan(pcts: number[]): number {
+  if (!pcts.length) return 7
+  const maxAbs = Math.max(...pcts.map(Math.abs))
+  return Math.min(7, Math.max(2, maxAbs))
+}
+
 /** Resolve a value to its tile colour + legible ink, interpolating linearly
- * along the ramp. σ mode spans ±3 × the day-adaptive `unit` (see sigmaUnit);
- * % mode spans the window's expected range (a fixed scale would render a
- * month as all-extremes). Values beyond the span clamp to the end colours. */
-export function rampColor(
-  value: number,
-  mode: ColorMode,
-  window?: PctWindow,
-  unit = 1,
-): { color: string; ink: string } {
-  const span = mode === "sigma" ? 3 * unit : pctWindowDef(window ?? "1wk").maxAbs
+ * along the ramp across ±span (σ: 3 × sigmaUnit; %: pctSpan — both
+ * day-adaptive). Values beyond the span clamp to the end colours. */
+export function rampColor(value: number, span: number): { color: string; ink: string } {
   const t = Math.max(-1, Math.min(1, span === 0 ? 0 : value / span))
   const p = (t + 1) * ((RAMP_COLORS.length - 1) / 2) // 0 … 6 across the stops
   const i = Math.min(RAMP_COLORS.length - 2, Math.floor(p))

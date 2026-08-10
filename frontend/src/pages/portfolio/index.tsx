@@ -7,7 +7,7 @@ import { useMemo, useState } from "react"
 import { Board } from "./board/board"
 import { FilterBar } from "./board/filter-bar"
 import { IndexCard, MoversCard, MostUnusualCard } from "./board/rail"
-import type { ColorMode, PctWindow } from "./board/color-scale"
+import type { ColorMode } from "./board/color-scale"
 import { useBoardData, type GroupBy } from "./board/use-board-data"
 
 // View prefs persist locally — they're device-level ergonomics, not data.
@@ -23,7 +23,6 @@ function usePersisted<T extends string>(key: string, initial: T) {
 export function PortfolioPage() {
   const [groupBy, setGroupBy] = usePersisted<GroupBy>("board-group-by", "group")
   const [mode, setMode] = usePersisted<ColorMode>("board-color-mode", "sigma")
-  const [window, setWindow] = usePersisted<PctWindow>("board-pct-window", "1wk")
   const { sections, tiles, coverage, isLoading } = useBoardData(groupBy)
   const allTiles = useMemo(() => [...tiles.values()], [tiles])
 
@@ -35,8 +34,6 @@ export function PortfolioPage() {
           onGroupBy={setGroupBy}
           mode={mode}
           onMode={setMode}
-          window={window}
-          onWindow={setWindow}
           coverage={coverage}
         />
         {isLoading ? (
@@ -50,7 +47,7 @@ export function PortfolioPage() {
             No assets yet. Add assets to a group and refresh prices.
           </p>
         ) : (
-          <Board sections={sections} mode={mode} window={window} />
+          <Board sections={sections} mode={mode} />
         )}
       </div>
       <aside className="w-full shrink-0 space-y-3 lg:w-[340px]">

@@ -1,5 +1,5 @@
 import { SegmentedControl } from "@/components/ui/segmented-control"
-import { PCT_WINDOWS, type ColorMode, type PctWindow } from "./color-scale"
+import { type ColorMode } from "./color-scale"
 import type { GroupBy } from "./use-board-data"
 
 export function FilterBar({
@@ -7,16 +7,12 @@ export function FilterBar({
   onGroupBy,
   mode,
   onMode,
-  window,
-  onWindow,
   coverage,
 }: {
   groupBy: GroupBy
   onGroupBy: (v: GroupBy) => void
   mode: ColorMode
   onMode: (v: ColorMode) => void
-  window: PctWindow
-  onWindow: (v: PctWindow) => void
   coverage: { total: number; scored: number; open: number }
 }) {
   return (
@@ -34,27 +30,17 @@ export function FilterBar({
       </span>
       <span className="flex items-center gap-2 text-xs text-muted-foreground">
         Colour by
+        {/* Both modes are single-session measures: σ-Move is today's move in
+            vol units, % is today's raw move. The multi-day windows belong to
+            the Movers card, which owns its own selector. */}
         <SegmentedControl<ColorMode>
           options={[
             { value: "sigma", label: "σ-Move" },
-            { value: "pct", label: "% change" },
+            { value: "pct", label: "% today" },
           ]}
           value={mode}
           onChange={onMode}
         />
-        {/* The window scopes the tiles and nothing else — it lives beside the
-            control it scopes, and disappears in σ mode (σ-Move is a
-            single-session measure; a multi-day σ isn't a thing vnr computes). */}
-        {mode === "pct" && (
-          <>
-            over
-            <SegmentedControl<PctWindow>
-              options={PCT_WINDOWS.map((w) => ({ value: w.value, label: w.label }))}
-              value={window}
-              onChange={onWindow}
-            />
-          </>
-        )}
       </span>
       <span className="ml-auto rounded-full border border-border px-2.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">
         {coverage.open} open · {coverage.scored} of {coverage.total} scored

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 import { Moon, Sun, Sunrise, Sunset } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { changeColor, formatChangePct } from "@/lib/format"
-import { rampColor, pctWindowDef, type ColorMode, type PctWindow } from "./color-scale"
+import { rampColor, pctWindowDef, type ColorMode } from "./color-scale"
 import type { Tile as TileData } from "./use-board-data"
 
 // One shared pulse: every live dot's animation phase is aligned to the wall
@@ -64,19 +64,17 @@ function fmtSigma(v: number): string {
 export const BoardTile = memo(function BoardTile({
   tile,
   mode,
-  window,
-  unit,
+  span,
 }: {
   tile: TileData
   mode: ColorMode
-  window: PctWindow
-  /** Day-adaptive σ ramp unit (see sigmaUnit). */
-  unit: number
+  /** Day-adaptive ramp span (±σ or ±% — see sigmaUnit / pctSpan). */
+  span: number
 }) {
-  const pct = tile.windowPct[window]
-  const value = mode === "sigma" ? tile.sigma : pct
+  // % mode is *today's* move — the multi-day windows live in the Movers card.
+  const value = mode === "sigma" ? tile.sigma : tile.todayPct
   const noReading = value == null
-  const stop = noReading ? null : rampColor(value, mode, window, unit)
+  const stop = noReading ? null : rampColor(value, span)
 
   // Every tile prints its own value as text — nothing on the board is
   // encoded by colour alone. A no-reading tile still shows the raw % move,
