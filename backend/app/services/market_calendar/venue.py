@@ -147,6 +147,47 @@ class Venue:
                 return Phase.PREMARKET
         return Phase.CLOSED
 
+    def next_phase_change(self, at: datetime | None = None) -> datetime | None:
+        """When :meth:`phase` will next report a different phase.
+
+        The boundaries mirror phase()'s exactly: close for OPEN, the
+        extended-hours edges for AFTERMARKET/PREMARKET, and the earlier of
+        premarket-start / open for CLOSED. None when the schedule can't be
+        answered (same fail-safe posture as everything else here).
+        """
+        ts = _as_utc(at)
+        phase = self.phase(ts)
+        if phase is None:
+            return None
+        try:
+            if phase is Phase.OPEN:
+                candidate = self._cal.next_close(ts)
+            else:
+                # Same one-minute nudge as phase(): at the exact close instant,
+                # previous_close must mean "the close that just happened".
+                prev_close = self._cal.previous_close(ts + pd.Timedelta(minutes=1))
+                nxt_open = self._cal.next_open(ts)
+                if phase is Phase.AFTERMARKET and self.extended_hours is not None:
+                    candidate = prev_close + self.extended_hours.post_offset
+                elif phase is Phase.PREMARKET:
+                    candidate = nxt_open
+                elif (
+                    # CLOSED: premarket start if this venue has one and it's
+                    # still ahead, else the opening bell.
+                    self.extended_hours is not None
+                    and ts < (pre_start := nxt_open - self.extended_hours.pre_offset)
+                ):
+                    candidate = pre_start
+                else:
+                    candidate = nxt_open
+        except Exception:
+            return None
+        # Always-open calendars (24/7 crypto) have a next_close that isn't a
+        # phase change at all — claiming one would be the schedule lying.
+        if self.phase(candidate) == phase:
+            return None
+        return candidate.to_pydatetime()
+
 
 # One Venue per calendar name, shared by every Symbol that resolves to it.
 _venues: dict[str, Venue | None] = {}

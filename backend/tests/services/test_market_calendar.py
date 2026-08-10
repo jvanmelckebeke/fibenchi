@@ -202,6 +202,35 @@ def test_any_venue_open_us_holiday():
     assert any_venue_open(["AAPL"], _utc(2024, 7, 4, 15, 0)) is False
 
 
+def test_next_phase_change_us_regular_day():
+    """Each phase's next transition on Wednesday 2024-04-03 (regular 13:30–20:00 UTC)."""
+    venue = AssetRef("AAPL").venue
+    # Open → the closing bell.
+    assert venue.next_phase_change(_utc(2024, 4, 3, 15, 0)) == _utc(2024, 4, 3, 20, 0)
+    # Premarket → the opening bell.
+    assert venue.next_phase_change(_utc(2024, 4, 3, 12, 0)) == _utc(2024, 4, 3, 13, 30)
+    # Aftermarket → close + 4h (20:00 ET = 00:00 UTC next day).
+    assert venue.next_phase_change(_utc(2024, 4, 3, 21, 0)) == _utc(2024, 4, 4, 0, 0)
+    # Closed overnight → next premarket start (04:00 ET = 08:00 UTC).
+    assert venue.next_phase_change(_utc(2024, 4, 4, 1, 0)) == _utc(2024, 4, 4, 8, 0)
+
+
+def test_next_phase_change_venue_without_extended_hours():
+    """No extended session → closed transitions straight at the opening bell."""
+    venue = AssetRef("IWDA.AS").venue
+    # XAMS regular hours 09:00–17:30 CEST = 07:00–15:30 UTC in April.
+    assert venue.next_phase_change(_utc(2024, 4, 3, 16, 0)) == _utc(2024, 4, 4, 7, 0)
+    assert venue.next_phase_change(_utc(2024, 4, 3, 10, 0)) == _utc(2024, 4, 3, 15, 30)
+
+
+def test_next_phase_change_always_open_venue_has_none():
+    """A 24/7 calendar never changes phase — pretending midnight is a
+    transition would be the schedule lying."""
+    venue = AssetRef("BTC-USD").venue
+    assert venue.phase(_utc(2024, 4, 6, 12, 0)) == "open"
+    assert venue.next_phase_change(_utc(2024, 4, 6, 12, 0)) is None
+
+
 def test_any_venue_open_fails_open_on_unknown_venue():
     """An unresolvable symbol must never let the gate block real work."""
     assert any_venue_open(["FOO.XX"], _utc(2024, 4, 6, 12, 0)) is True
