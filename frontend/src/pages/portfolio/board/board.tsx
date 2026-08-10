@@ -3,7 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { RAMP_COLORS, sigmaUnit } from "./color-scale"
 import type { ColorMode, PctWindow } from "./color-scale"
 import { pctWindowDef } from "./color-scale"
-import { BoardTile } from "./tile"
+import { BoardTile, PhaseIcon } from "./tile"
 import type { BoardSection } from "./use-board-data"
 
 export function Board({
@@ -74,13 +74,16 @@ function Legend({ mode, window, unit: sigmaScale }: { mode: ColorMode; window: P
         no reading
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-[7px] w-[7px] rounded-full bg-cyan-400 ring-[1.5px] ring-white/80" /> open
+        <PhaseIcon phase="open" /> open
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-[7px] w-[7px] rounded-full bg-amber-400 ring-[1.5px] ring-white/80" /> pre / post
+        <PhaseIcon phase="premarket" /> pre
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-[7px] w-[7px] rounded-full bg-zinc-800 ring-[1.5px] ring-white/60" /> closed
+        <PhaseIcon phase="aftermarket" /> post
+      </span>
+      <span className="flex items-center gap-1.5">
+        <PhaseIcon phase="closed" /> closed
       </span>
     </div>
   )

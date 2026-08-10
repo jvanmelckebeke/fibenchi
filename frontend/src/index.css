@@ -167,23 +167,23 @@
   );
 }
 
-.board-dot {
-  width: 7px;
-  height: 7px;
+/* Slight shadow keeps the stroke-only phase icons legible on any tile hue. */
+.phase-icon {
+  filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 0.7));
 }
 
-/* One shared pulse across every live tile (phase-locked to the wall clock via
-   a negative animation-delay) — synchronized reads as one system being alive,
-   independently-timed dots read as twinkling noise. */
+/* One shared pulse behind every open-market sun (phase-locked to the wall
+   clock via a negative animation-delay) — synchronized reads as one system
+   being alive, independently-timed pulses read as twinkling noise. */
 @keyframes board-ping {
-  0%       { transform: scale(1);   opacity: 0.45; }
-  60%, 100% { transform: scale(2.6); opacity: 0; }
+  0%       { transform: scale(1);   opacity: 0.35; }
+  60%, 100% { transform: scale(2.4); opacity: 0; }
 }
-.board-dot-ping {
+.board-ping {
   animation: none;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .board-dot-ping {
+  .board-ping {
     animation: board-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 }

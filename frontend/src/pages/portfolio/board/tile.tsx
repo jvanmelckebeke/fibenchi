@@ -1,5 +1,6 @@
 import { memo } from "react"
 import { Link } from "react-router-dom"
+import { Moon, Sun, Sunrise, Sunset } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { changeColor, formatChangePct } from "@/lib/format"
 import { rampColor, pctWindowDef, type ColorMode, type PctWindow } from "./color-scale"
@@ -13,30 +14,29 @@ function pingDelay(): string {
   return `-${Date.now() % PING_CYCLE_MS}ms`
 }
 
-function PhaseDot({ phase, live }: { phase: TileData["phase"]; live: boolean }) {
+// Day-cycle icons for the venue phase — sun up = market open. Hues stay
+// outside the value ramp (yellow/amber/slate, never red or green) so a state
+// glyph can never be misread as a value.
+export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: boolean }) {
   if (phase == null) return null
-  // Hues deliberately outside the value ramp (cyan/amber) so a state dot can
-  // never be misread as a value; ringed near-white to survive any tile colour.
   if (phase === "open") {
     return (
-      <span className="board-dot relative shrink-0" title={live ? "Open (live)" : "Open (scheduled)"}>
-        <span className="board-dot-ping absolute inset-0 rounded-full bg-cyan-400" style={{ animationDelay: pingDelay() }} />
-        <span className="relative block h-full w-full rounded-full bg-cyan-400 ring-[1.5px] ring-white/80" />
+      <span className="relative shrink-0" title={live ? "Open (live)" : "Open (scheduled)"}>
+        <span
+          className="board-ping absolute inset-0.5 rounded-full bg-yellow-300"
+          style={{ animationDelay: pingDelay() }}
+        />
+        <Sun className="phase-icon relative h-3.5 w-3.5 text-yellow-300" />
       </span>
     )
   }
-  if (phase === "premarket" || phase === "aftermarket") {
-    return (
-      <span className="board-dot shrink-0" title={phase === "premarket" ? "Pre-market" : "After-hours"}>
-        <span className="block h-full w-full rounded-full bg-amber-400 ring-[1.5px] ring-white/80" />
-      </span>
-    )
+  if (phase === "premarket") {
+    return <Sunrise className="phase-icon h-3.5 w-3.5 shrink-0 text-amber-400" aria-label="Pre-market" />
   }
-  return (
-    <span className="board-dot shrink-0" title="Closed">
-      <span className="block h-full w-full rounded-full bg-zinc-800 ring-[1.5px] ring-white/60" />
-    </span>
-  )
+  if (phase === "aftermarket") {
+    return <Sunset className="phase-icon h-3.5 w-3.5 shrink-0 text-orange-400" aria-label="After-hours" />
+  }
+  return <Moon className="phase-icon h-3.5 w-3.5 shrink-0 text-slate-400/80" aria-label="Closed" />
 }
 
 function reasonCopy(t: TileData): string | null {
@@ -111,7 +111,7 @@ export const BoardTile = memo(function BoardTile({
         >
           <span className="flex items-center justify-between gap-1">
             <span className="truncate font-mono text-[13px] font-semibold leading-none">{tile.symbol}</span>
-            <PhaseDot phase={tile.phase} live={tile.liveState} />
+            <PhaseIcon phase={tile.phase} live={tile.liveState} />
           </span>
           <span className="text-[12px] leading-none tabular-nums opacity-90">{valueEl}</span>
         </Link>
