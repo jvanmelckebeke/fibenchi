@@ -24,9 +24,9 @@ function RailCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-md border border-border bg-card p-4">
+    <section className="rounded-md border border-border bg-card p-5">
       <header className="mb-2.5 flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-medium text-muted-foreground">{title}</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
         {control}
       </header>
       {children}
@@ -62,10 +62,10 @@ export function IndexCard() {
         <p className="text-xs text-muted-foreground">No data yet.</p>
       ) : (
         <div className="space-y-1.5">
-          <div className="text-3xl font-light tabular-nums">
+          <div className="text-4xl font-light tabular-nums">
             {data.current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className={`text-sm font-medium tabular-nums ${changeColor(data.change)}`}>
+          <div className={`text-[15px] font-medium tabular-nums ${changeColor(data.change)}`}>
             {data.change >= 0 ? "+" : ""}
             {data.change.toFixed(2)} · {formatChangePct(data.change_pct).text}
           </div>
@@ -83,7 +83,7 @@ function MoverRow({ tile, pct, maxAbs }: { tile: Tile; pct: number; maxAbs: numb
   return (
     <Link
       to={`/asset/${tile.symbol}`}
-      className="relative flex items-center justify-between gap-2 rounded px-1.5 py-1 text-[13px] hover:bg-muted/40"
+      className="relative flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/40"
     >
       <span
         aria-hidden
@@ -133,7 +133,7 @@ export function MoversCard({ tiles }: { tiles: Tile[] }) {
           ))}
           {/* Never average (or rank) over a hole without saying so. */}
           {missing > 0 && (
-            <p className="pt-1 text-[11px] text-muted-foreground">
+            <p className="pt-1 text-xs text-muted-foreground">
               {missing} without a {pctWindowDef(window).label} series
             </p>
           )}
@@ -151,7 +151,7 @@ export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
   const unscored = tiles.filter((t) => t.sigma == null).length
 
   return (
-    <RailCard title="Most unusual" control={<span className="text-[11px] text-muted-foreground">today</span>}>
+    <RailCard title="Most unusual" control={<span className="text-xs text-muted-foreground">today</span>}>
       {scored.length === 0 ? (
         <p className="text-xs text-muted-foreground">No readings.</p>
       ) : (
@@ -160,7 +160,7 @@ export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
             <Link
               key={t.symbol}
               to={`/asset/${t.symbol}`}
-              className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-[13px] hover:bg-muted/40"
+              className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/40"
             >
               <span className="font-mono">{t.symbol}</span>
               <span className={`tabular-nums ${changeColor(t.sigma)}`}>
@@ -172,7 +172,7 @@ export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
         </div>
       )}
       {unscored > 0 && (
-        <p className="mt-2 border-t border-border/60 pt-1.5 text-[11px] text-muted-foreground">
+        <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
           {unscored} asset{unscored === 1 ? "" : "s"} without a σ today — still listed in Movers.
         </p>
       )}

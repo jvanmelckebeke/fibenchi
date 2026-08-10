@@ -53,7 +53,7 @@ export function PortfolioPage() {
           <Board sections={sections} mode={mode} window={window} />
         )}
       </div>
-      <aside className="w-full shrink-0 space-y-3 lg:w-[300px]">
+      <aside className="w-full shrink-0 space-y-3 lg:w-[340px]">
         <IndexCard />
         <MoversCard tiles={allTiles} />
         <MostUnusualCard tiles={allTiles} />
