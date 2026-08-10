@@ -24,9 +24,9 @@ function RailCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-md border border-border bg-card p-3">
-      <header className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+    <section className="rounded-md border border-border bg-card p-4">
+      <header className="mb-2.5 flex items-center justify-between gap-2">
+        <h3 className="text-[13px] font-medium text-muted-foreground">{title}</h3>
         {control}
       </header>
       {children}
@@ -61,11 +61,11 @@ export function IndexCard() {
       ) : !data.dates.length ? (
         <p className="text-xs text-muted-foreground">No data yet.</p>
       ) : (
-        <div className="space-y-1">
-          <div className="text-2xl font-light tabular-nums">
+        <div className="space-y-1.5">
+          <div className="text-3xl font-light tabular-nums">
             {data.current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className={`text-xs font-medium tabular-nums ${changeColor(data.change)}`}>
+          <div className={`text-sm font-medium tabular-nums ${changeColor(data.change)}`}>
             {data.change >= 0 ? "+" : ""}
             {data.change.toFixed(2)} · {formatChangePct(data.change_pct).text}
           </div>
@@ -83,7 +83,7 @@ function MoverRow({ tile, pct, maxAbs }: { tile: Tile; pct: number; maxAbs: numb
   return (
     <Link
       to={`/asset/${tile.symbol}`}
-      className="relative flex items-center justify-between gap-2 rounded px-1.5 py-0.5 text-xs hover:bg-muted/40"
+      className="relative flex items-center justify-between gap-2 rounded px-1.5 py-1 text-[13px] hover:bg-muted/40"
     >
       <span
         aria-hidden
@@ -160,7 +160,7 @@ export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
             <Link
               key={t.symbol}
               to={`/asset/${t.symbol}`}
-              className="flex items-center justify-between gap-2 rounded px-1.5 py-0.5 text-xs hover:bg-muted/40"
+              className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-[13px] hover:bg-muted/40"
             >
               <span className="font-mono">{t.symbol}</span>
               <span className={`tabular-nums ${changeColor(t.sigma)}`}>

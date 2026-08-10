@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest"
-import { RAMP, rampStop, sigmaUnit } from "./color-scale"
+import { RAMP_COLORS, rampColor, sigmaUnit } from "./color-scale"
+
+const NEUTRAL = RAMP_COLORS[3]
 
 describe("sigmaUnit — day-adaptive σ scale", () => {
   it("tightens on quiet days but floors at a ±1.5σ range", () => {
@@ -12,34 +14,43 @@ describe("sigmaUnit — day-adaptive σ scale", () => {
   it("defaults to the canonical scale with no readings", () => {
     expect(sigmaUnit([])).toBe(1)
   })
-  it("spreads a quiet day across the ramp instead of all-neutral", () => {
-    // max |σ| = 1.5 → unit 0.5 → edges ±0.5/1/1.5: a +1.4σ day gets strong colour.
-    expect(rampStop(1.4, "sigma", undefined, 0.5)).toBe(RAMP[5])
-    expect(rampStop(1.4, "sigma", undefined, 1)).toBe(RAMP[4])
-  })
 })
 
-describe("rampStop — σ mode", () => {
-  it("buckets on the fixed ±1/2/3 edges", () => {
-    expect(rampStop(-3.5, "sigma")).toBe(RAMP[0])
-    expect(rampStop(-2.2, "sigma")).toBe(RAMP[1])
-    expect(rampStop(-1.01, "sigma")).toBe(RAMP[2])
-    expect(rampStop(0, "sigma")).toBe(RAMP[3]) // neutral grey midpoint
-    expect(rampStop(0.99, "sigma")).toBe(RAMP[3])
-    expect(rampStop(1.5, "sigma")).toBe(RAMP[4])
-    expect(rampStop(2.7, "sigma")).toBe(RAMP[5])
-    expect(rampStop(3.0, "sigma")).toBe(RAMP[6])
+describe("rampColor — continuous diverging scale", () => {
+  it("hits the exact stops at the midpoint and clamped extremes", () => {
+    expect(rampColor(0, "sigma").color).toBe(NEUTRAL)
+    expect(rampColor(3, "sigma").color).toBe(RAMP_COLORS[6])
+    expect(rampColor(-3, "sigma").color).toBe(RAMP_COLORS[0])
+    expect(rampColor(99, "sigma").color).toBe(RAMP_COLORS[6]) // clamps
   })
-})
 
-describe("rampStop — % mode", () => {
-  it("rescales the edges per window so a month doesn't render all-extremes", () => {
-    // +6% is near-extreme over a week (±7 scale)…
-    expect(rampStop(6, "pct", "1wk")).toBe(RAMP[5])
-    // …but only mildly positive over a month (±14 scale).
-    expect(rampStop(6, "pct", "1mo")).toBe(RAMP[4])
-    // The neutral band scales too: ±2% over a month is "nothing happened".
-    expect(rampStop(2, "pct", "1mo")).toBe(RAMP[3])
-    expect(rampStop(-15, "pct", "1mo")).toBe(RAMP[0])
+  it("moves linearly — adjacent values differ by a shade, not a cliff", () => {
+    // The +0.7σ-grey-next-to-+0.8σ-green complaint: both must sit strictly
+    // between neutral and the +1σ stop, and 0.8 must be greener than 0.7.
+    const c7 = rampColor(0.7, "sigma").color
+    const c8 = rampColor(0.8, "sigma").color
+    expect(c7).not.toBe(NEUTRAL)
+    expect(c8).not.toBe(NEUTRAL)
+    expect(c7).not.toBe(c8)
+    const green = (hex: string) => parseInt(hex.slice(3, 5), 16)
+    expect(green(c8)).toBeGreaterThan(green(c7))
+    expect(green(c8)).toBeLessThan(green(RAMP_COLORS[6]))
+  })
+
+  it("scales with the day-adaptive unit", () => {
+    // unit 0.5 halves the span: +1.5σ is already the extreme.
+    expect(rampColor(1.5, "sigma", undefined, 0.5).color).toBe(RAMP_COLORS[6])
+    expect(rampColor(1.5, "sigma", undefined, 1).color).not.toBe(RAMP_COLORS[6])
+  })
+
+  it("rescales per window in % mode so a month doesn't render all-extremes", () => {
+    expect(rampColor(7, "pct", "1wk").color).toBe(RAMP_COLORS[6])
+    expect(rampColor(7, "pct", "1mo").color).not.toBe(RAMP_COLORS[6])
+  })
+
+  it("always supplies a legible ink", () => {
+    for (const v of [-3, -1.2, 0, 0.4, 2.9]) {
+      expect(rampColor(v, "sigma").ink).toMatch(/^#/)
+    }
   })
 })

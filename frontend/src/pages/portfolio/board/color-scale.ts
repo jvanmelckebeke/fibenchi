@@ -1,26 +1,21 @@
-// The board's diverging colour ramp and its bucketing rules.
+// The board's diverging colour ramp and its scaling rules.
 //
-// Seven classes, two opposed hues with a neutral grey midpoint so "nothing
-// happened" reads as nothing. The no-reading state is deliberately NOT on
-// this ramp (design principle 1: unknown must never render as calm).
+// A continuous two-hue diverging scale through a neutral grey midpoint, so
+// "nothing happened" reads as nothing and ±0.7σ vs ±0.8σ differ by a shade,
+// not a cliff. The no-reading state is deliberately NOT on this ramp
+// (design principle 1: unknown must never render as calm).
 
-export interface RampStop {
-  color: string
-  /** Ink colour that stays legible on this swatch. */
-  ink: string
-  label: string
-}
+import { readableTextColor } from "@/lib/format"
 
-// ≤-3σ … ≥+3σ. Inks picked per swatch: the outer reds/greens are dark enough
-// for near-white, the mid stops need brighter contrast handling.
-export const RAMP: RampStop[] = [
-  { color: "#7f1d2b", ink: "#f5e3e5", label: "≤ -3" },
-  { color: "#a8323f", ink: "#f8e7e9", label: "-3 … -2" },
-  { color: "#c2666e", ink: "#2b1114", label: "-2 … -1" },
-  { color: "#3b3b40", ink: "#c9c9cf", label: "-1 … +1" },
-  { color: "#4f8f6d", ink: "#0e1f17", label: "+1 … +2" },
-  { color: "#3fa878", ink: "#0c2018", label: "+2 … +3" },
-  { color: "#2fc98a", ink: "#0a2318", label: "≥ +3" },
+// Gradient stops at -3 … +3 (×unit): deep red → neutral grey → bright green.
+export const RAMP_COLORS = [
+  "#7f1d2b",
+  "#a8323f",
+  "#c2666e",
+  "#3b3b40",
+  "#4f8f6d",
+  "#3fa878",
+  "#2fc98a",
 ]
 
 export type ColorMode = "sigma" | "pct"
@@ -37,7 +32,7 @@ export function pctWindowDef(w: PctWindow) {
 }
 
 /** σ-mode ramp unit adapted to the day's actual spread: on a quiet day the
- * edges tighten so relative outliers still get colour, but never below a
+ * scale tightens so relative outliers still get colour, but never below a
  * ±1.5σ full range (a dead-calm day must not scream) and never looser than
  * the canonical ±3σ. The legend prints the resulting range, so the scale
  * stays honest about what it's doing. */
@@ -47,21 +42,34 @@ export function sigmaUnit(sigmas: number[]): number {
   return Math.min(1, Math.max(0.5, maxAbs / 3))
 }
 
-/** Bucket a value into the 7-class ramp. σ mode uses ±1/2/3 edges scaled by
- * the day-adaptive `unit` (see sigmaUnit); % mode rescales the same edges to
- * the window's expected range (a fixed scale would render a month as
- * all-extremes). */
-export function rampStop(
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.slice(1)
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+}
+
+function lerpHex(a: string, b: string, t: number): string {
+  const ca = hexToRgb(a)
+  const cb = hexToRgb(b)
+  const c = ca.map((v, i) => Math.round(v + (cb[i] - v) * t))
+  return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`
+}
+
+/** Resolve a value to its tile colour + legible ink, interpolating linearly
+ * along the ramp. σ mode spans ±3 × the day-adaptive `unit` (see sigmaUnit);
+ * % mode spans the window's expected range (a fixed scale would render a
+ * month as all-extremes). Values beyond the span clamp to the end colours. */
+export function rampColor(
   value: number,
   mode: ColorMode,
   window?: PctWindow,
   unit = 1,
-): RampStop {
-  const scale = mode === "sigma" ? unit : pctWindowDef(window ?? "1wk").maxAbs / 3
-  const edges = [-3, -2, -1, 1, 2, 3].map((e) => e * scale)
-  let idx = 0
-  while (idx < edges.length && value >= edges[idx]) idx++
-  return RAMP[idx]
+): { color: string; ink: string } {
+  const span = mode === "sigma" ? 3 * unit : pctWindowDef(window ?? "1wk").maxAbs
+  const t = Math.max(-1, Math.min(1, span === 0 ? 0 : value / span))
+  const p = (t + 1) * ((RAMP_COLORS.length - 1) / 2) // 0 … 6 across the stops
+  const i = Math.min(RAMP_COLORS.length - 2, Math.floor(p))
+  const color = lerpHex(RAMP_COLORS[i], RAMP_COLORS[i + 1], p - i)
+  return { color, ink: readableTextColor(color) }
 }
 
 /** The σ-Move EWMA baseline length: bars needed before the vol forecast is

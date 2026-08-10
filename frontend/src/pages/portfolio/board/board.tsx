@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { RAMP, sigmaUnit } from "./color-scale"
+import { RAMP_COLORS, sigmaUnit } from "./color-scale"
 import type { ColorMode, PctWindow } from "./color-scale"
 import { pctWindowDef } from "./color-scale"
 import { BoardTile } from "./tile"
@@ -61,11 +61,12 @@ function Legend({ mode, window, unit: sigmaScale }: { mode: ColorMode; window: P
   }
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-[11px] text-muted-foreground">
-      <span className="flex items-center gap-1">
+      <span className="flex items-center gap-1.5">
         <span className="tabular-nums">-{fmt(3)}{unit}</span>
-        {RAMP.map((r) => (
-          <span key={r.color} className="h-3 w-5 rounded-[2px]" style={{ backgroundColor: r.color }} />
-        ))}
+        <span
+          className="h-3 w-36 rounded-[2px]"
+          style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(", ")})` }}
+        />
         <span className="tabular-nums">+{fmt(3)}{unit}</span>
       </span>
       <span className="flex items-center gap-1.5">

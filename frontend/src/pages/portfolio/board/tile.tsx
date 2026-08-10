@@ -1,8 +1,8 @@
 import { memo } from "react"
 import { Link } from "react-router-dom"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { formatChangePct } from "@/lib/format"
-import { rampStop, pctWindowDef, type ColorMode, type PctWindow } from "./color-scale"
+import { changeColor, formatChangePct } from "@/lib/format"
+import { rampColor, pctWindowDef, type ColorMode, type PctWindow } from "./color-scale"
 import type { Tile as TileData } from "./use-board-data"
 
 // One shared pulse: every live dot's animation phase is aligned to the wall
@@ -76,17 +76,25 @@ export const BoardTile = memo(function BoardTile({
   const pct = tile.windowPct[window]
   const value = mode === "sigma" ? tile.sigma : pct
   const noReading = value == null
-  const stop = noReading ? null : rampStop(value, mode, window, unit)
+  const stop = noReading ? null : rampColor(value, mode, window, unit)
 
   // Every tile prints its own value as text — nothing on the board is
-  // encoded by colour alone. A no-reading tile still shows the raw % move.
-  const valueText = noReading
-    ? mode === "sigma"
-      ? `—σ ${tile.todayPct != null ? formatChangePct(tile.todayPct).text : ""}`.trim()
-      : "—%"
-    : mode === "sigma"
-      ? fmtSigma(value)
-      : formatChangePct(value).text
+  // encoded by colour alone. A no-reading tile still shows the raw % move,
+  // in its up/down colour: the reading is missing, the day is not.
+  const valueEl = noReading ? (
+    <>
+      {mode === "sigma" ? "—σ" : "—%"}
+      {mode === "sigma" && tile.todayPct != null && (
+        <span className={`ml-1 ${changeColor(tile.todayPct)}`}>
+          {formatChangePct(tile.todayPct).text}
+        </span>
+      )}
+    </>
+  ) : mode === "sigma" ? (
+    fmtSigma(value)
+  ) : (
+    formatChangePct(value).text
+  )
 
   const windows = (["1wk", "2wk", "1mo"] as const).map((w) => {
     const p = tile.windowPct[w]
@@ -105,7 +113,7 @@ export const BoardTile = memo(function BoardTile({
             <span className="truncate font-mono text-[13px] font-semibold leading-none">{tile.symbol}</span>
             <PhaseDot phase={tile.phase} live={tile.liveState} />
           </span>
-          <span className="text-[12px] leading-none tabular-nums opacity-90">{valueText}</span>
+          <span className="text-[12px] leading-none tabular-nums opacity-90">{valueEl}</span>
         </Link>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-[260px]">
