@@ -10,6 +10,7 @@ import type {
   AssetDetail,
   AssetUpdate,
   AssetPerformance,
+  CalendarPhase,
   ConstituentIndicator,
   EarningsInfo,
   EtfHoldings,
@@ -155,6 +156,10 @@ export const api = {
       for (const s of symbols) params.append("symbols", s)
       return request<Record<string, IndicatorSummary>>(`/indicators?${params.toString()}`)
     },
+  },
+  market: {
+    /** Scheduled phase + next bell per in-use venue calendar (with its symbols). */
+    phases: () => request<Record<string, CalendarPhase>>(`/market/phases`),
   },
   note: {
     get: (symbol: string) => request<Note>(`/assets/${symbol}/note`),

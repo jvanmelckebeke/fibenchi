@@ -52,5 +52,6 @@ export const keys = {
   symbolSearchYahoo: (q: string) => ["symbol-search-yahoo", q] as const,
   earnings: (symbol: string) => ["earnings", symbol] as const,
   symbolSources: ["symbol-sources"] as const,
+  marketPhases: ["market-phases"] as const,
   symbolSourceProviders: ["symbol-source-providers"] as const,
 }
