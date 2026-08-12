@@ -49,6 +49,8 @@ export interface Tile {
   reason: NoReadingReason | null
   /** Today's % change (live quote first, stored bar fallback). */
   todayPct: number | null
+  /** Last price — the magnitude behind the dimensionless σ (tooltip). */
+  price: number | null
   /** % change over each board window (from the shared 1mo series). */
   windowPct: Record<PctWindow, number | null>
   /** The 1mo close series the windows were derived from (tooltip sparkline). */
@@ -218,6 +220,7 @@ export function useBoardData(groupBy: GroupBy) {
         sigma,
         reason,
         todayPct: quote?.change_percent ?? snap?.change_pct ?? null,
+        price: quote?.price ?? snap?.close ?? null,
         windowPct: windowReturns[symbol] ?? EMPTY_WINDOWS,
         spark: series?.[symbol] ?? [],
         sections: sectionsBySymbol[symbol] ?? [],

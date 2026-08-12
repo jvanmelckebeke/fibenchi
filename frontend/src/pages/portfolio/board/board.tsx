@@ -85,8 +85,13 @@ export function Board({ sections, mode }: { sections: BoardSection[]; mode: Colo
     return () => window.removeEventListener("keydown", onKey)
   }, [pages.length])
 
+  // The tile card is 272px against a 62px tile — four tiles across and about
+  // two and a half tall, so it covers its neighbours. The delay makes it appear
+  // when you *stop* on a tile rather than when you sweep past one;
+  // skipDelayDuration keeps the next ones instant, so browsing stays fast once
+  // you're already reading cards.
   return (
-    <TooltipProvider delayDuration={150}>
+    <TooltipProvider delayDuration={450} skipDelayDuration={300}>
       {/* The section area is pinned to the measured page height, so the
           legend/pager row below it stays level across page flips. */}
       <div ref={ref}>
