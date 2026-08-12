@@ -1,6 +1,6 @@
 import { memo } from "react"
 import { Link } from "react-router-dom"
-import { Moon, Sun, Sunrise, Sunset } from "lucide-react"
+import { ArrowRightFromLine, ArrowRightToLine, Moon, Sun } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { changeColor, formatChangePct } from "@/lib/format"
 import { rampColor, pctWindowDef, type ColorMode } from "./color-scale"
@@ -14,9 +14,11 @@ function pingDelay(): string {
   return `-${Date.now() % PING_CYCLE_MS}ms`
 }
 
-// Day-cycle icons for the venue phase — sun up = market open. All glyphs
-// render in the tile's own ink (currentColor): the shape carries the state,
-// so no hue competes with the value ramp.
+// Venue-phase icons: sun up = open, moon = closed, and the extended sessions
+// read as arrows against the open/close boundary — into the line before it
+// opens, out of the line after it closes. All glyphs render in the tile's own
+// ink (currentColor): the shape carries the state, so no hue competes with the
+// value ramp.
 export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: boolean }) {
   if (phase == null) return null
   if (phase === "open") {
@@ -31,10 +33,10 @@ export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: bo
     )
   }
   if (phase === "premarket") {
-    return <Sunrise className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Pre-market" />
+    return <ArrowRightToLine className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Pre-market" />
   }
   if (phase === "aftermarket") {
-    return <Sunset className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="After-hours" />
+    return <ArrowRightFromLine className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="After-hours" />
   }
   return <Moon className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Closed" />
 }
