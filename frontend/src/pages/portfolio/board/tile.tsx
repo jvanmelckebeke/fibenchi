@@ -103,12 +103,12 @@ export const BoardTile = memo(function BoardTile({
           red-400 2.67:1 against 5.17:1. Hence the explicit popover surface;
           p-0 because the card owns its own padding and dividers.
 
-          `[&>svg]` is the Radix arrow specifically — it carries bg-foreground
-          from the shared primitive and would otherwise stay white. The card is
-          a div, so its own icons and sparkline aren't direct children. */}
+          `[&>svg]` is the Radix arrow specifically — it's filled foreground by
+          the shared primitive and would otherwise stay white. The card is a
+          div, so its own icons and sparkline aren't direct children. */}
       <TooltipContent
         side="top"
-        className="w-fit max-w-none rounded-lg border border-border bg-popover p-0 text-foreground shadow-lg [&>svg]:bg-popover [&>svg]:fill-popover"
+        className="w-fit max-w-none rounded-lg border border-border bg-popover p-0 text-foreground shadow-lg [&>svg]:fill-popover"
       >
         <TileTooltip tile={tile} mode={mode} span={span} />
       </TooltipContent>
