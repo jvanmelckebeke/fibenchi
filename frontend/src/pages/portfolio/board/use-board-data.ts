@@ -6,15 +6,13 @@
 // never disagree with the table about the same asset.
 
 import { useMemo } from "react"
-import { useQueries } from "@tanstack/react-query"
-import { api, type Asset, type SparklinePoint } from "@/lib/api"
+import { type Asset, type SparklinePoint } from "@/lib/api"
 import {
-  keys,
-  STALE_5MIN,
   useDataHealth,
   useGroups,
   useIndicators,
   useMarketPhases,
+  useSparklines,
   useTheses,
 } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
@@ -28,7 +26,14 @@ import { VNR_BASELINE_SESSIONS, type PctWindow, PCT_WINDOWS } from "./color-scal
 
 export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 
-/** Why a tile has no σ reading — each state gets its own honest copy. */
+/** Why a tile has no σ reading.
+ *
+ * The variants are load-bearing *here* even though the tooltip only prints
+ * `warmup`: `feed_behind` vs `gap` is what decides whether σ is withheld at
+ * all, and the cascade below reads them to stay honest. Nothing downstream
+ * discriminates them anymore — that is deliberate (all three non-warmup states
+ * resolve to the same user action), not an oversight to be tidied away.
+ */
 export type NoReadingReason =
   | { kind: "feed_behind" }
   | { kind: "gap"; sessions: number; nextScanSeconds: number | null }
@@ -39,13 +44,22 @@ export interface Tile {
   symbol: string
   name: string
   currency: string
+  /** Carried so prices format through formatAssetPrice: an index is not
+   * currency-denominated, and a yield index is quoted in percent. */
+  type: Asset["type"]
   /** σ-Move via the live-first cascade; null → see reason. */
   sigma: number | null
   reason: NoReadingReason | null
   /** Today's % change (live quote first, stored bar fallback). */
   todayPct: number | null
+  /** Last price — the magnitude behind the dimensionless σ (tooltip). */
+  price: number | null
   /** % change over each board window (from the shared 1mo series). */
   windowPct: Record<PctWindow, number | null>
+  /** The 1mo close series the windows were derived from (tooltip sparkline). */
+  spark: SparklinePoint[]
+  /** Sections this symbol belongs to under the active grouping (tooltip). */
+  sections: string[]
   phase: Phase | null
   /** Venue calendar name + next scheduled phase change (tooltip). */
   calendar: string | null
@@ -65,37 +79,23 @@ export interface BoardSection {
 export type GroupBy = "group" | "thesis"
 
 /** Per-symbol % change series over the covering month, shared by the tiles'
- * %-mode, the Movers card, and the tooltips — one fetch, three windows. */
+ * %-mode, the Movers card, and the tooltips — one fetch, three windows.
+ *
+ * Fetched by roster, not by group: the board's symbols span every group and
+ * (in thesis mode) some belong to none, so a per-group fetch both duplicated
+ * shared symbols and missed thesis-only ones entirely. Returns the raw series
+ * alongside the scalars — the tooltip sparkline draws from it, so reducing it
+ * away here would mean fetching the same month twice.
+ */
 function useWindowReturns(symbols: string[]) {
-  const { data: groups } = useGroups()
-  const sparkQueries = useQueries({
-    queries: (groups ?? []).map((g) => ({
-      queryKey: keys.groupSparklines(g.id, "1mo"),
-      queryFn: () => api.groups.sparklines(g.id, "1mo"),
-      staleTime: STALE_5MIN,
-    })),
-  })
-  // useQueries returns new result arrays each render; depend on a stable
-  // fingerprint of the data so the merge doesn't recompute per render.
-  const loaded = sparkQueries.filter((q) => q.data).length
-  const series = useMemo(() => {
-    const merged: Record<string, SparklinePoint[]> = {}
-    for (const q of sparkQueries) {
-      if (!q.data) continue
-      for (const [sym, points] of Object.entries(q.data)) {
-        if (!merged[sym] || points.length > merged[sym].length) merged[sym] = points
-      }
-    }
-    return merged
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- see fingerprint note above
-  }, [loaded, groups])
+  const { data: series } = useSparklines(symbols, "1mo")
 
   const quotes = useQuotes()
-  return useMemo(() => {
+  const windows = useMemo(() => {
     const out: Record<string, Record<PctWindow, number | null>> = {}
     const today = new Date()
     for (const sym of symbols) {
-      const points = series[sym]
+      const points = series?.[sym]
       const per = {} as Record<PctWindow, number | null>
       for (const w of PCT_WINDOWS) {
         per[w.value] = null
@@ -118,6 +118,8 @@ function useWindowReturns(symbols: string[]) {
     }
     return out
   }, [symbols, series, quotes])
+
+  return { windows, series }
 }
 
 const EMPTY_WINDOWS: Record<PctWindow, number | null> = { "1wk": null, "2wk": null, "1mo": null }
@@ -139,9 +141,37 @@ export function useBoardData(groupBy: GroupBy) {
     return bySymbol
   }, [groups, theses, groupBy])
 
-  const symbols = useMemo(() => [...roster.keys()].sort(), [roster])
-  const { data: snapshots } = useIndicators(symbols)
-  const windowReturns = useWindowReturns(symbols)
+  // What we *fetch* is the union over both groupings, deliberately wider than
+  // what we render. The per-symbol queries key on their symbol array, so a
+  // roster that grows when you switch to thesis mode would change the key and
+  // miss cache on all ~84 snapshots for the sake of a handful of extra ones.
+  // Keying on the union makes the Group ↔ Thesis toggle free.
+  //
+  // This is why useTheses() is not gated to thesis mode: the union needs it in
+  // both. Gating it would save one ~4 KB request and reintroduce the refetch.
+  const fetchSymbols = useMemo(() => {
+    const all = new Set<string>()
+    for (const g of groups ?? []) for (const a of g.assets) all.add(a.symbol)
+    for (const t of theses ?? []) for (const a of t.assets) all.add(a.symbol)
+    return [...all].sort()
+  }, [groups, theses])
+
+  const { data: snapshots } = useIndicators(fetchSymbols)
+  const { windows: windowReturns, series } = useWindowReturns(fetchSymbols)
+
+  // Which sections each symbol sits in, under the active grouping — the one
+  // question the tooltip can answer that the grid can't, since a tile only
+  // ever appears under one heading at a time.
+  const sectionsBySymbol = useMemo(() => {
+    const out: Record<string, string[]> = {}
+    const add = (sym: string, title: string) => (out[sym] ??= []).push(title)
+    if (groupBy === "group") {
+      for (const g of groups ?? []) for (const a of g.assets) add(a.symbol, g.name)
+    } else {
+      for (const t of theses ?? []) for (const a of t.assets) add(a.symbol, t.name)
+    }
+    return out
+  }, [groupBy, groups, theses])
 
   const symbolPhase = useMemo(() => {
     const out: Record<string, { calendar: string; phase: Phase; nextBell: string | null }> = {}
@@ -190,10 +220,14 @@ export function useBoardData(groupBy: GroupBy) {
         symbol,
         name: asset.name,
         currency: asset.currency,
+        type: asset.type,
         sigma,
         reason,
         todayPct: quote?.change_percent ?? snap?.change_pct ?? null,
+        price: quote?.price ?? snap?.close ?? null,
         windowPct: windowReturns[symbol] ?? EMPTY_WINDOWS,
+        spark: series?.[symbol] ?? [],
+        sections: sectionsBySymbol[symbol] ?? [],
         phase,
         calendar: scheduled?.calendar ?? null,
         nextBell: scheduled?.nextBell ?? null,
@@ -201,7 +235,7 @@ export function useBoardData(groupBy: GroupBy) {
       })
     }
     return out
-  }, [roster, quotes, snapshots, windowReturns, symbolPhase, health])
+  }, [roster, quotes, snapshots, windowReturns, series, sectionsBySymbol, symbolPhase, health])
 
   const sections = useMemo<BoardSection[]>(() => {
     const toTiles = (list: Asset[]) =>

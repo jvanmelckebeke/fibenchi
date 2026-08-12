@@ -48,7 +48,13 @@ function TooltipContent({
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="size-2.5 rotate-45 rounded-[2px] bg-foreground fill-foreground z-50 translate-y-[calc(-50%_-_2px)]" />
+        {/* Radix's own arrow polygon, left as a triangle. It already reorients
+            with the resolved side — pointing down at a trigger below it, up at
+            one above — so nothing here has to track that. shadcn's default
+            squares it into a diamond via rotate-45 plus a background; the
+            background is what makes that shape, so it has to go for the
+            polygon underneath to show. */}
+        <TooltipPrimitive.Arrow width={11} height={5} className="fill-foreground z-50" />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )

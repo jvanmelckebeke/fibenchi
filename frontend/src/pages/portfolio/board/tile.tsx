@@ -3,7 +3,8 @@ import { Link } from "react-router-dom"
 import { ArrowRightFromLine, ArrowRightToLine, Moon, Sun } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { changeColor, formatChangePct } from "@/lib/format"
-import { rampColor, pctWindowDef, type ColorMode } from "./color-scale"
+import { rampColor, type ColorMode } from "./color-scale"
+import { TileTooltip } from "./tile-tooltip"
 import type { Tile as TileData } from "./use-board-data"
 
 // One shared pulse: every live dot's animation phase is aligned to the wall
@@ -22,8 +23,11 @@ function pingDelay(): string {
 export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: boolean }) {
   if (phase == null) return null
   if (phase === "open") {
+    // No native `title` here: this span sits inside the Radix TooltipTrigger,
+    // so the browser's own tooltip would surface on top of the styled card ~500
+    // ms later. The live/scheduled distinction lives in the card's source line.
     return (
-      <span className="relative shrink-0" title={live ? "Open (live)" : "Open (scheduled)"}>
+      <span className="relative shrink-0" aria-label={live ? "Open (live)" : "Open (scheduled)"}>
         <span
           className="board-ping absolute inset-0.5 rounded-full bg-current"
           style={{ animationDelay: pingDelay() }}
@@ -39,24 +43,6 @@ export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: bo
     return <ArrowRightFromLine className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="After-hours" />
   }
   return <Moon className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Closed" />
-}
-
-function reasonCopy(t: TileData): string | null {
-  switch (t.reason?.kind) {
-    case "feed_behind":
-      return "price feed behind the live quote · heal retry within ~10 min"
-    case "gap": {
-      const scan = t.reason.nextScanSeconds
-      const when = scan != null ? `next scan ~${Math.max(1, Math.round(scan / 60))} min` : "runs automatically"
-      return `spans a ${t.reason.sessions}-session gap · hole heal, ${when}`
-    }
-    case "warmup":
-      return `building baseline · ${t.reason.bars}/${t.reason.needed} bars`
-    case "unknown":
-      return "no σ reading"
-    default:
-      return null
-  }
 }
 
 function fmtSigma(v: number): string {
@@ -96,11 +82,6 @@ export const BoardTile = memo(function BoardTile({
     formatChangePct(value).text
   )
 
-  const windows = (["1wk", "2wk", "1mo"] as const).map((w) => {
-    const p = tile.windowPct[w]
-    return `${pctWindowDef(w).label}: ${p != null ? formatChangePct(p).text : "—"}`
-  })
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -116,24 +97,20 @@ export const BoardTile = memo(function BoardTile({
           <span className="text-[11px] leading-none tabular-nums 2xl:text-[13px] opacity-90">{valueEl}</span>
         </Link>
       </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[260px]">
-        <div className="space-y-1 text-xs">
-          <div className="font-semibold">
-            {tile.symbol} <span className="font-normal text-muted-foreground">{tile.name}</span>
-          </div>
-          <div>
-            σ-Move today:{" "}
-            {tile.sigma != null ? fmtSigma(tile.sigma) : (reasonCopy(tile) ?? "no reading")}
-          </div>
-          {tile.todayPct != null && <div>today: {formatChangePct(tile.todayPct).text}</div>}
-          <div className="text-muted-foreground">{windows.join(" · ")}</div>
-          {tile.calendar && (
-            <div className="text-muted-foreground">
-              {tile.calendar} · {tile.phase ?? "?"}
-              {tile.nextBell && ` · next bell ${new Date(tile.nextBell).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
-            </div>
-          )}
-        </div>
+      {/* The default TooltipContent surface is bg-foreground/text-background —
+          near-white on this board. The app's finance colours are unusable on
+          it: emerald-400 measures 1.86:1 there against 7.44:1 on bg-popover,
+          red-400 2.67:1 against 5.17:1. Hence the explicit popover surface;
+          p-0 because the card owns its own padding and dividers.
+
+          `[&>svg]` is the Radix arrow specifically — it's filled foreground by
+          the shared primitive and would otherwise stay white. The card is a
+          div, so its own icons and sparkline aren't direct children. */}
+      <TooltipContent
+        side="top"
+        className="w-fit max-w-none rounded-lg border border-border bg-popover p-0 text-foreground shadow-lg [&>svg]:fill-popover"
+      >
+        <TileTooltip tile={tile} mode={mode} span={span} />
       </TooltipContent>
     </Tooltip>
   )

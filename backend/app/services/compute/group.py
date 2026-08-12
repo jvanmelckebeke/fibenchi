@@ -36,13 +36,36 @@ async def get_batch_sparklines(
 
     If group_id is None, uses the default group.
     """
-    days = PERIOD_DAYS.get(period, 90)
-    start = date.today() - timedelta(days=days)
-
     if group_id is not None:
         refs = await AssetRepository(db).list_in_group_refs(group_id)
     else:
         refs = await _get_default_group_refs(db)
+    return await _sparklines_for_refs(db, period, refs)
+
+
+async def get_sparklines_for_symbols(
+    db: AsyncSession, symbols: list[str], period: str = "3mo",
+) -> dict[str, list[dict]]:
+    """Close-price sparklines for specific tracked symbols, keyed by symbol.
+
+    The symbol-addressed sibling of the per-group batch, mirroring
+    ``compute_indicators_for_symbols``. A roster that spans several groups is
+    one call here instead of one per group — and symbols that repeat across
+    groups are fetched once, not once per membership. Untracked symbols are
+    omitted (no DB price history).
+    """
+    if not symbols:
+        return {}
+    refs = await AssetRepository(db).list_refs_by_symbols(symbols)
+    return await _sparklines_for_refs(db, period, refs)
+
+
+async def _sparklines_for_refs(
+    db: AsyncSession, period: str, refs: list[AssetRef],
+) -> dict[str, list[dict]]:
+    """Close-price series per symbol over the period, in one price query."""
+    days = PERIOD_DAYS.get(period, 90)
+    start = date.today() - timedelta(days=days)
 
     if not refs:
         return {}
