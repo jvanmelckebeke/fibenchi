@@ -288,7 +288,8 @@
       "usesOhlc": false,
       "snapshotDerived": null,
       "platforms": [
-        "web"
+        "web",
+        "app"
       ]
     }
   ]
