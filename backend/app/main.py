@@ -27,6 +27,7 @@ from app.routers import (
     pseudo_etfs,
     quotes,
     search,
+    sparklines,
     symbol_sources,
     system,
     tags,
@@ -204,6 +205,7 @@ app.include_router(pseudo_etf_analysis.router)
 app.include_router(quotes.router)
 app.include_router(settings_router.router)
 app.include_router(search.router)
+app.include_router(sparklines.router)
 app.include_router(symbol_sources.router)
 app.include_router(system.router)
 
