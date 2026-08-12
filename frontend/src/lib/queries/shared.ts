@@ -37,6 +37,8 @@ export const keys = {
   groupIndicators: (id: number) => ["group-indicators", id] as const,
   // Sorted+joined so the key is order-independent (same symbol set → one cache entry).
   indicators: (symbols: readonly string[]) => ["indicators", [...symbols].sort().join(",")] as const,
+  sparklines: (symbols: readonly string[], period?: string) =>
+    ["sparklines", [...symbols].sort().join(","), period] as const,
   note: (symbol: string) => ["note", symbol] as const,
   theses: ["theses"] as const,
   thesesPerformance: ["theses", "performance"] as const,

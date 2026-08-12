@@ -157,6 +157,17 @@ export const api = {
       return request<Record<string, IndicatorSummary>>(`/indicators?${params.toString()}`)
     },
   },
+  sparklines: {
+    /** Batch close-price series for arbitrary tracked symbols, keyed by symbol.
+     * The roster-shaped sibling of `groups.sparklines` — one request for a set
+     * that spans groups, and no duplicate series for shared memberships. */
+    batch: (symbols: string[], period?: string) => {
+      const params = new URLSearchParams()
+      for (const s of symbols) params.append("symbols", s)
+      if (period) params.append("period", period)
+      return request<Record<string, SparklinePoint[]>>(`/sparklines?${params.toString()}`)
+    },
+  },
   market: {
     /** Scheduled phase + next bell per in-use venue calendar (with its symbols). */
     phases: () => request<Record<string, CalendarPhase>>(`/market/phases`),
