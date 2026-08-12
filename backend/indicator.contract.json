@@ -188,6 +188,25 @@
       ]
     },
     {
+      "key": "rvol",
+      "kernel": "relative_volume",
+      "params": {
+        "period": 20
+      },
+      "outputFields": [
+        "rvol"
+      ],
+      "deltaFields": [],
+      "decimals": 2,
+      "fieldDecimals": {},
+      "warmup": 21,
+      "usesOhlc": true,
+      "snapshotDerived": "rvol",
+      "platforms": [
+        "web"
+      ]
+    },
+    {
       "key": "nefi",
       "kernel": "normalized_force_index",
       "params": {
@@ -243,6 +262,31 @@
       "warmup": 14,
       "usesOhlc": true,
       "snapshotDerived": "chop",
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "key": "vnr",
+      "kernel": "volatility_normalized_return",
+      "params": {
+        "lam": 0.94
+      },
+      "outputFields": [
+        "vnr"
+      ],
+      "deltaFields": [
+        "vnr_sigma",
+        "vnr_gap_sessions"
+      ],
+      "decimals": 2,
+      "fieldDecimals": {
+        "vnr_sigma": 6,
+        "vnr_gap_sessions": 0
+      },
+      "warmup": 60,
+      "usesOhlc": false,
+      "snapshotDerived": null,
       "platforms": [
         "web"
       ]
