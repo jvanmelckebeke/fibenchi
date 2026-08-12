@@ -266,3 +266,50 @@ async def test_list_assets_includes_orphans(client):
     assert resp.status_code == 200
     symbols = [a["symbol"] for a in resp.json()]
     assert "OKLO" in symbols
+
+
+# --- Index classification (#617) ---
+#
+# Yahoo's quoteType is a live lookup frozen into the row at creation, and it
+# has been wrong: six caret symbols landed as stock and formatted as currency
+# ever since. The ticker's shape answers the same question offline and can't
+# drift, so it gets the last word.
+
+async def test_caret_symbol_is_index_despite_yahoo_saying_equity(client):
+    """The exact ^GSPC failure: Yahoo calls it EQUITY, shape overrules."""
+    mock_info = {"symbol": "^GSPC", "name": "S&P 500", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        resp = await client.post("/api/assets", json={"symbol": "^GSPC"})
+    assert resp.status_code == 201
+    assert resp.json()["type"] == "index"
+
+
+async def test_caret_symbol_is_index_when_yahoo_agrees(client):
+    mock_info = {"symbol": "^TYX", "name": "Treasury Yield 30 Years", "type": "INDEX", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        resp = await client.post("/api/assets", json={"symbol": "^TYX"})
+    assert resp.status_code == 201
+    assert resp.json()["type"] == "index"
+
+
+async def test_caret_symbol_is_index_over_explicit_request(client):
+    """A caller asking for type=stock on a caret symbol doesn't get one — the
+    shape isn't a preference, and a mis-typed index is what caused #617."""
+    mock_info = {"symbol": "^N225", "name": "Nikkei 225", "type": "EQUITY", "currency": "JPY", "currency_code": "JPY"}
+    with _mock_validate(return_value=mock_info):
+        resp = await client.post("/api/assets", json={"symbol": "^N225", "type": "stock"})
+    assert resp.status_code == 201
+    assert resp.json()["type"] == "index"
+
+
+async def test_yahoo_still_decides_etf_vs_stock(client):
+    """Shape can't see the ETF/stock distinction, so Yahoo keeps that call."""
+    mock_info = {"symbol": "VWCE.DE", "name": "Vanguard FTSE All-World", "type": "ETF", "currency": "EUR", "currency_code": "EUR"}
+    with _mock_validate(return_value=mock_info):
+        resp = await client.post("/api/assets", json={"symbol": "VWCE.DE"})
+    assert resp.json()["type"] == "etf"
+
+    mock_info = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        resp = await client.post("/api/assets", json={"symbol": "AAPL"})
+    assert resp.json()["type"] == "stock"

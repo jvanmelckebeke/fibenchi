@@ -41,11 +41,12 @@ async def create_asset(
     if existing:
         return existing
 
+    ref = AssetRef(symbol)
     info = await yahoo_client.validate(symbol)
     if not info:
         if not name:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
-        currency = AssetRef(symbol).currency or "USD"
+        currency = ref.currency or "USD"
     else:
         currency = info.get("currency_code") or info.get("currency", "USD")
         if not name:
@@ -54,6 +55,15 @@ async def create_asset(
             asset_type = AssetType.ETF
         elif info["type"] == "INDEX":
             asset_type = AssetType.INDEX
+
+    # Shape has the last word on index-ness. Yahoo's quoteType is a live lookup
+    # resolved once and then frozen in the row, and it has already been wrong:
+    # ^GSPC, ^N225 and four others landed as stock and rendered with a currency
+    # symbol ever since. classify() answers the same question from the ticker
+    # alone, deterministically and offline, so it can't disagree with itself
+    # later. Yahoo stays authoritative for ETF-vs-stock, which shape can't see.
+    if ref.kind.is_index:
+        asset_type = AssetType.INDEX
 
     await ensure_currency(db, currency)
     return await repo.create(
