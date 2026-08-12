@@ -44,6 +44,9 @@ export interface Tile {
   symbol: string
   name: string
   currency: string
+  /** Carried so prices format through formatAssetPrice: an index is not
+   * currency-denominated, and a yield index is quoted in percent. */
+  type: Asset["type"]
   /** σ-Move via the live-first cascade; null → see reason. */
   sigma: number | null
   reason: NoReadingReason | null
@@ -217,6 +220,7 @@ export function useBoardData(groupBy: GroupBy) {
         symbol,
         name: asset.name,
         currency: asset.currency,
+        type: asset.type,
         sigma,
         reason,
         todayPct: quote?.change_percent ?? snap?.change_pct ?? null,

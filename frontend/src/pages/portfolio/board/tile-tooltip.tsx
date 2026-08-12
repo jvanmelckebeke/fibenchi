@@ -17,7 +17,7 @@
 // board renders, and hovering must stay free.
 
 import type { SparklinePoint } from "@/lib/api"
-import { changeColor, formatChangePct, formatPrice } from "@/lib/format"
+import { changeColor, formatAssetPrice, formatChangePct } from "@/lib/format"
 import { rampColor, PCT_WINDOWS, type ColorMode } from "./color-scale"
 import { BELL_VERB, PHASE_LABEL, countdown } from "./bell"
 import { PhaseIcon } from "./tile"
@@ -127,9 +127,13 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
       <div className="border-t border-border px-3 py-2">
         <div className="flex items-baseline gap-2">
           <span className={`text-[17px] font-semibold tabular-nums ${changeColor(lead)}`}>{leadText}</span>
+          {/* formatAssetPrice, not formatPrice: an index isn't
+              currency-denominated, and a yield index (^TYX, ^TNX, …) is quoted
+              in percent — a "$" in front of a 30-year Treasury yield is a
+              category error, not a cosmetic one. */}
           {tile.price != null && (
             <span className="text-[13px] font-medium tabular-nums text-muted-foreground">
-              {formatPrice(tile.price, tile.currency)}
+              {formatAssetPrice(tile.price, tile)}
             </span>
           )}
           {/* Everything that isn't warmup — feed_behind, gap, unknown — lands
@@ -150,7 +154,14 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
       </div>
 
       <div className="flex items-center gap-3 border-t border-border px-3 py-2">
-        <Sparkline points={tile.spark} monthPct={tile.windowPct["1mo"]} />
+        {/* The curve is the same month the table's bottom row measures, but
+            nothing about it says so — it's the one element here with no units,
+            and it reads as "recent" rather than as a span. The label is the
+            cheapest way to make it a statement instead of a mood. */}
+        <div className="shrink-0">
+          <Sparkline points={tile.spark} monthPct={tile.windowPct["1mo"]} />
+          <div className="mt-0.5 text-center text-[10px] text-muted-foreground">1mo</div>
+        </div>
         <table className="flex-1 text-[11px]">
           <tbody>
             {PCT_WINDOWS.map((w) => {
