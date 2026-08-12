@@ -38,11 +38,18 @@ from app.services.compute.indicators import (
 
 # Indicators the companion app implements today. Everything else is web-only;
 # promoting one to the app is a matter of adding it here + writing the TS kernel.
-APP_INDICATORS = {"rsi", "sma_20", "sma_50", "macd"}
+APP_INDICATORS = {"rsi", "sma_20", "sma_50", "macd", "vnr"}
 
 # App-relevant fields for the golden fixtures. The app computes neither the
 # *_delta / *_delta_sigma analysis fields nor the web-only indicators.
-APP_SERIES_FIELDS = ["rsi", "sma_20", "sma_50", "macd", "macd_signal", "macd_hist"]
+#
+# ``vnr_sigma`` is the exception to "the app skips the companion fields": it is
+# the forward vol forecast the app divides a live intraday return by to score
+# today's move before its bar is written, so its EWMA recursion needs pinning
+# too. ``vnr_gap_sessions`` is not fixtured — the synthetic series has a
+# RangeIndex, so ``session_gap_days`` reports no gap information and the column
+# is null throughout; there is nothing to pin.
+APP_SERIES_FIELDS = ["rsi", "sma_20", "sma_50", "macd", "macd_signal", "macd_hist", "vnr", "vnr_sigma"]
 APP_SNAPSHOT_FIELDS = [*APP_SERIES_FIELDS, "macd_signal_dir"]
 
 CONTRACT_VERSION = 1
