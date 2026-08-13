@@ -2,7 +2,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.asset import AssetAttachments, AssetCreate, AssetResponse, AssetUpdate
+from app.schemas.asset import (
+    AssetAttachments,
+    AssetCreate,
+    AssetDetectionReset,
+    AssetResponse,
+    AssetUpdate,
+)
 from app.services import asset_service
 from app.services.asset_suggestion import suggest_for_asset
 
@@ -62,6 +68,24 @@ async def update_asset(asset_id: int, data: AssetUpdate, db: AsyncSession = Depe
         currency=data.currency,
         unit_kind=data.unit_kind,
     ))
+
+
+@router.post(
+    "/{asset_id}/reset-detection",
+    response_model=AssetResponse,
+    summary="Hand classification fields back to auto-detection",
+)
+async def reset_detection(asset_id: int, data: AssetDetectionReset, db: AsyncSession = Depends(get_db)):
+    """Adopt Fibenchi's read for the named fields and clear their user flag, so
+    they track future improvements again.
+
+    The inverse of a PATCH: editing says "I've decided", this says "you decide".
+    ``currency`` is never reset — the shape's currency is a venue-suffix fallback,
+    weaker than Yahoo's, and inert once the unit says the number isn't money.
+    """
+    return _with_suggestion(
+        await asset_service.reset_asset_detection(db, asset_id, set(data.fields))
+    )
 
 
 @router.get(

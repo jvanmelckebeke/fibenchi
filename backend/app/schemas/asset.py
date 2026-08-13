@@ -38,6 +38,15 @@ class AssetUpdate(BaseModel):
     )
 
 
+class AssetDetectionReset(BaseModel):
+    """Which fields to hand back to auto-detection."""
+
+    fields: list[str] = Field(
+        default=["type", "unit_kind"],
+        description="Field names to reset: 'type' and/or 'unit_kind'. Defaults to both.",
+    )
+
+
 class TagBrief(BaseModel):
     id: int = Field(description="Tag ID")
     name: str = Field(description="Tag label (e.g. 'tech', 'growth')")
@@ -71,7 +80,20 @@ class AssetSuggestionResponse(BaseModel):
     type: AssetType = Field(description="Type the ticker's shape implies")
     unit_kind: UnitKind = Field(description="How the price number should read")
     currency: str | None = Field(default=None, description="Inferred currency, null for indices")
-    disagrees: list[str] = Field(default=[], description="Auto fields differing from stored values")
+    differs: list[str] = Field(
+        default=[],
+        description=(
+            "Fields where the shape meaningfully differs from the stored value, whoever "
+            "set it. These are the fields that can be reset to auto-detection."
+        ),
+    )
+    disagrees: list[str] = Field(
+        default=[],
+        description=(
+            "The subset of 'differs' still auto-detected — what may be surfaced "
+            "unprompted. A user-set field never appears here."
+        ),
+    )
 
 
 class AssetResponse(BaseModel):

@@ -34,13 +34,14 @@ class AssetSuggestion:
     type: AssetType
     unit_kind: UnitKind
     currency: str | None
-    #: Fields that are AUTO *and* differ from what's stored — i.e. the ones
-    #: worth showing the user. A USER-set field never appears here.
+    #: Fields where the shape meaningfully differs from what's stored,
+    #: regardless of who stored it. This is what makes a value *resettable*.
+    differs: frozenset[str] = frozenset()
+    #: The subset of ``differs`` that is still AUTO — i.e. what Fibenchi may
+    #: raise unprompted. A field the user set never appears here, however much
+    #: the shape disagrees with it; going looking for that is the user's move,
+    #: which is why ``differs`` is exposed separately.
     disagrees: frozenset[str] = frozenset()
-
-    @property
-    def has_disagreement(self) -> bool:
-        return bool(self.disagrees)
 
 
 def suggest_for(ref: AssetRef) -> AssetSuggestion:
@@ -55,22 +56,44 @@ def suggest_for(ref: AssetRef) -> AssetSuggestion:
 
 
 def suggest_for_asset(asset: Asset) -> AssetSuggestion:
-    """The shape's read on a stored asset, flagging only actionable gaps."""
+    """The shape's read on a stored asset, and where it differs from the row."""
     base = suggest_for(AssetRef(asset.symbol))
 
-    disagrees: set[str] = set()
+    differs: set[str] = set()
     # Type: only meaningful for indices. Shape can't distinguish stock from
     # ETF, so proposing STOCK over a stored ETF would be noise, not a finding.
-    if (
-        asset.type_source.is_auto
-        and base.type is AssetType.INDEX
-        and asset.type is not AssetType.INDEX
-    ):
-        disagrees.add("type")
-    if asset.unit_source.is_auto and base.unit_kind is not asset.unit_kind:
-        disagrees.add("unit_kind")
+    if base.type is AssetType.INDEX and asset.type is not AssetType.INDEX:
+        differs.add("type")
+    if base.unit_kind is not asset.unit_kind:
+        differs.add("unit_kind")
 
-    return AssetSuggestion(base.type, base.unit_kind, base.currency, frozenset(disagrees))
+    # Provenance gates only the *unprompted* half. A user-set field stays in
+    # ``differs`` so it remains resettable and can be shown on request —
+    # "don't argue with you" must not collapse into "never speak again".
+    source = {"type": asset.type_source, "unit_kind": asset.unit_source}
+    disagrees = {f for f in differs if source[f].is_auto}
+
+    return AssetSuggestion(
+        base.type, base.unit_kind, base.currency, frozenset(differs), frozenset(disagrees),
+    )
+
+
+async def reset_detection(asset: Asset, fields: set[str]) -> None:
+    """Hand a field back to auto-detection: adopt the shape's answer, and
+    clear the provenance so future improvements are picked up again.
+
+    ``currency`` is deliberately not reset. The shape's currency is a
+    *fallback* inferred from the venue suffix — Yahoo's answer is better, and
+    an index's currency is inert anyway once unit_kind says the number isn't
+    money. Resetting it could only make things worse.
+    """
+    base = suggest_for(AssetRef(asset.symbol))
+    if "type" in fields:
+        asset.type = base.type
+        asset.type_source = FieldSource.AUTO
+    if "unit_kind" in fields:
+        asset.unit_kind = base.unit_kind
+        asset.unit_source = FieldSource.AUTO
 
 
 def source_for(explicit: object | None) -> FieldSource:

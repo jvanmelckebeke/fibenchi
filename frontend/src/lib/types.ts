@@ -14,12 +14,16 @@ export type UnitKind = "currency" | "percent" | "points"
 export type FieldSource = "auto" | "user"
 
 /** Fibenchi's read on a ticker — advisory, never applied on its own.
- * `disagrees` lists only auto fields that differ from what's stored, so an
- * empty array means there is nothing worth showing. */
+ *
+ * `differs` is every field the shape reads differently, whoever set it: these
+ * are the resettable ones. `disagrees` is the auto-only subset — what may be
+ * raised unprompted. A field you set stays in `differs` but leaves
+ * `disagrees`, so it's still visible and reversible without nagging. */
 export interface AssetSuggestion {
   type: AssetType
   unit_kind: UnitKind
   currency: string | null
+  differs: string[]
   disagrees: string[]
 }
 

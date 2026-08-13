@@ -17,7 +17,7 @@ from app.models import (
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
 from app.schemas.asset import AssetAttachments
-from app.services.asset_suggestion import suggest_for
+from app.services.asset_suggestion import reset_detection, suggest_for
 from app.services.currency_service import ensure_currency
 from app.services.entity_lookups import get_asset
 from app.services.yahoo import yahoo_client
@@ -114,6 +114,21 @@ async def update_asset(
         asset.unit_kind = unit_kind
         asset.unit_source = FieldSource.USER
 
+    return await AssetRepository(db).save(asset)
+
+
+async def reset_asset_detection(db: AsyncSession, asset_id: int, fields: set[str]):
+    """Hand the named fields back to auto-detection.
+
+    The inverse of an edit: an edit says "I've decided", this says "you decide
+    again". Without it a classification choice would be one-way — the recommendation
+    invisible forever and the value only changeable by hand — which is not what
+    "Fibenchi doesn't argue with you" was supposed to mean.
+    """
+    asset = await db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(404, f"Asset {asset_id} not found")
+    await reset_detection(asset, fields)
     return await AssetRepository(db).save(asset)
 
 

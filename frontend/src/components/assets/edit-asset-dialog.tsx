@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useUpdateAsset } from "@/lib/queries"
+import { useResetAssetDetection, useUpdateAsset } from "@/lib/queries"
 import { AssetSuggestionBanner } from "@/components/assets/asset-suggestion-banner"
 import type { Asset, AssetType, UnitKind } from "@/lib/api"
 
@@ -47,6 +47,7 @@ const UNIT_OPTIONS: { value: UnitKind; label: string; hint: string }[] = [
 
 function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () => void }) {
   const updateAsset = useUpdateAsset()
+  const resetDetection = useResetAssetDetection()
   const [name, setName] = useState(asset.name)
   const [type, setType] = useState<AssetType>(asset.type)
   const [currency, setCurrency] = useState(asset.currency)
@@ -69,6 +70,25 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
     if (!s) return
     if (s.disagrees.includes("type")) setType(s.type)
     if (s.disagrees.includes("unit_kind")) setUnitKind(s.unit_kind)
+  }
+
+  // Resetting is the inverse of an edit and has to go straight to the server:
+  // it clears the user flag, which no PATCH of a value could express. Local
+  // form state follows so the dialog doesn't sit on a stale selection.
+  const handleReset = () => {
+    const s = asset.suggested
+    if (!s) return
+    const fields = s.differs.filter((f) => !s.disagrees.includes(f))
+    resetDetection.mutate(
+      { id: asset.id, fields },
+      {
+        onSuccess: (updated) => {
+          setType(updated.type)
+          setUnitKind(updated.unit_kind)
+          setCurrency(updated.currency)
+        },
+      },
+    )
   }
 
   const handleSave = () => {
@@ -97,9 +117,10 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
       </DialogHeader>
       <div className="space-y-4 py-2">
         <AssetSuggestionBanner
-          symbol={asset.symbol}
           suggestion={asset.suggested}
           onApply={applySuggestion}
+          onReset={handleReset}
+          resetPending={resetDetection.isPending}
         />
         <div className="space-y-2">
           <Label htmlFor="asset-name">Name</Label>

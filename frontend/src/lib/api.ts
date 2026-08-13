@@ -82,6 +82,13 @@ export const api = {
     list: () => request<Asset[]>("/assets"),
     create: (data: AssetCreate) =>
       request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
+    /** Hand classification fields back to auto-detection: adopt Fibenchi's
+     * read and clear the user flag, so they track improvements again. */
+    resetDetection: (id: number, fields?: string[]) =>
+      request<Asset>(`/assets/${id}/reset-detection`, {
+        method: "POST",
+        body: JSON.stringify(fields ? { fields } : {}),
+      }),
     update: (id: number, data: AssetUpdate) =>
       request<Asset>(`/assets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     attachments: (symbol: string) =>

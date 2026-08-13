@@ -379,3 +379,72 @@ async def test_patching_currency_also_claims_the_unit(client):
     resp = await client.patch(f"/api/assets/{created.json()['id']}", json={"currency": "EUR"})
     assert resp.json()["currency"] == "EUR"
     assert resp.json()["unit_source"] == "user"
+
+
+async def test_user_set_field_stays_visible_and_resettable(client, db):
+    """"Don't argue with you" must not collapse into "never speak again".
+
+    A field the user set leaves `disagrees` (no nagging) but stays in
+    `differs` — otherwise the recommendation vanishes the moment you touch the
+    field, and the choice becomes one-way.
+    """
+    mock_info = {"symbol": "^N225", "name": "Nikkei 225", "type": "EQUITY", "currency": "JPY", "currency_code": "JPY"}
+    with _mock_validate(return_value=mock_info):
+        created = await client.post("/api/assets", json={"symbol": "^N225"})
+    aid = created.json()["id"]
+
+    resp = await client.patch(f"/api/assets/{aid}", json={"type": "etf", "unit_kind": "currency"})
+    data = resp.json()
+    assert data["type"] == "etf"
+    assert data["suggested"]["disagrees"] == []          # quiet
+    assert set(data["suggested"]["differs"]) == {"type", "unit_kind"}  # but visible
+
+
+async def test_reset_detection_restores_auto(client):
+    """The inverse of an edit: adopt the shape's answer and clear the flag, so
+    the field tracks improvements again."""
+    mock_info = {"symbol": "^N225", "name": "Nikkei 225", "type": "EQUITY", "currency": "JPY", "currency_code": "JPY"}
+    with _mock_validate(return_value=mock_info):
+        created = await client.post("/api/assets", json={"symbol": "^N225"})
+    aid = created.json()["id"]
+    await client.patch(f"/api/assets/{aid}", json={"type": "etf", "unit_kind": "currency"})
+
+    resp = await client.post(f"/api/assets/{aid}/reset-detection", json={})
+    data = resp.json()
+    assert resp.status_code == 200
+    assert data["type"] == "index"
+    assert data["unit_kind"] == "points"
+    assert data["type_source"] == "auto"
+    assert data["unit_source"] == "auto"
+    assert data["suggested"]["differs"] == []
+
+
+async def test_reset_detection_is_per_field(client):
+    mock_info = {"symbol": "^N225", "name": "Nikkei 225", "type": "EQUITY", "currency": "JPY", "currency_code": "JPY"}
+    with _mock_validate(return_value=mock_info):
+        created = await client.post("/api/assets", json={"symbol": "^N225"})
+    aid = created.json()["id"]
+    await client.patch(f"/api/assets/{aid}", json={"type": "etf", "unit_kind": "currency"})
+
+    resp = await client.post(f"/api/assets/{aid}/reset-detection", json={"fields": ["unit_kind"]})
+    data = resp.json()
+    assert data["unit_kind"] == "points" and data["unit_source"] == "auto"
+    assert data["type"] == "etf" and data["type_source"] == "user"
+
+
+async def test_reset_detection_leaves_currency_alone(client):
+    """The shape's currency is a venue-suffix fallback, weaker than Yahoo's —
+    resetting it could only make things worse."""
+    mock_info = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        created = await client.post("/api/assets", json={"symbol": "AAPL"})
+    aid = created.json()["id"]
+    await client.patch(f"/api/assets/{aid}", json={"currency": "EUR"})
+
+    resp = await client.post(f"/api/assets/{aid}/reset-detection", json={})
+    assert resp.json()["currency"] == "EUR"
+
+
+async def test_reset_detection_unknown_asset_404(client):
+    resp = await client.post("/api/assets/9999/reset-detection", json={})
+    assert resp.status_code == 404
