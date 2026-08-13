@@ -6,6 +6,11 @@ asyncpg==0.31.0
 alembic==1.15.2
 yahooquery>=2.3.7,<3.0
 pandas==2.2.3
+# Pinned for the same reason pandas is, plus one of its own: the indicator
+# contract fixtures are exact float comparisons, so a transitive numpy bump
+# that shifts a last-ulp result fails the contract-freshness CI step and reads
+# as a mystery contract break rather than a dependency change.
+numpy==2.5.2
 exchange-calendars==4.13.2
 apscheduler==3.11.0
 pydantic-settings==2.9.1

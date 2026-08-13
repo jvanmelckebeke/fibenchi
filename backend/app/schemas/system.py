@@ -38,7 +38,13 @@ class DataHealthResponse(BaseModel):
 
 class OrphanAsset(BaseModel):
     """An asset row referenced by nothing — no group, thesis, or pseudo-ETF.
-    Leftovers of removals; safe to hard-delete or re-adopt."""
+    Leftovers of removals; re-adoptable, or hard-deletable once you know the cost.
+
+    "Referenced by nothing" is about *containers*, not content: an orphan can
+    still carry a note and annotations, which the hard delete cascades away.
+    Those are hand-written and unrecoverable — unlike price bars, which Yahoo
+    re-supplies — so they are reported separately and the UI warns on them.
+    """
 
     id: int = Field(description="Asset ID (for add-to-group/thesis calls)")
     symbol: str = Field(description="Ticker symbol")
@@ -46,6 +52,14 @@ class OrphanAsset(BaseModel):
     type: str = Field(description="Asset type (stock/etf/index)")
     price_bars: int = Field(description="Stored daily bars that would be deleted with it")
     latest_bar: datetime.date | None = Field(description="Newest stored daily bar")
+    annotations: int = Field(
+        description="Hand-written chart annotations that would be deleted with it "
+        "(not re-fetchable)"
+    )
+    has_note: bool = Field(
+        description="Whether a hand-written thesis note would be deleted with it "
+        "(not re-fetchable)"
+    )
 
 
 class StatsResponse(BaseModel):
