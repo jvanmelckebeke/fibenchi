@@ -110,8 +110,3 @@ async def reset_detection(asset: Asset, fields: set[str]) -> None:
     if "unit_kind" in fields:
         asset.unit_kind = base.unit_kind
         asset.unit_source = FieldSource.AUTO
-
-
-def source_for(explicit: object | None) -> FieldSource:
-    """USER when a caller supplied a value, AUTO when it left the field alone."""
-    return FieldSource.USER if explicit is not None else FieldSource.AUTO

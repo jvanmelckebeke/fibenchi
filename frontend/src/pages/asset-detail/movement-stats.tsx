@@ -1,22 +1,20 @@
 import { useMemo } from "react"
 import { computeMovementStats } from "@/lib/movement-stats"
 import { formatChangePct, changeColor, formatAssetPrice, formatDateLong } from "@/lib/format"
-import type { Price, AssetType, UnitKind } from "@/lib/types"
+import type { Price, Asset } from "@/lib/types"
 
 interface MovementStatsProps {
   prices: Price[]
   label: string
   symbol: string
-  currency: string
-  assetType: AssetType
-  unitKind?: UnitKind
+  asset?: Asset
 }
 
-export function MovementStats({ prices, label, symbol, currency, assetType, unitKind }: MovementStatsProps) {
+export function MovementStats({ prices, label, symbol, asset }: MovementStatsProps) {
   const stats = useMemo(() => computeMovementStats(prices), [prices])
   if (!stats) return null
 
-  const hints = { type: assetType, symbol, currency, unit_kind: unitKind }
+  const hints = asset ?? { type: "stock" as const, symbol, currency: "USD" }
   const ret = formatChangePct(stats.periodReturnPct)
 
   return (

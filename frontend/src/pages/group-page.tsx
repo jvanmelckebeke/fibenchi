@@ -392,14 +392,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
             <AssetCard
               key={asset.id}
               groupId={groupId}
-              assetId={asset.id}
-              symbol={asset.symbol}
-              name={asset.name}
-              type={asset.type}
-              currency={asset.currency}
-              unitKind={asset.unit_kind}
-              suggested={asset.suggested}
-              tags={asset.tags}
+              asset={asset}
               quote={quotes[asset.symbol]}
               sparklineData={batchSparklines?.[asset.symbol]}
               indicatorData={batchIndicators?.[asset.symbol]}
