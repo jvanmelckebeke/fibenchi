@@ -8,6 +8,8 @@ import pandas as pd
 import pytest
 
 from app.services.compute.indicators import (
+    VNR_SIGMA_FLOOR_FRAC,
+    _ewma_daily_vol,
     _true_range,
     adx,
     atr,
@@ -621,3 +623,77 @@ def test_snapshot_change_pct_suppressed_on_gap_bar():
     # Contiguous series still reports a change.
     full = _make_price_df(100)
     assert build_indicator_snapshot(compute_indicators(full)).change_pct is not None
+
+
+def _flat_then_move(flat_sessions: int, vol: float = 0.012, move: float = 0.03) -> pd.Series:
+    """A normally-volatile name that goes completely flat, then really moves.
+
+    Models a suspended ticker, an ETC that stops repricing, or anything gone
+    quiet in a group that isn't pruned — the series that decays the EWMA
+    forecast toward zero.
+    """
+    rng = np.random.default_rng(7)
+    closes = [100.0]
+    for r in rng.normal(0, vol, 260):
+        closes.append(closes[-1] * (1 + r))
+    closes.extend([closes[-1]] * flat_sessions)
+    closes.append(closes[-1] * (1 + move))
+    return pd.Series(closes, index=pd.bdate_range("2020-01-01", periods=len(closes)))
+
+
+def test_sigma_floor_bounds_a_flat_series_blowup():
+    """`.replace(0, NaN)` only ever caught variance that reached *exactly* zero,
+    which floating point rarely does. A series that goes quiet decays sigma
+    smoothly toward zero and the first real move divides by almost nothing."""
+    series = _flat_then_move(120)
+    unfloored = volatility_normalized_return(series, sigma_floor_frac=0.0).iloc[-1]
+    floored = volatility_normalized_return(series).iloc[-1]
+    assert unfloored > 90       # the bug: a +3% day scoring like a market crash
+    assert floored < 25         # bounded, though still large — see the constant
+    assert floored < unfloored / 4
+
+
+def test_sigma_floor_is_inert_on_an_ordinary_series():
+    """The floor must not touch normal readings — it is scaled to a fraction of
+    the asset's own long-run vol precisely so a genuinely calm stretch still
+    scores as one. Regression against picking the fraction too high."""
+    series = _flat_then_move(0)
+    assert volatility_normalized_return(series).iloc[-1] == pytest.approx(
+        volatility_normalized_return(series, sigma_floor_frac=0.0).iloc[-1], abs=1e-9
+    )
+
+
+def test_sigma_floor_scales_per_asset_not_globally():
+    """A quiet instrument and a violent one get different floors — a global
+    constant would either be inert for one or clip the other's real moves."""
+    calm = _flat_then_move(0, vol=0.001)
+    wild = _flat_then_move(0, vol=0.05)
+    # Read the forecast *before* the trailing move — that bar's return is a
+    # fixed 3% in both series and would swamp the calm one's own scale.
+    assert _ewma_daily_vol(calm, 0.94).iloc[-2] < _ewma_daily_vol(wild, 0.94).iloc[-2] / 10
+
+
+def test_sigma_floor_uses_no_future_returns():
+    """The long-run anchor is an *expanding* stdev, so truncating the series
+    must not change any bar that survives — a rolling/full-sample estimate
+    would leak later volatility into an earlier bar's denominator."""
+    series = _flat_then_move(120)
+    full = volatility_normalized_return(series)
+    truncated = volatility_normalized_return(series.iloc[:-40])
+    pd.testing.assert_series_equal(full.iloc[:-40], truncated, check_names=False)
+
+
+def test_sigma_floor_still_nans_a_totally_flat_series():
+    """No returns at all means no honest denominator: the floor is zero too, so
+    the division stays guarded rather than producing an infinity."""
+    flat = pd.Series([100.0] * 80, index=pd.bdate_range("2020-01-01", periods=80))
+    assert _ewma_daily_vol(flat, 0.94).dropna().empty
+    assert volatility_normalized_return(flat).dropna().empty
+
+
+def test_sigma_floor_fraction_is_published_to_the_companion_app():
+    """The app re-implements this kernel from indicator.contract.json; a floor
+    that only exists in Python would silently drift the two apart."""
+    from app.services.compute.indicators import INDICATOR_REGISTRY
+
+    assert INDICATOR_REGISTRY["vnr"].params["sigma_floor_frac"] == VNR_SIGMA_FLOOR_FRAC
