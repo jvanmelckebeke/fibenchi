@@ -11,7 +11,7 @@ import { MarketStatusDot } from "@/components/market-status-dot"
 import { useAddAssetToThesis } from "@/lib/queries"
 import { DeferredSparkline } from "@/components/chart/sparkline"
 import { TagBadge } from "@/components/tags/tag-badge"
-import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
+import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary, UnitKind, AssetSuggestion } from "@/lib/api"
 import { formatAssetPriceWithSettings } from "@/lib/format"
 import { ChangePct } from "@/components/change-pct"
 import { getCardDescriptors, isVisibleAt, type IndicatorDescriptor, type Placement } from "@/lib/indicator-registry"
@@ -28,6 +28,8 @@ export interface AssetCardProps {
   name: string
   type: AssetType
   currency: string
+  unitKind: UnitKind
+  suggested?: AssetSuggestion | null
   tags: TagBrief[]
   quote?: Quote
   sparklineData?: SparklinePoint[]
@@ -66,6 +68,8 @@ export const AssetCard = memo(function AssetCard({
   name,
   type,
   currency,
+  unitKind,
+  suggested,
   tags,
   quote,
   sparklineData,
@@ -89,7 +93,7 @@ export const AssetCard = memo(function AssetCard({
   const addToThesis = useAddAssetToThesis()
 
   const priceFmt = lastPrice != null
-    ? formatAssetPriceWithSettings(lastPrice, { type, symbol, currency }, {
+    ? formatAssetPriceWithSettings(lastPrice, { type, symbol, currency, unit_kind: unitKind }, {
         compact: settings.compact_numbers,
         group: settings.thousands_separator,
       })
@@ -175,7 +179,7 @@ export const AssetCard = memo(function AssetCard({
         onNewThesis={() => setNewThesisOpen(true)}
       />
       <EditAssetDialog
-        asset={{ id: assetId, symbol, name, type, currency }}
+        asset={{ id: assetId, symbol, name, type, currency, unit_kind: unitKind, suggested }}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

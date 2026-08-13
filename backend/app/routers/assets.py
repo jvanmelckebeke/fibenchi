@@ -4,8 +4,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.asset import AssetAttachments, AssetCreate, AssetResponse, AssetUpdate
 from app.services import asset_service
+from app.services.asset_suggestion import suggest_for_asset
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
+
+
+def _with_suggestion(asset):
+    """Attach Fibenchi's read on the row, for ``AssetResponse.suggested``.
+
+    A transient attribute rather than a column, and attached here rather than
+    in the service because it is a presentation concern: the suggestion is
+    re-derived on every read so it can never go stale, and is never written —
+    the whole point is that stored values change only when a user applies one.
+    """
+    asset.suggested = suggest_for_asset(asset)
+    return asset
 
 
 @router.get("", response_model=list[AssetResponse], summary="List all assets")
@@ -16,7 +29,7 @@ async def list_assets(db: AsyncSession = Depends(get_db)):
     until ``POST /api/groups/{id}/assets`` attaches them. Internal views that need
     only grouped assets use repository-level filters directly.
     """
-    return await asset_service.list_assets(db)
+    return [_with_suggestion(a) for a in await asset_service.list_assets(db)]
 
 
 @router.post("", response_model=AssetResponse, status_code=201, summary="Add an asset")
@@ -28,22 +41,27 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
     ``POST /api/groups/{id}/assets`` afterwards to attach it to the Watchlist
     or any other group.
     """
-    return await asset_service.create_asset(db, data.symbol, data.name, data.type)
+    return _with_suggestion(await asset_service.create_asset(db, data.symbol, data.name, data.type))
 
 
 @router.patch("/{asset_id}", response_model=AssetResponse, summary="Update asset metadata")
 async def update_asset(asset_id: int, data: AssetUpdate, db: AsyncSession = Depends(get_db)):
-    """Patch an asset's metadata (name, type, currency). Useful for reclassifying
-    a ticker (e.g. stock → index) or fixing an incorrect auto-detected currency.
-    Fields omitted from the request body are left untouched.
+    """Patch an asset's metadata (name, type, currency, unit_kind). Useful for
+    reclassifying a ticker (e.g. stock → index), fixing an auto-detected
+    currency, or saying how the price number reads. Fields omitted from the
+    request body are left untouched.
+
+    Any field supplied is recorded as *your* choice, so Fibenchi stops
+    suggesting alternatives for it — see ``suggested`` on the response.
     """
-    return await asset_service.update_asset(
+    return _with_suggestion(await asset_service.update_asset(
         db,
         asset_id,
         name=data.name,
         asset_type=data.type,
         currency=data.currency,
-    )
+        unit_kind=data.unit_kind,
+    ))
 
 
 @router.get(

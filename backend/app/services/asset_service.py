@@ -2,7 +2,8 @@ from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import AssetRef
+from app.domain import AssetRef, UnitKind
+from app.domain.provenance import FieldSource
 from app.models import (
     Annotation,
     Asset,
@@ -16,6 +17,7 @@ from app.models import (
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.group_repo import GroupRepository
 from app.schemas.asset import AssetAttachments
+from app.services.asset_suggestion import suggest_for
 from app.services.currency_service import ensure_currency
 from app.services.entity_lookups import get_asset
 from app.services.yahoo import yahoo_client
@@ -29,11 +31,17 @@ async def create_asset(
     db: AsyncSession,
     symbol: str,
     name: str | None,
-    asset_type: AssetType,
+    asset_type: AssetType | None = None,
 ):
     """Create an asset row. Group attachment is the caller's responsibility —
     use ``POST /api/groups/{id}/assets`` afterwards to put it in a group
-    (Watchlist or otherwise)."""
+    (Watchlist or otherwise).
+
+    ``asset_type`` None means "you decide" and is recorded as AUTO; an
+    explicit value is a human's call and is recorded as USER, which keeps
+    later suggestions quiet about it. The two were indistinguishable while
+    the schema defaulted to STOCK.
+    """
     repo = AssetRepository(db)
     symbol = symbol.upper()
 
@@ -42,32 +50,31 @@ async def create_asset(
         return existing
 
     ref = AssetRef(symbol)
+    suggestion = suggest_for(ref)
     info = await yahoo_client.validate(symbol)
     if not info:
         if not name:
             raise HTTPException(404, f"Symbol {symbol} not found on Yahoo Finance")
         currency = ref.currency or "USD"
+        detected = suggestion.type
     else:
         currency = info.get("currency_code") or info.get("currency", "USD")
         if not name:
             name = info["name"]
-        if info["type"] == "ETF":
-            asset_type = AssetType.ETF
-        elif info["type"] == "INDEX":
-            asset_type = AssetType.INDEX
-
-    # Shape has the last word on index-ness. Yahoo's quoteType is a live lookup
-    # resolved once and then frozen in the row, and it has already been wrong:
-    # ^GSPC, ^N225 and four others landed as stock and rendered with a currency
-    # symbol ever since. classify() answers the same question from the ticker
-    # alone, deterministically and offline, so it can't disagree with itself
-    # later. Yahoo stays authoritative for ETF-vs-stock, which shape can't see.
-    if ref.kind.is_index:
-        asset_type = AssetType.INDEX
+        # Yahoo owns the ETF/stock call — shape can't see that distinction —
+        # but shape owns index-ness, because quoteType is a live lookup frozen
+        # into the row and it has already been wrong (see migration 0020).
+        detected = AssetType.ETF if info["type"] == "ETF" else suggestion.type
 
     await ensure_currency(db, currency)
     return await repo.create(
-        symbol=symbol, name=name, type=asset_type, currency=currency,
+        symbol=symbol,
+        name=name,
+        type=asset_type or detected,
+        type_source=FieldSource.AUTO if asset_type is None else FieldSource.USER,
+        currency=currency,
+        unit_kind=suggestion.unit_kind,
+        unit_source=FieldSource.AUTO,
     )
 
 
@@ -77,12 +84,18 @@ async def update_asset(
     name: str | None = None,
     asset_type: AssetType | None = None,
     currency: str | None = None,
+    unit_kind: UnitKind | None = None,
 ):
-    """Apply partial updates to an asset row (name, type, currency).
+    """Apply partial updates to an asset row (name, type, currency, unit).
 
-    Lets users reclassify a ticker after the fact (e.g. flip an index that
-    was auto-detected as a stock to ``AssetType.INDEX``) and override the
-    Yahoo-derived currency. None-valued fields are left untouched.
+    Lets users reclassify a ticker after the fact and override the
+    Yahoo-derived currency or unit. None-valued fields are left untouched.
+
+    Touching a field marks it USER, which is what stops Fibenchi from
+    suggesting against it afterwards — the point isn't that the value is
+    right, it's that a human decided it. ``unit_source`` covers both
+    ``unit_kind`` and ``currency``: they answer one question together, so
+    setting either means the caller has taken over the whole answer.
     """
     asset = await db.get(Asset, asset_id)
     if not asset:
@@ -92,9 +105,14 @@ async def update_asset(
         asset.name = name
     if asset_type is not None:
         asset.type = asset_type
+        asset.type_source = FieldSource.USER
     if currency is not None:
         await ensure_currency(db, currency)
         asset.currency = currency
+        asset.unit_source = FieldSource.USER
+    if unit_kind is not None:
+        asset.unit_kind = unit_kind
+        asset.unit_source = FieldSource.USER
 
     return await AssetRepository(db).save(asset)
 

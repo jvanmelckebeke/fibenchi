@@ -2,6 +2,8 @@ import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.domain.instrument import UnitKind
+from app.domain.provenance import FieldSource
 from app.models.asset import AssetType
 from app.services.currency_service import lookup as currency_lookup
 
@@ -9,13 +11,31 @@ from app.services.currency_service import lookup as currency_lookup
 class AssetCreate(BaseModel):
     symbol: str = Field(max_length=20, description="Ticker symbol (e.g. AAPL, VOO). Validated against Yahoo Finance.")
     name: str | None = Field(default=None, max_length=200, description="Display name. Auto-detected from Yahoo Finance if omitted.")
-    type: AssetType = Field(default=AssetType.STOCK, description="Asset type: stock or etf. Auto-detected if name is omitted.")
+    type: AssetType | None = Field(
+        default=None,
+        description=(
+            "Asset type. Omit to let Fibenchi decide (recorded as auto-detected, and "
+            "re-suggested if the guess later improves); supplying one marks it as your "
+            "choice, which suppresses suggestions against it."
+        ),
+    )
 
 
 class AssetUpdate(BaseModel):
+    """Partial update. Any field supplied here is recorded as a user choice, so
+    Fibenchi stops suggesting alternatives for it."""
+
     name: str | None = Field(default=None, max_length=200, description="New display name.")
     type: AssetType | None = Field(default=None, description="Override asset type (stock/etf/index).")
     currency: str | None = Field(default=None, max_length=10, description="Override currency code (e.g. 'USD', 'EUR').")
+    unit_kind: UnitKind | None = Field(
+        default=None,
+        description=(
+            "Override how the price number reads: 'currency' (uses the currency field), "
+            "'percent' (the number is a rate, e.g. a Treasury yield), or 'points' "
+            "(an index level, no unit)."
+        ),
+    )
 
 
 class TagBrief(BaseModel):
@@ -40,12 +60,37 @@ class AssetAttachments(BaseModel):
     annotation_count: int = Field(default=0, description="Number of chart annotations")
 
 
+class AssetSuggestionResponse(BaseModel):
+    """What Fibenchi reads the ticker as — advisory, never applied on its own.
+
+    ``disagrees`` lists only fields that are still auto-detected *and* differ
+    from what is stored; a field the user set never appears, however much the
+    shape disagrees with it. An empty list means there is nothing to show.
+    """
+
+    type: AssetType = Field(description="Type the ticker's shape implies")
+    unit_kind: UnitKind = Field(description="How the price number should read")
+    currency: str | None = Field(default=None, description="Inferred currency, null for indices")
+    disagrees: list[str] = Field(default=[], description="Auto fields differing from stored values")
+
+
 class AssetResponse(BaseModel):
     id: int = Field(description="Internal asset ID")
     symbol: str = Field(description="Ticker symbol")
     name: str = Field(description="Display name")
     type: AssetType = Field(description="Asset type: stock or etf")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
+    unit_kind: UnitKind = Field(
+        default=UnitKind.CURRENCY,
+        description="How the price number reads: currency, percent, or points",
+    )
+    type_source: FieldSource = Field(default=FieldSource.AUTO, description="Who set 'type': auto or user")
+    unit_source: FieldSource = Field(
+        default=FieldSource.AUTO, description="Who set 'unit_kind'/'currency': auto or user",
+    )
+    suggested: AssetSuggestionResponse | None = Field(
+        default=None, description="Fibenchi's read on this ticker; null when not computed",
+    )
     created_at: datetime.datetime = Field(description="Timestamp when the asset was first added")
     tags: list[TagBrief] = Field(default=[], description="Tags attached to this asset")
 

@@ -14,7 +14,7 @@ import { MarketStatusDot } from "@/components/market-status-dot"
 import { resolveIcon } from "@/lib/icon-utils"
 import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatAssetPriceWithSettings } from "@/lib/format"
 import { ChangePct } from "@/components/change-pct"
-import type { AssetType } from "@/lib/api"
+import type { UnitKind, AssetType } from "@/lib/api"
 import { useQuote } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useRefreshPrices, useCreateAsset, useGroups, useAddAssetsToGroup } from "@/lib/queries"
@@ -27,6 +27,7 @@ export function Header({
   name,
   currency,
   type,
+  unitKind,
   assetWindow,
   setAssetWindow,
   isTracked,
@@ -38,6 +39,7 @@ export function Header({
   name?: string
   currency: string
   type: AssetType
+  unitKind?: UnitKind
   assetWindow: AssetWindow
   setAssetWindow: (w: AssetWindow) => void
   isTracked: boolean
@@ -55,7 +57,7 @@ export function Header({
   const changePct = quote?.change_percent ?? null
   const [priceRef, pctRef] = usePriceFlash(price)
   const priceFmt = price != null
-    ? formatAssetPriceWithSettings(price, { type, symbol, currency }, {
+    ? formatAssetPriceWithSettings(price, { type, symbol, currency, unit_kind: unitKind }, {
         compact: settings.compact_numbers,
         group: settings.thousands_separator,
       })

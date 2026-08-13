@@ -268,38 +268,44 @@ async def test_list_assets_includes_orphans(client):
     assert "OKLO" in symbols
 
 
-# --- Index classification (#617) ---
+# --- Classification, units and provenance (#617) ---
 #
-# Yahoo's quoteType is a live lookup frozen into the row at creation, and it
-# has been wrong: six caret symbols landed as stock and formatted as currency
-# ever since. The ticker's shape answers the same question offline and can't
-# drift, so it gets the last word.
+# Yahoo's quoteType is a live lookup frozen into the row at creation, and it has
+# been wrong: six caret symbols landed as stock and formatted as currency ever
+# since. Shape answers the same question offline and can't drift. But shape does
+# not get to overrule a human — provenance is what keeps a recommendation a
+# recommendation.
 
-async def test_caret_symbol_is_index_despite_yahoo_saying_equity(client):
-    """The exact ^GSPC failure: Yahoo calls it EQUITY, shape overrules."""
+async def test_caret_symbol_detected_as_index(client):
+    """The exact ^GSPC failure: Yahoo says EQUITY, shape says index."""
     mock_info = {"symbol": "^GSPC", "name": "S&P 500", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "^GSPC"})
     assert resp.status_code == 201
-    assert resp.json()["type"] == "index"
+    data = resp.json()
+    assert data["type"] == "index"
+    assert data["unit_kind"] == "points"
+    assert data["type_source"] == "auto"
 
 
-async def test_caret_symbol_is_index_when_yahoo_agrees(client):
+async def test_yield_index_is_quoted_in_percent(client):
     mock_info = {"symbol": "^TYX", "name": "Treasury Yield 30 Years", "type": "INDEX", "currency": "USD", "currency_code": "USD"}
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "^TYX"})
-    assert resp.status_code == 201
-    assert resp.json()["type"] == "index"
+    assert resp.json()["unit_kind"] == "percent"
 
 
-async def test_caret_symbol_is_index_over_explicit_request(client):
-    """A caller asking for type=stock on a caret symbol doesn't get one — the
-    shape isn't a preference, and a mis-typed index is what caused #617."""
+async def test_explicit_type_is_honoured_and_marked_user(client):
+    """Shape does not overrule a human. An explicit type is a decision, and
+    recording it as USER is what stops Fibenchi arguing with it later."""
     mock_info = {"symbol": "^N225", "name": "Nikkei 225", "type": "EQUITY", "currency": "JPY", "currency_code": "JPY"}
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "^N225", "type": "stock"})
-    assert resp.status_code == 201
-    assert resp.json()["type"] == "index"
+    data = resp.json()
+    assert data["type"] == "stock"
+    assert data["type_source"] == "user"
+    # ...and the suggestion stays silent about the field the user owns.
+    assert "type" not in data["suggested"]["disagrees"]
 
 
 async def test_yahoo_still_decides_etf_vs_stock(client):
@@ -308,8 +314,68 @@ async def test_yahoo_still_decides_etf_vs_stock(client):
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "VWCE.DE"})
     assert resp.json()["type"] == "etf"
+    assert resp.json()["unit_kind"] == "currency"
 
+
+async def test_suggestion_is_silent_when_it_agrees(client):
     mock_info = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "AAPL"})
-    assert resp.json()["type"] == "stock"
+    assert resp.json()["suggested"]["disagrees"] == []
+
+
+async def test_suggestion_flags_a_drifted_auto_row(client, db):
+    """A row Fibenchi guessed wrong should offer itself up for correction."""
+    from app.models import Asset, AssetType
+
+    mock_info = {"symbol": "^GSPC", "name": "S&P 500", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        created = await client.post("/api/assets", json={"symbol": "^GSPC"})
+
+    # Simulate the pre-migration state: auto-detected, and wrong.
+    asset = await db.get(Asset, created.json()["id"])
+    asset.type = AssetType.STOCK
+    asset.unit_kind = "CURRENCY"
+    await db.commit()
+
+    resp = await client.get("/api/assets")
+    data = [a for a in resp.json() if a["symbol"] == "^GSPC"][0]
+    assert set(data["suggested"]["disagrees"]) == {"type", "unit_kind"}
+    assert data["suggested"]["type"] == "index"
+    assert data["suggested"]["unit_kind"] == "points"
+    # Advisory only — nothing was rewritten behind the user's back.
+    assert data["type"] == "stock"
+
+
+async def test_editing_a_field_silences_its_suggestion(client, db):
+    """The whole point of provenance: once you decide, Fibenchi stops nagging —
+    even though the shape still disagrees just as much."""
+    from app.models import Asset
+
+    mock_info = {"symbol": "^GSPC", "name": "S&P 500", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        created = await client.post("/api/assets", json={"symbol": "^GSPC"})
+    aid = created.json()["id"]
+
+    asset = await db.get(Asset, aid)
+    asset.unit_kind = "CURRENCY"
+    await db.commit()
+    before = await client.get("/api/assets")
+    assert "unit_kind" in [a for a in before.json() if a["id"] == aid][0]["suggested"]["disagrees"]
+
+    resp = await client.patch(f"/api/assets/{aid}", json={"unit_kind": "currency"})
+    assert resp.status_code == 200
+    assert resp.json()["unit_source"] == "user"
+    assert resp.json()["suggested"]["disagrees"] == []
+
+
+async def test_patching_currency_also_claims_the_unit(client):
+    """unit_kind and currency answer one question together, so taking over
+    either means taking over both."""
+    mock_info = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    with _mock_validate(return_value=mock_info):
+        created = await client.post("/api/assets", json={"symbol": "AAPL"})
+
+    resp = await client.patch(f"/api/assets/{created.json()['id']}", json={"currency": "EUR"})
+    assert resp.json()["currency"] == "EUR"
+    assert resp.json()["unit_source"] == "user"

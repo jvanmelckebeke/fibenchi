@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { computeMovementStats } from "@/lib/movement-stats"
 import { formatChangePct, changeColor, formatAssetPrice, formatDateLong } from "@/lib/format"
-import type { Price, AssetType } from "@/lib/types"
+import type { Price, AssetType, UnitKind } from "@/lib/types"
 
 interface MovementStatsProps {
   prices: Price[]
@@ -9,13 +9,14 @@ interface MovementStatsProps {
   symbol: string
   currency: string
   assetType: AssetType
+  unitKind?: UnitKind
 }
 
-export function MovementStats({ prices, label, symbol, currency, assetType }: MovementStatsProps) {
+export function MovementStats({ prices, label, symbol, currency, assetType, unitKind }: MovementStatsProps) {
   const stats = useMemo(() => computeMovementStats(prices), [prices])
   if (!stats) return null
 
-  const hints = { type: assetType, symbol, currency }
+  const hints = { type: assetType, symbol, currency, unit_kind: unitKind }
   const ret = formatChangePct(stats.periodReturnPct)
 
   return (

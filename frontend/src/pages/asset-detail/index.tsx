@@ -45,7 +45,7 @@ export function AssetDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} type={asset?.type ?? "stock"} assetWindow={assetWindow} setAssetWindow={setAssetWindow} isTracked={isTracked} assetId={asset?.id} mode={mode} setMode={setMode} />
+      <Header symbol={symbol} name={asset?.name} currency={asset?.currency ?? "USD"} type={asset?.type ?? "stock"} unitKind={asset?.unit_kind} assetWindow={assetWindow} setAssetWindow={setAssetWindow} isTracked={isTracked} assetId={asset?.id} mode={mode} setMode={setMode} />
       <ChartSection
         symbol={symbol}
         assetWindow={assetWindow}
@@ -62,6 +62,7 @@ export function AssetDetailPage() {
           symbol={symbol}
           currency={asset?.currency ?? "USD"}
           assetType={asset?.type ?? "stock"}
+          unitKind={asset?.unit_kind}
         />
       )}
       {mode === "historical" && indicators && indicators.length > 0 && (

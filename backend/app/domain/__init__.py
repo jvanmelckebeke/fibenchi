@@ -4,7 +4,7 @@ on this layer.
 """
 
 from app.domain.assetref import AssetRef
-from app.domain.instrument import AssetKind, Instrument
+from app.domain.instrument import AssetKind, Instrument, UnitKind
 from app.domain.phases import Phase, Session
 
-__all__ = ["AssetKind", "AssetRef", "Instrument", "Phase", "Session"]
+__all__ = ["AssetKind", "AssetRef", "Instrument", "Phase", "Session", "UnitKind"]
