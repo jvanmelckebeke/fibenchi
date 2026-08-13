@@ -10,7 +10,7 @@ describe("computeLiveVnr", () => {
   it("scores the live move when the stored bar is the quote's prior session", () => {
     // dbClose == previous_close → forecast (vnr_sigma) applies to the live day.
     const v = computeLiveVnr(
-      { change_percent: -1.06, previous_close: 28300 },
+      { change_percent: -1.06, previous_close: 28300, price: 28000 },
       { vnr_sigma: 0.0576 },
       28300,
     )
@@ -21,19 +21,65 @@ describe("computeLiveVnr", () => {
   it("returns null (→ caller falls back) when the stored bar isn't the quote's prior session", () => {
     // Friday close 30250 vs Monday previous_close 28300 → >0.5% apart.
     expect(
-      computeLiveVnr({ change_percent: -1.06, previous_close: 28300 }, { vnr_sigma: 0.0576 }, 30250),
+      computeLiveVnr(
+        { change_percent: -1.06, previous_close: 28300, price: 28000 },
+        { vnr_sigma: 0.0576 },
+        30250,
+      ),
     ).toBeNull()
   })
 
   it("returns null when quote or forecast data is missing/degenerate", () => {
+    const q = { change_percent: -1.06, previous_close: 28300, price: 28000 }
     expect(computeLiveVnr(undefined, { vnr_sigma: 0.0576 }, 28300)).toBeNull()
-    expect(computeLiveVnr({ change_percent: -1.06, previous_close: 28300 }, {}, 28300)).toBeNull()
+    expect(computeLiveVnr(q, {}, 28300)).toBeNull()
+    expect(computeLiveVnr(q, { vnr_sigma: 0 }, 28300)).toBeNull()
+    expect(computeLiveVnr(q, { vnr_sigma: 0.0576 }, 0)).toBeNull()
+  })
+})
+
+// Real XAIX.DE state on 2026-08-13: Yahoo's daily history had no 2026-08-12 bar
+// (its own feed jumps 08-11 → 08-13), so the gap guard NaN'd the stored `vnr`.
+// The quote still knew the missing session — previous_close 207.45 IS the 08-12
+// close — making change_percent a verified single-session return. σ = +0.71.
+describe("computeLiveVnr with a gap-flagged snapshot (#625)", () => {
+  const gapQuote = { change_percent: 1.18, previous_close: 207.45, price: 209.9 }
+  const gapValues = { vnr_sigma: 0.016578, vnr_gap_sessions: 2 }
+
+  it("scores a mover instead of blanking it — the regression", () => {
+    // dbClose is the quote's own session, so the prior-session anchor check
+    // would reduce to |move| <= 0.5% and reject this +1.18% day.
+    expect(computeLiveVnr(gapQuote, gapValues, 209.9)).toBeCloseTo(0.712, 3)
+  })
+
+  it("scores movers of either direction at any magnitude", () => {
+    const down = { change_percent: -3.35, previous_close: 60.56, price: 58.53 }
     expect(
-      computeLiveVnr({ change_percent: -1.06, previous_close: 28300 }, { vnr_sigma: 0 }, 28300),
-    ).toBeNull()
+      computeLiveVnr(down, { vnr_sigma: 0.02638, vnr_gap_sessions: 2 }, 58.53),
+    ).toBeCloseTo(-1.27, 2)
+  })
+
+  it("still blanks when the stored bar predates the quote entirely", () => {
+    // Gap-flagged AND genuinely behind: dbClose matches neither the price nor
+    // the previous close, so the forecast is too old to apply. Blank is right.
+    expect(computeLiveVnr(gapQuote, gapValues, 180)).toBeNull()
+  })
+
+  it("returns null without a quote to recover the missing session from", () => {
+    expect(computeLiveVnr(undefined, gapValues, 209.9)).toBeNull()
+  })
+
+  it("returns null when the forecast is missing or degenerate", () => {
+    expect(computeLiveVnr(gapQuote, { vnr_gap_sessions: 2 }, 209.9)).toBeNull()
     expect(
-      computeLiveVnr({ change_percent: -1.06, previous_close: 28300 }, { vnr_sigma: 0.0576 }, 0),
+      computeLiveVnr(gapQuote, { vnr_sigma: 0, vnr_gap_sessions: 2 }, 209.9),
     ).toBeNull()
+  })
+
+  it("leaves non-gap-flagged behaviour unchanged", () => {
+    // Same numbers without the gap flag: the anchor check applies as before and
+    // rejects, because dbClose is the quote's current session.
+    expect(computeLiveVnr(gapQuote, { vnr_sigma: 0.016578 }, 209.9)).toBeNull()
   })
 })
 
