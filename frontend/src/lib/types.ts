@@ -419,7 +419,11 @@ export interface OrphanAsset {
   symbol: string
   name: string
   type: string
-  /** stored daily bars that would be deleted with it */
+  /** stored daily bars that would be deleted with it — re-fetchable from Yahoo */
   price_bars: number
   latest_bar: string | null
+  /** hand-written chart annotations that would be deleted with it — not re-fetchable */
+  annotations: number
+  /** whether a hand-written thesis note would be deleted with it — not re-fetchable */
+  has_note: boolean
 }

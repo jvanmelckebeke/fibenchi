@@ -44,7 +44,12 @@ jobs:
         run: |
           python -m scripts.export_companion_schema
           python -m scripts.export_indicator_contract
-          if ! git diff --exit-code -- companion.schema.json indicator.contract.json indicator.fixtures.json; then
+          # `:/` anchors the pathspec to the repo root. The exporters write to a
+          # __file__-relative path, so the artifacts always land in backend/ —
+          # but a plain cwd-relative spec silently matches nothing (and so
+          # passes) from any cwd but backend/. This survives the step moving to
+          # a job without the working-directory default above.
+          if ! git diff --exit-code -- :/backend/companion.schema.json :/backend/indicator.contract.json :/backend/indicator.fixtures.json; then
             echo "::error::Contract artifacts are stale. Run both export scripts in backend/ and commit the result (then copy into fibenchi-app/)."
             exit 1
           fi

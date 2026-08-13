@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "// packageManager": "Matches the corepack pin in both Dockerfiles. Without it a host pnpm 11 would rewrite pnpm-lock.yaml to a newer format, which breaks the image build's --frozen-lockfile while a warm local node_modules keeps working.",
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -1,5 +1,7 @@
 """Tests for GET /api/system/data-health."""
 
+from datetime import date
+
 import pytest
 from sqlalchemy import delete, select
 
@@ -158,6 +160,41 @@ async def test_orphans_listed_and_hard_deletable(client, db):
         select(PriceHistory).where(PriceHistory.asset_id == orph.id)
     )).scalars().all()
     assert bars == []
+
+
+async def test_orphans_report_handwritten_content_that_delete_would_destroy(client, db):
+    """Notes and annotations cascade away with the row and can't be re-fetched,
+    so the listing has to surface them — "orphan" means no container, not no
+    content, and the UI's delete warning is built from these two fields."""
+    from app.models import Annotation, Note
+
+    plain = await seed_asset_with_prices(db, "PLAIN", n_days=10, add_to_group=False)
+    written = await seed_asset_with_prices(db, "WRITTEN", n_days=10, add_to_group=False)
+    db.add(Note(asset_id=written.id, content="why I bought it"))
+    db.add_all([
+        Annotation(asset_id=written.id, date=date(2026, 1, 5), title="entry"),
+        Annotation(asset_id=written.id, date=date(2026, 2, 5), title="added"),
+    ])
+    await db.commit()
+
+    orphans = {o["symbol"]: o for o in (await client.get("/api/system/orphans")).json()}
+    assert orphans["WRITTEN"]["annotations"] == 2
+    assert orphans["WRITTEN"]["has_note"] is True
+    assert orphans["PLAIN"]["annotations"] == 0
+    assert orphans["PLAIN"]["has_note"] is False
+    # The annotation count must not fan out and multiply the bar count — same
+    # seed, so the annotated row must report exactly what the plain one does.
+    assert orphans["WRITTEN"]["price_bars"] == orphans["PLAIN"]["price_bars"] > 0
+
+    # And the delete really does take them, which is what the warning claims.
+    assert (await client.delete(f"/api/system/orphans/{written.id}")).status_code == 204
+    assert (await db.execute(
+        select(Annotation).where(Annotation.asset_id == written.id)
+    )).scalars().all() == []
+    assert (await db.execute(
+        select(Note).where(Note.asset_id == written.id)
+    )).scalars().all() == []
+    assert plain.id is not None  # untouched
 
 
 async def test_orphan_delete_refuses_referenced_assets(client, db):
