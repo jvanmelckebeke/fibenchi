@@ -221,3 +221,23 @@ async def test_indicators_empty_group(client, db):
     resp = await client.get(f"/api/groups/{gid}/indicators")
     assert resp.status_code == 200
     assert resp.json() == {}
+
+
+async def test_group_assets_carry_the_suggestion(client, db):
+    """Regression: the edit dialog reads group data, not /api/assets.
+
+    The suggestion was attached per-router, so an asset served through a group
+    arrived with suggested=null and the dialog could never show one. It's
+    derived in AssetResponse now, which is why this holds for every endpoint
+    that serialises an asset rather than the ones someone remembered.
+    """
+    gid = await _get_default_group_id(db)
+    asset = await seed_asset_with_prices(db, symbol="^N225", n_days=10)
+    asset.type = AssetType.STOCK
+    await db.commit()
+
+    resp = await client.get(f"/api/groups/{gid}")
+    served = [a for a in resp.json()["assets"] if a["symbol"] == "^N225"][0]
+    assert served["suggested"] is not None
+    assert served["suggested"]["type"] == "index"
+    assert "type" in served["suggested"]["differs"]

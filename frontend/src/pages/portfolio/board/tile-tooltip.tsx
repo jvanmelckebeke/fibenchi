@@ -121,7 +121,7 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
             </span>
           )}
         </div>
-        {tile.name && <div className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">{tile.name}</div>}
+        {tile.asset.name && <div className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">{tile.asset.name}</div>}
       </div>
 
       <div className="border-t border-border px-3 py-2">
@@ -133,7 +133,7 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
               category error, not a cosmetic one. */}
           {tile.price != null && (
             <span className="text-[13px] font-medium tabular-nums text-muted-foreground">
-              {formatAssetPrice(tile.price, tile)}
+              {formatAssetPrice(tile.price, tile.asset)}
             </span>
           )}
           {/* Everything that isn't warmup — feed_behind, gap, unknown — lands

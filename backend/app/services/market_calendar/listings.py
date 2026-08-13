@@ -105,6 +105,21 @@ INDEX_CALENDARS: dict[str, str] = {
     "^HSI": "XHKG",
 }
 
+# Indices quoted as a rate rather than a level: the number *is* a percentage,
+# so "4.63" means 4.63%, not 4.63 points and certainly not $4.63. Every other
+# index is a level in points and carries no unit at all.
+#
+# This lived in the frontend as a hardcoded set in format.ts, which meant a
+# yield index outside those four rendered as bare points with no way for the
+# user to say otherwise. It's venue-adjacent trait data keyed by symbol, same
+# as INDEX_CALENDARS above, so it belongs in the same table file.
+PERCENT_QUOTED_INDICES: frozenset[str] = frozenset({
+    "^TYX",   # CBOE 30-year Treasury yield
+    "^TNX",   # CBOE 10-year Treasury yield
+    "^FVX",   # CBOE 5-year Treasury yield
+    "^IRX",   # CBOE 13-week T-bill rate
+})
+
 # Unsuffixed Yahoo symbols are US listings (NYSE/NASDAQ share the holiday set).
 DEFAULT_US_CALENDAR = "XNYS"
 

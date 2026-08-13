@@ -2,8 +2,9 @@
 
 The one-pass ``classify`` is the single place ticker characters are
 interpreted. It decides *everything* the shape can tell — what kind of
-instrument it is, which venue calendar governs it, and its inferred
-currency — captured together in an :class:`Instrument` so no later code
+instrument it is, which venue calendar governs it, how its price number
+should be read, and its inferred currency — captured together in an
+:class:`Instrument` so no later code
 ever re-inspects the characters ("is this a future?" is
 ``ref.kind.is_future``, not another ``endswith`` somewhere).
 """
@@ -50,6 +51,25 @@ class AssetKind(str, Enum):
         return self is AssetKind.FUTURE
 
 
+class UnitKind(str, Enum):
+    """How an instrument's price number should be read.
+
+    Distinct from ``currency``, which only answers *which* currency and so
+    can't express the other two cases at all. A 30-year Treasury yield of
+    "46.28" is 4.628%, and the S&P 500 at "6912.34" is a level in points —
+    neither is denominated in anything, yet both were forced to carry a
+    currency code because the column is non-null.
+    """
+
+    CURRENCY = "currency"   # $71.40 — the currency field says which
+    PERCENT = "percent"     # 4.63% — the number is a rate
+    POINTS = "points"       # 6,912.34 — an index level, no unit
+
+    @property
+    def is_currency(self) -> bool:
+        return self is UnitKind.CURRENCY
+
+
 @dataclass(frozen=True)
 class Instrument:
     """Everything a ticker's shape can tell, decided once by ``classify``."""
@@ -57,6 +77,7 @@ class Instrument:
     kind: AssetKind
     calendar: str | None = None
     currency: str | None = None
+    unit: UnitKind = UnitKind.CURRENCY
 
 
 def classify(ticker: str) -> Instrument:
@@ -70,17 +91,23 @@ def classify(ticker: str) -> Instrument:
         DEFAULT_US_CALENDAR,
         FIAT_QUOTES,
         INDEX_CALENDARS,
+        PERCENT_QUOTED_INDICES,
         SUFFIX_LISTINGS,
         Listing,
     )
+
+    def index(sym: str, calendar: str | None = None) -> Instrument:
+        # An index is never denominated: it's a rate or a level, never money.
+        unit = UnitKind.PERCENT if sym in PERCENT_QUOTED_INDICES else UnitKind.POINTS
+        return Instrument(AssetKind.INDEX, calendar=calendar, unit=unit)
 
     sym = ticker.upper().strip()
     if not sym:
         return Instrument(AssetKind.UNKNOWN)
     if sym in INDEX_CALENDARS:
-        return Instrument(AssetKind.INDEX, calendar=INDEX_CALENDARS[sym])
+        return index(sym, INDEX_CALENDARS[sym])
     if sym.startswith("^"):
-        return Instrument(AssetKind.INDEX)  # unknown index — don't guess a venue
+        return index(sym)  # unknown index — don't guess a venue
     if sym.endswith("=X"):
         return Instrument(AssetKind.FX)      # not exchange-session shaped
     if sym.endswith("=F"):

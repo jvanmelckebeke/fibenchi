@@ -4,6 +4,29 @@ import type { MarketState } from "./market-state"
 
 export type AssetType = "stock" | "etf" | "index"
 
+/** How an asset's price number reads. Distinct from `currency`, which only
+ * answers *which* currency and so can't express a rate or a bare index level. */
+export type UnitKind = "currency" | "percent" | "points"
+
+/** Whether a stored field was derived by Fibenchi or chosen by the user.
+ * Auto fields may be re-suggested when the guess improves; user fields are
+ * never argued with. */
+export type FieldSource = "auto" | "user"
+
+/** Fibenchi's read on a ticker — advisory, never applied on its own.
+ *
+ * `differs` is every field the shape reads differently, whoever set it: these
+ * are the resettable ones. `disagrees` is the auto-only subset — what may be
+ * raised unprompted. A field you set stays in `differs` but leaves
+ * `disagrees`, so it's still visible and reversible without nagging. */
+export interface AssetSuggestion {
+  type: AssetType
+  unit_kind: UnitKind
+  currency: string | null
+  differs: string[]
+  disagrees: string[]
+}
+
 export interface TagBrief {
   id: number
   name: string
@@ -34,6 +57,10 @@ export interface Asset {
   name: string
   type: AssetType
   currency: string
+  unit_kind: UnitKind
+  type_source: FieldSource
+  unit_source: FieldSource
+  suggested?: AssetSuggestion | null
   created_at: string
   tags: TagBrief[]
 }
@@ -59,6 +86,7 @@ export interface AssetUpdate {
   name?: string
   type?: AssetType
   currency?: string
+  unit_kind?: UnitKind
 }
 
 export interface SymbolSearchResult {

@@ -41,12 +41,13 @@ export type NoReadingReason =
   | { kind: "unknown" }
 
 export interface Tile {
+  /** The tile's identity — also its React key, route param and lookup key. */
   symbol: string
-  name: string
-  currency: string
-  /** Carried so prices format through formatAssetPrice: an index is not
-   * currency-denominated, and a yield index is quoted in percent. */
-  type: Asset["type"]
+  /** The row behind the tile. Held whole rather than copied field by field, so
+   * it satisfies AssetFormatHints directly (an index isn't
+   * currency-denominated, a yield index is quoted in percent) and a new asset
+   * field costs nothing here. */
+  asset: Asset
   /** σ-Move via the live-first cascade; null → see reason. */
   sigma: number | null
   reason: NoReadingReason | null
@@ -218,9 +219,7 @@ export function useBoardData(groupBy: GroupBy) {
 
       out.set(symbol, {
         symbol,
-        name: asset.name,
-        currency: asset.currency,
-        type: asset.type,
+        asset,
         sigma,
         reason,
         todayPct: quote?.change_percent ?? snap?.change_pct ?? null,

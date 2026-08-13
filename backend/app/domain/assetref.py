@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from functools import cached_property
 
-from app.domain.instrument import AssetKind, Instrument, classify
+from app.domain.instrument import AssetKind, Instrument, UnitKind, classify
 from app.services.market_calendar.venue import Venue, _venue_for
 
 
@@ -68,6 +68,12 @@ class AssetRef(str):
         """What kind of instrument the ticker's shape says this is —
         ``ref.kind.is_future`` etc., never re-inspect the characters."""
         return self._instrument.kind
+
+    @property
+    def unit(self) -> UnitKind:
+        """How this ticker's price number should be read (currency/percent/
+        points) — the shape's recommendation, not the stored choice."""
+        return self._instrument.unit
 
     @property
     def calendar_name(self) -> str | None:
