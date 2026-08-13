@@ -21,10 +21,26 @@ suggestion, which is an ordinary update through ``update_asset``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from app.domain import AssetRef, UnitKind
 from app.domain.provenance import FieldSource
 from app.models import Asset, AssetType
+
+
+class Classified(Protocol):
+    """The fields a suggestion is computed from.
+
+    A Protocol rather than ``Asset`` because ``AssetResponse`` carries exactly
+    these too, and deriving the suggestion in the response schema is what stops
+    it depending on which router happened to remember to attach it.
+    """
+
+    symbol: str
+    type: AssetType
+    unit_kind: UnitKind
+    type_source: FieldSource
+    unit_source: FieldSource
 
 
 @dataclass(frozen=True)
@@ -55,7 +71,7 @@ def suggest_for(ref: AssetRef) -> AssetSuggestion:
     return AssetSuggestion(AssetType.STOCK, ref.unit, ref.currency)
 
 
-def suggest_for_asset(asset: Asset) -> AssetSuggestion:
+def suggest_for_asset(asset: Classified) -> AssetSuggestion:
     """The shape's read on a stored asset, and where it differs from the row."""
     base = suggest_for(AssetRef(asset.symbol))
 

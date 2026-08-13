@@ -1,6 +1,6 @@
 import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.domain.instrument import UnitKind
 from app.domain.provenance import FieldSource
@@ -111,7 +111,7 @@ class AssetResponse(BaseModel):
         default=FieldSource.AUTO, description="Who set 'unit_kind'/'currency': auto or user",
     )
     suggested: AssetSuggestionResponse | None = Field(
-        default=None, description="Fibenchi's read on this ticker; null when not computed",
+        default=None, description="Fibenchi's read on this ticker",
     )
     created_at: datetime.datetime = Field(description="Timestamp when the asset was first added")
     tags: list[TagBrief] = Field(default=[], description="Tags attached to this asset")
@@ -124,3 +124,22 @@ class AssetResponse(BaseModel):
         """Convert raw Yahoo code (e.g. 'GBp') to display code ('GBP') for API responses."""
         display, _ = currency_lookup(v)
         return display
+
+    @model_validator(mode="after")
+    def derive_suggestion(self):
+        """Compute the suggestion here rather than in each router.
+
+        Every field it needs is already on this model, and attaching it
+        per-endpoint meant an asset served through /api/groups arrived with
+        ``suggested: null`` — so the edit dialog, which reads group data, could
+        never show one. Deriving it in the schema makes that unforgettable.
+        """
+        # Imported here: app.services imports app.schemas, so a module-level
+        # import would close the loop.
+        from app.services.asset_suggestion import suggest_for_asset
+
+        if self.suggested is None:
+            self.suggested = AssetSuggestionResponse.model_validate(
+                suggest_for_asset(self), from_attributes=True,
+            )
+        return self

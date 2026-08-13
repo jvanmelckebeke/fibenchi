@@ -10,21 +10,8 @@ from app.schemas.asset import (
     AssetUpdate,
 )
 from app.services import asset_service
-from app.services.asset_suggestion import suggest_for_asset
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
-
-
-def _with_suggestion(asset):
-    """Attach Fibenchi's read on the row, for ``AssetResponse.suggested``.
-
-    A transient attribute rather than a column, and attached here rather than
-    in the service because it is a presentation concern: the suggestion is
-    re-derived on every read so it can never go stale, and is never written —
-    the whole point is that stored values change only when a user applies one.
-    """
-    asset.suggested = suggest_for_asset(asset)
-    return asset
 
 
 @router.get("", response_model=list[AssetResponse], summary="List all assets")
@@ -35,7 +22,7 @@ async def list_assets(db: AsyncSession = Depends(get_db)):
     until ``POST /api/groups/{id}/assets`` attaches them. Internal views that need
     only grouped assets use repository-level filters directly.
     """
-    return [_with_suggestion(a) for a in await asset_service.list_assets(db)]
+    return await asset_service.list_assets(db)
 
 
 @router.post("", response_model=AssetResponse, status_code=201, summary="Add an asset")
@@ -47,7 +34,7 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
     ``POST /api/groups/{id}/assets`` afterwards to attach it to the Watchlist
     or any other group.
     """
-    return _with_suggestion(await asset_service.create_asset(db, data.symbol, data.name, data.type))
+    return await asset_service.create_asset(db, data.symbol, data.name, data.type)
 
 
 @router.patch("/{asset_id}", response_model=AssetResponse, summary="Update asset metadata")
@@ -60,14 +47,14 @@ async def update_asset(asset_id: int, data: AssetUpdate, db: AsyncSession = Depe
     Any field supplied is recorded as *your* choice, so Fibenchi stops
     suggesting alternatives for it — see ``suggested`` on the response.
     """
-    return _with_suggestion(await asset_service.update_asset(
+    return await asset_service.update_asset(
         db,
         asset_id,
         name=data.name,
         asset_type=data.type,
         currency=data.currency,
         unit_kind=data.unit_kind,
-    ))
+    )
 
 
 @router.post(
@@ -83,9 +70,7 @@ async def reset_detection(asset_id: int, data: AssetDetectionReset, db: AsyncSes
     ``currency`` is never reset — the shape's currency is a venue-suffix fallback,
     weaker than Yahoo's, and inert once the unit says the number isn't money.
     """
-    return _with_suggestion(
-        await asset_service.reset_asset_detection(db, asset_id, set(data.fields))
-    )
+    return await asset_service.reset_asset_detection(db, asset_id, set(data.fields))
 
 
 @router.get(
