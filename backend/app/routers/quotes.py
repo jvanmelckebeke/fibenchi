@@ -20,9 +20,18 @@ async def get_quotes(symbols: str = Query(..., description="Comma-separated list
 @router.get(
     "/quotes/stream",
     summary="SSE stream of grouped asset quotes (delta compressed)",
-    responses={200: {"content": {"text/event-stream": {}}, "description": "Server-Sent Events stream. Each event has `event: quotes` with JSON data containing only the symbols whose quote changed since the last push. The first event contains all grouped symbols."}},
+    responses={200: {"content": {"text/event-stream": {}}, "description": "Server-Sent Events stream. Each event has `event: quotes` with JSON data containing only the symbols whose quote changed since the last push. The first event contains all grouped symbols. `event: intraday` is sent only when the `intraday` query param names symbols."}},
 )
-async def stream_quotes():
+async def stream_quotes(
+    intraday: str | None = Query(
+        None,
+        description=(
+            "Comma-separated symbols to also receive 1-minute bars for "
+            "(`event: intraday`). Omit for none — bars are opt-in because the "
+            "first frame is large and most views never draw them."
+        ),
+    ),
+):
     """Open a Server-Sent Events stream that pushes real-time quotes for all
     assets that belong to at least one group.
 
@@ -37,9 +46,16 @@ async def stream_quotes():
     - **300 s** when all markets are closed
 
     Each SSE event uses `event: quotes` with a JSON object keyed by symbol.
+
+    **Intraday bars** arrive as a separate `event: intraday`, and only for the
+    symbols named in the `intraday` param. Quotes are small and every page
+    shows them; a full bar set is neither. To change the selection, reopen the
+    stream with a different param — the new connection's first push carries
+    the full window for the newly requested symbols.
     """
+    symbols = frozenset(s.strip().upper() for s in (intraday or "").split(",") if s.strip())
     return StreamingResponse(
-        quote_service.quote_event_generator(),
+        quote_service.quote_event_generator(symbols),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
