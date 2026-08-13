@@ -13,6 +13,7 @@ from app.domain import AssetKind, AssetRef
 from app.services.market_calendar import (
     DEFAULT_US_CALENDAR,
     INDEX_CALENDARS,
+    PERCENT_QUOTED_INDICES,
     SUFFIX_LISTINGS,
     any_venue_open,
 )
@@ -266,6 +267,40 @@ def test_symbol_currency_shapes():
     assert AssetRef("^GSPC").currency is None
     assert AssetRef("EURUSD=X").currency is None
     assert AssetRef("FOO.ZZ").currency is None
+
+
+def test_every_percent_quoted_index_resolves_a_calendar():
+    """A tracked index with no calendar degrades *silently*: classify returns
+    calendar=None, session_gap_days falls back to np.busday_count (weekends but
+    not holidays), so every exchange holiday reads as a session hole and blanks
+    σ-Move on the bar after it — and scan_session_coverage skips venue-less
+    assets, so the hole heal never touches it.
+
+    PERCENT_QUOTED_INDICES and INDEX_CALENDARS are two hand-maintained tables
+    keyed by the same symbols; #633 was the four yield indices being in one and
+    not the other. This pins the invariant so the next addition can't repeat it.
+    """
+    for symbol in sorted(PERCENT_QUOTED_INDICES):
+        assert AssetRef(symbol).calendar_name is not None, (
+            f"{symbol} is tracked as a percent-quoted index but has no calendar "
+            f"— add it to INDEX_CALENDARS"
+        )
+
+
+def test_yield_indices_follow_the_nyse_session_set():
+    """The CBOE yield indices track the bond market, which closes on days NYSE
+    stays open — but exchange_calendars has no SIFMA calendar and Yahoo serves
+    bars on those days (carried forward), so XNYS is the mapping that matches
+    the data. Pinned against 2025 fixtures; see #633 for the measurements."""
+    venue = AssetRef("^TNX").venue
+    assert venue is not None
+    # Bond market closed, NYSE open — Yahoo still has a bar, so it must be a
+    # session or the gap guard fabricates a hole.
+    assert venue.is_session(date(2025, 10, 13)) is True   # Columbus Day
+    assert venue.is_session(date(2025, 11, 11)) is True   # Veterans Day
+    # Both closed — correctly not a session.
+    assert venue.is_session(date(2025, 4, 18)) is False   # Good Friday
+    assert AssetRef("^TNX").calendar_name == AssetRef("^GSPC").calendar_name
 
 
 def test_new_calendar_coverage():
