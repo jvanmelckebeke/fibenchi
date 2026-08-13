@@ -77,19 +77,28 @@ async def get_quotes(symbols: str) -> list[Quote]:
     return await get_price_provider().batch_fetch_quotes(symbol_list)
 
 
-async def quote_event_generator():
+async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
     """Yield SSE events with quotes for all grouped assets, adapting interval to market state.
 
     After the initial full payload, only symbols whose data changed since the
     last push are included (delta mode).  This dramatically reduces bandwidth
     when most markets are closed or prices are stable.
 
-    Also pushes ``event: intraday`` with 1-minute bars for the live day view.
-    First push sends full day data, subsequent pushes send only new bars (delta).
+    ``intraday_symbols`` opts the connection in to ``event: intraday``, the
+    1-minute bars behind the live day view. First push sends the full window,
+    later pushes only new bars (delta).
+
+    **Intraday is opt-in and scoped.** Quotes are small and every page shows
+    them, so they go to everyone; a full bar set is not — measured at 738 KiB
+    for 78 symbols (#615), re-sent on every reconnect. Only two views draw
+    bars, and each wants a handful of symbols, so a connection that doesn't ask
+    gets none. Passing ``None`` is therefore *silence*, not *everything*: the
+    saving is automatic and a caller cannot forget to ask for less.
     """
     last_payload: dict[str, Quote] = {}
     # Track last pushed intraday bar timestamp per symbol
     last_intraday_ts: dict[str, int] = {}
+    wanted_intraday = frozenset(intraday_symbols or ())
 
     while True:
         try:
@@ -140,9 +149,13 @@ async def quote_event_generator():
             has_active_market = any_active(market_states)
 
             # Always push intraday on first iteration or when markets are active
-            if has_active_market or not last_intraday_ts:
+            if wanted_intraday and (has_active_market or not last_intraday_ts):
+                # Scoped to what this connection asked for. Filtering the refs
+                # rather than the result keeps the DB from reading bars nobody
+                # will draw — the query is the expensive half, not the JSON.
+                bar_refs = [r for r in refs if r.symbol in wanted_intraday]
                 async with async_session() as db:
-                    all_bars = await get_intraday_bars(db, refs)
+                    all_bars = await get_intraday_bars(db, bar_refs)
 
                 if all_bars:
                     if not last_intraday_ts:

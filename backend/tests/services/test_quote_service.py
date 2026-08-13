@@ -9,9 +9,23 @@ import pytest
 from app.domain import AssetRef
 from app.schemas.intraday import IntradayBar
 from app.schemas.quote import Quote
-from app.services.quote_service import get_quotes, quote_event_generator
+from app.services.quote_service import (
+    _reset_asset_list_cache,
+    get_quotes,
+    quote_event_generator,
+)
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
+
+
+@pytest.fixture(autouse=True)
+def _clear_roster_cache():
+    """The roster cache is module state with a 30s TTL, so without this a test
+    silently inherits the previous test's symbols. Every test here used AAPL
+    until one didn't, and it failed only when run alongside the others."""
+    _reset_asset_list_cache()
+    yield
+    _reset_asset_list_cache()
 
 
 def _mock_provider(quotes_return=None, quotes_side_effect=None):
@@ -131,7 +145,11 @@ async def test_stream_delta_only_changed():
 
 async def test_stream_intraday_event_serializes_bars():
     """The ``intraday`` SSE event carries {symbol: [bar]} with the wire keys
-    time/price/volume/session (the frontend's ``IntradayPoint`` mirror)."""
+    time/price/volume/session (the frontend's ``IntradayPoint`` mirror).
+
+    Note the explicit subscription: bars are opt-in, so this test has to ask
+    for them the way a live view does.
+    """
     mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"})]
     bars = {
         "AAPL": [
@@ -160,7 +178,7 @@ async def test_stream_intraday_event_serializes_bars():
         MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
 
         events = []
-        async for event in quote_event_generator():
+        async for event in quote_event_generator(frozenset({"AAPL"})):
             events.append(event)
 
     intraday_events = [e for e in events if e.startswith("event: intraday")]
@@ -172,6 +190,79 @@ async def test_stream_intraday_event_serializes_bars():
             {"time": 1771000060, "price": 185.6, "volume": 800, "session": "regular"},
         ]
     }
+
+
+async def test_stream_without_subscription_sends_no_intraday():
+    """No subscription means silence, not everything.
+
+    The whole saving in #621 rests on this default: the board, the group table
+    and every other view hold this stream without drawing a single bar, and
+    used to be sent 738 KiB anyway.
+    """
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"})]
+    bars_call = AsyncMock(return_value={"AAPL": [
+        IntradayBar(time=1771000000, price=185.5, volume=1200, session="regular"),
+    ]})
+
+    async def mock_sleep(seconds):
+        raise asyncio.CancelledError()
+
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__ = AsyncMock(return_value=AsyncMock())
+    mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+
+    with (
+        patch("app.services.quote_service.async_session", return_value=mock_session_ctx),
+        patch("app.services.quote_service.AssetRepository") as MockRepo,
+        patch("app.services.quote_service.get_price_provider", return_value=_mock_provider(mock_quotes)),
+        patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
+        patch("app.services.quote_service.get_intraday_bars", bars_call),
+    ):
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1)])
+
+        events = [e async for e in quote_event_generator()]
+
+    assert not [e for e in events if e.startswith("event: intraday")]
+    # Not merely filtered out of the payload — never read from the DB.
+    bars_call.assert_not_awaited()
+    # Quotes still flow: this is scoping intraday, not muting the stream.
+    assert [e for e in events if e.startswith("event: quotes")]
+
+
+async def test_stream_intraday_scoped_to_subscribed_symbols():
+    """A subscription for one symbol must not drag the rest of the roster along."""
+    mock_quotes = [
+        Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"}),
+        Quote(**{"symbol": "MSFT", "price": 420.00, "market_state": "REGULAR"}),
+    ]
+    seen_refs: list[list[AssetRef]] = []
+
+    async def capture_bars(db, refs):
+        seen_refs.append(list(refs))
+        return {}
+
+    async def mock_sleep(seconds):
+        raise asyncio.CancelledError()
+
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__ = AsyncMock(return_value=AsyncMock())
+    mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+
+    with (
+        patch("app.services.quote_service.async_session", return_value=mock_session_ctx),
+        patch("app.services.quote_service.AssetRepository") as MockRepo,
+        patch("app.services.quote_service.get_price_provider", return_value=_mock_provider(mock_quotes)),
+        patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
+        patch("app.services.quote_service.get_intraday_bars", capture_bars),
+    ):
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(
+            return_value=[AssetRef("AAPL", 1), AssetRef("MSFT", 2)]
+        )
+
+        async for _ in quote_event_generator(frozenset({"MSFT"})):
+            pass
+
+    assert seen_refs == [[AssetRef("MSFT", 2)]]
 
 
 async def test_stream_adaptive_interval_regular():
