@@ -197,9 +197,16 @@ const SESSION_MATCH_TOL = 0.005
  * Once today's bar is synced (previous_close no longer matches the stored close),
  * the DB `vnr` is already current, so we return null and let the caller fall back
  * to it. Also returns null when the forecast/quote data is missing or degenerate.
+ *
+ * A gap-flagged snapshot is the exception, and it is why this function reads
+ * `values` rather than just the forecast — see the comment on that branch.
  */
 export function computeLiveVnr(
-  quote: { change_percent: number | null; previous_close: number | null } | undefined,
+  quote: {
+    change_percent: number | null
+    previous_close: number | null
+    price: number | null
+  } | undefined,
   values: Record<string, number | string | null | undefined> | undefined,
   dbClose: number | null | undefined,
 ): number | null {
@@ -209,6 +216,24 @@ export function computeLiveVnr(
   const sigma = getNumericValue(values, "vnr_sigma")
   if (changePct == null || prevClose == null || sigma == null || sigma <= 0) return null
   if (dbClose == null || dbClose === 0) return null
+
+  // Gap-flagged bar: the stored `vnr` is null because the stored series is
+  // missing a session, so a positional close-to-close return would silently
+  // span the hole (#559). The *quote* is not missing it — `previous_close` is
+  // the absent session's close — so `change_percent` is a verified single-
+  // session return and the forecast still applies to it.
+  //
+  // Without this branch the only remaining path to a reading is the anchor
+  // check below, and for a gap-flagged bar `dbClose` is the quote's own
+  // session, so that check reduces to `|today's move| <= SESSION_MATCH_TOL`:
+  // it resolves exactly the symbols that didn't move and blanks the ones that
+  // did (#625). `isStoredVnrStale` still guards the case where the stored bar
+  // predates the quote entirely — there the forecast is too old to trust and
+  // blanking remains correct.
+  if (getNumericValue(values, "vnr_gap_sessions") != null && !isStoredVnrStale(quote, dbClose)) {
+    return changePct / 100 / sigma
+  }
+
   // Only reuse the forecast when the stored bar is the quote's prior session.
   // (When they differ, the two anchors are close enough that either formula
   // agrees — a flat day — or today's bar is stored and the DB vnr is correct.)
