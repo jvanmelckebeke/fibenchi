@@ -11,12 +11,13 @@ export interface ComboItem {
 /**
  * A combobox that lists existing `{id,name,color}` entities (filtered by a
  * search box), shows the currently-selected ones as removable badges, and
- * offers a "create new" affordance via the `renderCreate` render-prop. Shared
- * by the tag and thesis inputs, which previously hand-rolled identical
- * click-outside / dropdown / row markup.
+ * offers a "create new" affordance via the `create` prop. Shared by the tag
+ * and thesis inputs, which previously hand-rolled identical click-outside /
+ * dropdown / row markup.
  *
  * Search is controlled by the caller (so create flows can read the typed text,
- * e.g. to seed a "New thesis" dialog name). Open state is owned internally.
+ * e.g. to seed a "New thesis" dialog name). Open state — including closing
+ * after select *and* after create — is owned internally.
  */
 export function ComboCreateInput<T extends ComboItem>({
   label,
@@ -27,7 +28,7 @@ export function ComboCreateInput<T extends ComboItem>({
   onRemove,
   options,
   onSelect,
-  renderCreate,
+  create,
 }: {
   label: string
   placeholder: string
@@ -39,8 +40,15 @@ export function ComboCreateInput<T extends ComboItem>({
   /** All candidate entities; filtered internally by search and not-already-current. */
   options: T[]
   onSelect: (item: T) => void
-  /** Create-new footer; receives the trimmed search and a fn to close the dropdown. */
-  renderCreate?: (search: string, close: () => void) => ReactNode
+  /** Create-new footer. The component renders the button and closes the
+   * dropdown itself once `onCreate` resolves (it stays open on rejection). */
+  create?: {
+    /** Button label for the trimmed search text. */
+    label: (search: string) => ReactNode
+    /** Extra content above the button (e.g. a colour picker). */
+    extras?: ReactNode
+    onCreate: (search: string) => void | Promise<unknown>
+  }
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -105,7 +113,20 @@ export function ComboCreateInput<T extends ComboItem>({
                   {item.name}
                 </button>
               ))}
-              {search.trim() && !exactMatch && renderCreate?.(search.trim(), close)}
+              {search.trim() && !exactMatch && create && (
+                <div className={create.extras ? "border-t p-2 space-y-2" : "border-t p-1"}>
+                  {create.extras}
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent text-muted-foreground"
+                    onClick={() => {
+                      Promise.resolve(create.onCreate(search.trim())).then(close, () => {})
+                    }}
+                  >
+                    {create.label(search.trim())}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

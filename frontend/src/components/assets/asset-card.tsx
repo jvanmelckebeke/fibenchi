@@ -11,7 +11,7 @@ import { MarketStatusDot } from "@/components/market-status-dot"
 import { useAddAssetToThesis } from "@/lib/queries"
 import { DeferredSparkline } from "@/components/chart/sparkline"
 import { TagBadge } from "@/components/tags/tag-badge"
-import type { AssetType, Quote, TagBrief, SparklinePoint, IndicatorSummary } from "@/lib/api"
+import type { Asset, Quote, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatAssetPriceWithSettings } from "@/lib/format"
 import { ChangePct } from "@/components/change-pct"
 import { getCardDescriptors, isVisibleAt, type IndicatorDescriptor, type Placement } from "@/lib/indicator-registry"
@@ -23,12 +23,10 @@ const CARD_DESCRIPTORS = getCardDescriptors()
 
 export interface AssetCardProps {
   groupId: number
-  assetId: number
-  symbol: string
-  name: string
-  type: AssetType
-  currency: string
-  tags: TagBrief[]
+  /** The row itself, not its fields spread out: a new asset field (unit_kind,
+   * suggested, whatever comes next) then costs nothing here or in the parent,
+   * which is holding the whole Asset anyway. */
+  asset: Asset
   quote?: Quote
   sparklineData?: SparklinePoint[]
   indicatorData?: IndicatorSummary
@@ -61,12 +59,7 @@ function MiniIndicatorCard({
 
 export const AssetCard = memo(function AssetCard({
   groupId,
-  assetId,
-  symbol,
-  name,
-  type,
-  currency,
-  tags,
+  asset,
   quote,
   sparklineData,
   indicatorData,
@@ -75,6 +68,7 @@ export const AssetCard = memo(function AssetCard({
   showSparkline,
   indicatorVisibility,
 }: AssetCardProps) {
+  const { id: assetId, symbol, name, type, currency, tags } = asset
   const { settings } = useSettings()
   const enabledCards = useMemo(
     () => CARD_DESCRIPTORS.filter((d) => isVisibleAt(indicatorVisibility, d.id, "group_card")),
@@ -89,7 +83,7 @@ export const AssetCard = memo(function AssetCard({
   const addToThesis = useAddAssetToThesis()
 
   const priceFmt = lastPrice != null
-    ? formatAssetPriceWithSettings(lastPrice, { type, symbol, currency }, {
+    ? formatAssetPriceWithSettings(lastPrice, asset, {
         compact: settings.compact_numbers,
         group: settings.thousands_separator,
       })
@@ -175,7 +169,7 @@ export const AssetCard = memo(function AssetCard({
         onNewThesis={() => setNewThesisOpen(true)}
       />
       <EditAssetDialog
-        asset={{ id: assetId, symbol, name, type, currency }}
+        asset={asset}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

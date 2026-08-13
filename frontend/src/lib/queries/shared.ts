@@ -29,11 +29,16 @@ export const keys = {
   holdingsIndicators: (symbol: string) => ["holdings-indicators", symbol] as const,
   tags: ["tags"] as const,
   groups: ["groups"] as const,
+  dataHealth: ["data-health"] as const,
+  systemStats: ["system-stats"] as const,
+  orphans: ["orphans"] as const,
   group: (id: number) => ["groups", id] as const,
   groupSparklines: (id: number, period?: string) => ["group-sparklines", id, period] as const,
   groupIndicators: (id: number) => ["group-indicators", id] as const,
   // Sorted+joined so the key is order-independent (same symbol set → one cache entry).
   indicators: (symbols: readonly string[]) => ["indicators", [...symbols].sort().join(",")] as const,
+  sparklines: (symbols: readonly string[], period?: string) =>
+    ["sparklines", [...symbols].sort().join(","), period] as const,
   note: (symbol: string) => ["note", symbol] as const,
   theses: ["theses"] as const,
   thesesPerformance: ["theses", "performance"] as const,
@@ -49,5 +54,6 @@ export const keys = {
   symbolSearchYahoo: (q: string) => ["symbol-search-yahoo", q] as const,
   earnings: (symbol: string) => ["earnings", symbol] as const,
   symbolSources: ["symbol-sources"] as const,
+  marketPhases: ["market-phases"] as const,
   symbolSourceProviders: ["symbol-source-providers"] as const,
 }

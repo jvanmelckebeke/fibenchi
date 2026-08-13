@@ -113,6 +113,18 @@ export function useIndicators(symbols: string[], enabled = true) {
   })
 }
 
+/** Close-price series for an arbitrary set of tracked symbols, keyed by symbol.
+ * Addressed by roster rather than by group, so a set spanning several groups —
+ * or containing assets in none, as thesis-only members are — is one request. */
+export function useSparklines(symbols: string[], period?: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.sparklines(symbols, period),
+    queryFn: () => api.sparklines.batch(symbols, period),
+    enabled: enabled && symbols.length > 0,
+    staleTime: STALE_5MIN,
+  })
+}
+
 /** Prefetch the metadata, sparklines and indicators for every group except
  * ``activeGroupId`` so switching groups feels instant. The active group's
  * data is already being fetched by the page that called this hook. */

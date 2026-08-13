@@ -2,7 +2,7 @@ import { PriceChart } from "@/components/chart/price-chart"
 import { ChartSkeleton } from "@/components/chart/chart-skeleton"
 import { IntradayChart } from "@/components/chart/intraday-chart"
 import { useAssetWindow, useAnnotations } from "@/lib/queries"
-import { useIntraday, useQuote } from "@/lib/quote-stream"
+import { useIntraday, useIntradaySubscription, useQuote } from "@/lib/quote-stream"
 import type { AssetWindow } from "@/lib/asset-window"
 import type { Placement } from "@/lib/indicator-registry"
 import type { AssetType } from "@/lib/api"
@@ -41,8 +41,9 @@ export function ChartSection({
 }
 
 function LiveChartSection({ symbol }: { symbol: string }) {
-  const intraday = useIntraday()
   const upperSymbol = symbol.toUpperCase()
+  useIntradaySubscription([upperSymbol])
+  const intraday = useIntraday()
   const points = intraday[upperSymbol]
   const quote = useQuote(upperSymbol)
   const previousClose = quote?.previous_close ?? null

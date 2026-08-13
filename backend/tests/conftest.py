@@ -96,6 +96,22 @@ def reset_yahoo_throttle():
 
 
 @pytest.fixture(autouse=True)
+def reset_stats_cache():
+    """Clear the stats/data-health TTL cache between tests.
+
+    It's module state with a 60s TTL, so without this a test that seeds its own
+    collection silently reads the previous test's numbers — and only when run
+    alongside them. Lives here rather than in the one test file that needs it
+    today, so a future file hitting these endpoints can't inherit the hazard.
+    """
+    from app.services.stats_service import reset_stats_cache as _reset
+
+    _reset()
+    yield
+    _reset()
+
+
+@pytest.fixture(autouse=True)
 async def setup_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

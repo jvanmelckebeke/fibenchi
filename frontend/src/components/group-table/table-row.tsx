@@ -20,6 +20,7 @@ import {
   computeLiveVnr,
   isStoredVnrStale,
 } from "@/lib/indicator-registry"
+import { marketState as marketStateInfo } from "@/lib/market-state"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 import { resolveIcon } from "@/lib/icon-utils"
@@ -113,10 +114,9 @@ export const TableRow = memo(function TableRow({
   const hasDbFallback = !hasLiveQuote && displayPrice != null
   // Suppress stale indicator when market is closed — DB prices are already current.
   // When no quote yet, market_state is unknown so we assume market hours (show stale).
+  // The POSTPOST-counts-as-closed knowledge lives in the shared trait table.
   const marketState = quote?.market_state
-  // "POSTPOST" = post-market session ended (prices settled); Yahoo never emits
-  // "POSTMARKET". "POST" is still active after-hours, so stale stays meaningful.
-  const isMarketClosed = marketState === "CLOSED" || marketState === "POSTPOST"
+  const isMarketClosed = marketState != null && marketStateInfo(marketState).phase === "closed"
   const showStale = hasDbFallback && !isMarketClosed
 
   const { settings } = useSettings()
@@ -294,6 +294,13 @@ export const TableRow = memo(function TableRow({
             // it. Blank the cell rather than render a wrong-signed number.
             const vnrStale = field === "vnr" && liveVnr == null
               && isStoredVnrStale(quote, indicator?.close)
+            // The backend NaN's the stored σ-Move when the bar's return spans a
+            // gap in price_history (venue-calendar-verified where the venue is
+            // known) and reports the gap width instead — explain the blank
+            // rather than leave it mute.
+            const vnrGap = field === "vnr" && liveVnr == null
+              ? getNumericValue(indicator?.values, "vnr_gap_sessions")
+              : null
             const values = liveVnr != null
               ? { ...indicator?.values, vnr: liveVnr }
               : indicator?.values
@@ -316,7 +323,13 @@ export const TableRow = memo(function TableRow({
                 ) : (
                   <span
                     className="text-muted-foreground"
-                    title={vnrStale ? "σ-Move unavailable — price data is behind the live quote" : undefined}
+                    title={
+                      vnrStale
+                        ? "σ-Move unavailable — price data is behind the live quote. A background job reconciles this automatically (usually within ~10 min)."
+                        : vnrGap != null
+                          ? `σ-Move unavailable — the last return spans ${vnrGap} trading sessions (gap in stored price history). A background job backfills missing sessions automatically; see the Stats page.`
+                          : undefined
+                    }
                   >
                     &mdash;
                   </span>

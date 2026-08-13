@@ -74,6 +74,9 @@ interface QuoteStreamState {
   store: QuoteStore
   intraday: IntradayMap
   status: ConnectionStatus
+  /** Declare that a mounted component will draw bars for these symbols.
+   *  Returns an unsubscribe. See `useIntradaySubscription`. */
+  subscribeIntraday: (symbols: string[]) => () => void
 }
 
 const defaultStore = new QuoteStore()
@@ -81,7 +84,13 @@ const QuoteStreamContext = createContext<QuoteStreamState>({
   store: defaultStore,
   intraday: {},
   status: "connecting",
+  subscribeIntraday: () => () => {},
 })
+
+/** How long to wait after the demand set changes before reconnecting.
+ *  Navigation unmounts one live view and mounts another in quick succession;
+ *  without this, that lands as two reconnects instead of one. */
+const RESUBSCRIBE_DEBOUNCE_MS = 400
 
 export function QuoteStreamProvider({ children }: { children: React.ReactNode }) {
   const [storeRef] = useState(() => new QuoteStore())
@@ -92,12 +101,45 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
   const backoffMs = useRef(1_000)
   const mountedRef = useRef(true)
 
+  // Who currently wants bars, and for what. Keyed by an identity token per
+  // subscriber so two views asking for the same symbol both have to leave
+  // before it drops out of the union.
+  const demands = useRef(new Map<symbol, string[]>())
+  const demandTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The `intraday=` query param, and the effect dependency that reopens the
+  // stream when it changes. Sorted so an unchanged set can't reorder into a
+  // different string and trigger a pointless reconnect.
+  const [intradayParam, setIntradayParam] = useState("")
+
+  const subscribeIntraday = useCallback((symbols: string[]) => {
+    const token = Symbol("intraday-demand")
+    const recompute = () => {
+      if (demandTimer.current) clearTimeout(demandTimer.current)
+      demandTimer.current = setTimeout(() => {
+        const union = new Set<string>()
+        for (const list of demands.current.values()) {
+          for (const s of list) union.add(s.toUpperCase())
+        }
+        setIntradayParam([...union].sort().join(","))
+      }, RESUBSCRIBE_DEBOUNCE_MS)
+    }
+    demands.current.set(token, symbols)
+    recompute()
+    return () => {
+      demands.current.delete(token)
+      recompute()
+    }
+  }, [])
+
   useEffect(() => {
     mountedRef.current = true
 
     function connect() {
       if (!mountedRef.current) return
-      const es = new EventSource("/api/quotes/stream")
+      const url = intradayParam
+        ? `/api/quotes/stream?intraday=${encodeURIComponent(intradayParam)}`
+        : "/api/quotes/stream"
+      const es = new EventSource(url)
       esRef.current = es
 
       es.addEventListener("quotes", (e) => {
@@ -183,10 +225,14 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
       esRef.current = null
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
     }
-  }, [storeRef])
+    // intradayParam: a changed selection reopens the stream, which is how the
+    // server learns about it. Quotes survive that — the new connection's first
+    // push is a full payload and QuoteStore.merge keeps the previous values,
+    // so nothing on screen blanks.
+  }, [storeRef, intradayParam])
 
   return (
-    <QuoteStreamContext.Provider value={{ store: storeRef, intraday, status }}>
+    <QuoteStreamContext.Provider value={{ store: storeRef, intraday, status, subscribeIntraday }}>
       {children}
     </QuoteStreamContext.Provider>
   )
@@ -221,6 +267,29 @@ export function useQuote(symbol: string): Quote | undefined {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useIntraday(): IntradayMap {
   return useContext(QuoteStreamContext).intraday
+}
+
+/** Ask the stream for 1-minute bars while this component is mounted.
+ *
+ * Bars are opt-in: a connection that doesn't ask receives none, because the
+ * first frame is large (738 KiB for the full roster, #615) and most views
+ * never draw one. Call this from anything that renders an `IntradayChart`,
+ * then read the data with `useIntraday()`.
+ *
+ * Changing the set reopens the SSE connection, so the bars arrive after a
+ * round-trip rather than being there already. Debounced, so navigating
+ * between two live views costs one reconnect, not two.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useIntradaySubscription(symbols: string[]): void {
+  const { subscribeIntraday } = useContext(QuoteStreamContext)
+  // The array identity changes every render at most call sites; the joined
+  // string is what actually decides whether the demand changed.
+  const key = symbols.join(",")
+  useEffect(
+    () => subscribeIntraday(key ? key.split(",") : []),
+    [subscribeIntraday, key],
+  )
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

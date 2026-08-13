@@ -1,59 +1,60 @@
-import { useState } from "react"
-import { ChartSkeleton } from "@/components/chart/chart-skeleton"
-import { PeriodSelector } from "@/components/period-selector"
-import { usePortfolioIndex, usePortfolioPerformers } from "@/lib/queries"
-import { formatChangePct, changeColor } from "@/lib/format"
-import { PortfolioChart } from "./portfolio-chart"
-import { PerformersSection } from "./performers-section"
+// The homepage dense board: every tracked asset as a σ-Move-coloured tile in
+// one screen, with a rail of summary cards. Replaces the old index-chart +
+// 1y-performers Overview (a history page, not a today page). Design spec:
+// GitHub epic #512.
 
-export function PortfolioPage() {
-  const [period, setPeriod] = useState<string>("1y")
-  const { data, isLoading, isFetching } = usePortfolioIndex(period)
-  const { data: performers, isLoading: performersLoading } = usePortfolioPerformers(period)
+import { useMemo, useState } from "react"
+import { Board } from "./board/board"
+import { FilterBar } from "./board/filter-bar"
+import { IndexCard, MoversCard, MostUnusualCard } from "./board/rail"
+import type { ColorMode } from "./board/color-scale"
+import { useBoardData, type GroupBy } from "./board/use-board-data"
 
-  return (
-    <div className="p-6 space-y-8">
-      <div className="flex justify-center">
-        <PeriodSelector value={period} onChange={setPeriod} />
-      </div>
-
-      {isLoading ? (
-        <ChartSkeleton height={480} />
-      ) : !data || !data.dates.length ? (
-        <div className="h-[480px] flex items-center justify-center text-muted-foreground">
-          No data yet. Add assets to a group and refresh prices.
-        </div>
-      ) : (
-        <div className="relative">
-          {isFetching && (
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10 rounded-t-md">
-              <div className="h-full w-1/3 bg-primary animate-[slide_1s_ease-in-out_infinite]" />
-            </div>
-          )}
-          <PortfolioChart dates={data.dates} values={data.values} up={data.change >= 0} />
-          <ValueDisplay current={data.current} change={data.change} changePct={data.change_pct} />
-        </div>
-      )}
-
-      <PerformersSection performers={performers} isLoading={performersLoading} period={period} />
-    </div>
-  )
+// View prefs persist locally — they're device-level ergonomics, not data.
+function usePersisted<T extends string>(key: string, initial: T) {
+  const [value, setValue] = useState<T>(() => (localStorage.getItem(key) as T) ?? initial)
+  const set = (v: T) => {
+    setValue(v)
+    localStorage.setItem(key, v)
+  }
+  return [value, set] as const
 }
 
-function ValueDisplay({ current, change, changePct }: { current: number; change: number; changePct: number }) {
-  const sign = change >= 0 ? "+" : ""
-  const colorClass = changeColor(change)
-  const chg = formatChangePct(changePct)
+export function PortfolioPage() {
+  const [groupBy, setGroupBy] = usePersisted<GroupBy>("board-group-by", "group")
+  const [mode, setMode] = usePersisted<ColorMode>("board-color-mode", "sigma")
+  const { sections, tiles, coverage, isLoading } = useBoardData(groupBy)
+  const allTiles = useMemo(() => [...tiles.values()], [tiles])
 
   return (
-    <div className="text-center space-y-1">
-      <div className="text-5xl font-light tracking-tight tabular-nums">
-        {current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+    <div className="flex flex-col gap-5 p-4 lg:flex-row lg:items-start">
+      <div className="min-w-0 flex-1 space-y-4">
+        <FilterBar
+          groupBy={groupBy}
+          onGroupBy={setGroupBy}
+          mode={mode}
+          onMode={setMode}
+          coverage={coverage}
+        />
+        {isLoading ? (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-[3px] 2xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] 2xl:gap-1">
+            {Array.from({ length: 24 }, (_, i) => (
+              <div key={i} className="h-[62px] animate-pulse 2xl:h-[80px] rounded-[3px] bg-muted/40" />
+            ))}
+          </div>
+        ) : sections.length === 0 ? (
+          <p className="py-16 text-center text-sm text-muted-foreground">
+            No assets yet. Add assets to a group and refresh prices.
+          </p>
+        ) : (
+          <Board sections={sections} mode={mode} />
+        )}
       </div>
-      <div className={`text-sm font-medium ${colorClass} flex items-center justify-center gap-3`}>
-        <span>{sign}{change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        <span>{chg.text}</span>
-      </div>
+      <aside className="w-full shrink-0 space-y-3 lg:w-[300px] 2xl:w-[340px]">
+        <IndexCard />
+        <MoversCard tiles={allTiles} />
+        <MostUnusualCard tiles={allTiles} />
+      </aside>
     </div>
   )
 }

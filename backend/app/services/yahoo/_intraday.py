@@ -2,29 +2,47 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
+from datetime import datetime
 
 import pandas as pd
 
 from app.services.yahoo._base import _YahooBase
+from app.services.yahoo._history import padded_history_frame
 from app.services.yahoo.currency import resolve_currency
 from app.services.yahoo.rate_limit import check_crumb
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderIntradayBar:
+    """One raw 1-minute bar as fetched from Yahoo.
+
+    Provider-internal transport shape: divisor-normalised but not yet
+    session-classified — :mod:`app.services.intraday` classifies (using
+    ``tz_name`` as a venue-less fallback) and persists, at which point the
+    bar becomes an :class:`~app.models.intraday.IntradayPrice` row.
+    """
+
+    timestamp: datetime  # tz-aware
+    price: float
+    volume: int
+    tz_name: str | None
+
+
 class _IntradayMixin(_YahooBase):
-    async def intraday(self, symbols: list[str]) -> dict[str, list[dict]]:
+    async def intraday(self, symbols: list[str]) -> dict[str, list[ProviderIntradayBar]]:
         """Fetch 1-minute intraday bars including pre/post-market.
 
-        Returns ``{symbol: [{timestamp, price, volume, tz_name}, ...]}``.
-        Bars are divisor-normalised but NOT session-classified — that's
-        the caller's job (uses exchange-hours which live in
-        :mod:`app.services.intraday`).
+        Returns ``{symbol: [ProviderIntradayBar, ...]}``. Bars are
+        divisor-normalised but NOT session-classified — that's the caller's
+        job (uses exchange-hours which live in :mod:`app.services.intraday`).
         """
         if not symbols:
             return {}
 
-        def _fetch() -> dict[str, list[dict]]:
+        def _fetch() -> dict[str, list[ProviderIntradayBar]]:
             ticker = self._ticker(symbols)
             price_data = ticker.price
 
@@ -40,8 +58,8 @@ class _IntradayMixin(_YahooBase):
                     if isinstance(sym_data, str):
                         logger.debug("Yahoo intraday error for %s: %s", sym, sym_data)
 
-            hist = ticker._historical_data_to_dataframe(data, params, adj_timezone=True)
-            if isinstance(hist, dict) or hist.empty:
+            hist = padded_history_frame(ticker, data, params, symbols)
+            if hist.empty:
                 return {}
 
             available = (
@@ -50,7 +68,7 @@ class _IntradayMixin(_YahooBase):
                 else None
             )
 
-            out: dict[str, list[dict]] = {}
+            out: dict[str, list[ProviderIntradayBar]] = {}
             for sym in symbols:
                 try:
                     if available is not None:
@@ -73,7 +91,7 @@ class _IntradayMixin(_YahooBase):
                         if first_ts.tzinfo is not None:
                             tz_name = str(first_ts.tzinfo)
 
-                    bars: list[dict] = []
+                    bars: list[ProviderIntradayBar] = []
                     for idx, row in df.iterrows():
                         ts = pd.Timestamp(idx)
                         if ts.tzinfo is None:
@@ -90,12 +108,12 @@ class _IntradayMixin(_YahooBase):
                         if divisor != 1:
                             close_val = close_val / divisor
 
-                        bars.append({
-                            "timestamp": dt,
-                            "price": round(close_val, 4),
-                            "volume": int(row["volume"]) if pd.notna(row.get("volume", None)) else 0,
-                            "tz_name": tz_name,
-                        })
+                        bars.append(ProviderIntradayBar(
+                            timestamp=dt,
+                            price=round(close_val, 4),
+                            volume=int(row["volume"]) if pd.notna(row.get("volume", None)) else 0,
+                            tz_name=tz_name,
+                        ))
                     if bars:
                         out[sym] = bars
                 except (KeyError, TypeError) as exc:

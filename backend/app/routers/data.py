@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import PeriodType
 from app.database import get_db
+from app.schemas.batch_data import SymbolBatchData
 from app.services.data_service import ALLOWED_FIELDS, MAX_SYMBOLS, query_batch_data
 
 router = APIRouter(prefix="/api/data", tags=["data"])
@@ -14,6 +15,10 @@ router = APIRouter(prefix="/api/data", tags=["data"])
     "",
     summary="Batch data query for multiple symbols",
     response_description="Dict keyed by symbol with requested data fields, or per-symbol error.",
+    response_model=dict[str, SymbolBatchData],
+    # Only the requested fields appear per symbol; unset fields are dropped,
+    # not emitted as nulls.
+    response_model_exclude_none=True,
 )
 async def get_data(
     symbols: str = Query(

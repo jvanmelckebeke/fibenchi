@@ -1,0 +1,312 @@
+"""Self-heal stored daily bars that are wrong or missing.
+
+Two independent repair loops:
+
+- ``heal_unreconciled_prices`` — the *trailing-bar* heal: the frontend blanks
+  σ-Move when an asset's latest stored close reconciles with neither the live
+  price nor the quote's previous close (``isStoredVnrStale`` in
+  ``frontend/src/lib/indicator-registry.ts``). That state means the stored
+  data is at least two sessions behind the quote — e.g.
+  ``drop_unsettled_last_bar`` discarded a lagging bar and every scheduled sync
+  since missed the symbol. Rather than waiting up to a day for the next
+  scheduled sync, this detects the broken invariant server-side and refreshes
+  just the affected symbols.
+
+- ``heal_interior_holes`` — the *mid-series* heal (issue #559 fix 3): a
+  scheduled session with no stored bar (upstream feed hole, NaN-skipped
+  upsert, failed nightly sync) silently blanks σ-Move on the bar after it and
+  degrades gap-aware indicators. The venue calendar makes such holes exactly
+  detectable — expected sessions minus stored dates — and Yahoo usually
+  backfills a missing session within a day or two, so a re-fetch of the hole
+  range repairs it automatically.
+"""
+
+import logging
+import time
+from datetime import date, timedelta
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain import AssetRef
+from app.repositories.asset_repo import AssetRepository
+from app.repositories.price_repo import PriceRepository
+from app.services.price_providers import get_price_provider
+from app.services.price_sync import (
+    Anchor,
+    _as_date,
+    _reconciles,
+    sync_asset_prices,
+    sync_asset_prices_range,
+)
+
+logger = logging.getLogger(__name__)
+
+# Skip symbols attempted recently: when Yahoo itself is serving unreconcilable
+# data (daily feed lagging the quote for hours), a refresh changes nothing and
+# retrying every run would just hammer the API.
+HEAL_COOLDOWN_SECONDS = 30 * 60
+
+# Bound per-symbol fetches per run. Wider breakage than this is a sync-level
+# outage for the scheduled full runs to handle, not the straggler loop.
+MAX_HEALS_PER_RUN = 10
+
+_last_attempt: dict[str, float] = {}
+
+
+async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
+    """Refresh grouped assets whose latest stored bar contradicts the live quote.
+
+    Returns ``{symbol: rows_upserted}`` for the symbols refreshed this run.
+    """
+    assets = await AssetRepository(db).list_in_any_group()
+    if not assets:
+        return {}
+    # Detached refs: the heal loop below commits/rolls back per symbol, which
+    # expires live ORM instances mid-loop.
+    by_symbol = {a.symbol: AssetRef.of(a) for a in assets}
+
+    latest = await PriceRepository(db).get_latest_closes([r.id for r in by_symbol.values()])
+    quotes = await get_price_provider().batch_fetch_quotes(list(by_symbol))
+
+    # Carry each stale symbol's reconciliation anchor so the per-symbol refresh
+    # below can reuse the quote we already fetched instead of round-tripping to
+    # Yahoo again for the same (price, previous_close, market_state) data.
+    stale: list[tuple[str, Anchor]] = []
+    for q in quotes:
+        sym = q.symbol
+        ref = by_symbol.get(sym)
+        if ref is None:
+            continue
+        stored = latest.get(ref.id)
+        if stored is None:  # no bars yet — initial fill is the sync's job
+            continue
+        price, previous_close = q.price, q.previous_close
+        if price is None and previous_close is None:  # dead quote, nothing to anchor on
+            continue
+        bar_date, bar_close = stored
+        if _reconciles(bar_close, price) or _reconciles(bar_close, previous_close):
+            continue
+        logger.info(
+            "%s: stored %s close %s reconciles with neither price %s nor previous_close %s",
+            sym, bar_date, bar_close, price, previous_close,
+        )
+        anchor: Anchor = (price, previous_close, q.market_state, _as_date(q.session_date))
+        stale.append((sym, anchor))
+
+    if not stale:
+        return {}
+
+    now = time.monotonic()
+    due = [
+        (s, a) for (s, a) in stale
+        if (t := _last_attempt.get(s)) is None or now - t >= HEAL_COOLDOWN_SECONDS
+    ]
+    skipped_cooldown = len(stale) - len(due)
+    deferred = due[MAX_HEALS_PER_RUN:]
+    due = due[:MAX_HEALS_PER_RUN]
+    if skipped_cooldown or deferred:
+        logger.info(
+            "Price heal: %d stale symbol(s); healing %d (%d on cooldown, %d deferred to next run)",
+            len(stale), len(due), skipped_cooldown, len(deferred),
+        )
+
+    healed: dict[str, int] = {}
+    for sym, anchor in due:
+        _last_attempt[sym] = now
+        try:
+            healed[sym] = await sync_asset_prices(db, by_symbol[sym], period="1mo", anchor=anchor)
+        except Exception:
+            logger.warning("Price heal for %s failed", sym, exc_info=True)
+            # This loop shares one session across symbols; roll back a
+            # half-applied transaction so it can't poison the next heal.
+            await db.rollback()
+    return healed
+
+
+# ---------------------------------------------------------------------------
+# Interior-hole heal
+# ---------------------------------------------------------------------------
+
+# The hole scan is cheap (one DB query + calendar lookups) but each detected
+# hole costs a Yahoo range fetch, and holes either fill on the first try or
+# need Yahoo to backfill upstream — rescanning faster gains nothing *for a
+# symbol that was attempted*. Deferred symbols were never attempted, so a
+# scan that hit the per-scan cap schedules the next one much sooner: the
+# retry cooldown below already keeps attempted-but-unfillable holes from
+# being re-hammered.
+HOLE_SCAN_INTERVAL_SECONDS = 6 * 60 * 60
+HOLE_BACKLOG_RESCAN_SECONDS = 30 * 60
+
+# A hole that survived a re-fetch is data Yahoo doesn't have (yet). Retry
+# daily — backfills typically land within a day or two — instead of every scan.
+HOLE_RETRY_COOLDOWN_SECONDS = 24 * 60 * 60
+
+# Bound per-scan fetches; wider breakage is a sync-level outage. Sized for a
+# feed-wide event (2026-08-05: Yahoo served NaN OHLC for one session across
+# dozens of European symbols at once) to drain in hours, not days.
+MAX_HOLE_HEALS_PER_SCAN = 10
+
+# Only scan the window that feeds the group snapshot + display periods; ancient
+# holes beyond it don't blank anything a user currently sees.
+HOLE_SCAN_WINDOW_DAYS = 120
+
+_last_hole_scan: float | None = None
+# Whether the last scan hit the per-scan cap and left symbols unattempted —
+# if so the next scan runs after the short backlog interval.
+_hole_backlog: bool = False
+# symbol → (last attempt, the exact holes attempted). A changed hole set is a
+# new problem and bypasses the cooldown.
+_hole_attempts: dict[str, tuple[float, frozenset[date]]] = {}
+
+
+def find_interior_holes(stored: set[date], sessions: set[date]) -> set[date]:
+    """Scheduled sessions strictly inside the stored range with no stored bar.
+
+    Boundaries are excluded on purpose: a missing *leading* stretch is backfill
+    territory (`_ensure_prices`) and a missing *trailing* bar is the
+    reconciliation heal's job — this only finds mid-series holes.
+    """
+    if not stored or not sessions:
+        return set()
+    first, last = min(stored), max(stored)
+    return {d for d in sessions if first < d < last and d not in stored}
+
+
+async def scan_session_coverage(db: AsyncSession) -> list[tuple[AssetRef, int, set[date]]]:
+    """Per grouped symbol: ``(ref, scheduled_session_count, interior_holes)``
+    over the stored range within the scan window.
+
+    Detection only — no cooldown filtering, no side effects. The single
+    source for both the heal scan and the data-health/stats endpoints, so
+    what gets reported and what gets repaired can't disagree. Symbols
+    without a resolvable venue calendar are skipped — without the session
+    list a hole cannot be told apart from a holiday.
+    """
+    assets = await AssetRepository(db).list_in_any_group()
+    if not assets:
+        return []
+
+    window_start = date.today() - timedelta(days=HOLE_SCAN_WINDOW_DAYS)
+    all_prices = await PriceRepository(db).list_by_assets_since(
+        [a.id for a in assets], window_start
+    )
+    stored_by_asset: dict[int, set[date]] = {}
+    for p in all_prices:
+        stored_by_asset.setdefault(p.asset_id, set()).add(p.date)
+
+    coverage = []
+    for asset in assets:
+        stored = stored_by_asset.get(asset.id)
+        if not stored or len(stored) < 2:
+            continue  # initial fill is the sync's job
+        # Detached ref, not the ORM object: rollbacks in the heal loop expire
+        # every live instance in the session, and touching an expired
+        # attribute outside a greenlet context raises MissingGreenlet.
+        ref = AssetRef.of(asset)
+        if ref.venue is None:
+            continue
+        sessions = ref.venue.session_dates(min(stored), max(stored))
+        if not sessions:
+            continue
+        coverage.append((ref, len(sessions), find_interior_holes(stored, sessions)))
+    return coverage
+
+
+async def detect_hole_candidates(db: AsyncSession) -> list[tuple[AssetRef, set[date]]]:
+    """Every grouped symbol with interior holes in the scan window, newest
+    hole first (the heal's priority order, and the order worth showing users).
+    """
+    candidates = [(ref, holes) for ref, _, holes in await scan_session_coverage(db) if holes]
+    # Newest hole first: a hole at yesterday's session blanks σ-Move *today*,
+    # while an old interior hole only dents historical charts — when the cap
+    # forces a choice, heal what the user is currently looking at.
+    candidates.sort(key=lambda c: max(c[1]), reverse=True)
+    return candidates
+
+
+def next_hole_scan_in_seconds() -> int:
+    """Approximate seconds until the next hole scan is *eligible* to run.
+
+    The scan piggybacks on the 10-minute heal job, so the real start is this
+    value rounded up to the next job tick — close enough for display.
+    """
+    if _last_hole_scan is None:
+        return 0
+    interval = HOLE_BACKLOG_RESCAN_SECONDS if _hole_backlog else HOLE_SCAN_INTERVAL_SECONDS
+    return max(0, int(interval - (time.monotonic() - _last_hole_scan)))
+
+
+async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str, int]:
+    """Detect and re-fetch mid-series session holes for grouped assets.
+
+    Returns ``{symbol: rows_upserted}`` for the symbols refreshed this scan.
+    """
+    global _last_hole_scan, _hole_backlog
+    now = time.monotonic()
+    interval = HOLE_BACKLOG_RESCAN_SECONDS if _hole_backlog else HOLE_SCAN_INTERVAL_SECONDS
+    if not force and _last_hole_scan is not None and now - _last_hole_scan < interval:
+        return {}
+    _last_hole_scan = now
+
+    detected = await detect_hole_candidates(db)
+    candidates = []
+    for ref, holes in detected:
+        signature = frozenset(holes)
+        last = _hole_attempts.get(ref)
+        if last and last[1] == signature and now - last[0] < HOLE_RETRY_COOLDOWN_SECONDS:
+            continue  # same holes, recently attempted — wait for Yahoo to backfill
+        candidates.append((ref, holes, signature))
+
+    if not candidates:
+        _hole_backlog = False
+        return {}
+
+    deferred = candidates[MAX_HOLE_HEALS_PER_SCAN:]
+    candidates = candidates[:MAX_HOLE_HEALS_PER_SCAN]
+    _hole_backlog = bool(deferred)
+    if deferred:
+        logger.info(
+            "Hole heal: %d symbol(s) with interior holes; healing %d, deferring %d "
+            "(next scan in %d min)",
+            len(candidates) + len(deferred), len(candidates), len(deferred),
+            HOLE_BACKLOG_RESCAN_SECONDS // 60,
+        )
+
+    healed: dict[str, int] = {}
+    for ref, holes, signature in candidates:
+        symbol = ref
+        _hole_attempts[symbol] = (now, signature)
+        # Yahoo's range end is exclusive, so a fetch ending at max(holes)
+        # would never request the newest hole — pad one day past it. The
+        # start is padded back a few days so the range always contains
+        # sessions Yahoo *does* have bars for: a range covering only the
+        # missing day comes back empty and reads as "No data found".
+        fetch_start = min(holes) - timedelta(days=5)
+        fetch_end = max(holes) + timedelta(days=1)
+        try:
+            count = await sync_asset_prices_range(db, ref, fetch_start, fetch_end)
+            healed[symbol] = count
+            refreshed = await PriceRepository(db).list_by_asset_since(ref.id, min(holes))
+            remaining = holes - {p.date for p in refreshed}
+            if remaining:
+                logger.info(
+                    "%s: %d of %d interior hole(s) persist after re-fetch "
+                    "(Yahoo may backfill later): %s",
+                    symbol, len(remaining), len(holes),
+                    ", ".join(d.isoformat() for d in sorted(remaining)),
+                )
+            else:
+                logger.info(
+                    "%s: healed %d interior hole(s): %s",
+                    symbol, len(holes),
+                    ", ".join(d.isoformat() for d in sorted(holes)),
+                )
+        except ValueError as e:
+            # Expected: Yahoo has no history for the range (delisted symbol,
+            # feed gap). The cooldown above keeps it from retrying every scan.
+            logger.info("Hole heal for %s: %s", symbol, e)
+            await db.rollback()
+        except Exception:
+            logger.warning("Hole heal for %s failed", symbol, exc_info=True)
+            await db.rollback()
+    return healed

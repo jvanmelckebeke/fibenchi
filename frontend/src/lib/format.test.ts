@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { compactSigFig, formatCompactNumber, formatCompactPrice } from "./format"
+import { compactSigFig, formatAssetPrice, formatCompactNumber, formatCompactPrice } from "./format"
+import type { AssetFormatHints } from "./format"
 
 describe("compactSigFig", () => {
   it("keeps ~3 significant figures so low-thousands prices stay distinct (NKT.CO case)", () => {
@@ -69,5 +70,57 @@ describe("formatCompactPrice", () => {
   it("handles currencies without a symbol (NKT.CO / DKK)", () => {
     expect(formatCompactPrice(1122, "DKK")).toBe("DKK 1.12K")
     expect(formatCompactPrice(72000, "DKK")).toBe("DKK 72.0K")
+  })
+})
+
+// --- Unit-aware asset prices (#617) ---
+//
+// `currency` only ever answers *which* currency, so an index was forced to
+// claim a denomination it doesn't have — the S&P 500 rendered as "$6,912.34"
+// and a 30-year Treasury yield as "$46.28". `unit_kind` is the field that can
+// say "this is a rate" or "this has no unit", and it replaced a hardcoded
+// four-ticker YIELD_INDICES set that nothing outside format.ts could reach.
+
+describe("formatAssetPrice / unit_kind", () => {
+  const hints = (over: Partial<AssetFormatHints> = {}): AssetFormatHints => ({
+    type: "stock",
+    symbol: "AAPL",
+    currency: "USD",
+    ...over,
+  })
+
+  it("denominates a currency-quoted asset", () => {
+    expect(formatAssetPrice(71.4, hints({ unit_kind: "currency" }))).toBe("$71.40")
+  })
+
+  it("prints a percent-quoted index as a rate", () => {
+    expect(
+      formatAssetPrice(4.628, hints({ symbol: "^TYX", type: "index", unit_kind: "percent" })),
+    ).toBe("4.63%")
+  })
+
+  it("prints a points-quoted index bare — no symbol, no percent", () => {
+    const s = formatAssetPrice(6912.34, hints({ symbol: "^GSPC", type: "index", unit_kind: "points" }), undefined, true)
+    expect(s).toBe("6,912.34")
+  })
+
+  it("honours unit_kind over the ticker, so any yield index can be marked", () => {
+    // ^BVSP was never in the old hardcoded set; the user can now say so.
+    expect(
+      formatAssetPrice(10.5, hints({ symbol: "^BVSP", type: "index", unit_kind: "percent" })),
+    ).toBe("10.50%")
+  })
+
+  it("honours unit_kind over the ticker in the other direction too", () => {
+    // Currency wins even on a caret symbol, if that is what the user chose.
+    expect(
+      formatAssetPrice(46.28, hints({ symbol: "^TYX", type: "index", unit_kind: "currency" })),
+    ).toBe("$46.28")
+  })
+
+  it("falls back on type when unit_kind is absent", () => {
+    // Endpoints predating unit_kind must not start printing "$" on an index.
+    expect(formatAssetPrice(6912.34, hints({ symbol: "^GSPC", type: "index" }))).toBe("6912.34")
+    expect(formatAssetPrice(71.4, hints())).toBe("$71.40")
   })
 })

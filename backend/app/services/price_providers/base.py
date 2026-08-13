@@ -5,6 +5,8 @@ from datetime import date
 
 import pandas as pd
 
+from app.schemas.quote import Quote
+
 
 class PriceProvider(ABC):
     """Provider interface for OHLCV price data, quotes, and currency info.
@@ -39,11 +41,11 @@ class PriceProvider(ABC):
         """
 
     @abstractmethod
-    async def batch_fetch_quotes(self, symbols: list[str]) -> list[dict]:
+    async def batch_fetch_quotes(self, symbols: list[str]) -> list[Quote]:
         """Fetch current market quotes for multiple symbols.
 
-        Returns list of dicts with keys: symbol, price, previous_close,
-        change, change_percent, volume, avg_volume, currency, market_state.
+        Returns one :class:`~app.schemas.quote.Quote` per symbol; degraded
+        symbols come back as ``Quote.placeholder`` rather than being omitted.
         """
 
     @abstractmethod

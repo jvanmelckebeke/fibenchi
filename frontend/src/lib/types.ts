@@ -1,6 +1,31 @@
 // TypeScript types matching backend Pydantic schemas
 
+import type { MarketState } from "./market-state"
+
 export type AssetType = "stock" | "etf" | "index"
+
+/** How an asset's price number reads. Distinct from `currency`, which only
+ * answers *which* currency and so can't express a rate or a bare index level. */
+export type UnitKind = "currency" | "percent" | "points"
+
+/** Whether a stored field was derived by Fibenchi or chosen by the user.
+ * Auto fields may be re-suggested when the guess improves; user fields are
+ * never argued with. */
+export type FieldSource = "auto" | "user"
+
+/** Fibenchi's read on a ticker — advisory, never applied on its own.
+ *
+ * `differs` is every field the shape reads differently, whoever set it: these
+ * are the resettable ones. `disagrees` is the auto-only subset — what may be
+ * raised unprompted. A field you set stays in `differs` but leaves
+ * `disagrees`, so it's still visible and reversible without nagging. */
+export interface AssetSuggestion {
+  type: AssetType
+  unit_kind: UnitKind
+  currency: string | null
+  differs: string[]
+  disagrees: string[]
+}
 
 export interface TagBrief {
   id: number
@@ -32,6 +57,10 @@ export interface Asset {
   name: string
   type: AssetType
   currency: string
+  unit_kind: UnitKind
+  type_source: FieldSource
+  unit_source: FieldSource
+  suggested?: AssetSuggestion | null
   created_at: string
   tags: TagBrief[]
 }
@@ -57,6 +86,7 @@ export interface AssetUpdate {
   name?: string
   type?: AssetType
   currency?: string
+  unit_kind?: UnitKind
 }
 
 export interface SymbolSearchResult {
@@ -266,7 +296,19 @@ export interface SparklinePoint {
 export interface IndicatorSummary {
   close: number | null
   change_pct: number | null
+  /** Price bars behind the snapshot — distinguishes "building baseline" from other null-indicator causes. */
+  bars: number | null
   values: Record<string, number | string | null>
+}
+
+/** Scheduled phase of one venue calendar (GET /api/market/phases).
+ * Calendar-derived and quote-feed-independent; the SSE market_state wins when present. */
+export interface CalendarPhase {
+  phase: "premarket" | "open" | "aftermarket" | "closed"
+  /** UTC instant of the next phase transition; null when unanswerable (e.g. 24/7 venues). */
+  next_change_at: string | null
+  /** Grouped symbols trading on this calendar — the symbol→venue mapping, served backend-side. */
+  symbols: string[]
 }
 
 export interface SymbolSource {
@@ -307,7 +349,7 @@ export interface Quote {
   volume: number | null
   avg_volume: number | null
   currency: string
-  market_state: string | null
+  market_state: MarketState | null
 }
 
 export interface IntradayPoint {
@@ -321,4 +363,67 @@ export interface EarningsInfo {
   earnings_date: string | null
   is_estimate: boolean
   last_reported_date: string | null
+}
+
+// --- System / data health ---
+
+export interface HoleSymbol {
+  symbol: string
+  /** ISO dates of scheduled sessions with no stored bar */
+  missing_sessions: string[]
+}
+
+/** Price-history self-heal status (GET /api/system/data-health). */
+export interface DataHealth {
+  hole_symbols: HoleSymbol[]
+  total_missing_sessions: number
+  /** Scheduled session bars in the scan window — completeness denominator */
+  expected_session_bars: number
+  /** Symbols the coverage scan can check — affected-count denominator */
+  covered_symbols: number
+  next_scan_in_seconds: number
+  heals_per_scan: number
+  scan_window_days: number
+}
+
+/** Collection-size numbers (GET /api/system/stats). */
+export interface Stats {
+  assets_total: number
+  assets_tracked: number
+  /** Ungrouped but kept because a thesis or pseudo-ETF references them */
+  assets_thesis_or_etf_only: number
+  /** Ungrouped and referenced by nothing — leftovers of removals */
+  assets_orphaned: number
+  stocks: number
+  etfs: number
+  indexes: number
+  crypto: number
+  futures: number
+  fx: number
+  price_bars: number
+  earliest_bar: string | null
+  latest_bar: string | null
+  collected_days: number
+  intraday_bars: number
+  groups: number
+  pseudo_etfs: number
+  theses: number
+  tags: number
+  annotations: number
+  symbol_directory_entries: number
+}
+
+/** An asset row referenced by nothing (GET /api/system/orphans). */
+export interface OrphanAsset {
+  id: number
+  symbol: string
+  name: string
+  type: string
+  /** stored daily bars that would be deleted with it — re-fetchable from Yahoo */
+  price_bars: number
+  latest_bar: string | null
+  /** hand-written chart annotations that would be deleted with it — not re-fetchable */
+  annotations: number
+  /** whether a hand-written thesis note would be deleted with it — not re-fetchable */
+  has_note: boolean
 }

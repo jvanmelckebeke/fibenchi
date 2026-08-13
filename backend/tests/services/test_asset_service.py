@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.domain import UnitKind
+from app.domain.provenance import FieldSource
 from app.models import AssetType
 from app.services.asset_service import create_asset, delete_asset, list_assets, update_asset
 from tests.helpers import make_model_asset as _make_asset
@@ -140,10 +142,13 @@ async def test_create_asset_detects_etf_type(MockAssetRepo, mock_validate, _mock
     new_asset = _make_asset(symbol="SPY", type=AssetType.ETF)
     mock_repo.create = AsyncMock(return_value=new_asset)
 
-    await create_asset(db, symbol="SPY", name=None, asset_type=AssetType.STOCK)
+    # None = "you decide". An explicit STOCK here would be a user choice and
+    # would win — see test_create_asset_explicit_type_beats_detection.
+    await create_asset(db, symbol="SPY", name=None, asset_type=None)
 
     call_kwargs = mock_repo.create.call_args[1]
     assert call_kwargs["type"] == AssetType.ETF
+    assert call_kwargs["type_source"] is FieldSource.AUTO
 
 
 @patch(_ensure_patch, new_callable=AsyncMock)
@@ -159,10 +164,34 @@ async def test_create_asset_detects_index_type(MockAssetRepo, mock_validate, _mo
     new_asset = _make_asset(symbol="^TYX", type=AssetType.INDEX)
     mock_repo.create = AsyncMock(return_value=new_asset)
 
-    await create_asset(db, symbol="^TYX", name=None, asset_type=AssetType.STOCK)
+    await create_asset(db, symbol="^TYX", name=None, asset_type=None)
 
     call_kwargs = mock_repo.create.call_args[1]
     assert call_kwargs["type"] == AssetType.INDEX
+    # Shape also says how the number reads: a yield is a rate, not a price.
+    assert call_kwargs["unit_kind"] is UnitKind.PERCENT
+    assert call_kwargs["unit_source"] is FieldSource.AUTO
+
+
+@patch(_ensure_patch, new_callable=AsyncMock)
+@patch("app.services.asset_service.yahoo_client")
+@patch("app.services.asset_service.AssetRepository")
+async def test_create_asset_explicit_type_beats_detection(MockAssetRepo, mock_validate, _mock_ensure):
+    """A supplied type is a human decision: detection yields to it, and the row
+    records that a human made the call so suggestions stay quiet afterwards."""
+    db = AsyncMock()
+    mock_repo = MockAssetRepo.return_value
+    mock_repo.find_by_symbol = AsyncMock(return_value=None)
+    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {
+        "symbol": "^TYX", "name": "Treasury Yield 30 Years", "type": "INDEX", "currency": "USD", "currency_code": "USD",
+    }
+    mock_repo.create = AsyncMock(return_value=_make_asset(symbol="^TYX", type=AssetType.STOCK))
+
+    await create_asset(db, symbol="^TYX", name=None, asset_type=AssetType.STOCK)
+
+    call_kwargs = mock_repo.create.call_args[1]
+    assert call_kwargs["type"] == AssetType.STOCK
+    assert call_kwargs["type_source"] is FieldSource.USER
 
 
 @patch(_ensure_patch, new_callable=AsyncMock)

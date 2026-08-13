@@ -1,10 +1,10 @@
-"""Tests for the startup/cron cache warmup helpers in app.main."""
+"""Tests for the startup/cron cache warmup helpers in app.background_tasks."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.main import warm_all_group_caches
+from app.background_tasks import warm_all_group_caches
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -16,8 +16,8 @@ def _make_group(gid: int, name: str = "G"):
     return g
 
 
-@patch("app.main.compute_and_cache_indicators", new_callable=AsyncMock)
-@patch("app.main.async_session")
+@patch("app.background_tasks.jobs.compute_and_cache_indicators", new_callable=AsyncMock)
+@patch("app.background_tasks.jobs.async_session")
 @patch("app.repositories.group_repo.GroupRepository")
 async def test_warm_all_group_caches_iterates_every_group(
     MockGroupRepo, mock_async_session, mock_compute,
@@ -39,8 +39,8 @@ async def test_warm_all_group_caches_iterates_every_group(
     assert called_group_ids == [1, 2, 3]
 
 
-@patch("app.main.compute_and_cache_indicators", new_callable=AsyncMock)
-@patch("app.main.async_session")
+@patch("app.background_tasks.jobs.compute_and_cache_indicators", new_callable=AsyncMock)
+@patch("app.background_tasks.jobs.async_session")
 @patch("app.repositories.group_repo.GroupRepository")
 async def test_warm_all_group_caches_continues_on_per_group_failure(
     MockGroupRepo, mock_async_session, mock_compute,
@@ -61,8 +61,8 @@ async def test_warm_all_group_caches_continues_on_per_group_failure(
     assert mock_compute.await_count == 3
 
 
-@patch("app.main.compute_and_cache_indicators", new_callable=AsyncMock)
-@patch("app.main.async_session")
+@patch("app.background_tasks.jobs.compute_and_cache_indicators", new_callable=AsyncMock)
+@patch("app.background_tasks.jobs.async_session")
 @patch("app.repositories.group_repo.GroupRepository")
 async def test_warm_all_group_caches_handles_no_groups(
     MockGroupRepo, mock_async_session, mock_compute,

@@ -3,15 +3,30 @@ import datetime
 from pydantic import BaseModel, Field
 
 
-class PriceResponse(BaseModel):
-    date: datetime.date = Field(description="Trading date")
+class OHLCV(BaseModel):
+    """One bar of open/high/low/close/volume."""
+
     open: float = Field(description="Opening price")
     high: float = Field(description="Highest price of the day")
     low: float = Field(description="Lowest price of the day")
     close: float = Field(description="Closing price")
     volume: int = Field(description="Trading volume")
 
+
+class DatedOHLCV(OHLCV):
+    """An OHLCV bar bound to its trading date.
+
+    Validates from anything bar-shaped (``PriceHistory`` ORM rows,
+    ``PriceResponse`` models) via ``from_attributes``.
+    """
+
+    date: datetime.date = Field(description="Trading date")
+
     model_config = {"from_attributes": True}
+
+
+class PriceResponse(DatedOHLCV):
+    """A daily price bar as served by the price endpoints."""
 
 
 class IndicatorResponse(BaseModel):
@@ -46,18 +61,51 @@ class EtfHoldingsResponse(BaseModel):
 
 
 class IndicatorSnapshotBase(BaseModel):
-    """Shared indicator fields for holding and constituent snapshot responses."""
+    """The indicator snapshot — service-level object AND response shape.
+
+    Built by ``build_indicator_snapshot`` and cached by the compute layer;
+    the group/symbol indicator endpoints serve it as-is. ``values`` is an
+    open map on purpose: its keys are driven by ``INDICATOR_REGISTRY``
+    (output fields + ``snapshot_derived``) and the fundamentals cache merges
+    more keys in *after* construction — instances must therefore stay
+    mutable (no ``frozen=True``), and a closed per-field model would lie
+    about the payload. A degenerate snapshot (insufficient history) is an
+    all-default instance, not a missing entry.
+    """
+
     close: float | None = Field(default=None, description="Latest closing price")
     change_pct: float | None = Field(default=None, description="1-day percentage change")
+    bars: int | None = Field(
+        default=None,
+        description="Price bars behind this snapshot's computation. Lets clients tell "
+        "'building baseline' (fewer bars than an indicator's warmup, e.g. σ-Move's 60 "
+        "sessions) apart from other null-indicator causes. None when nothing was computed.",
+    )
     values: dict[str, float | str | None] = Field(
         default_factory=dict,
         description="Indicator values keyed by field name (includes derived fields like macd_signal_dir, bb_position)",
     )
 
 
-class HoldingIndicatorResponse(IndicatorSnapshotBase):
-    symbol: str = Field(description="Holding ticker symbol")
+class CurrencyIndicatorSnapshot(IndicatorSnapshotBase):
+    """A snapshot with its display currency but no symbol — the batch data
+    endpoint's ``snapshot`` field, where the symbol is already the payload
+    key. Serializing a :class:`SymbolIndicatorSnapshot` through a field of
+    this type strips ``symbol`` (declared-type serialization)."""
+
     currency: str = Field(default="USD", description="ISO 4217 currency code")
+
+
+class SymbolIndicatorSnapshot(CurrencyIndicatorSnapshot):
+    """A snapshot bound to its symbol — the shape
+    ``compute_batch_indicator_snapshots`` returns (holdings, pseudo-ETF
+    constituents, batch data)."""
+
+    symbol: str = Field(description="Ticker symbol")
+
+
+class HoldingIndicatorResponse(SymbolIndicatorSnapshot):
+    """Per-holding indicator snapshot as served by the holdings endpoint."""
 
 
 class SparklinePointResponse(BaseModel):

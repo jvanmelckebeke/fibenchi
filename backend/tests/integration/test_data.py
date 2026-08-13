@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.schemas.price import SymbolIndicatorSnapshot
+from app.schemas.quote import Quote
 from tests.helpers import make_yahoo_df, seed_asset_with_prices
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -48,7 +50,7 @@ async def test_invalid_period_422(client):
 
 
 async def test_quote_field(client):
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50, "change": 1.2}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "change": 1.2})]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with patch("app.services.data_service.get_price_provider", return_value=mock_prov):
@@ -62,8 +64,8 @@ async def test_quote_field(client):
 
 async def test_quote_multiple_symbols(client):
     mock_quotes = [
-        {"symbol": "AAPL", "price": 185.50},
-        {"symbol": "MSFT", "price": 420.00},
+        Quote(**{"symbol": "AAPL", "price": 185.50}),
+        Quote(**{"symbol": "MSFT", "price": 420.00}),
     ]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
@@ -84,7 +86,7 @@ async def test_quote_multiple_symbols(client):
 
 async def test_snapshot_field(client):
     mock_snapshots = [
-        {"symbol": "AAPL", "close": 185.5, "change_pct": 0.65, "currency": "USD", "values": {"rsi": 62.3}},
+        SymbolIndicatorSnapshot(**{"symbol": "AAPL", "close": 185.5, "change_pct": 0.65, "currency": "USD", "values": {"rsi": 62.3}}),
     ]
     with patch("app.services.data_service.compute_batch_indicator_snapshots", new_callable=AsyncMock, return_value=mock_snapshots):
         resp = await client.get("/api/data?symbols=AAPL&fields=snapshot")
@@ -155,8 +157,8 @@ async def test_indicators_tracked_asset(client, db):
 
 async def test_default_fields(client):
     """Omitting fields parameter returns quote + snapshot."""
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50}]
-    mock_snapshots = [{"symbol": "AAPL", "close": 185.5, "values": {"rsi": 55.0}}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50})]
+    mock_snapshots = [SymbolIndicatorSnapshot(**{"symbol": "AAPL", "close": 185.5, "values": {"rsi": 55.0}})]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with (
@@ -178,8 +180,8 @@ async def test_default_fields(client):
 
 async def test_all_fields(client, db):
     await seed_asset_with_prices(db, symbol="TEST")
-    mock_quotes = [{"symbol": "TEST", "price": 150.0}]
-    mock_snapshots = [{"symbol": "TEST", "close": 150.0, "values": {"rsi": 55.0}}]
+    mock_quotes = [Quote(**{"symbol": "TEST", "price": 150.0})]
+    mock_snapshots = [SymbolIndicatorSnapshot(**{"symbol": "TEST", "close": 150.0, "values": {"rsi": 55.0}})]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with (
@@ -202,7 +204,7 @@ async def test_all_fields(client, db):
 
 
 async def test_symbols_uppercase_normalization(client):
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50})]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with patch("app.services.data_service.get_price_provider", return_value=mock_prov):
@@ -233,8 +235,8 @@ async def test_mixed_tracked_untracked(client, db):
     """Request with both tracked and untracked symbols returns data for both."""
     await seed_asset_with_prices(db, symbol="TRACKED")
     mock_quotes = [
-        {"symbol": "TRACKED", "price": 150.0},
-        {"symbol": "UNTRACKED", "price": 200.0},
+        Quote(**{"symbol": "TRACKED", "price": 150.0}),
+        Quote(**{"symbol": "UNTRACKED", "price": 200.0}),
     ]
     mock_df = make_yahoo_df()
     mock_prov = MagicMock()
@@ -261,7 +263,7 @@ async def test_mixed_tracked_untracked(client, db):
 
 async def test_response_only_requested_fields(client):
     """Response should only contain the fields that were requested."""
-    mock_quotes = [{"symbol": "AAPL", "price": 185.50}]
+    mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50})]
     mock_prov = MagicMock()
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with patch("app.services.data_service.get_price_provider", return_value=mock_prov):

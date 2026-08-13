@@ -2,7 +2,7 @@ import { memo } from "react"
 import { Link } from "react-router-dom"
 import type { Quote } from "@/lib/api"
 import type { Asset, IntradayPoint, IndicatorSummary } from "@/lib/types"
-import { useIntraday, useQuoteStatus } from "@/lib/quote-stream"
+import { useIntraday, useIntradaySubscription, useQuoteStatus } from "@/lib/quote-stream"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
 import { formatPrice, formatCompactNumber, changeColor } from "@/lib/format"
@@ -20,6 +20,9 @@ interface LiveDayViewProps {
 }
 
 export function LiveDayView({ assets, quotes, indicators }: LiveDayViewProps) {
+  // This view is the reason the group's bars are on the wire at all — nothing
+  // else in the app draws more than one symbol's worth.
+  useIntradaySubscription(assets.map((a) => a.symbol))
   const intraday = useIntraday()
 
   return (

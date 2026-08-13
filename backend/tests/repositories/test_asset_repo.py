@@ -84,17 +84,17 @@ async def test_list_in_any_group_symbols(db):
     assert "MSFT" not in symbols
 
 
-async def test_list_in_group_id_symbol_pairs(db):
+async def test_list_in_group_refs(db):
     aapl = await _create_asset(db, "AAPL")
     await _create_asset(db, "MSFT")
     await _add_to_default_group(db, aapl)
 
     default_group = await GroupRepository(db).get_default()
     repo = AssetRepository(db)
-    pairs = await repo.list_in_group_id_symbol_pairs(default_group.id)
-    symbols = [s for _, s in pairs]
-    assert "AAPL" in symbols
-    assert "MSFT" not in symbols
+    refs = await repo.list_in_group_refs(default_group.id)
+    assert "AAPL" in refs
+    assert "MSFT" not in refs
+    assert refs[0].id == aapl.id
 
 
 async def test_list_all_includes_ungrouped(db):

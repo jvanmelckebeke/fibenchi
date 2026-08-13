@@ -2,7 +2,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.asset import AssetAttachments, AssetCreate, AssetResponse, AssetUpdate
+from app.schemas.asset import (
+    AssetAttachments,
+    AssetCreate,
+    AssetDetectionReset,
+    AssetResponse,
+    AssetUpdate,
+)
 from app.services import asset_service
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -33,9 +39,13 @@ async def create_asset(data: AssetCreate, db: AsyncSession = Depends(get_db)):
 
 @router.patch("/{asset_id}", response_model=AssetResponse, summary="Update asset metadata")
 async def update_asset(asset_id: int, data: AssetUpdate, db: AsyncSession = Depends(get_db)):
-    """Patch an asset's metadata (name, type, currency). Useful for reclassifying
-    a ticker (e.g. stock → index) or fixing an incorrect auto-detected currency.
-    Fields omitted from the request body are left untouched.
+    """Patch an asset's metadata (name, type, currency, unit_kind). Useful for
+    reclassifying a ticker (e.g. stock → index), fixing an auto-detected
+    currency, or saying how the price number reads. Fields omitted from the
+    request body are left untouched.
+
+    Any field supplied is recorded as *your* choice, so Fibenchi stops
+    suggesting alternatives for it — see ``suggested`` on the response.
     """
     return await asset_service.update_asset(
         db,
@@ -43,7 +53,24 @@ async def update_asset(asset_id: int, data: AssetUpdate, db: AsyncSession = Depe
         name=data.name,
         asset_type=data.type,
         currency=data.currency,
+        unit_kind=data.unit_kind,
     )
+
+
+@router.post(
+    "/{asset_id}/reset-detection",
+    response_model=AssetResponse,
+    summary="Hand classification fields back to auto-detection",
+)
+async def reset_detection(asset_id: int, data: AssetDetectionReset, db: AsyncSession = Depends(get_db)):
+    """Adopt Fibenchi's read for the named fields and clear their user flag, so
+    they track future improvements again.
+
+    The inverse of a PATCH: editing says "I've decided", this says "you decide".
+    ``currency`` is never reset — the shape's currency is a venue-suffix fallback,
+    weaker than Yahoo's, and inert once the unit says the number isn't money.
+    """
+    return await asset_service.reset_asset_detection(db, asset_id, set(data.fields))
 
 
 @router.get(

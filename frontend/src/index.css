@@ -153,3 +153,37 @@
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
+/* --- Homepage dense board ------------------------------------------------ */
+
+/* No-reading tiles: dark fill + 135° hatch, deliberately outside the value
+   ramp — a broken σ must never render as the calm neutral midpoint. */
+.board-tile-unread {
+  color: oklch(0.62 0.01 280);
+  background-color: oklch(0.23 0.008 280);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    oklch(0.32 0.01 280 / 55%) 5px 6px
+  );
+}
+
+/* Slight shadow keeps the stroke-only phase icons legible on any tile hue. */
+.phase-icon {
+  filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 0.7));
+}
+
+/* One shared pulse behind every open-market sun (phase-locked to the wall
+   clock via a negative animation-delay) — synchronized reads as one system
+   being alive, independently-timed pulses read as twinkling noise. */
+@keyframes board-ping {
+  0%       { transform: scale(1);   opacity: 0.35; }
+  60%, 100% { transform: scale(2.4); opacity: 0; }
+}
+.board-ping {
+  animation: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .board-ping {
+    animation: board-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+}

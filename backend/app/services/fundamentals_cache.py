@@ -9,6 +9,7 @@ merged from cache when available.
 import asyncio
 import logging
 
+from app.schemas.price import IndicatorSnapshotBase, SymbolIndicatorSnapshot
 from app.services.yahoo import yahoo_client
 from app.utils import TTLCache
 
@@ -89,14 +90,14 @@ def _schedule_background_fetch(symbols: list[str]) -> None:
 
 def merge_fundamentals_from_cache(
     symbols: list[str],
-    target: dict[str, dict],
-    values_key: str = "values",
+    target: dict[str, IndicatorSnapshotBase],
 ) -> None:
-    """Merge cached fundamentals into target dict, scheduling background fetch for misses.
+    """Merge cached fundamentals into snapshots, scheduling background fetch for misses.
 
     For each symbol in target, if fundamentals are cached, merge them into
-    target[symbol][values_key].  Symbols without cache entries trigger a
-    background fetch so they'll be available on the next request.
+    ``target[symbol].values`` (in-place — the snapshots may already sit in
+    the indicator cache). Symbols without cache entries trigger a background
+    fetch so they'll be available on the next request.
     """
     cached = get_cached_fundamentals(symbols)
     uncached = []
@@ -105,7 +106,7 @@ def merge_fundamentals_from_cache(
         upper = sym.upper()
         fund = cached.get(upper)
         if fund and sym in target:
-            target[sym].setdefault(values_key, {}).update(fund)
+            target[sym].values.update(fund)
         elif upper not in cached:
             uncached.append(upper)
 
@@ -126,22 +127,20 @@ def merge_fundamentals_into_rows(symbol: str, rows: list) -> None:
         _schedule_background_fetch([upper])
 
 
-def merge_fundamentals_into_batch(results: list[dict]) -> None:
-    """Merge cached fundamentals into batch indicator snapshots.
+def merge_fundamentals_into_batch(results: list[SymbolIndicatorSnapshot]) -> None:
+    """Merge cached fundamentals into batch indicator snapshots (in place).
 
-    Each entry in results has a 'symbol' key. Schedules background fetch
-    for any symbols not in cache.
+    Schedules a background fetch for any symbols not in cache.
     """
-    symbols = [e["symbol"] for e in results if "symbol" in e]
-    cached = get_cached_fundamentals(symbols)
+    cached = get_cached_fundamentals([e.symbol for e in results])
     uncached = []
 
     for entry in results:
-        sym = entry.get("symbol", "").upper()
+        sym = entry.symbol.upper()
         fund = cached.get(sym)
         if fund:
-            entry.setdefault("values", {}).update(fund)
-        elif sym and sym not in cached:
+            entry.values.update(fund)
+        elif sym not in cached:
             uncached.append(sym)
 
     if uncached:

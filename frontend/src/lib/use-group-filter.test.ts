@@ -15,7 +15,7 @@ const indicators = (
   vnr: number,
   vnr_sigma: number,
 ): Record<string, IndicatorSummary> => ({
-  "001440.KS": { close, change_pct: null, values: { vnr, vnr_sigma } },
+  "001440.KS": { close, change_pct: null, bars: null, values: { vnr, vnr_sigma } },
 })
 
 describe("getSortValue — σ-Move (vnr)", () => {

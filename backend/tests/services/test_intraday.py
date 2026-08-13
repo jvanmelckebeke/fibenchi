@@ -1,18 +1,19 @@
 """Tests for intraday price fetching and session classification."""
 
-from datetime import datetime, time
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
 
+from app.domain import AssetRef
 from app.services.intraday import (
-    _EXCHANGE_HOURS,
     _classify_session,
     fetch_and_store_intraday,
 )
 from app.services.yahoo import yahoo_client
+from app.services.yahoo._intraday import ProviderIntradayBar
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
@@ -24,98 +25,71 @@ CPH = ZoneInfo("Europe/Copenhagen")
 
 
 class TestClassifySession:
-    """Session classification logic for pre/regular/post."""
+    """Session classification: venue schedule first, wall-clock fallback."""
 
     async def test_us_premarket(self):
         ts = datetime(2026, 2, 25, 7, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "pre"
+        assert _classify_session(ts, AssetRef("AAPL")) == "pre"
 
     async def test_us_regular(self):
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "regular"
+        assert _classify_session(ts, AssetRef("AAPL")) == "regular"
 
     async def test_us_regular_at_open(self):
         ts = datetime(2026, 2, 25, 9, 30, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "regular"
+        assert _classify_session(ts, AssetRef("AAPL")) == "regular"
 
     async def test_us_post_at_close(self):
         ts = datetime(2026, 2, 25, 16, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "post"
+        assert _classify_session(ts, AssetRef("AAPL")) == "post"
 
     async def test_us_postmarket(self):
         ts = datetime(2026, 2, 25, 18, 0, tzinfo=ET)
-        assert _classify_session(ts, "America/New_York") == "post"
+        assert _classify_session(ts, AssetRef("AAPL")) == "post"
+
+    async def test_us_half_day_post_after_early_close(self):
+        """Day after Thanksgiving 2023: 13:00 ET close. 14:00 ET is post —
+        the old wall-clock table filed it as regular."""
+        ts = datetime(2023, 11, 24, 14, 0, tzinfo=ET)
+        assert _classify_session(ts, AssetRef("AAPL")) == "post"
 
     async def test_copenhagen_regular(self):
-        """NKT.CO: 10:00 CET is regular Copenhagen hours (9:00-17:00)."""
+        """NKT.CO: 10:00 CET is inside XCSE regular hours."""
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
-        assert _classify_session(ts, "Europe/Copenhagen") == "regular"
+        assert _classify_session(ts, AssetRef("NKT.CO")) == "regular"
 
-    async def test_copenhagen_pre(self):
-        """NKT.CO: 8:30 CET is before Copenhagen open (9:00)."""
+    async def test_copenhagen_morning_auction_files_as_pre(self):
+        """XCSE has no extended hours; an 8:30 bar is a closed-phase print
+        filed to the nearer boundary — the upcoming open."""
         ts = datetime(2026, 2, 25, 8, 30, tzinfo=CPH)
-        assert _classify_session(ts, "Europe/Copenhagen") == "pre"
+        assert _classify_session(ts, AssetRef("NKT.CO")) == "pre"
 
-    async def test_copenhagen_post(self):
-        ts = datetime(2026, 2, 25, 17, 0, tzinfo=CPH)
-        assert _classify_session(ts, "Europe/Copenhagen") == "post"
+    async def test_copenhagen_evening_files_as_post(self):
+        ts = datetime(2026, 2, 25, 17, 30, tzinfo=CPH)
+        assert _classify_session(ts, AssetRef("NKT.CO")) == "post"
 
-    async def test_copenhagen_fallback_to_et_misclassifies(self):
-        """Without timezone info, 10:00 CET falls back to ET (4:00 AM) → 'pre'.
-
-        This documents the bug that the tz_name extraction fixes.
-        """
+    async def test_unknown_venue_uses_tz_fallback(self):
+        """No venue but a bar timezone: generic local hours beat assuming ET."""
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
-        assert _classify_session(ts, None) == "pre"  # wrong! should be regular
+        assert _classify_session(ts, AssetRef("FOO.XX"), "Europe/Copenhagen") == "regular"
 
-    async def test_unknown_timezone_falls_back_to_et(self):
+    async def test_unknown_venue_and_tz_falls_back_to_et(self):
+        """Nothing to go on: 10:00 CET reads as 4:00 ET → 'pre'. Documents the
+        residual fallback limitation for fully unresolvable symbols."""
+        ts = datetime(2026, 2, 25, 10, 0, tzinfo=CPH)
+        assert _classify_session(ts, AssetRef("FOO.XX"), None) == "pre"
+
+    async def test_unknown_venue_bad_tz_string_falls_back_to_et(self):
         ts = datetime(2026, 2, 25, 10, 0, tzinfo=ET)
-        assert _classify_session(ts, "Unknown/Timezone") == "regular"
+        assert _classify_session(ts, AssetRef("FOO.XX"), "Unknown/Timezone") == "regular"
 
     async def test_london_regular(self):
         ts = datetime(2026, 2, 25, 12, 0, tzinfo=ZoneInfo("Europe/London"))
-        assert _classify_session(ts, "Europe/London") == "regular"
+        assert _classify_session(ts, AssetRef("HSBA.L")) == "regular"
 
-    async def test_london_pre(self):
+    async def test_london_before_open_files_as_pre(self):
         ts = datetime(2026, 2, 25, 7, 30, tzinfo=ZoneInfo("Europe/London"))
-        assert _classify_session(ts, "Europe/London") == "pre"
-
-
-# ---------- _EXCHANGE_HOURS completeness ----------
-
-
-class TestExchangeHours:
-    """Verify key exchanges are present in the lookup."""
-
-    @pytest.mark.parametrize("tz", [
-        "Europe/Copenhagen",
-        "Europe/Oslo",
-        "Europe/Brussels",
-        "Europe/Dublin",
-        "Europe/Lisbon",
-        "Europe/Warsaw",
-        "Europe/Athens",
-        "Europe/Istanbul",
-    ])
-    async def test_newly_added_timezones_present(self, tz):
-        assert tz in _EXCHANGE_HOURS
-
-    @pytest.mark.parametrize("tz", [
-        "America/New_York",
-        "Europe/London",
-        "Europe/Berlin",
-        "Europe/Stockholm",
-        "Asia/Tokyo",
-        "Australia/Sydney",
-    ])
-    async def test_core_timezones_present(self, tz):
-        assert tz in _EXCHANGE_HOURS
-
-    async def test_hours_are_time_tuples(self):
-        for tz, (open_t, close_t) in _EXCHANGE_HOURS.items():
-            assert isinstance(open_t, time), f"{tz} open is not a time"
-            assert isinstance(close_t, time), f"{tz} close is not a time"
-            assert open_t < close_t, f"{tz} open >= close"
+        assert _classify_session(ts, AssetRef("HSBA.L")) == "pre"
 
 
 # ---------- YahooClient.intraday ----------
@@ -166,7 +140,7 @@ class TestClientIntraday:
 
         assert "NKT.CO" in result
         # Each bar carries tz_name so the caller can classify sessions later.
-        tz_names = {bar["tz_name"] for bar in result["NKT.CO"]}
+        tz_names = {bar.tz_name for bar in result["NKT.CO"]}
         assert all(tz and "Copenhagen" in tz for tz in tz_names)
 
     async def test_calls_get_data_with_include_prepost(self):
@@ -189,6 +163,29 @@ class TestClientIntraday:
     async def test_empty_symbols_returns_empty(self):
         assert await yahoo_client.intraday([]) == {}
 
+    async def test_omitted_symbol_is_padded_not_keyerror(self):
+        """#593: a symbol absent from Yahoo's chart response is padded with an
+        empty payload before frame-building, so one omission can't abort the
+        whole batch (staging 2026-08-05: KeyError '2914.T' killed a full
+        82-symbol intraday sync)."""
+        ts_list = [datetime(2026, 2, 25, 15, 0, tzinfo=timezone.utc)]
+        hist = _make_hist_df("AAPL", ts_list, [100.0])
+
+        mock_ticker = MagicMock()
+        mock_ticker.price = {"AAPL": {"currency": "USD",
+                                      "exchangeTimezoneName": "America/New_York"}}
+        # Raw chart response contains AAPL but omits 2914.T entirely.
+        mock_ticker._get_data.return_value = {"AAPL": {"timestamp": [1]}}
+        mock_ticker._historical_data_to_dataframe.return_value = hist
+
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            result = await yahoo_client.intraday(["AAPL", "2914.T"])
+
+        assert "AAPL" in result
+        assert "2914.T" not in result
+        padded = mock_ticker._historical_data_to_dataframe.call_args[0][0]
+        assert padded["2914.T"] == {}
+
     async def test_applies_currency_divisor(self):
         """Subunit currencies (e.g. GBp) should divide prices."""
         ts_list = [datetime(2026, 2, 25, 10, 0, tzinfo=ZoneInfo("Europe/London"))]
@@ -208,7 +205,7 @@ class TestClientIntraday:
             with patch("app.services.yahoo._intraday.resolve_currency", return_value=("GBP", 100)):
                 result = await yahoo_client.intraday(["VOD.L"])
 
-        assert result["VOD.L"][0]["price"] == 85.0
+        assert result["VOD.L"][0].price == 85.0
 
     async def test_filters_synthetic_non_minute_boundary_bars(self):
         """Yahoo echo bars at non-minute-boundary timestamps are dropped."""
@@ -234,7 +231,7 @@ class TestClientIntraday:
 
         assert "P911.DE" in result
         assert len(result["P911.DE"]) == 2  # synthetic bar dropped
-        prices = [bar["price"] for bar in result["P911.DE"]]
+        prices = [bar.price for bar in result["P911.DE"]]
         assert prices == [41.0, 42.0]
 
     async def test_skips_symbol_on_key_error(self):
@@ -265,14 +262,14 @@ class TestFetchAndStoreIntraday:
     async def test_deletes_stale_bars_before_upsert(self):
         """Bars older than the oldest fresh bar should be deleted."""
         fresh_bars = [
-            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "tz_name": "America/New_York"},
-            {"timestamp": datetime(2026, 2, 25, 10, 0, tzinfo=ET), "price": 31.0, "volume": 200, "tz_name": "America/New_York"},
+            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 9, 0, tzinfo=ET), price=30.0, volume=100, tz_name="America/New_York"),
+            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 10, 0, tzinfo=ET), price=31.0, volume=200, tz_name="America/New_York"),
         ]
 
         mock_db = AsyncMock()
 
         with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}):
-            count = await fetch_and_store_intraday(mock_db, ["KTOS"], {"KTOS": 1})
+            count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == 2
 
@@ -288,19 +285,19 @@ class TestFetchAndStoreIntraday:
         mock_db = AsyncMock()
 
         with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={}):
-            count = await fetch_and_store_intraday(mock_db, ["KTOS"], {"KTOS": 1})
+            count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == 0
         mock_db.execute.assert_not_called()
 
-    async def test_skips_unknown_symbols(self):
-        """Bars for symbols not in asset_map are skipped."""
+    async def test_skips_refs_without_stored_id(self):
+        """Bars for refs not bound to a stored asset row are skipped."""
         fresh_bars = [
-            {"timestamp": datetime(2026, 2, 25, 9, 0, tzinfo=ET), "price": 30.0, "volume": 100, "tz_name": "America/New_York"},
+            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 9, 0, tzinfo=ET), price=30.0, volume=100, tz_name="America/New_York"),
         ]
         mock_db = AsyncMock()
 
         with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"UNKNOWN": fresh_bars}):
-            count = await fetch_and_store_intraday(mock_db, ["UNKNOWN"], {"KTOS": 1})
+            count = await fetch_and_store_intraday(mock_db, [AssetRef("UNKNOWN")])
 
         assert count == 0

@@ -45,6 +45,15 @@ export function useUpdateAsset() {
   )
 }
 
+/** Hand an asset's classification fields back to auto-detection. Invalidates
+ * the same keys as an edit — it is an edit, just in the other direction. */
+export function useResetAssetDetection() {
+  return useInvalidatingMutation(
+    ({ id, fields }: { id: number; fields?: string[] }) => api.assets.resetDetection(id, fields),
+    [keys.assets, keys.groups],
+  )
+}
+
 // Search
 export function useLocalSearch(query: string) {
   return useQuery<SymbolSearchResult[]>({

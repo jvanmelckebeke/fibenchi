@@ -1,4 +1,4 @@
-import type { AssetType } from "@/lib/types"
+import type { AssetType, UnitKind } from "@/lib/types"
 
 /**
  * Pick a legible foreground (near-black or white) for content sitting on a solid
@@ -29,16 +29,28 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   CHF: "CHF\u00a0",
 }
 
-const YIELD_INDICES = new Set(["^TYX", "^TNX", "^FVX", "^IRX"])
-
+/**
+ * What an asset needs to format its own price. `unit_kind` is the answer to
+ * "how does this number read" and is the only thing consulted — `type` and
+ * `symbol` are kept for callers and for the pre-unit_kind fallback below.
+ *
+ * This replaced a hardcoded four-ticker YIELD_INDICES set: percent-ness is a
+ * property of the asset now, set by the backend and overridable by the user,
+ * rather than a list in the frontend nothing outside it could reach.
+ */
 export interface AssetFormatHints {
   type: AssetType
   symbol: string
   currency: string
+  // snake_case to match the API shape, so a whole `Asset` is a valid hint.
+  unit_kind?: UnitKind
 }
 
-function isYieldIndex(symbol: string): boolean {
-  return YIELD_INDICES.has(symbol.toUpperCase())
+/** Assets fetched through endpoints that predate `unit_kind` don't carry one.
+ * Falling back on `type` keeps them formatting as they always did rather than
+ * printing a currency symbol on an index. */
+function unitOf(asset: AssetFormatHints): UnitKind {
+  return asset.unit_kind ?? (asset.type === "index" ? "points" : "currency")
 }
 
 const ZERO_DECIMAL_CURRENCIES = new Set(["KRW", "JPY", "IDR", "HUF", "VND", "CLP", "TWD"])
@@ -66,13 +78,14 @@ export function formatAssetPrice(
   decimals?: number,
   groupDigits = false,
 ): string {
-  if (asset.type !== "index") return formatPrice(value, asset.currency, decimals, groupDigits)
+  const unit = unitOf(asset)
+  if (unit === "currency") return formatPrice(value, asset.currency, decimals, groupDigits)
   const d = decimals ?? 2
   const fixed = value.toFixed(d)
   const [int, frac] = fixed.split(".")
   const grouped = groupDigits ? int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : int
   const body = frac !== undefined ? `${grouped}.${frac}` : grouped
-  return isYieldIndex(asset.symbol) ? `${body}%` : body
+  return unit === "percent" ? `${body}%` : body
 }
 
 /** Significant figures kept by the compact abbreviation. Tuning knob, not a user setting. */
@@ -120,7 +133,7 @@ export function formatCompactPrice(value: number, currency: string): string {
 }
 
 export function formatAssetCompactPrice(value: number, asset: AssetFormatHints): string {
-  if (asset.type !== "index") return formatCompactPrice(value, asset.currency)
+  if (unitOf(asset) === "currency") return formatCompactPrice(value, asset.currency)
   return formatAssetPrice(value, asset, 2)
 }
 

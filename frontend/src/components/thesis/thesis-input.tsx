@@ -29,20 +29,10 @@ export function ThesisInput({ assetId }: { assetId: number }) {
           addToThesis.mutate({ thesisId: t.id, assetId })
           setSearch("")
         }}
-        renderCreate={(s, close) => (
-          <div className="border-t p-1">
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent text-muted-foreground"
-              onClick={() => {
-                close()
-                setDialogOpen(true)
-              }}
-            >
-              + New thesis &ldquo;{s}&rdquo;&hellip;
-            </button>
-          </div>
-        )}
+        create={{
+          label: (s) => <>+ New thesis &ldquo;{s}&rdquo;&hellip;</>,
+          onCreate: () => setDialogOpen(true),
+        }}
       />
       <NewThesisDialog
         open={dialogOpen}

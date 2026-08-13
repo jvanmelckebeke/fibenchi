@@ -1,4 +1,7 @@
 import type {
+  DataHealth,
+  OrphanAsset,
+  Stats,
   Annotation,
   AnnotationCreate,
   Asset,
@@ -7,6 +10,7 @@ import type {
   AssetDetail,
   AssetUpdate,
   AssetPerformance,
+  CalendarPhase,
   ConstituentIndicator,
   EarningsInfo,
   EtfHoldings,
@@ -78,6 +82,13 @@ export const api = {
     list: () => request<Asset[]>("/assets"),
     create: (data: AssetCreate) =>
       request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
+    /** Hand classification fields back to auto-detection: adopt Fibenchi's
+     * read and clear the user flag, so they track improvements again. */
+    resetDetection: (id: number, fields?: string[]) =>
+      request<Asset>(`/assets/${id}/reset-detection`, {
+        method: "POST",
+        body: JSON.stringify(fields ? { fields } : {}),
+      }),
     update: (id: number, data: AssetUpdate) =>
       request<Asset>(`/assets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     attachments: (symbol: string) =>
@@ -152,6 +163,21 @@ export const api = {
       for (const s of symbols) params.append("symbols", s)
       return request<Record<string, IndicatorSummary>>(`/indicators?${params.toString()}`)
     },
+  },
+  sparklines: {
+    /** Batch close-price series for arbitrary tracked symbols, keyed by symbol.
+     * The roster-shaped sibling of `groups.sparklines` — one request for a set
+     * that spans groups, and no duplicate series for shared memberships. */
+    batch: (symbols: string[], period?: string) => {
+      const params = new URLSearchParams()
+      for (const s of symbols) params.append("symbols", s)
+      if (period) params.append("period", period)
+      return request<Record<string, SparklinePoint[]>>(`/sparklines?${params.toString()}`)
+    },
+  },
+  market: {
+    /** Scheduled phase + next bell per in-use venue calendar (with its symbols). */
+    phases: () => request<Record<string, CalendarPhase>>(`/market/phases`),
   },
   note: {
     get: (symbol: string) => request<Note>(`/assets/${symbol}/note`),
@@ -231,5 +257,12 @@ export const api = {
       delete: (id: number, annotationId: number) =>
         request<void>(`/pseudo-etfs/${id}/annotations/${annotationId}`, { method: "DELETE" }),
     },
+  },
+  system: {
+    dataHealth: () => request<DataHealth>("/system/data-health"),
+    stats: () => request<Stats>("/system/stats"),
+    orphans: () => request<OrphanAsset[]>("/system/orphans"),
+    deleteOrphan: (assetId: number) =>
+      request<void>(`/system/orphans/${assetId}`, { method: "DELETE" }),
   },
 }

@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
+from app.schemas.quote import Quote
 from app.services.yahoo.currency import resolve_currency
 
 logger = logging.getLogger(__name__)
@@ -125,8 +126,8 @@ def normalize_date_index(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def parse_quote_row(sym: str, info: dict) -> dict:
-    """Build one quote dict from Yahoo's per-symbol price-info dict."""
+def parse_quote_row(sym: str, info: dict) -> Quote:
+    """Build one :class:`Quote` from Yahoo's per-symbol price-info dict."""
     currency, divisor = resolve_currency(info, sym)
 
     price = sanitize_float(info.get("regularMarketPrice"))
@@ -136,28 +137,29 @@ def parse_quote_row(sym: str, info: dict) -> dict:
     volume = info.get("regularMarketVolume")
     avg_volume = info.get("averageDailyVolume10Day")
 
-    return {
-        "symbol": sym,
-        "price": round(float(price) / divisor, 4) if price is not None else None,
-        "previous_close": round(float(prev_close) / divisor, 4) if prev_close is not None else None,
-        "change": round(float(change) / divisor, 4) if change is not None else None,
+    return Quote(
+        symbol=sym,
+        price=round(float(price) / divisor, 4) if price is not None else None,
+        previous_close=round(float(prev_close) / divisor, 4) if prev_close is not None else None,
+        change=round(float(change) / divisor, 4) if change is not None else None,
         # ``ticker.quotes`` (/v7/finance/quote) returns this already in
         # percent units (10.53 = 10.53%), unlike ``ticker.price`` which
         # returned a decimal (0.1053). No ×100 needed.
-        "change_percent": round(float(change_pct), 2) if change_pct is not None else None,
-        "volume": int(volume) if volume is not None else None,
-        "avg_volume": int(avg_volume) if avg_volume is not None else None,
-        "currency": currency,
-        "market_state": info.get("marketState"),
+        change_percent=round(float(change_pct), 2) if change_pct is not None else None,
+        volume=int(volume) if volume is not None else None,
+        avg_volume=int(avg_volume) if avg_volume is not None else None,
+        currency=currency,
+        market_state=info.get("marketState"),
         # Exchange-local session date (ISO str, best-effort). Internal reconciliation
-        # aid for price-sync; QuoteResponse ignores it, the SSE forwards it harmlessly.
-        "session_date": _quote_session_date(info),
-    }
+        # aid for price-sync; QuoteResponse drops it at the REST boundary, the SSE
+        # forwards it harmlessly.
+        session_date=_quote_session_date(info),
+    )
 
 
-def parse_quotes(symbols: list[str], price_data: dict) -> list[dict]:
+def parse_quotes(symbols: list[str], price_data: dict) -> list[Quote]:
     """Build the full quote list, logging unusual values."""
-    results: list[dict] = []
+    results: list[Quote] = []
     null_symbols: list[str] = []
     nan_fields: list[str] = []
 
@@ -165,7 +167,7 @@ def parse_quotes(symbols: list[str], price_data: dict) -> list[dict]:
         info = price_data.get(sym, {})
         if not isinstance(info, dict):
             logger.warning("Yahoo returned non-dict for %s: %s", sym, repr(info)[:200])
-            results.append({"symbol": sym})
+            results.append(Quote.placeholder(sym))
             continue
 
         if info.get("regularMarketPrice") is not None and sanitize_float(info["regularMarketPrice"]) is None:

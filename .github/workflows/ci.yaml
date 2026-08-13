@@ -34,6 +34,26 @@ jobs:
 
       - run: uv pip install --system -r requirements-dev.txt
       - run: ruff check .
+
+      # The cross-language contract artifacts are generated from Python sources
+      # (schemas/companion.py, compute/indicators.py) and consumed by the
+      # separate companion app. Regenerate them here and fail if anything moves:
+      # a dirty tree means someone edited a source without re-exporting, so the
+      # artifact the app reads no longer describes this backend.
+      - name: Contract artifacts are in sync with their sources
+        run: |
+          python -m scripts.export_companion_schema
+          python -m scripts.export_indicator_contract
+          # `:/` anchors the pathspec to the repo root. The exporters write to a
+          # __file__-relative path, so the artifacts always land in backend/ —
+          # but a plain cwd-relative spec silently matches nothing (and so
+          # passes) from any cwd but backend/. This survives the step moving to
+          # a job without the working-directory default above.
+          if ! git diff --exit-code -- :/backend/companion.schema.json :/backend/indicator.contract.json :/backend/indicator.fixtures.json; then
+            echo "::error::Contract artifacts are stale. Run both export scripts in backend/ and commit the result (then copy into fibenchi-app/)."
+            exit 1
+          fi
+
       - run: pytest
       - run: uv pip install --system pip-audit
       - run: pip-audit -r requirements.txt

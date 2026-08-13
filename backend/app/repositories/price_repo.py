@@ -1,10 +1,14 @@
+import logging
 from datetime import date
 
 import pandas as pd
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain import AssetRef
 from app.models import PriceHistory
+
+logger = logging.getLogger(__name__)
 
 
 class PriceRepository:
@@ -139,7 +143,47 @@ class PriceRepository:
         await self.db.commit()
         return result.rowcount or 0
 
-    async def upsert_prices(self, asset_id: int, df: pd.DataFrame) -> int:
+    @staticmethod
+    def build_price_rows(ref: AssetRef, df: pd.DataFrame) -> list[dict]:
+        """Convert a price DataFrame to insertable row dicts.
+
+        Rows with a NaN in any OHLC column are skipped — but never silently:
+        a skipped bar leaves a hole in price_history that is indistinguishable
+        from a market holiday downstream (it inflates σ-Move, issue #559), so
+        every skip is logged with its dates.
+        """
+        ohlc_cols = ["open", "high", "low", "close"]
+        rows = []
+        skipped: list[date] = []
+        for idx, row in df.iterrows():
+            dt = idx.date() if hasattr(idx, "date") else idx
+            if not isinstance(dt, date):
+                dt = pd.Timestamp(dt).date()
+
+            if row[ohlc_cols].isna().any():
+                skipped.append(dt)
+                continue
+
+            rows.append({
+                "asset_id": ref.id,
+                "date": dt,
+                "open": round(float(row["open"]), 4),
+                "high": round(float(row["high"]), 4),
+                "low": round(float(row["low"]), 4),
+                "close": round(float(row["close"]), 4),
+                "volume": int(row["volume"]) if pd.notna(row["volume"]) else 0,
+            })
+
+        if skipped:
+            logger.warning(
+                "Skipped %d price bar(s) with NaN OHLC for %s (asset_id=%d) "
+                "(dates: %s) — this leaves a gap in price_history",
+                len(skipped), ref, ref.id,
+                ", ".join(d.isoformat() for d in skipped),
+            )
+        return rows
+
+    async def upsert_prices(self, ref: AssetRef, df: pd.DataFrame) -> int:
         """Upsert price rows from a DataFrame. Returns row count.
 
         Uses PostgreSQL ON CONFLICT DO UPDATE. For SQLite (tests), this
@@ -150,25 +194,9 @@ class PriceRepository:
 
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-        ohlc_cols = ["open", "high", "low", "close"]
-        rows = []
-        for idx, row in df.iterrows():
-            if row[ohlc_cols].isna().any():
-                continue
-
-            dt = idx.date() if hasattr(idx, "date") else idx
-            if not isinstance(dt, date):
-                dt = pd.Timestamp(dt).date()
-
-            rows.append({
-                "asset_id": asset_id,
-                "date": dt,
-                "open": round(float(row["open"]), 4),
-                "high": round(float(row["high"]), 4),
-                "low": round(float(row["low"]), 4),
-                "close": round(float(row["close"]), 4),
-                "volume": int(row["volume"]) if pd.notna(row["volume"]) else 0,
-            })
+        rows = self.build_price_rows(ref, df)
+        if not rows:
+            return 0
 
         stmt = pg_insert(PriceHistory).values(rows)
         stmt = stmt.on_conflict_do_update(

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { LayoutDashboard, Briefcase, LineChart, Settings } from "lucide-react"
+import { LayoutDashboard, Briefcase, LineChart, ChartPie, Settings } from "lucide-react"
 import { useQuoteStatus } from "@/lib/quote-stream"
 import { GroupsSection } from "@/components/layout/groups-section"
 import {
@@ -80,6 +80,18 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={location.pathname === "/stats"}
+              tooltip="Stats"
+            >
+              <Link to="/stats">
+                <ChartPie />
+                <span>Stats</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild

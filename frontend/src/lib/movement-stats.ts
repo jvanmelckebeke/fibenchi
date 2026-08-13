@@ -33,8 +33,22 @@ export interface MovementStats {
   upDays: number
   /** Count of days that closed lower than the previous close. */
   downDays: number
-  /** Number of day-over-day transitions considered (prices.length - 1). */
+  /** Number of single-session transitions considered. Excludes bar-to-bar steps
+   * that span a gap in the stored series (missing session or holiday), so it can
+   * be lower than prices.length - 1. */
   tradingDays: number
+}
+
+/** Business days (Mon–Fri) in the half-open range [startIso, endIso). */
+function weekdaysBetween(startIso: string, endIso: string): number {
+  const MS_DAY = 86_400_000
+  const end = Date.parse(endIso)
+  let count = 0
+  for (let t = Date.parse(startIso); t < end; t += MS_DAY) {
+    const dow = new Date(t).getUTCDay()
+    if (dow !== 0 && dow !== 6) count++
+  }
+  return count
 }
 
 /**
@@ -65,11 +79,20 @@ export function computeMovementStats(prices: Price[]): MovementStats | null {
   let peakDate = first.date
   let maxDrawdown: Drawdown | null = null
 
+  let transitions = 0
+
   for (let i = 1; i < prices.length; i++) {
     const prev = prices[i - 1].close
     const { close: cur, date } = prices[i]
 
-    if (prev > 0) {
+    // "Daily" metrics assume adjacent bars are adjacent sessions. When the
+    // previous stored bar is more than one business day back (missing session
+    // or holiday), the step is a multi-session return — excluding it keeps a
+    // composite move from being filed as a single-day extreme (issue #559).
+    const singleSession = weekdaysBetween(prices[i - 1].date, date) <= 1
+
+    if (singleSession && prev > 0) {
+      transitions++
       const dayPct = (cur / prev - 1) * 100
       if (dayPct > 0) upDays++
       else if (dayPct < 0) downDays++
@@ -101,6 +124,6 @@ export function computeMovementStats(prices: Price[]): MovementStats | null {
     maxDrawdown,
     upDays,
     downDays,
-    tradingDays: prices.length - 1,
+    tradingDays: transitions,
   }
 }
