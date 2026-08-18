@@ -1,9 +1,10 @@
 // Assembles everything the dense board renders: the tile roster with per-tile
 // σ/%/phase resolution, the section grouping, and the coverage numbers.
 //
-// σ resolution reuses the group table's exact cascade (computeLiveVnr →
-// stored vnr unless isStoredVnrStale → explain the blank) so the board can
-// never disagree with the table about the same asset.
+// σ resolution calls the shared resolver (lib/sigma) rather than restating the
+// cascade, so the board and the group table cannot disagree about an asset.
+// They used to agree only by luck: each site ordered the same decisions
+// differently, and gap-vs-stale simply rarely co-occurred (#629).
 
 import { useMemo } from "react"
 import { type Asset, type SparklinePoint } from "@/lib/api"
@@ -16,29 +17,23 @@ import {
   useTheses,
 } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
-import {
-  computeLiveVnr,
-  getNumericValue,
-  isStoredVnrStale,
-} from "@/lib/indicator-registry"
+import { resolveSigma, type WithheldReason } from "@/lib/sigma"
 import { marketState } from "@/lib/market-state"
-import { VNR_BASELINE_SESSIONS, type PctWindow, PCT_WINDOWS } from "./color-scale"
+import { type PctWindow, PCT_WINDOWS } from "./color-scale"
 
 export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 
-/** Why a tile has no σ reading.
+/** Why a tile has no σ reading — the shared {@link WithheldReason}, plus the
+ * one field only the board has: when the next hole scan runs.
  *
- * The variants are load-bearing *here* even though the tooltip only prints
- * `warmup`: `feed_behind` vs `gap` is what decides whether σ is withheld at
- * all, and the cascade below reads them to stay honest. Nothing downstream
- * discriminates them anymore — that is deliberate (all three non-warmup states
- * resolve to the same user action), not an oversight to be tidied away.
+ * The variants stay discriminated even though the tooltip only shapes
+ * `warmup`: they decide *whether* σ is withheld at all. Nothing downstream
+ * discriminates the rest — deliberate (they resolve to the same user action),
+ * not an oversight to be tidied away.
  */
 export type NoReadingReason =
-  | { kind: "feed_behind" }
+  | Exclude<WithheldReason, { kind: "gap" }>
   | { kind: "gap"; sessions: number; nextScanSeconds: number | null }
-  | { kind: "warmup"; bars: number; needed: number }
-  | { kind: "unknown" }
 
 export interface Tile {
   /** The tile's identity — also its React key, route param and lookup key. */
@@ -187,29 +182,17 @@ export function useBoardData(groupBy: GroupBy) {
     for (const [symbol, asset] of roster) {
       const quote = quotes[symbol]
       const snap = snapshots?.[symbol]
-      const values = snap?.values
 
-      let sigma = computeLiveVnr(quote, values, snap?.close)
-      let reason: NoReadingReason | null = null
-      if (sigma == null) {
-        const stale = isStoredVnrStale(quote, snap?.close)
-        const stored = getNumericValue(values, "vnr")
-        if (stored != null && !stale) {
-          sigma = stored
-        } else if (stale) {
-          reason = { kind: "feed_behind" }
-        } else {
-          const gap = getNumericValue(values, "vnr_gap_sessions")
-          const bars = snap?.bars ?? null
-          if (gap != null) {
-            reason = { kind: "gap", sessions: gap, nextScanSeconds: health?.next_scan_in_seconds ?? null }
-          } else if (bars != null && bars < VNR_BASELINE_SESSIONS) {
-            reason = { kind: "warmup", bars, needed: VNR_BASELINE_SESSIONS }
-          } else {
-            reason = { kind: "unknown" }
-          }
-        }
-      }
+      const resolved = resolveSigma(quote, snap)
+      const sigma = resolved.status === "ok" ? resolved.sigma : null
+      // The board adds one field the shared resolver has no business knowing:
+      // when the next hole scan runs. Widen the reason here rather than
+      // pushing a board concern into lib/sigma.
+      const reason: NoReadingReason | null = resolved.status === "withheld"
+        ? resolved.reason.kind === "gap"
+          ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
+          : resolved.reason
+        : null
 
       const scheduled = symbolPhase[symbol]
       const liveState = quote?.market_state != null

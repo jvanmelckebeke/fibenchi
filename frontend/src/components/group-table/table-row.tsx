@@ -17,9 +17,8 @@ import {
   formatDeltaAnnotation,
   getDescriptorByField,
   formatIndicatorField,
-  computeLiveVnr,
-  isStoredVnrStale,
 } from "@/lib/indicator-registry"
+import { resolveSigma, sigmaWithheldTitle } from "@/lib/sigma"
 import { marketState as marketStateInfo } from "@/lib/market-state"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -281,34 +280,21 @@ export const TableRow = memo(function TableRow({
                 </td>
               )
             }
-            // σ-Move is a daily-bar indicator; its stored value reflects the last
-            // completed bar (yesterday during market hours), which can contradict
-            // the live change % beside it. Recompute it against the live quote so
-            // it tracks today. Falls back to the DB value once today's bar syncs.
-            const liveVnr = field === "vnr"
-              ? computeLiveVnr(quote, indicator?.values, indicator?.close)
-              : null
-            // When we can't recompute live and fall back to the stored σ-Move,
-            // that stored bar may predate the live quote (price sync behind ≥2
-            // sessions) — showing it would contradict the live change % beside
-            // it. Blank the cell rather than render a wrong-signed number.
-            const vnrStale = field === "vnr" && liveVnr == null
-              && isStoredVnrStale(quote, indicator?.close)
-            // The backend NaN's the stored σ-Move when the bar's return spans a
-            // gap in price_history (venue-calendar-verified where the venue is
-            // known) and reports the gap width instead — explain the blank
-            // rather than leave it mute.
-            const vnrGap = field === "vnr" && liveVnr == null
-              ? getNumericValue(indicator?.values, "vnr_gap_sessions")
-              : null
-            const values = liveVnr != null
-              ? { ...indicator?.values, vnr: liveVnr }
+            // σ-Move needs session identity, not just a number: its stored
+            // value describes a completed daily bar, which during market hours
+            // is *yesterday* and can contradict the live change % beside it.
+            // The shared resolver (lib/sigma) decides — same call the board and
+            // the sort key make, so the three can't disagree (#629).
+            const sigma = field === "vnr" ? resolveSigma(quote, indicator) : null
+            const withheld = sigma?.status === "withheld" ? sigma.reason : null
+            const values = sigma?.status === "ok"
+              ? { ...indicator?.values, vnr: sigma.sigma }
               : indicator?.values
             const val = getNumericValue(values, field)
             const desc = getDescriptorByField(field)
             // Route through the shared registry formatter so the table matches the
             // card/detail rendering (decimals, threshold colours, currency prefix).
-            const formatted = !vnrStale && val != null && desc && values
+            const formatted = !withheld && val != null && desc && values
               ? formatIndicatorField(field, desc, values, asset.currency)
               : null
             return (
@@ -323,13 +309,7 @@ export const TableRow = memo(function TableRow({
                 ) : (
                   <span
                     className="text-muted-foreground"
-                    title={
-                      vnrStale
-                        ? "σ-Move unavailable — price data is behind the live quote. A background job reconciles this automatically (usually within ~10 min)."
-                        : vnrGap != null
-                          ? `σ-Move unavailable — the last return spans ${vnrGap} trading sessions (gap in stored price history). A background job backfills missing sessions automatically; see the Stats page.`
-                          : undefined
-                    }
+                    title={withheld ? sigmaWithheldTitle(withheld) ?? undefined : undefined}
                   >
                     &mdash;
                   </span>
