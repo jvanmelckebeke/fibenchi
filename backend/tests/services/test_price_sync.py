@@ -676,3 +676,96 @@ async def test_upsert_of_nothing_leaves_the_cache_alone(db):
         await _upsert_prices(db, AssetRef.of(asset), pd.DataFrame())
 
     assert _indicator_cache.get_value(key) == {"fresh": True}
+
+
+# --- #635: the session date is direct evidence, so it outranks the heuristic --
+
+async def test_drop_unsettled_uses_session_date_when_predecessor_does_not_match():
+    """The regression: an interior hole right before today leaves the frame's
+    second-to-last bar unmatched with `previous_close`, which used to early-
+    return and persist a still-forming partial as a completed close."""
+    today = date.today()
+    df = _df_ending(today, [90.0, 100.0, 103.0])
+    kept = drop_unsettled_last_bar(
+        df, price=103.0, previous_close=101.0,   # predecessor 100.0 != 101.0
+        market_state="REGULAR", session_date=today,
+    )
+    assert len(kept) == len(df) - 1
+
+
+async def test_drop_unsettled_drops_a_lagging_bar_dated_the_live_session():
+    """Market closed, bar dated today, Yahoo's daily feed still behind the
+    quote — drop it rather than store a value that reconciles with nothing."""
+    today = date.today()
+    df = _df_ending(today, [90.0, 100.0, 103.0])
+    kept = drop_unsettled_last_bar(
+        df, price=108.0, previous_close=101.0,   # 103 hasn't settled to 108
+        market_state="POSTPOST", session_date=today,
+    )
+    assert len(kept) == len(df) - 1
+
+
+async def test_drop_unsettled_keeps_a_settled_bar_dated_the_live_session():
+    today = date.today()
+    df = _df_ending(today, [90.0, 100.0, 103.0])
+    kept = drop_unsettled_last_bar(
+        df, price=103.0, previous_close=101.0,
+        market_state="POSTPOST", session_date=today,
+    )
+    assert len(kept) == len(df)
+
+
+# --- #635: impossible bars are rejected at the write path --------------------
+
+def _bar(o, h, low, c, vol=1000):
+    return {"open": o, "high": h, "low": low, "close": c, "volume": vol}
+
+
+def test_build_price_rows_rejects_self_contradictory_bars():
+    """A wrong value on a date that exists passed every downstream guard: they
+    all reason about dates or about the latest bar, never about values."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame(
+        [
+            _bar(100, 105, 99, 102),      # fine
+            _bar(100, 95, 99, 97),        # high below low
+            _bar(100, 105, -1, 102),      # non-positive
+        ],
+        index=pd.bdate_range("2025-01-02", periods=3),
+    )
+    rows = PriceRepository.build_price_rows(ref, df)
+    assert [r["date"] for r in rows] == [date(2025, 1, 2)]
+
+
+def test_build_price_rows_keeps_a_close_outside_its_own_range():
+    """Measured: ~1% of real provider bars print an auction close outside the
+    intraday range, by up to 4.4% of price. Rejecting those would punch ~182
+    holes a year into the series and blank σ-Move after each one — inventing
+    the defect this whole batch removed."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame(
+        [_bar(100, 105, 99, 105.5), _bar(100, 105, 99, 98.5), _bar(105.5, 105, 99, 102)],
+        index=pd.bdate_range("2025-01-02", periods=3),
+    )
+    assert len(PriceRepository.build_price_rows(ref, df)) == 3
+
+
+def test_build_price_rows_keeps_a_real_crash():
+    """Only self-contradiction is rejected, never merely surprising — a market
+    that gaps 40% is a market this app exists to show."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame(
+        [_bar(100, 101, 99, 100), _bar(60, 62, 55, 58)],
+        index=pd.bdate_range("2025-01-02", periods=2),
+    )
+    assert len(PriceRepository.build_price_rows(ref, df)) == 2
+
+
+def test_build_price_rows_logs_rejected_bars(caplog):
+    """A rejected bar leaves a hole, which downstream must be able to explain."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame([_bar(100, 95, 99, 97)], index=pd.bdate_range("2025-01-02", periods=1))
+    with caplog.at_level(logging.WARNING):
+        PriceRepository.build_price_rows(ref, df)
+    assert "inconsistent" in caplog.text
+    assert "2025-01-02" in caplog.text

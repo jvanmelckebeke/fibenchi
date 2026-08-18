@@ -77,22 +77,39 @@ def drop_unsettled_last_bar(
 
     last_close = float(df.iloc[-1]["close"])
     prev_bar_close = float(df.iloc[-2]["close"])
+    last_bar_dt = df.index[-1]
+    last_bar_date = last_bar_dt.date() if hasattr(last_bar_dt, "date") else last_bar_dt
 
-    # Only act when the trailing bar is the current session (its predecessor is
-    # the quote's previous close). Otherwise it is already a completed bar.
+    # The bar's own date, where we have it, settles which session it is —
+    # direct evidence, so it is consulted before the close heuristic rather
+    # than behind it. It used to sit *after* the early return below, which made
+    # it unreachable whenever the predecessor didn't match `previous_close`
+    # (e.g. an interior hole right before today), and a still-forming partial
+    # was then persisted as a completed close (#635).
+    if session_date is not None and isinstance(last_bar_date, date):
+        if last_bar_date < session_date:
+            # Yahoo simply hasn't appended today's forming bar yet: this row is
+            # a completed prior session, not an unsettled one.
+            return df
+        if is_session_forming(market_state):
+            logger.debug(
+                "%s: dropping trailing %s bar (dated the live session, market open)",
+                symbol or "?", last_bar_dt,
+            )
+            return df.iloc[:-1]
+        if _reconciles(last_close, price):
+            return df  # closed and settled to the live close
+        logger.info(
+            "%s: dropping trailing %s bar (dated the live session; market %s; "
+            "close=%s hasn't settled to quote %s)",
+            symbol or "?", last_bar_dt, market_state, last_close, price,
+        )
+        return df.iloc[:-1]
+
+    # No session date (degraded quote): fall back to identifying the current
+    # session by its predecessor matching the quote's previous close.
     if not _reconciles(prev_bar_close, previous_close):
         return df
-
-    # If we know the live session's date and the trailing bar predates it, Yahoo
-    # simply hasn't appended today's forming bar yet: this row is a completed
-    # prior session, not an unsettled one — keep it. (Without this a flat prior
-    # day, where the predecessor also matches ``previous_close``, would be
-    # wrongly dropped and blank σ-Move until a heal.)
-    if session_date is not None:
-        last_bar_dt = df.index[-1]
-        last_bar_date = last_bar_dt.date() if hasattr(last_bar_dt, "date") else last_bar_dt
-        if last_bar_date < session_date:
-            return df
 
     # An open session's bar is always a live partial — drop it even though it
     # matches the live price right now, because it will drift as trading goes on.
