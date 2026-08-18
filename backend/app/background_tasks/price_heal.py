@@ -112,14 +112,31 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
 
     healed: dict[str, int] = {}
     for sym, anchor in due:
-        _last_attempt[sym] = now
+        ref = by_symbol[sym]
         try:
-            healed[sym] = await sync_asset_prices(db, by_symbol[sym], period="1mo", anchor=anchor)
+            healed[sym] = await sync_asset_prices(db, ref, period="1mo", anchor=anchor)
         except Exception:
+            _last_attempt[sym] = now  # back off on a failing symbol too
             logger.warning("Price heal for %s failed", sym, exc_info=True)
             # This loop shares one session across symbols; roll back a
             # half-applied transaction so it can't poison the next heal.
             await db.rollback()
+            continue
+        # Cooldown is for "Yahoo is serving data we cannot reconcile", so spend
+        # it on that outcome rather than on the attempt: a heal that *worked*
+        # should not lock the symbol out for 30 minutes if it breaks again, and
+        # (before #627) a heal that structurally *could not* work was buying the
+        # lockout every time while changing nothing.
+        price, previous_close = anchor[0], anchor[1]
+        stored = (await PriceRepository(db).get_latest_closes([ref.id])).get(ref.id)
+        if stored is None or not (
+            _reconciles(stored[1], price) or _reconciles(stored[1], previous_close)
+        ):
+            _last_attempt[sym] = now
+            logger.info(
+                "%s: still unreconciled after heal — backing off %d min",
+                sym, HEAL_COOLDOWN_SECONDS // 60,
+            )
     return healed
 
 
