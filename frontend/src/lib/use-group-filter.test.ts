@@ -14,8 +14,9 @@ const indicators = (
   close: number | null,
   vnr: number,
   vnr_sigma: number,
+  as_of: string | null = null,
 ): Record<string, IndicatorSummary> => ({
-  "001440.KS": { close, change_pct: null, bars: null, values: { vnr, vnr_sigma } },
+  "001440.KS": { close, as_of, change_pct: null, bars: null, values: { vnr, vnr_sigma } },
 })
 
 describe("getSortValue — σ-Move (vnr)", () => {
