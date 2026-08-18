@@ -11,6 +11,7 @@ from app.schemas.intraday import IntradayBar
 from app.schemas.quote import Quote
 from app.services.quote_service import (
     _reset_asset_list_cache,
+    attach_prior_sessions,
     get_quotes,
     quote_event_generator,
 )
@@ -56,6 +57,62 @@ async def test_get_quotes_uppercase_normalization():
 async def test_get_quotes_empty_returns_empty():
     result = await get_quotes("")
     assert result == []
+
+
+# --- prior_session_date: the calendar half of session identity (#626) --------
+
+def test_attach_prior_sessions_skips_a_holiday():
+    """Easter Monday's prior session is the Thursday — Good Friday isn't one.
+    A naive "session_date minus one business day" would name the holiday and
+    the client would then reject a perfectly good stored bar."""
+    quotes = [Quote(symbol="AAPL", session_date="2025-04-21")]
+    assert attach_prior_sessions(quotes)[0].prior_session_date == "2025-04-17"
+
+
+def test_attach_prior_sessions_skips_a_weekend():
+    quotes = [Quote(symbol="AAPL", session_date="2025-04-14")]  # Monday
+    assert attach_prior_sessions(quotes)[0].prior_session_date == "2025-04-11"
+
+
+def test_attach_prior_sessions_handles_a_247_venue():
+    """Crypto trades every day, so the prior session is simply yesterday."""
+    quotes = [Quote(symbol="BTC-USD", session_date="2025-04-21")]
+    assert attach_prior_sessions(quotes)[0].prior_session_date == "2025-04-20"
+
+
+def test_attach_prior_sessions_leaves_unknown_venues_null():
+    """Fail-safe, as everywhere in market_calendar: no calendar, no answer —
+    the client falls back rather than being handed a guess."""
+    quotes = [Quote(symbol="FOO.ZZ", session_date="2025-04-21")]
+    assert attach_prior_sessions(quotes)[0].prior_session_date is None
+
+
+def test_attach_prior_sessions_tolerates_missing_or_bad_session_date():
+    quotes = [
+        Quote(symbol="AAPL"),                              # degraded quote
+        Quote(symbol="MSFT", session_date="not-a-date"),   # provider garbage
+    ]
+    assert [q.prior_session_date for q in attach_prior_sessions(quotes)] == [None, None]
+
+
+def test_attach_prior_sessions_resolves_once_per_calendar():
+    """Dozens of tickers, a handful of venues: the calendar lookup is keyed by
+    (calendar, session_date), not by symbol."""
+    quotes = [Quote(symbol=s, session_date="2025-04-21") for s in ("AAPL", "MSFT", "IBM")]
+    with patch("app.services.quote_service.AssetRef", wraps=AssetRef) as spy:
+        out = attach_prior_sessions(quotes)
+    assert {q.prior_session_date for q in out} == {"2025-04-17"}
+    # One AssetRef per quote is fine; the point is the *calendar* query is shared.
+    assert spy.call_count == 3
+
+
+async def test_get_quotes_attaches_prior_session():
+    """The REST path enriches too — it used to strip session_date entirely."""
+    mock_prov = _mock_provider(quotes_return=[Quote(symbol="AAPL", session_date="2025-04-21")])
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
+        result = await get_quotes("AAPL")
+    assert result[0].session_date == "2025-04-21"
+    assert result[0].prior_session_date == "2025-04-17"
 
 
 async def test_stream_emits_full_payload_first():

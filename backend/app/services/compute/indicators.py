@@ -699,8 +699,12 @@ def build_indicator_snapshot(indicators: pd.DataFrame) -> IndicatorSnapshotBase:
         if defn.snapshot_derived:
             values.update(defn.snapshot_derived(latest))
 
+    last_dt = indicators.index[-1]
+    as_of = last_dt.date() if hasattr(last_dt, "date") else last_dt
+
     return IndicatorSnapshotBase(
         close=round(latest["close"], 2),
+        as_of=as_of if isinstance(as_of, date) else None,
         change_pct=change_pct,
         bars=len(indicators),
         values=values,

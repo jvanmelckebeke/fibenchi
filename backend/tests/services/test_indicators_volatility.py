@@ -697,3 +697,19 @@ def test_sigma_floor_fraction_is_published_to_the_companion_app():
     from app.services.compute.indicators import INDICATOR_REGISTRY
 
     assert INDICATOR_REGISTRY["vnr"].params["sigma_floor_frac"] == VNR_SIGMA_FLOOR_FRAC
+
+
+def test_snapshot_carries_the_last_bar_date():
+    """Without this the client cannot ask *which session* close/change_pct/vnr
+    describe, and infers it by comparing prices within 0.5% — a test that fails
+    precisely when the price moved, i.e. on the days worth looking at (#626)."""
+    df = _make_price_df(100)
+    snapshot = build_indicator_snapshot(compute_indicators(df))
+    assert snapshot.as_of == df.index[-1].date()
+
+
+def test_snapshot_as_of_is_none_without_bars():
+    """A degenerate snapshot has no bar to be `as_of`; the client must treat
+    None as "unknown session" rather than as a date."""
+    empty = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+    assert build_indicator_snapshot(empty).as_of is None

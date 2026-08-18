@@ -8,7 +8,7 @@ lifetime and shared by every Symbol that resolves to it. All methods return
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
@@ -81,6 +81,26 @@ class Venue:
         if sessions is None:
             return None
         return d in sessions
+
+    def previous_session(self, d: date) -> date | None:
+        """The trading session immediately before ``d`` (exclusive).
+
+        The exact answer to "is this stored bar the session before that quote?"
+        — the question the σ-Move display used to approximate by comparing two
+        closes within 0.5%, which is a test of how far the price moved rather
+        than of which session it was (#626).
+
+        ``d`` itself need not be a session. None when the calendar can't answer
+        (unknown venue, out of range, or no session in the lookback), and the
+        caller falls back to its calendar-less heuristic as everywhere else
+        here. The 15-day window comfortably clears the longest exchange
+        shutdown any mapped calendar has (Golden Week, Lunar New Year).
+        """
+        sessions = self.session_dates(d - timedelta(days=15), d)
+        if not sessions:
+            return None
+        earlier = [s for s in sessions if s < d]
+        return max(earlier) if earlier else None
 
     def local_date(self, at: datetime | None = None) -> date | None:
         """The venue's local calendar date at ``at`` (UTC now by default).
