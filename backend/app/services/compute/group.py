@@ -1,5 +1,6 @@
 """Batch indicator computation and sparkline data for group asset pages."""
 
+from collections.abc import Iterable
 from datetime import date, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,8 +18,29 @@ from app.services.fundamentals_cache import merge_fundamentals_from_cache
 from app.utils import TTLCache
 
 # In-memory cache for batch indicator snapshots.
-# Key: (frozenset of symbols, latest_price_date) — auto-invalidates when prices change.
+# Key: (frozenset of symbols, latest_price_date).
+#
+# The date in that key only advances when a *newer bar* appears. Every repair
+# mechanism in the system fixes a value or backfills an *interior* session —
+# a corrected close, a hole filled at 08-12 while 08-13 already exists — and
+# none of those move the set-wide max. The key is therefore incapable, in
+# principle, of representing the change a heal makes, and the broken snapshot
+# would serve out the rest of its TTL (#628). Writers call
+# `invalidate_indicator_cache` instead of waiting.
 _indicator_cache: TTLCache = TTLCache(default_ttl=600)
+
+
+def invalidate_indicator_cache(symbols: Iterable[str]) -> int:
+    """Drop cached snapshots covering any of ``symbols``. Returns entries removed.
+
+    Entries are keyed by the *set* of symbols they were computed for, so one
+    repaired symbol invalidates every group snapshot containing it — which is
+    the point: those snapshots embed the stale value.
+    """
+    wanted = {str(s) for s in symbols}
+    if not wanted:
+        return 0
+    return _indicator_cache.invalidate(lambda key: bool(key[0] & wanted))
 
 
 async def _get_default_group_refs(db: AsyncSession) -> list[AssetRef]:

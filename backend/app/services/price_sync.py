@@ -10,6 +10,7 @@ from app.domain import AssetRef
 from app.domain.market_state import is_session_forming
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
+from app.services.compute.group import invalidate_indicator_cache
 from app.services.price_providers import PriceProvider, get_price_provider
 
 logger = logging.getLogger(__name__)
@@ -253,6 +254,8 @@ async def _drop_and_persist(
         last_kept = kept.index[-1]
         last_kept = last_kept.date() if hasattr(last_kept, "date") else last_kept
         removed = await PriceRepository(db).delete_prices_after(ref.id, last_kept)
+        if removed:
+            invalidate_indicator_cache([ref])
         if removed and not dropped:
             logger.info(
                 "%s: purged %d orphaned row(s) after %s — the provider no longer "
@@ -377,5 +380,14 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
 
 
 async def _upsert_prices(db: AsyncSession, ref: AssetRef, df: pd.DataFrame) -> int:
-    """Upsert price rows from a DataFrame. Returns row count."""
-    return await PriceRepository(db).upsert_prices(ref, df)
+    """Upsert price rows from a DataFrame. Returns row count.
+
+    Every write path funnels through here, so this is where the batch
+    indicator cache learns that a symbol's series changed — its key can't
+    notice a corrected value or a backfilled interior session on its own
+    (#628).
+    """
+    count = await PriceRepository(db).upsert_prices(ref, df)
+    if count:
+        invalidate_indicator_cache([ref])
+    return count
