@@ -122,6 +122,14 @@ VNR_SIGMA_FLOOR_FRAC = 0.15
 # anything; below this the EWMA is the better of two weak estimates.
 VNR_SIGMA_FLOOR_MIN_OBS = 20
 
+# Sessions of history before the vol baseline means anything. This is the
+# registry's `warmup_periods` for vnr *and* the kernel's own gate — it used to
+# be metadata only, sizing the history fetch but never blanking an output, so
+# a 3-bar EWMA emitted a confident number and only the board's `bars` check
+# stood between it and the user (#631). One constant, so the promise the
+# contract publishes is the promise the kernel keeps.
+VNR_WARMUP_SESSIONS = 60
+
 
 def session_gap_days(index: pd.Index, session_dates: set[date] | None = None) -> pd.Series:
     """Sessions elapsed between each bar and the previous stored bar.
@@ -167,6 +175,7 @@ def _ewma_daily_vol(
     gaps: pd.Series | None = None,
     sigma_floor_frac: float = VNR_SIGMA_FLOOR_FRAC,
     sigma_floor_min_obs: int = VNR_SIGMA_FLOOR_MIN_OBS,
+    warmup: int = VNR_WARMUP_SESSIONS,
 ) -> pd.Series:
     """Forward EWMA volatility forecast (RiskMetrics zero-mean).
 
@@ -187,6 +196,12 @@ def _ewma_daily_vol(
     ``ignore_na=False`` the skipped position still ages the older observations,
     approximating one extra decay step for the missing stretch.
 
+    Warmup: no forecast until ``warmup`` returns have been observed. An EWMA
+    has no hard edge, so without this it happily reports a "volatility" built
+    from one or two observations, and the σ-Move divided by it reads as fact.
+    Gap-excluded returns don't count toward the total, which is the honest
+    reading — a holed series really does have fewer observations.
+
     Floor: the EWMA is a pure function of *recent* returns, so a series that
     goes quiet — a suspended ticker, an ETC that stops repricing, anything gone
     stale in a group that isn't pruned — decays it smoothly toward zero, and the
@@ -201,7 +216,9 @@ def _ewma_daily_vol(
     if gaps is not None:
         returns = returns.where(~(gaps > 1))
     # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
-    ewma_var = (returns**2).ewm(alpha=1 - lam, adjust=False, ignore_na=False).mean()
+    ewma_var = (returns**2).ewm(
+        alpha=1 - lam, adjust=False, ignore_na=False, min_periods=warmup,
+    ).mean()
     sigma = np.sqrt(ewma_var)
     floor = returns.expanding(min_periods=sigma_floor_min_obs).std() * sigma_floor_frac
     # `floor > sigma` is False wherever floor is NaN, so early bars keep sigma.
@@ -215,6 +232,7 @@ def volatility_normalized_return(
     gaps: pd.Series | None = None,
     sigma_floor_frac: float = VNR_SIGMA_FLOOR_FRAC,
     sigma_floor_min_obs: int = VNR_SIGMA_FLOOR_MIN_OBS,
+    warmup: int = VNR_WARMUP_SESSIONS,
 ) -> pd.Series:
     """Volatility-normalized daily return — a "sigma move" / return z-score.
 
@@ -250,7 +268,7 @@ def volatility_normalized_return(
     # The forecast gets the same gap series so gap-spanning returns can't
     # contaminate the denominator either (they would understate later σ-moves).
     sigma_forecast = _ewma_daily_vol(
-        closes, lam, gaps, sigma_floor_frac, sigma_floor_min_obs,
+        closes, lam, gaps, sigma_floor_frac, sigma_floor_min_obs, warmup,
     ).shift(1)
     return (returns / sigma_forecast).where(~(gaps > 1))
 
@@ -629,7 +647,7 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         # by compute_indicators, which owns the session-gap series.
         output_fields=["vnr", "vnr_sigma", "vnr_gap_sessions"],
         decimals=2,
-        warmup_periods=60,
+        warmup_periods=VNR_WARMUP_SESSIONS,
         field_decimals={"vnr_sigma": 6, "vnr_gap_sessions": 0},
         needs_gaps=True,
     ),

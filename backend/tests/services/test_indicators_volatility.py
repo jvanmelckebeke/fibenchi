@@ -9,6 +9,7 @@ import pytest
 
 from app.services.compute.indicators import (
     VNR_SIGMA_FLOOR_FRAC,
+    VNR_WARMUP_SESSIONS,
     _ewma_daily_vol,
     _true_range,
     adx,
@@ -432,11 +433,16 @@ def test_vnr_gap_sessions_flag_in_output():
 
 
 def test_vnr_no_gap_no_flag():
-    """A contiguous business-day series carries no gap flags and no suppression."""
+    """A contiguous business-day series carries no gap flags and no suppression.
+
+    Sliced past the warmup: every bar after the vol baseline is established
+    must carry a value, so the assertion isolates *gap* suppression from the
+    warmup gate (#631) rather than conflating the two.
+    """
     full = _make_price_df(100)
     result = compute_indicators(full)
     assert result["vnr_gap_sessions"].isna().all()
-    assert result["vnr"].iloc[10:].notna().all()
+    assert result["vnr"].iloc[VNR_WARMUP_SESSIONS + 1:].notna().all()
 
 
 def test_vnr_regression_issue_559():
@@ -713,3 +719,31 @@ def test_snapshot_as_of_is_none_without_bars():
     None as "unknown session" rather than as a date."""
     empty = pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
     assert build_indicator_snapshot(empty).as_of is None
+
+
+def test_vnr_warmup_is_enforced_not_just_declared():
+    """`warmup_periods` used to size the history fetch and nothing else, so a
+    12-bar series produced a confident σ from a one-or-two-observation EWMA and
+    only the board's `bars` check stood between it and the user (#631)."""
+    short = _make_price_df(40)
+    snapshot = build_indicator_snapshot(compute_indicators(short))
+    assert snapshot.values["vnr"] is None
+    assert snapshot.values["vnr_sigma"] is None
+    assert snapshot.bars == 40
+
+
+def test_vnr_emits_once_the_baseline_exists():
+    """The gate opens at warmup+1 (the forecast is shifted by one bar), and
+    every later bar carries a value."""
+    df = _make_price_df(VNR_WARMUP_SESSIONS + 20)
+    result = compute_indicators(df)
+    assert result["vnr"].iloc[:VNR_WARMUP_SESSIONS].isna().all()
+    assert result["vnr"].iloc[VNR_WARMUP_SESSIONS + 1:].notna().all()
+
+
+def test_vnr_kernel_gate_matches_the_published_warmup():
+    """The registry value is what the contract publishes to the companion app;
+    the kernel must keep exactly that promise, not a second copy of it."""
+    from app.services.compute.indicators import INDICATOR_REGISTRY
+
+    assert INDICATOR_REGISTRY["vnr"].warmup_periods == VNR_WARMUP_SESSIONS
