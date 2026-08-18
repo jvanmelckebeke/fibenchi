@@ -1,7 +1,7 @@
 """Tests for the price_sync service (sync orchestration and upsert logic)."""
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
@@ -566,8 +566,12 @@ async def test_drop_and_persist_deletes_orphaned_partial(db):
     assert asset.id not in latest  # the orphaned 2025-06-30 partial was deleted
 
 
-async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
-    """No drop → no delete: a settled frame leaves later stored rows untouched."""
+async def test_drop_and_persist_keeps_rows_when_the_frame_is_stale(db):
+    """A frame ending long ago is a truncated provider response, not proof that
+    later stored rows are orphans — so nothing is deleted. Every path into
+    _drop_and_persist fetches *to now*, so this only happens when the provider
+    gave a short answer, and deleting real data on that basis would be worse
+    than leaving a stale row (#627)."""
     asset = Asset(symbol="KEEP", name="Keep", type=AssetType.STOCK, currency="USD")
     db.add(asset)
     await db.flush()
@@ -575,7 +579,8 @@ async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
                         open=1, high=1, low=1, close=500.0, volume=0))
     await db.commit()
 
-    # Closed, settled bar (matches live price) → drop_unsettled keeps everything.
+    # Closed, settled bar (matches live price) → drop_unsettled keeps everything,
+    # and the frame is dated 2025-01 → far outside PURGE_FRESHNESS_DAYS.
     df = _df_from_closes([57.5, 58.04, 59.0])
     anchor = (58.72, 58.04, "POSTPOST", None)
     with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
@@ -583,3 +588,49 @@ async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
 
     latest = await PriceRepository(db).get_latest_closes([asset.id])
     assert latest[asset.id][0] == date(2025, 6, 30)  # untouched
+
+
+async def test_drop_and_persist_purges_orphan_the_provider_stopped_reporting(db):
+    """The #627 regression: an orphan whose date the provider no longer returns.
+
+    Nothing is dropped (the frame never contained that date), so the old
+    `len(kept) < len(df)` gate purged nothing — and heal_unreconciled_prices
+    re-ran this exact path and no-opped identically, forever. A *current* frame
+    is proof enough that a row past its end is an orphan.
+    """
+    asset = Asset(symbol="STUCK", name="Stuck", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    orphan = date.today() + timedelta(days=1)  # past anything a fetch can return
+    db.add(PriceHistory(asset_id=asset.id, date=orphan,
+                        open=1, high=1, low=1, close=999.0, volume=0))
+    await db.commit()
+
+    # Settled frame ending today: nothing to drop, but authoritative about now.
+    df = _df_ending(date.today(), [57.5, 58.04, 59.0])
+    anchor = (59.0, 58.04, "POSTPOST", None)
+    with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
+        await _drop_and_persist(db, AssetRef.of(asset), df, anchor)
+
+    latest = await PriceRepository(db).get_latest_closes([asset.id])
+    assert asset.id not in latest  # orphan gone; only the (mocked) upsert remains
+
+
+async def test_drop_and_persist_current_frame_keeps_its_own_last_bar(db):
+    """The freshness purge must delete strictly *after* the last kept bar — a
+    current frame must never delete the bar it just stored."""
+    asset = Asset(symbol="SELF", name="Self", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    today = date.today()
+    db.add(PriceHistory(asset_id=asset.id, date=today,
+                        open=1, high=1, low=1, close=59.0, volume=0))
+    await db.commit()
+
+    df = _df_ending(today, [57.5, 58.04, 59.0])
+    anchor = (59.0, 58.04, "POSTPOST", None)
+    with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
+        await _drop_and_persist(db, AssetRef.of(asset), df, anchor)
+
+    latest = await PriceRepository(db).get_latest_closes([asset.id])
+    assert latest[asset.id][0] == today

@@ -186,18 +186,55 @@ def _drop_unanchored_trailing_bar(df: pd.DataFrame, ref: AssetRef) -> pd.DataFra
     return df.iloc[:-1]
 
 
+# How stale the fetched frame's last bar may be before a purge is no longer
+# safe. Every path into ``_drop_and_persist`` fetches *to now*, so a frame
+# ending days ago means the provider truncated rather than that the market was
+# quiet — and rows "past the end" of a truncated frame are real data, not
+# orphans. Wide enough to cover a long weekend plus a holiday.
+PURGE_FRESHNESS_DAYS = 5
+
+
+def _frame_reaches_present(df: pd.DataFrame, ref: AssetRef) -> bool:
+    """Whether the fetched frame is authoritative about *now*.
+
+    Only then can "the DB holds a row past this frame's last bar" be read as
+    "that row is an orphan" rather than "the provider gave us a short answer".
+    """
+    if df.empty:
+        return False
+    last_dt = df.index[-1]
+    last_date = last_dt.date() if hasattr(last_dt, "date") else last_dt
+    if not isinstance(last_date, date):
+        return False
+    venue = getattr(ref, "venue", None)
+    today = (venue.local_date() if venue is not None else None) or date.today()
+    return (today - last_date).days <= PURGE_FRESHNESS_DAYS
+
+
 async def _drop_and_persist(
     db: AsyncSession, ref: AssetRef, df: pd.DataFrame, anchor: Anchor,
 ) -> int:
     """Drop the trailing unsettled bar (if any), upsert the rest, and purge any
     stale copy left behind. Returns the number of rows upserted.
 
-    When the trailing bar is dropped, a partial persisted at that date by an
-    earlier (e.g. quote-degraded) sync would linger in the DB — upsert only
-    touches the completed rows it received, so it can never clear a row it no
-    longer has. That orphan keeps ``get_latest_closes`` returning an unreconciled
-    close and blanks σ-Move for the whole session. Delete any row past the last
-    kept bar so the settled data is authoritative.
+    A partial persisted by an earlier (e.g. quote-degraded) sync lingers in the
+    DB — upsert only touches the rows it received, so it can never clear one it
+    no longer has. That orphan keeps ``get_latest_closes`` returning an
+    unreconciled close and blanks σ-Move for the whole session. Delete any row
+    past the last kept bar so the settled data is authoritative.
+
+    The purge needs proof that this frame is authoritative about the present,
+    or a truncated provider response would delete real data. Two independent
+    proofs, either sufficient (#627):
+
+    * **A bar was dropped.** ``drop_unsettled_last_bar`` only fires on a bar it
+      identified as the *current* session, so the frame demonstrably reached it.
+    * **The frame is fresh.** Its last bar is within ``PURGE_FRESHNESS_DAYS``.
+
+    Gating on the first alone — as this did — meant an orphan whose date the
+    provider had stopped reporting was never purged: nothing was dropped, so
+    nothing was deleted, and ``heal_unreconciled_prices`` re-ran this same path
+    and no-opped identically, forever.
     """
     price, previous_close, market_state, session_date = anchor
     if price is None or previous_close is None:
@@ -211,10 +248,17 @@ async def _drop_and_persist(
         df, price, previous_close, market_state, symbol=ref, session_date=session_date,
     )
     count = await _upsert_prices(db, ref, kept)
-    if not kept.empty and len(kept) < len(df):
+    dropped = len(kept) < len(df)
+    if not kept.empty and (dropped or _frame_reaches_present(df, ref)):
         last_kept = kept.index[-1]
         last_kept = last_kept.date() if hasattr(last_kept, "date") else last_kept
-        await PriceRepository(db).delete_prices_after(ref.id, last_kept)
+        removed = await PriceRepository(db).delete_prices_after(ref.id, last_kept)
+        if removed and not dropped:
+            logger.info(
+                "%s: purged %d orphaned row(s) after %s — the provider no longer "
+                "reports them and this frame is current",
+                ref, removed, last_kept,
+            )
     return count
 
 
