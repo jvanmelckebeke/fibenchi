@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time as _time
 from collections.abc import Sequence
+from datetime import date
 
 from pydantic import TypeAdapter
 
@@ -70,11 +71,41 @@ def _poll_interval(market_states: set[str], symbols: Sequence[str], at=None) -> 
     return interval
 
 
+def attach_prior_sessions(quotes: list[Quote]) -> list[Quote]:
+    """Fill each quote's ``prior_session_date`` from its venue calendar.
+
+    The provider knows which session a quote is *in*; only the calendar knows
+    which session came before it. Shipping that answer (rather than the two
+    raw dates) keeps the client free of calendar logic: a snapshot whose
+    ``as_of`` equals this value is the quote's prior bar, exactly (#626).
+
+    Resolved per ``(calendar, session_date)`` rather than per symbol — a
+    portfolio is dozens of tickers across a handful of venues, and the answer
+    only changes when a venue's local date rolls.
+    """
+    resolved: dict[tuple[str, str], str | None] = {}
+    for q in quotes:
+        if not q.session_date:
+            continue
+        venue = AssetRef(q.symbol).venue
+        if venue is None:
+            continue
+        key = (venue.name, q.session_date)
+        if key not in resolved:
+            try:
+                prior = venue.previous_session(date.fromisoformat(q.session_date))
+            except ValueError:  # provider gave a non-ISO date; not our problem to fix here
+                prior = None
+            resolved[key] = prior.isoformat() if prior else None
+        q.prior_session_date = resolved[key]
+    return quotes
+
+
 async def get_quotes(symbols: str) -> list[Quote]:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
-    return await get_price_provider().batch_fetch_quotes(symbol_list)
+    return attach_prior_sessions(await get_price_provider().batch_fetch_quotes(symbol_list))
 
 
 async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
@@ -118,7 +149,9 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
                 await asyncio.sleep(60)
                 continue
 
-            quotes = await get_price_provider().batch_fetch_quotes(list(refs))
+            quotes = attach_prior_sessions(
+                await get_price_provider().batch_fetch_quotes(list(refs))
+            )
 
             # Build keyed payload
             full_payload: dict[str, Quote] = {}

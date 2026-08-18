@@ -269,6 +269,31 @@ def test_symbol_currency_shapes():
     assert AssetRef("FOO.ZZ").currency is None
 
 
+def test_previous_session_is_calendar_exact():
+    """The exact answer the σ-Move display used to approximate by comparing two
+    closes within 0.5% — a test of how far the price moved, not of which
+    session it was (#626)."""
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.previous_session(date(2025, 4, 21)) == date(2025, 4, 17)  # skips Good Friday
+    assert nyse.previous_session(date(2025, 4, 14)) == date(2025, 4, 11)  # skips the weekend
+    # `d` need not itself be a session.
+    assert nyse.previous_session(date(2025, 4, 19)) == date(2025, 4, 17)  # a Saturday
+    # 24/7 venues have no holidays to skip.
+    crypto = AssetRef("BTC-USD").venue
+    assert crypto is not None
+    assert crypto.previous_session(date(2025, 4, 21)) == date(2025, 4, 20)
+
+
+def test_previous_session_fails_safe():
+    """Out of calendar range returns None rather than a guess, matching every
+    other query here — the caller falls back to its calendar-less heuristic."""
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.previous_session(date(1800, 1, 2)) is None
+    assert AssetRef("FOO.ZZ").venue is None
+
+
 def test_every_percent_quoted_index_resolves_a_calendar():
     """A tracked index with no calendar degrades *silently*: classify returns
     calendar=None, session_gap_days falls back to np.busday_count (weekends but

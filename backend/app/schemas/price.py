@@ -74,6 +74,13 @@ class IndicatorSnapshotBase(BaseModel):
     """
 
     close: float | None = Field(default=None, description="Latest closing price")
+    as_of: datetime.date | None = Field(
+        default=None,
+        description="Exchange-local date of the last bar behind this snapshot. Lets a "
+        "client identify which session `close`/`change_pct`/`vnr` describe — pair it "
+        "with a quote's `session_date`/`prior_session_date` — instead of inferring it "
+        "from price similarity. None for a degenerate snapshot with no bars.",
+    )
     change_pct: float | None = Field(default=None, description="1-day percentage change")
     bars: int | None = Field(
         default=None,
