@@ -634,3 +634,45 @@ async def test_drop_and_persist_current_frame_keeps_its_own_last_bar(db):
 
     latest = await PriceRepository(db).get_latest_closes([asset.id])
     assert latest[asset.id][0] == today
+
+
+# --- writes tell the indicator cache their series changed (#628) ------------
+
+async def test_upsert_invalidates_the_indicator_cache(db):
+    """The cache key is (symbols, set-wide max date), which a corrected close or
+    a backfilled interior session does not move. Without this the repaired
+    symbol keeps serving its broken snapshot for the rest of the 600s TTL."""
+    from app.services.compute.group import _indicator_cache
+
+    asset = Asset(symbol="CACHE", name="Cache", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    await db.commit()
+
+    _indicator_cache.clear()
+    key = (frozenset({"CACHE"}), date(2025, 1, 6))
+    _indicator_cache.set_value(key, {"stale": True})
+
+    with patch.object(PriceRepository, "upsert_prices", new_callable=AsyncMock, return_value=3):
+        await _upsert_prices(db, AssetRef.of(asset), _df_from_closes([1.0, 2.0, 3.0]))
+
+    assert _indicator_cache.get_value(key) is None
+
+
+async def test_upsert_of_nothing_leaves_the_cache_alone(db):
+    """An empty frame changed no series, so it must not throw away work."""
+    from app.services.compute.group import _indicator_cache
+
+    asset = Asset(symbol="NOOP", name="Noop", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    await db.commit()
+
+    _indicator_cache.clear()
+    key = (frozenset({"NOOP"}), date(2025, 1, 6))
+    _indicator_cache.set_value(key, {"fresh": True})
+
+    with patch.object(PriceRepository, "upsert_prices", new_callable=AsyncMock, return_value=0):
+        await _upsert_prices(db, AssetRef.of(asset), pd.DataFrame())
+
+    assert _indicator_cache.get_value(key) == {"fresh": True}

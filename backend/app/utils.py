@@ -81,6 +81,25 @@ class TTLCache:
             del self._data[oldest]
         self._data[key] = (value, time.monotonic())
 
+    def invalidate(self, predicate) -> int:
+        """Drop every entry whose *key* matches ``predicate``. Returns the count.
+
+        A TTL bounds how long a stale entry survives; it cannot express "the
+        thing this was derived from just changed". Callers that write the
+        underlying data use this to say so directly, rather than waiting out a
+        window during which the cache is known to be wrong.
+        """
+        if self._lock is not None:
+            with self._lock:
+                return self._invalidate_unlocked(predicate)
+        return self._invalidate_unlocked(predicate)
+
+    def _invalidate_unlocked(self, predicate) -> int:
+        doomed = [k for k in self._data if predicate(k)]
+        for k in doomed:
+            del self._data[k]
+        return len(doomed)
+
     def clear(self) -> None:
         """Remove all entries."""
         if self._lock is not None:

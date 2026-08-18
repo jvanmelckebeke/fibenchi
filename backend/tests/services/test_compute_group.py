@@ -12,6 +12,7 @@ from app.services.compute.group import (
     compute_and_cache_indicators,
     compute_indicators_for_symbols,
     get_batch_sparklines,
+    invalidate_indicator_cache,
 )
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
@@ -269,3 +270,39 @@ class TestComputeIndicatorsForSymbols:
         assert mock_compute_ind.call_count == calls_after_group
 
         _indicator_cache._data.clear()
+
+
+# --- cache invalidation: the key cannot see a repair on its own (#628) -------
+
+def test_invalidate_drops_every_entry_containing_the_symbol():
+    """Entries are keyed by the *set* of symbols they cover, so one repaired
+    symbol must invalidate every group snapshot embedding its stale value."""
+    _indicator_cache.clear()
+    _indicator_cache.set_value((frozenset({"AAPL", "MSFT"}), date(2026, 8, 13)), {"a": 1})
+    _indicator_cache.set_value((frozenset({"AAPL"}), date(2026, 8, 13)), {"b": 2})
+    _indicator_cache.set_value((frozenset({"IBM"}), date(2026, 8, 13)), {"c": 3})
+
+    assert invalidate_indicator_cache(["AAPL"]) == 2
+    assert _indicator_cache.get_value((frozenset({"IBM"}), date(2026, 8, 13))) == {"c": 3}
+    assert _indicator_cache.get_value((frozenset({"AAPL"}), date(2026, 8, 13))) is None
+
+
+def test_invalidate_survives_a_repair_that_does_not_move_the_date():
+    """The exact blind spot: a corrected *close* — or a hole backfilled behind
+    the newest bar — leaves the key's date untouched, so nothing expires and
+    the known-broken snapshot serves out its TTL."""
+    _indicator_cache.clear()
+    key = (frozenset({"XAIX.DE"}), date(2026, 8, 13))
+    _indicator_cache.set_value(key, {"stale": True})
+    # A heal fills 2026-08-12; the set-wide max is still 2026-08-13, so the key
+    # a fresh request computes is byte-identical to the cached one.
+    assert _indicator_cache.get_value(key) == {"stale": True}
+    invalidate_indicator_cache(["XAIX.DE"])
+    assert _indicator_cache.get_value(key) is None
+
+
+def test_invalidate_accepts_asset_refs_and_ignores_empty():
+    _indicator_cache.clear()
+    _indicator_cache.set_value((frozenset({"IWDA.AS"}), date(2026, 8, 13)), {"x": 1})
+    assert invalidate_indicator_cache([]) == 0
+    assert invalidate_indicator_cache([AssetRef("IWDA.AS")]) == 1
