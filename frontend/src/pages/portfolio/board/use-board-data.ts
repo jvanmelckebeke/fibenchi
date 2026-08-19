@@ -74,6 +74,23 @@ export interface BoardSection {
 
 export type GroupBy = "group" | "thesis"
 
+/** Which venue phases earn a tile. "open" is the trading session proper —
+ * pre-market and after-hours are excluded on purpose: they're thin, the tile
+ * carries no volume to show how thin, and the coverage badge already counts
+ * "open" this way. One predicate, so the badge and the grid can't disagree. */
+export type PhaseFilter = "all" | "open"
+
+/** Narrow the tile map to what the filter admits. A `null` phase is an
+ * unresolved calendar, not an open one, so it is hidden too — the filter
+ * promises "these can move", and an unknown venue can't back that. */
+export function applyPhaseFilter(
+  tiles: Map<string, Tile>,
+  filter: PhaseFilter,
+): Map<string, Tile> {
+  if (filter === "all") return tiles
+  return new Map([...tiles].filter(([, t]) => t.phase === "open"))
+}
+
 /** Per-symbol % change series over the covering month, shared by the tiles'
  * %-mode, the Movers card, and the tooltips — one fetch, three windows.
  *
@@ -120,7 +137,7 @@ function useWindowReturns(symbols: string[]) {
 
 const EMPTY_WINDOWS: Record<PctWindow, number | null> = { "1wk": null, "2wk": null, "1mo": null }
 
-export function useBoardData(groupBy: GroupBy) {
+export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all") {
   const { data: groups, isLoading: groupsLoading } = useGroups()
   const { data: theses } = useTheses()
   const quotes = useQuotes()
@@ -219,9 +236,21 @@ export function useBoardData(groupBy: GroupBy) {
     return out
   }, [roster, quotes, snapshots, windowReturns, series, sectionsBySymbol, symbolPhase, health])
 
+  // Filtering happens on the tile map, before sections are assembled: the
+  // lookups below then drop the hidden symbols by themselves, the
+  // length guard clears the sections that empty out, and thesis mode's
+  // "No thesis" bucket follows without a second code path.
+  //
+  // `tiles` itself stays whole — the rail and the coverage badge summarise the
+  // day, which includes the venues that have already gone home.
+  const visibleTiles = useMemo(
+    () => applyPhaseFilter(tiles, phaseFilter),
+    [tiles, phaseFilter],
+  )
+
   const sections = useMemo<BoardSection[]>(() => {
     const toTiles = (list: Asset[]) =>
-      list.map((a) => tiles.get(a.symbol)).filter((t): t is Tile => !!t)
+      list.map((a) => visibleTiles.get(a.symbol)).filter((t): t is Tile => !!t)
     if (groupBy === "group") {
       return (groups ?? [])
         .map((g) => ({ key: `g${g.id}`, title: g.name, accent: null, tiles: toTiles(g.assets) }))
@@ -231,10 +260,10 @@ export function useBoardData(groupBy: GroupBy) {
       .map((t) => ({ key: `t${t.id}`, title: t.name, accent: t.color, tiles: toTiles(t.assets) }))
       .filter((s) => s.tiles.length > 0)
     const inThesis = new Set((theses ?? []).flatMap((t) => t.assets.map((a) => a.symbol)))
-    const rest = [...tiles.values()].filter((t) => !inThesis.has(t.symbol))
+    const rest = [...visibleTiles.values()].filter((t) => !inThesis.has(t.symbol))
     if (rest.length) out.push({ key: "no-thesis", title: "No thesis", accent: null, tiles: rest })
     return out
-  }, [groupBy, groups, theses, tiles])
+  }, [groupBy, groups, theses, visibleTiles])
 
   const coverage = useMemo(() => {
     const all = [...tiles.values()]
