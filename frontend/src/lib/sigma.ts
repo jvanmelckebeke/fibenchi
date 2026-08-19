@@ -34,6 +34,7 @@ import { getNumericValue } from "@/lib/indicator-registry"
 // file. CI regenerates and fails on any difference.
 import {
   SESSION_MATCH_TOL,
+  VNR_MAX_SESSIONS_BEHIND,
   VNR_WARMUP_SESSIONS,
 } from "@/lib/generated/backend-constants"
 
@@ -44,8 +45,10 @@ export type SigmaSource = "live" | "settled"
 /** Why no σ is shown. Kept discriminated even where the UI collapses them:
  * the distinction decides *whether* to withhold, and the tooltip explains it. */
 export type WithheldReason =
-  /** The stored bar predates the quote by 2+ sessions. */
-  | { kind: "feed_behind" }
+  /** The stored bar is further behind the live session than the vol forecast
+   * can bridge. `sessions` is the measured distance, or null when the venue
+   * has no calendar and all we know is "further back than the prior one". */
+  | { kind: "feed_behind"; sessions: number | null }
   /** The stored series is missing sessions, so its own return spans a hole. */
   | { kind: "gap"; sessions: number }
   /** Too little history for the vol baseline to mean anything. */
@@ -61,69 +64,90 @@ export type SigmaResolution =
   | { status: "ok"; sigma: number; source: SigmaSource }
   | { status: "withheld"; reason: WithheldReason }
 
-/** How the snapshot's bar relates to the quote's session. */
-type SessionRelation =
-  /** The stored bar *is* the quote's session. */
-  | "current"
-  /** The stored bar is the session immediately before the quote's. */
-  | "prior"
-  /** Two or more sessions back. */
-  | "behind"
-  /** No quote at all — σ and the change % beside it share the stored bar. */
-  | "none"
-  /** Nothing to compare — a provider placeholder with no prices and no dates.
-   * Deliberately not "behind": absence of evidence is not evidence of
-   * staleness, and reading it as such blanked every symbol at once whenever
-   * the provider hiccuped (#632). */
-  | "unknown"
+/** The stored bar is further back than any window we ship or could score. */
+const BEYOND_WINDOW = Number.POSITIVE_INFINITY
 
 function near(a: number | null | undefined, b: number | null | undefined): boolean {
   if (a == null || b == null || b === 0) return false
   return Math.abs(a - b) / Math.abs(b) <= SESSION_MATCH_TOL
 }
 
-function relateSession(snapshot: IndicatorSummary, quote: Quote | undefined): SessionRelation {
-  if (!quote) return "none"
+/**
+ * How many venue sessions the stored bar sits behind the quote's live session.
+ *
+ * 0 means the bar *is* the live session, 1 the session before it, and so on.
+ * A distance rather than a category, because that is what the decision below
+ * actually needs: the old five-value enum could say "yesterday" or "older",
+ * and everything past yesterday collapsed into one bucket that had to be
+ * refused wholesale (#642).
+ *
+ * `null` is *unknowable*, not far: no quote at all, or a provider placeholder
+ * carrying neither dates nor prices. Absence of evidence is not evidence of
+ * staleness — reading it as such blanked every symbol at once whenever the
+ * provider hiccuped (#632).
+ */
+function sessionsBehind(snapshot: IndicatorSummary, quote: Quote | undefined): number | null {
+  if (!quote) return null
   const asOf = snapshot.as_of
   const session = quote.session_date
 
   if (asOf && session) {
-    if (asOf === session) return "current"
-    if (quote.prior_session_date) {
-      // Exact: the calendar already answered "which session came before".
-      return asOf === quote.prior_session_date ? "prior" : "behind"
+    if (asOf === session) return 0
+    // The calendar already counted the sessions, in order — read the distance
+    // off the index. Counting business days here instead is the heuristic that
+    // turns every holiday into a hole (#559, #633).
+    if (quote.recent_sessions?.length) {
+      const i = quote.recent_sessions.indexOf(asOf)
+      return i >= 0 ? i : BEYOND_WINDOW
     }
-    // Venue has no calendar. We know it isn't the current session; whether it
-    // is the one before has to be corroborated on price.
-    return near(quote.previous_close, snapshot.close) ? "prior" : "behind"
+    // Venue has no calendar. We know it isn't the live session; whether it is
+    // the one before can only be corroborated on price, and nothing further
+    // back is distinguishable from anything else.
+    return near(quote.previous_close, snapshot.close) ? 1 : BEYOND_WINDOW
   }
 
   // Pre-#626 cached snapshot, or a quote the provider couldn't date.
-  if (near(quote.price, snapshot.close)) return "current"
-  if (near(quote.previous_close, snapshot.close)) return "prior"
-  // Matching neither is real evidence of staleness — but only if there was
-  // something to match against. A provider placeholder carries no prices at
-  // all, and reading that as "behind" blanked every symbol simultaneously
-  // while blaming the user's data for the provider's hiccup (#632).
-  if (quote.price == null && quote.previous_close == null) return "unknown"
-  return "behind"
+  if (near(quote.price, snapshot.close)) return 0
+  if (near(quote.previous_close, snapshot.close)) return 1
+  if (quote.price == null && quote.previous_close == null) return null
+  return BEYOND_WINDOW
+}
+
+/** Which number we are entitled to show. */
+type Plan = "live" | "settled" | "too-behind"
+
+/**
+ * Choose the strategy from the bar's distance alone.
+ *
+ * Short because the distance already says everything. `vnr_sigma` at bar t is
+ * the forecast for session t+1, so:
+ *
+ * - **d = 0** — the stored `vnr` already scores this session, and its forecast
+ *   is for *tomorrow*; dividing today's move by it is the mis-denomination
+ *   #626 describes. Show the stored value. The exception is a gap-flagged bar,
+ *   whose `vnr` is null while the quote's own single-session return stays
+ *   perfectly sound (#625).
+ * - **d >= 1** — the stored `vnr` describes a session that has since been
+ *   superseded, so it must not be shown next to a live price. But the quote's
+ *   `change_percent` is measured against the true previous close, making it a
+ *   verified single-session return at *any* distance; only the forecast ages,
+ *   by exactly d-1 EWMA updates. Score live while that is within tolerance.
+ * - **null** — nothing to contradict the snapshot, so it stands.
+ */
+function planFor(behind: number | null, gapFlagged: boolean): Plan {
+  if (behind === null) return "settled"
+  if (behind === 0) return gapFlagged ? "live" : "settled"
+  return behind <= VNR_MAX_SESSIONS_BEHIND ? "live" : "too-behind"
 }
 
 /**
  * Resolve what the σ column should show for one asset.
  *
- * The order matters and is the whole point of having one function:
- *
- * 1. **Live** when the quote covers a session the stored series doesn't — the
- *    stored bar is the prior session, or it is the current session but
- *    gap-flagged (the stored `vnr` is then null, yet the quote's
- *    `previous_close` *is* the missing session's close, so `change_percent` is
- *    a verified single-session return — #625).
- * 2. **Stored** when the bar is the quote's own session, or there is no quote
- *    to contradict it. Note this is checked *before* any live recompute for a
- *    settled bar: dividing today's return by a forecast that already absorbed
- *    today's move is the mis-denomination #626 describes.
- * 3. **Withheld**, with the most specific reason available.
+ * Three steps, deliberately separate: locate the bar, choose what that entitles
+ * us to compute, then either compute it or explain the absence. Every consumer
+ * goes through here — the group table, the board, the sort key and the detail
+ * page each used to order these decisions their own way and agreed only
+ * because gap and staleness rarely co-occur (#629).
  */
 export function resolveSigma(
   quote: Quote | undefined,
@@ -137,24 +161,28 @@ export function resolveSigma(
   const gap = getNumericValue(values, "vnr_gap_sessions")
   const bars = snapshot.bars
 
-  const relation = relateSession(snapshot, quote)
+  const behind = sessionsBehind(snapshot, quote)
+  const plan = planFor(behind, gap != null)
   const change = quote?.change_percent
-  const canScoreLive = change != null && forecast != null && forecast > 0
+  /** The distance, when it is a real count rather than "off the end". */
+  const distance = behind != null && Number.isFinite(behind) ? behind : null
 
-  if (canScoreLive && (relation === "prior" || (relation === "current" && gap != null))) {
+  if (plan === "live" && change != null && forecast != null && forecast > 0) {
     return { status: "ok", sigma: change / 100 / forecast, source: "live" }
   }
-
-  if (stored != null && (relation === "current" || relation === "none" || relation === "unknown")) {
+  if (plan === "settled" && stored != null) {
     return { status: "ok", sigma: stored, source: "settled" }
   }
 
-  if (relation === "behind") return { status: "withheld", reason: { kind: "feed_behind" } }
+  // Nothing renderable. Explain it, most specific cause first.
+  if (plan === "too-behind") {
+    return { status: "withheld", reason: { kind: "feed_behind", sessions: distance } }
+  }
   if (gap != null) return { status: "withheld", reason: { kind: "gap", sessions: gap } }
   if (bars != null && bars < VNR_WARMUP_SESSIONS) {
     return { status: "withheld", reason: { kind: "warmup", bars, needed: VNR_WARMUP_SESSIONS } }
   }
-  if (relation === "prior") return { status: "withheld", reason: { kind: "cannot_score" } }
+  if (plan === "live") return { status: "withheld", reason: { kind: "cannot_score" } }
   return { status: "withheld", reason: { kind: "no_data" } }
 }
 
@@ -169,7 +197,9 @@ export function sigmaSortKey(resolution: SigmaResolution): number | null {
 export function sigmaWithheldTitle(reason: WithheldReason): string | null {
   switch (reason.kind) {
     case "feed_behind":
-      return "σ-Move unavailable — price data is behind the live quote. A background job reconciles this automatically (usually within ~10 min)."
+      return reason.sessions != null
+        ? `σ-Move unavailable — stored prices are ${reason.sessions} trading sessions behind the live quote, too far for the volatility baseline to still describe today. A background job backfills this automatically.`
+        : "σ-Move unavailable — price data is behind the live quote. A background job reconciles this automatically (usually within ~10 min)."
     case "gap":
       return `σ-Move unavailable — the last return spans ${reason.sessions} trading sessions (gap in stored price history). A background job backfills missing sessions automatically; see the Stats page.`
     case "warmup":

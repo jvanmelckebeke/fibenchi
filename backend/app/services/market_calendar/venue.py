@@ -82,6 +82,33 @@ class Venue:
             return None
         return d in sessions
 
+    def recent_sessions(self, d: date, count: int) -> list[date] | None:
+        """The ``count`` most recent sessions at or before ``d``, newest first.
+
+        Answers "how many sessions back is this stored bar?" exactly, which is
+        the question the σ-Move display needs and cannot ask from two dates
+        alone: a client that only knows the current and prior session can
+        distinguish "yesterday" from "older", but not "older" from "far too
+        old" (#642). Shipping an ordered window lets it read the distance off
+        an index instead of counting business days — the heuristic that makes
+        every holiday look like a hole (#559, #633).
+
+        ``d`` need not itself be a session. None when the calendar can't answer
+        (unknown venue, out of range), and the caller falls back to its
+        calendar-less heuristic as everywhere else here; a shorter-than-asked
+        list is a real answer (the calendar simply starts later).
+
+        The lookback allows 15 days on top of a week per session requested,
+        which clears the longest shutdown any mapped calendar has (Golden Week,
+        Lunar New Year) even if it lands mid-window.
+        """
+        if count <= 0:
+            return []
+        sessions = self.session_dates(d - timedelta(days=15 + count * 7), d)
+        if not sessions:
+            return None
+        return sorted(sessions, reverse=True)[:count]
+
     def previous_session(self, d: date) -> date | None:
         """The trading session immediately before ``d`` (exclusive).
 
@@ -90,17 +117,12 @@ class Venue:
         closes within 0.5%, which is a test of how far the price moved rather
         than of which session it was (#626).
 
-        ``d`` itself need not be a session. None when the calendar can't answer
-        (unknown venue, out of range, or no session in the lookback), and the
-        caller falls back to its calendar-less heuristic as everywhere else
-        here. The 15-day window comfortably clears the longest exchange
-        shutdown any mapped calendar has (Golden Week, Lunar New Year).
+        A one-session specialisation of :meth:`recent_sessions`, shifted a day
+        to make the bound exclusive, so there is a single lookback
+        implementation to get wrong.
         """
-        sessions = self.session_dates(d - timedelta(days=15), d)
-        if not sessions:
-            return None
-        earlier = [s for s in sessions if s < d]
-        return max(earlier) if earlier else None
+        sessions = self.recent_sessions(d - timedelta(days=1), 1)
+        return sessions[0] if sessions else None
 
     def local_date(self, at: datetime | None = None) -> date | None:
         """The venue's local calendar date at ``at`` (UTC now by default).

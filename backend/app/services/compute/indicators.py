@@ -90,6 +90,24 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
 # RiskMetrics daily decay; shared by the vnr indicator and its live forecast.
 VNR_LAMBDA = 0.94
 
+# How many sessions the stored bar may sit behind the live session and still be
+# scored. Lives here, beside lambda, because it is a property of the vol model
+# rather than of any display: `vnr_sigma` at bar t forecasts session t+1, so a
+# bar N sessions behind carries a forecast that missed N-1 EWMA updates, and
+# lambda is what decides how much those updates were worth. At 0.94 the most
+# recent return carries 6% of the variance, so one missed update moves the
+# forecast by sqrt(0.94 + 0.06k^2) where k is that day's move in units of the
+# forecast: a typical (1σ) day is exact, a 3σ day costs 22%, and a dead-flat
+# day can never cost more than 3%.
+#
+# The numerator is unaffected at any distance — the quote's `change_percent` is
+# measured against the true previous close, so it stays a verified
+# single-session return no matter how stale our own bars are. Only the
+# denominator ages, which is why this is a bound and not a blank (#642).
+#
+# Exported to the frontend by scripts/export_shared_constants.py.
+VNR_MAX_SESSIONS_BEHIND = 3
+
 # Floor on the vol forecast, as a fraction of the asset's *own* long-run vol.
 # The EWMA is a pure function of recent returns, so a series that stops moving
 # decays it toward zero and the next real move divides by almost nothing. A

@@ -15,6 +15,7 @@ from app.domain.phases import Phase
 from app.repositories.asset_repo import AssetRepository
 from app.schemas.intraday import IntradayBar
 from app.schemas.quote import Quote
+from app.services.compute.indicators import VNR_MAX_SESSIONS_BEHIND
 from app.services.intraday import get_intraday_bars
 from app.services.market_calendar import schedule_poll_hint
 from app.services.price_providers import get_price_provider
@@ -71,19 +72,28 @@ def _poll_interval(market_states: set[str], symbols: Sequence[str], at=None) -> 
     return interval
 
 
-def attach_prior_sessions(quotes: list[Quote]) -> list[Quote]:
-    """Fill each quote's ``prior_session_date`` from its venue calendar.
+# Sessions of history to ship on each quote. Derived from the client's own
+# tolerance rather than picked, so the window is structurally guaranteed to
+# contain every distance the client will accept — a hand-chosen number here
+# could silently fall short and blank exactly the bars #642 set out to score.
+# The margin covers the boundary itself plus room for the tolerance to grow.
+QUOTE_SESSION_WINDOW = VNR_MAX_SESSIONS_BEHIND + 3
+
+
+def attach_recent_sessions(quotes: list[Quote]) -> list[Quote]:
+    """Fill each quote's ``recent_sessions`` from its venue calendar.
 
     The provider knows which session a quote is *in*; only the calendar knows
-    which session came before it. Shipping that answer (rather than the two
-    raw dates) keeps the client free of calendar logic: a snapshot whose
-    ``as_of`` equals this value is the quote's prior bar, exactly (#626).
+    what came before it. Shipping an ordered window (rather than raw dates for
+    the client to count between) keeps the client free of calendar logic: it
+    finds how far behind a stored bar is by looking ``as_of`` up in the list,
+    and "not in the list" is the answer for anything older (#626, #642).
 
     Resolved per ``(calendar, session_date)`` rather than per symbol — a
     portfolio is dozens of tickers across a handful of venues, and the answer
     only changes when a venue's local date rolls.
     """
-    resolved: dict[tuple[str, str], str | None] = {}
+    resolved: dict[tuple[str, str], list[str] | None] = {}
     for q in quotes:
         if not q.session_date:
             continue
@@ -93,11 +103,13 @@ def attach_prior_sessions(quotes: list[Quote]) -> list[Quote]:
         key = (venue.name, q.session_date)
         if key not in resolved:
             try:
-                prior = venue.previous_session(date.fromisoformat(q.session_date))
+                sessions = venue.recent_sessions(
+                    date.fromisoformat(q.session_date), QUOTE_SESSION_WINDOW
+                )
             except ValueError:  # provider gave a non-ISO date; not our problem to fix here
-                prior = None
-            resolved[key] = prior.isoformat() if prior else None
-        q.prior_session_date = resolved[key]
+                sessions = None
+            resolved[key] = [s.isoformat() for s in sessions] if sessions else None
+        q.recent_sessions = resolved[key]
     return quotes
 
 
@@ -105,7 +117,7 @@ async def get_quotes(symbols: str) -> list[Quote]:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
-    return attach_prior_sessions(await get_price_provider().batch_fetch_quotes(symbol_list))
+    return attach_recent_sessions(await get_price_provider().batch_fetch_quotes(symbol_list))
 
 
 async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
@@ -149,7 +161,7 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
                 await asyncio.sleep(60)
                 continue
 
-            quotes = attach_prior_sessions(
+            quotes = attach_recent_sessions(
                 await get_price_provider().batch_fetch_quotes(list(refs))
             )
 

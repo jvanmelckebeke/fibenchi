@@ -31,7 +31,7 @@ from __future__ import annotations
 import pathlib
 from dataclasses import dataclass
 
-from app.services.compute.indicators import VNR_WARMUP_SESSIONS
+from app.services.compute.indicators import VNR_MAX_SESSIONS_BEHIND, VNR_WARMUP_SESSIONS
 from app.services.price_sync import SESSION_MATCH_TOL
 
 
@@ -60,6 +60,26 @@ SHARED = [
             "to decide a stored bar is unreconciled and needs refetching. A drift\n"
             "here means the heal and the display disagree about which bars are\n"
             "usable, and σ stays blank on symbols the heal reports as repaired."
+        ),
+    ),
+    Constant(
+        name="VNR_MAX_SESSIONS_BEHIND",
+        value=VNR_MAX_SESSIONS_BEHIND,
+        source="app/services/compute/indicators.py",
+        doc=(
+            "How many sessions the stored bar may sit behind the live session and\n"
+            "still be scored.\n"
+            "\n"
+            "`vnr_sigma` at bar t forecasts session t+1, so a bar N sessions behind\n"
+            "carries a forecast that missed N-1 EWMA updates. The numerator is\n"
+            "unaffected at any distance: the quote's `change_percent` is measured\n"
+            "against the true previous close, so it stays a verified single-session\n"
+            "return however stale our own bars are. Only the denominator ages, which\n"
+            "is why this is a bound rather than a blank.\n"
+            "\n"
+            "Shared because the backend sizes the session window it ships on each\n"
+            "quote from this number — the window has to contain every distance the\n"
+            "frontend is willing to accept."
         ),
     ),
     Constant(

@@ -24,6 +24,25 @@
 export const SESSION_MATCH_TOL = 0.005
 
 /**
+ * How many sessions the stored bar may sit behind the live session and
+ * still be scored.
+ *
+ * `vnr_sigma` at bar t forecasts session t+1, so a bar N sessions behind
+ * carries a forecast that missed N-1 EWMA updates. The numerator is
+ * unaffected at any distance: the quote's `change_percent` is measured
+ * against the true previous close, so it stays a verified single-session
+ * return however stale our own bars are. Only the denominator ages, which
+ * is why this is a bound rather than a blank.
+ *
+ * Shared because the backend sizes the session window it ships on each
+ * quote from this number — the window has to contain every distance the
+ * frontend is willing to accept.
+ *
+ * @see backend/app/services/compute/indicators.py
+ */
+export const VNR_MAX_SESSIONS_BEHIND = 3
+
+/**
  * Sessions of history before the EWMA vol baseline is trustworthy.
  *
  * Enforced backend-side in `compute_indicators`, which returns no σ
