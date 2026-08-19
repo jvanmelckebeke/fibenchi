@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # The frontend's σ-Move (vnr) only trusts a stored daily bar when its close
 # reconciles with the live quote — within this tolerance of either the current
 # price (same session) or the previous close (prior session). Keep it in sync
-# with ``SESSION_MATCH_TOL`` in ``frontend/src/lib/indicator-registry.ts``.
+# with ``SESSION_MATCH_TOL`` in ``frontend/src/lib/sigma.ts``.
 SESSION_MATCH_TOL = 0.005  # 0.5%
 
 # "Is the current session's daily bar still forming?" now comes from the
@@ -49,7 +49,8 @@ def drop_unsettled_last_bar(
     session, and a sync running mid-session (or before Yahoo settles the bar
     after a market's close) persists that partial value. Once the price moves
     on, the stored close matches neither the live price nor the previous close,
-    so the frontend blanks σ-Move (see ``isStoredVnrStale``).
+    so the frontend blanks σ-Move (the ``behind`` case in ``resolveSigma``,
+    ``frontend/src/lib/sigma.ts``).
 
     This keeps the daily table to *completed* sessions. The last bar is dropped
     when it is identifiably the current session (its predecessor equals the

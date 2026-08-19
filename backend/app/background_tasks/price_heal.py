@@ -4,9 +4,10 @@ Two independent repair loops:
 
 - ``heal_unreconciled_prices`` — the *trailing-bar* heal: the frontend blanks
   σ-Move when an asset's latest stored close reconciles with neither the live
-  price nor the quote's previous close (``isStoredVnrStale`` in
-  ``frontend/src/lib/indicator-registry.ts``). That state means the stored
-  data is at least two sessions behind the quote — e.g.
+  price nor the quote's previous close (``resolveSigma`` in
+  ``frontend/src/lib/sigma.ts`` reads that as ``behind`` and withholds with
+  ``feed_behind``). That state means the stored data is at least two sessions
+  behind the quote — e.g.
   ``drop_unsettled_last_bar`` discarded a lagging bar and every scheduled sync
   since missed the symbol. Rather than waiting up to a day for the next
   scheduled sync, this detects the broken invariant server-side and refreshes
