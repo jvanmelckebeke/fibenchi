@@ -7,14 +7,6 @@ import { rampColor, type ColorMode } from "./color-scale"
 import { TileTooltip } from "./tile-tooltip"
 import type { Tile as TileData } from "./use-board-data"
 
-// One shared pulse: every live dot's animation phase is aligned to the wall
-// clock (negative delay = time since the epoch mod the cycle), so the board
-// reads as one system being alive rather than twinkling noise.
-const PING_CYCLE_MS = 2400
-function pingDelay(): string {
-  return `-${Date.now() % PING_CYCLE_MS}ms`
-}
-
 // Venue-phase icons: sun up = open, moon = closed, and the extended sessions
 // read as arrows against the open/close boundary — into the line before it
 // opens, out of the line after it closes. All glyphs render in the tile's own
@@ -23,17 +15,20 @@ function pingDelay(): string {
 export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: boolean }) {
   if (phase == null) return null
   if (phase === "open") {
-    // No native `title` here: this span sits inside the Radix TooltipTrigger,
-    // so the browser's own tooltip would surface on top of the styled card ~500
-    // ms later. The live/scheduled distinction lives in the card's source line.
+    // The sun used to sit in front of an animated ping halo, added to make
+    // "live" unmissable. The glyph is distinctive enough on its own, and it was
+    // the only one of the four phase icons that moved, so on a board built to
+    // be scanned it read as noise rather than signal, worst around midday when
+    // most tiles are open (#655).
+    //
+    // Still no native `title`: this renders inside the Radix TooltipTrigger, so
+    // the browser's own tooltip would surface on top of the styled card ~500 ms
+    // later. The live/scheduled distinction lives in the card's source line.
     return (
-      <span className="relative shrink-0" aria-label={live ? "Open (live)" : "Open (scheduled)"}>
-        <span
-          className="board-ping absolute inset-0.5 rounded-full bg-current"
-          style={{ animationDelay: pingDelay() }}
-        />
-        <Sun className="phase-icon relative h-3.5 w-3.5 text-current 2xl:h-4 2xl:w-4" />
-      </span>
+      <Sun
+        className="phase-icon h-3.5 w-3.5 shrink-0 text-current 2xl:h-4 2xl:w-4"
+        aria-label={live ? "Open (live)" : "Open (scheduled)"}
+      />
     )
   }
   if (phase === "premarket") {
