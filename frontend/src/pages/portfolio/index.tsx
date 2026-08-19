@@ -8,7 +8,7 @@ import { Board } from "./board/board"
 import { FilterBar } from "./board/filter-bar"
 import { IndexCard, MoversCard, MostUnusualCard } from "./board/rail"
 import type { ColorMode } from "./board/color-scale"
-import { useBoardData, type GroupBy } from "./board/use-board-data"
+import { useBoardData, type GroupBy, type PhaseFilter } from "./board/use-board-data"
 
 // View prefs persist locally — they're device-level ergonomics, not data.
 function usePersisted<T extends string>(key: string, initial: T) {
@@ -23,7 +23,8 @@ function usePersisted<T extends string>(key: string, initial: T) {
 export function PortfolioPage() {
   const [groupBy, setGroupBy] = usePersisted<GroupBy>("board-group-by", "group")
   const [mode, setMode] = usePersisted<ColorMode>("board-color-mode", "sigma")
-  const { sections, tiles, coverage, isLoading } = useBoardData(groupBy)
+  const [phaseFilter, setPhaseFilter] = usePersisted<PhaseFilter>("board-phase-filter", "all")
+  const { sections, tiles, coverage, isLoading } = useBoardData(groupBy, phaseFilter)
   const allTiles = useMemo(() => [...tiles.values()], [tiles])
 
   return (
@@ -34,6 +35,8 @@ export function PortfolioPage() {
           onGroupBy={setGroupBy}
           mode={mode}
           onMode={setMode}
+          phaseFilter={phaseFilter}
+          onPhaseFilter={setPhaseFilter}
           coverage={coverage}
         />
         {isLoading ? (
@@ -43,11 +46,26 @@ export function PortfolioPage() {
             ))}
           </div>
         ) : sections.length === 0 ? (
+          // An empty board under the Open filter is a normal state — a
+          // weekend, or the hours after the US close — not an empty account.
+          // Saying "no assets" there would read as a broken board.
           <p className="py-16 text-center text-sm text-muted-foreground">
-            No assets yet. Add assets to a group and refresh prices.
+            {phaseFilter === "open" && allTiles.length > 0 ? (
+              <>
+                No markets open right now.{" "}
+                <button
+                  onClick={() => setPhaseFilter("all")}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Show all {allTiles.length}
+                </button>
+              </>
+            ) : (
+              "No assets yet. Add assets to a group and refresh prices."
+            )}
           </p>
         ) : (
-          <Board sections={sections} mode={mode} />
+          <Board sections={sections} mode={mode} scaleTiles={allTiles} />
         )}
       </div>
       <aside className="w-full shrink-0 space-y-3 lg:w-[300px] 2xl:w-[340px]">

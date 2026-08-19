@@ -1,9 +1,10 @@
 // Assembles everything the dense board renders: the tile roster with per-tile
 // σ/%/phase resolution, the section grouping, and the coverage numbers.
 //
-// σ resolution reuses the group table's exact cascade (computeLiveVnr →
-// stored vnr unless isStoredVnrStale → explain the blank) so the board can
-// never disagree with the table about the same asset.
+// σ resolution calls the shared resolver (lib/sigma) rather than restating the
+// cascade, so the board and the group table cannot disagree about an asset.
+// They used to agree only by luck: each site ordered the same decisions
+// differently, and gap-vs-stale simply rarely co-occurred (#629).
 
 import { useMemo } from "react"
 import { type Asset, type SparklinePoint } from "@/lib/api"
@@ -16,29 +17,23 @@ import {
   useTheses,
 } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
-import {
-  computeLiveVnr,
-  getNumericValue,
-  isStoredVnrStale,
-} from "@/lib/indicator-registry"
+import { resolveSigma, type WithheldReason } from "@/lib/sigma"
 import { marketState } from "@/lib/market-state"
-import { VNR_BASELINE_SESSIONS, type PctWindow, PCT_WINDOWS } from "./color-scale"
+import { type PctWindow, PCT_WINDOWS } from "./color-scale"
 
 export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 
-/** Why a tile has no σ reading.
+/** Why a tile has no σ reading — the shared {@link WithheldReason}, plus the
+ * one field only the board has: when the next hole scan runs.
  *
- * The variants are load-bearing *here* even though the tooltip only prints
- * `warmup`: `feed_behind` vs `gap` is what decides whether σ is withheld at
- * all, and the cascade below reads them to stay honest. Nothing downstream
- * discriminates them anymore — that is deliberate (all three non-warmup states
- * resolve to the same user action), not an oversight to be tidied away.
+ * The variants stay discriminated even though the tooltip only shapes
+ * `warmup`: they decide *whether* σ is withheld at all. Nothing downstream
+ * discriminates the rest — deliberate (they resolve to the same user action),
+ * not an oversight to be tidied away.
  */
 export type NoReadingReason =
-  | { kind: "feed_behind" }
+  | Exclude<WithheldReason, { kind: "gap" }>
   | { kind: "gap"; sessions: number; nextScanSeconds: number | null }
-  | { kind: "warmup"; bars: number; needed: number }
-  | { kind: "unknown" }
 
 export interface Tile {
   /** The tile's identity — also its React key, route param and lookup key. */
@@ -78,6 +73,23 @@ export interface BoardSection {
 }
 
 export type GroupBy = "group" | "thesis"
+
+/** Which venue phases earn a tile. "open" is the trading session proper —
+ * pre-market and after-hours are excluded on purpose: they're thin, the tile
+ * carries no volume to show how thin, and the coverage badge already counts
+ * "open" this way. One predicate, so the badge and the grid can't disagree. */
+export type PhaseFilter = "all" | "open"
+
+/** Narrow the tile map to what the filter admits. A `null` phase is an
+ * unresolved calendar, not an open one, so it is hidden too — the filter
+ * promises "these can move", and an unknown venue can't back that. */
+export function applyPhaseFilter(
+  tiles: Map<string, Tile>,
+  filter: PhaseFilter,
+): Map<string, Tile> {
+  if (filter === "all") return tiles
+  return new Map([...tiles].filter(([, t]) => t.phase === "open"))
+}
 
 /** Per-symbol % change series over the covering month, shared by the tiles'
  * %-mode, the Movers card, and the tooltips — one fetch, three windows.
@@ -125,7 +137,7 @@ function useWindowReturns(symbols: string[]) {
 
 const EMPTY_WINDOWS: Record<PctWindow, number | null> = { "1wk": null, "2wk": null, "1mo": null }
 
-export function useBoardData(groupBy: GroupBy) {
+export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all") {
   const { data: groups, isLoading: groupsLoading } = useGroups()
   const { data: theses } = useTheses()
   const quotes = useQuotes()
@@ -187,29 +199,17 @@ export function useBoardData(groupBy: GroupBy) {
     for (const [symbol, asset] of roster) {
       const quote = quotes[symbol]
       const snap = snapshots?.[symbol]
-      const values = snap?.values
 
-      let sigma = computeLiveVnr(quote, values, snap?.close)
-      let reason: NoReadingReason | null = null
-      if (sigma == null) {
-        const stale = isStoredVnrStale(quote, snap?.close)
-        const stored = getNumericValue(values, "vnr")
-        if (stored != null && !stale) {
-          sigma = stored
-        } else if (stale) {
-          reason = { kind: "feed_behind" }
-        } else {
-          const gap = getNumericValue(values, "vnr_gap_sessions")
-          const bars = snap?.bars ?? null
-          if (gap != null) {
-            reason = { kind: "gap", sessions: gap, nextScanSeconds: health?.next_scan_in_seconds ?? null }
-          } else if (bars != null && bars < VNR_BASELINE_SESSIONS) {
-            reason = { kind: "warmup", bars, needed: VNR_BASELINE_SESSIONS }
-          } else {
-            reason = { kind: "unknown" }
-          }
-        }
-      }
+      const resolved = resolveSigma(quote, snap)
+      const sigma = resolved.status === "ok" ? resolved.sigma : null
+      // The board adds one field the shared resolver has no business knowing:
+      // when the next hole scan runs. Widen the reason here rather than
+      // pushing a board concern into lib/sigma.
+      const reason: NoReadingReason | null = resolved.status === "withheld"
+        ? resolved.reason.kind === "gap"
+          ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
+          : resolved.reason
+        : null
 
       const scheduled = symbolPhase[symbol]
       const liveState = quote?.market_state != null
@@ -236,9 +236,21 @@ export function useBoardData(groupBy: GroupBy) {
     return out
   }, [roster, quotes, snapshots, windowReturns, series, sectionsBySymbol, symbolPhase, health])
 
+  // Filtering happens on the tile map, before sections are assembled: the
+  // lookups below then drop the hidden symbols by themselves, the
+  // length guard clears the sections that empty out, and thesis mode's
+  // "No thesis" bucket follows without a second code path.
+  //
+  // `tiles` itself stays whole — the rail and the coverage badge summarise the
+  // day, which includes the venues that have already gone home.
+  const visibleTiles = useMemo(
+    () => applyPhaseFilter(tiles, phaseFilter),
+    [tiles, phaseFilter],
+  )
+
   const sections = useMemo<BoardSection[]>(() => {
     const toTiles = (list: Asset[]) =>
-      list.map((a) => tiles.get(a.symbol)).filter((t): t is Tile => !!t)
+      list.map((a) => visibleTiles.get(a.symbol)).filter((t): t is Tile => !!t)
     if (groupBy === "group") {
       return (groups ?? [])
         .map((g) => ({ key: `g${g.id}`, title: g.name, accent: null, tiles: toTiles(g.assets) }))
@@ -248,10 +260,10 @@ export function useBoardData(groupBy: GroupBy) {
       .map((t) => ({ key: `t${t.id}`, title: t.name, accent: t.color, tiles: toTiles(t.assets) }))
       .filter((s) => s.tiles.length > 0)
     const inThesis = new Set((theses ?? []).flatMap((t) => t.assets.map((a) => a.symbol)))
-    const rest = [...tiles.values()].filter((t) => !inThesis.has(t.symbol))
+    const rest = [...visibleTiles.values()].filter((t) => !inThesis.has(t.symbol))
     if (rest.length) out.push({ key: "no-thesis", title: "No thesis", accent: null, tiles: rest })
     return out
-  }, [groupBy, groups, theses, tiles])
+  }, [groupBy, groups, theses, visibleTiles])
 
   const coverage = useMemo(() => {
     const all = [...tiles.values()]

@@ -1,7 +1,7 @@
 """Tests for the price_sync service (sync orchestration and upsert logic)."""
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
@@ -566,8 +566,12 @@ async def test_drop_and_persist_deletes_orphaned_partial(db):
     assert asset.id not in latest  # the orphaned 2025-06-30 partial was deleted
 
 
-async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
-    """No drop → no delete: a settled frame leaves later stored rows untouched."""
+async def test_drop_and_persist_keeps_rows_when_the_frame_is_stale(db):
+    """A frame ending long ago is a truncated provider response, not proof that
+    later stored rows are orphans — so nothing is deleted. Every path into
+    _drop_and_persist fetches *to now*, so this only happens when the provider
+    gave a short answer, and deleting real data on that basis would be worse
+    than leaving a stale row (#627)."""
     asset = Asset(symbol="KEEP", name="Keep", type=AssetType.STOCK, currency="USD")
     db.add(asset)
     await db.flush()
@@ -575,7 +579,8 @@ async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
                         open=1, high=1, low=1, close=500.0, volume=0))
     await db.commit()
 
-    # Closed, settled bar (matches live price) → drop_unsettled keeps everything.
+    # Closed, settled bar (matches live price) → drop_unsettled keeps everything,
+    # and the frame is dated 2025-01 → far outside PURGE_FRESHNESS_DAYS.
     df = _df_from_closes([57.5, 58.04, 59.0])
     anchor = (58.72, 58.04, "POSTPOST", None)
     with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
@@ -583,3 +588,184 @@ async def test_drop_and_persist_keeps_rows_when_nothing_dropped(db):
 
     latest = await PriceRepository(db).get_latest_closes([asset.id])
     assert latest[asset.id][0] == date(2025, 6, 30)  # untouched
+
+
+async def test_drop_and_persist_purges_orphan_the_provider_stopped_reporting(db):
+    """The #627 regression: an orphan whose date the provider no longer returns.
+
+    Nothing is dropped (the frame never contained that date), so the old
+    `len(kept) < len(df)` gate purged nothing — and heal_unreconciled_prices
+    re-ran this exact path and no-opped identically, forever. A *current* frame
+    is proof enough that a row past its end is an orphan.
+    """
+    asset = Asset(symbol="STUCK", name="Stuck", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    orphan = date.today() + timedelta(days=1)  # past anything a fetch can return
+    db.add(PriceHistory(asset_id=asset.id, date=orphan,
+                        open=1, high=1, low=1, close=999.0, volume=0))
+    await db.commit()
+
+    # Settled frame ending today: nothing to drop, but authoritative about now.
+    df = _df_ending(date.today(), [57.5, 58.04, 59.0])
+    anchor = (59.0, 58.04, "POSTPOST", None)
+    with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
+        await _drop_and_persist(db, AssetRef.of(asset), df, anchor)
+
+    latest = await PriceRepository(db).get_latest_closes([asset.id])
+    assert asset.id not in latest  # orphan gone; only the (mocked) upsert remains
+
+
+async def test_drop_and_persist_current_frame_keeps_its_own_last_bar(db):
+    """The freshness purge must delete strictly *after* the last kept bar — a
+    current frame must never delete the bar it just stored."""
+    asset = Asset(symbol="SELF", name="Self", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    today = date.today()
+    db.add(PriceHistory(asset_id=asset.id, date=today,
+                        open=1, high=1, low=1, close=59.0, volume=0))
+    await db.commit()
+
+    df = _df_ending(today, [57.5, 58.04, 59.0])
+    anchor = (59.0, 58.04, "POSTPOST", None)
+    with patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
+        await _drop_and_persist(db, AssetRef.of(asset), df, anchor)
+
+    latest = await PriceRepository(db).get_latest_closes([asset.id])
+    assert latest[asset.id][0] == today
+
+
+# --- writes tell the indicator cache their series changed (#628) ------------
+
+async def test_upsert_invalidates_the_indicator_cache(db):
+    """The cache key is (symbols, set-wide max date), which a corrected close or
+    a backfilled interior session does not move. Without this the repaired
+    symbol keeps serving its broken snapshot for the rest of the 600s TTL."""
+    from app.services.compute.group import _indicator_cache
+
+    asset = Asset(symbol="CACHE", name="Cache", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    await db.commit()
+
+    _indicator_cache.clear()
+    key = (frozenset({"CACHE"}), date(2025, 1, 6))
+    _indicator_cache.set_value(key, {"stale": True})
+
+    with patch.object(PriceRepository, "upsert_prices", new_callable=AsyncMock, return_value=3):
+        await _upsert_prices(db, AssetRef.of(asset), _df_from_closes([1.0, 2.0, 3.0]))
+
+    assert _indicator_cache.get_value(key) is None
+
+
+async def test_upsert_of_nothing_leaves_the_cache_alone(db):
+    """An empty frame changed no series, so it must not throw away work."""
+    from app.services.compute.group import _indicator_cache
+
+    asset = Asset(symbol="NOOP", name="Noop", type=AssetType.STOCK, currency="USD")
+    db.add(asset)
+    await db.flush()
+    await db.commit()
+
+    _indicator_cache.clear()
+    key = (frozenset({"NOOP"}), date(2025, 1, 6))
+    _indicator_cache.set_value(key, {"fresh": True})
+
+    with patch.object(PriceRepository, "upsert_prices", new_callable=AsyncMock, return_value=0):
+        await _upsert_prices(db, AssetRef.of(asset), pd.DataFrame())
+
+    assert _indicator_cache.get_value(key) == {"fresh": True}
+
+
+# --- #635: the session date is direct evidence, so it outranks the heuristic --
+
+async def test_drop_unsettled_uses_session_date_when_predecessor_does_not_match():
+    """The regression: an interior hole right before today leaves the frame's
+    second-to-last bar unmatched with `previous_close`, which used to early-
+    return and persist a still-forming partial as a completed close."""
+    today = date.today()
+    df = _df_ending(today, [90.0, 100.0, 103.0])
+    kept = drop_unsettled_last_bar(
+        df, price=103.0, previous_close=101.0,   # predecessor 100.0 != 101.0
+        market_state="REGULAR", session_date=today,
+    )
+    assert len(kept) == len(df) - 1
+
+
+async def test_drop_unsettled_drops_a_lagging_bar_dated_the_live_session():
+    """Market closed, bar dated today, Yahoo's daily feed still behind the
+    quote — drop it rather than store a value that reconciles with nothing."""
+    today = date.today()
+    df = _df_ending(today, [90.0, 100.0, 103.0])
+    kept = drop_unsettled_last_bar(
+        df, price=108.0, previous_close=101.0,   # 103 hasn't settled to 108
+        market_state="POSTPOST", session_date=today,
+    )
+    assert len(kept) == len(df) - 1
+
+
+async def test_drop_unsettled_keeps_a_settled_bar_dated_the_live_session():
+    today = date.today()
+    df = _df_ending(today, [90.0, 100.0, 103.0])
+    kept = drop_unsettled_last_bar(
+        df, price=103.0, previous_close=101.0,
+        market_state="POSTPOST", session_date=today,
+    )
+    assert len(kept) == len(df)
+
+
+# --- #635: impossible bars are rejected at the write path --------------------
+
+def _bar(o, h, low, c, vol=1000):
+    return {"open": o, "high": h, "low": low, "close": c, "volume": vol}
+
+
+def test_build_price_rows_rejects_self_contradictory_bars():
+    """A wrong value on a date that exists passed every downstream guard: they
+    all reason about dates or about the latest bar, never about values."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame(
+        [
+            _bar(100, 105, 99, 102),      # fine
+            _bar(100, 95, 99, 97),        # high below low
+            _bar(100, 105, -1, 102),      # non-positive
+        ],
+        index=pd.bdate_range("2025-01-02", periods=3),
+    )
+    rows = PriceRepository.build_price_rows(ref, df)
+    assert [r["date"] for r in rows] == [date(2025, 1, 2)]
+
+
+def test_build_price_rows_keeps_a_close_outside_its_own_range():
+    """Measured: ~1% of real provider bars print an auction close outside the
+    intraday range, by up to 4.4% of price. Rejecting those would punch ~182
+    holes a year into the series and blank σ-Move after each one — inventing
+    the defect this whole batch removed."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame(
+        [_bar(100, 105, 99, 105.5), _bar(100, 105, 99, 98.5), _bar(105.5, 105, 99, 102)],
+        index=pd.bdate_range("2025-01-02", periods=3),
+    )
+    assert len(PriceRepository.build_price_rows(ref, df)) == 3
+
+
+def test_build_price_rows_keeps_a_real_crash():
+    """Only self-contradiction is rejected, never merely surprising — a market
+    that gaps 40% is a market this app exists to show."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame(
+        [_bar(100, 101, 99, 100), _bar(60, 62, 55, 58)],
+        index=pd.bdate_range("2025-01-02", periods=2),
+    )
+    assert len(PriceRepository.build_price_rows(ref, df)) == 2
+
+
+def test_build_price_rows_logs_rejected_bars(caplog):
+    """A rejected bar leaves a hole, which downstream must be able to explain."""
+    ref = AssetRef("TEST", 1)
+    df = pd.DataFrame([_bar(100, 95, 99, 97)], index=pd.bdate_range("2025-01-02", periods=1))
+    with caplog.at_level(logging.WARNING):
+        PriceRepository.build_price_rows(ref, df)
+    assert "inconsistent" in caplog.text
+    assert "2025-01-02" in caplog.text

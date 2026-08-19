@@ -4,9 +4,10 @@ Two independent repair loops:
 
 - ``heal_unreconciled_prices`` — the *trailing-bar* heal: the frontend blanks
   σ-Move when an asset's latest stored close reconciles with neither the live
-  price nor the quote's previous close (``isStoredVnrStale`` in
-  ``frontend/src/lib/indicator-registry.ts``). That state means the stored
-  data is at least two sessions behind the quote — e.g.
+  price nor the quote's previous close (``resolveSigma`` in
+  ``frontend/src/lib/sigma.ts`` reads that as ``behind`` and withholds with
+  ``feed_behind``). That state means the stored data is at least two sessions
+  behind the quote — e.g.
   ``drop_unsettled_last_bar`` discarded a lagging bar and every scheduled sync
   since missed the symbol. Rather than waiting up to a day for the next
   scheduled sync, this detects the broken invariant server-side and refreshes
@@ -112,14 +113,31 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
 
     healed: dict[str, int] = {}
     for sym, anchor in due:
-        _last_attempt[sym] = now
+        ref = by_symbol[sym]
         try:
-            healed[sym] = await sync_asset_prices(db, by_symbol[sym], period="1mo", anchor=anchor)
+            healed[sym] = await sync_asset_prices(db, ref, period="1mo", anchor=anchor)
         except Exception:
+            _last_attempt[sym] = now  # back off on a failing symbol too
             logger.warning("Price heal for %s failed", sym, exc_info=True)
             # This loop shares one session across symbols; roll back a
             # half-applied transaction so it can't poison the next heal.
             await db.rollback()
+            continue
+        # Cooldown is for "Yahoo is serving data we cannot reconcile", so spend
+        # it on that outcome rather than on the attempt: a heal that *worked*
+        # should not lock the symbol out for 30 minutes if it breaks again, and
+        # (before #627) a heal that structurally *could not* work was buying the
+        # lockout every time while changing nothing.
+        price, previous_close = anchor[0], anchor[1]
+        stored = (await PriceRepository(db).get_latest_closes([ref.id])).get(ref.id)
+        if stored is None or not (
+            _reconciles(stored[1], price) or _reconciles(stored[1], previous_close)
+        ):
+            _last_attempt[sym] = now
+            logger.info(
+                "%s: still unreconciled after heal — backing off %d min",
+                sym, HEAL_COOLDOWN_SECONDS // 60,
+            )
     return healed
 
 

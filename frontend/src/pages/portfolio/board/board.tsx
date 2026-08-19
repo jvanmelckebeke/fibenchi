@@ -5,7 +5,7 @@ import { RAMP_COLORS, pctSpan, sigmaUnit } from "./color-scale"
 import type { ColorMode } from "./color-scale"
 import { packSections } from "./paging"
 import { BoardTile, PhaseIcon } from "./tile"
-import type { BoardSection } from "./use-board-data"
+import type { BoardSection, Tile } from "./use-board-data"
 
 // Geometry per breakpoint, mirroring the tile/grid Tailwind classes. Row =
 // tile height + gap; header = section title + margins + inter-section gap.
@@ -57,15 +57,26 @@ function usePagedSections(sections: BoardSection[]) {
   return { ref, footerRef, pages, availPx: metrics.availPx }
 }
 
-export function Board({ sections, mode }: { sections: BoardSection[]; mode: ColorMode }) {
+export function Board({
+  sections,
+  mode,
+  scaleTiles,
+}: {
+  sections: BoardSection[]
+  mode: ColorMode
+  /** The tiles the ramp is calibrated on — the *unfiltered* board, which is
+   * wider than what `sections` renders when the Open filter is on. Calibrating
+   * on the visible subset would repaint every surviving tile as you toggle,
+   * which makes the filter something other than a hide. */
+  scaleTiles: Tile[]
+}) {
   // Day-adaptive scale: computed over the whole board — every page and
   // section shares one ramp (per-page scales would make colours incomparable).
   const span = useMemo(() => {
-    const tiles = sections.flatMap((s) => s.tiles)
     if (mode === "sigma")
-      return 3 * sigmaUnit(tiles.map((t) => t.sigma).filter((v): v is number => v != null))
-    return pctSpan(tiles.map((t) => t.todayPct).filter((v): v is number => v != null))
-  }, [sections, mode])
+      return 3 * sigmaUnit(scaleTiles.map((t) => t.sigma).filter((v): v is number => v != null))
+    return pctSpan(scaleTiles.map((t) => t.todayPct).filter((v): v is number => v != null))
+  }, [scaleTiles, mode])
 
   const { ref, footerRef, pages, availPx } = usePagedSections(sections)
   const [page, setPage] = useState(0)

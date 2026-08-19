@@ -13,6 +13,7 @@ from app.domain import AssetKind, AssetRef
 from app.services.market_calendar import (
     DEFAULT_US_CALENDAR,
     INDEX_CALENDARS,
+    PERCENT_QUOTED_INDICES,
     SUFFIX_LISTINGS,
     any_venue_open,
 )
@@ -266,6 +267,101 @@ def test_symbol_currency_shapes():
     assert AssetRef("^GSPC").currency is None
     assert AssetRef("EURUSD=X").currency is None
     assert AssetRef("FOO.ZZ").currency is None
+
+
+def test_recent_sessions_is_ordered_and_calendar_exact():
+    """The client reads "how many sessions behind" off this list's index, so the
+    order and the holiday skips are the contract."""
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.recent_sessions(date(2025, 4, 21), 4) == [
+        date(2025, 4, 21),   # Easter Monday — a session
+        date(2025, 4, 17),   # Good Friday is not, so Thursday follows
+        date(2025, 4, 16),
+        date(2025, 4, 15),
+    ]
+
+
+def test_recent_sessions_includes_the_day_itself_only_when_it_is_one():
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.recent_sessions(date(2025, 4, 19), 1) == [date(2025, 4, 17)]  # a Saturday
+
+
+def test_recent_sessions_spans_a_long_shutdown():
+    """The lookback has to clear the longest holiday any mapped calendar has,
+    or a window that lands on one silently comes back short."""
+    tokyo = AssetRef("7203.T").venue
+    assert tokyo is not None
+    sessions = tokyo.recent_sessions(date(2025, 5, 7), 6)  # just after Golden Week
+    assert len(sessions) == 6
+    assert sessions == sorted(sessions, reverse=True)
+
+
+def test_recent_sessions_fails_safe():
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.recent_sessions(date(1800, 1, 2), 3) is None
+    assert nyse.recent_sessions(date(2025, 4, 21), 0) == []
+
+
+def test_previous_session_is_calendar_exact():
+    """The exact answer the σ-Move display used to approximate by comparing two
+    closes within 0.5% — a test of how far the price moved, not of which
+    session it was (#626)."""
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.previous_session(date(2025, 4, 21)) == date(2025, 4, 17)  # skips Good Friday
+    assert nyse.previous_session(date(2025, 4, 14)) == date(2025, 4, 11)  # skips the weekend
+    # `d` need not itself be a session.
+    assert nyse.previous_session(date(2025, 4, 19)) == date(2025, 4, 17)  # a Saturday
+    # 24/7 venues have no holidays to skip.
+    crypto = AssetRef("BTC-USD").venue
+    assert crypto is not None
+    assert crypto.previous_session(date(2025, 4, 21)) == date(2025, 4, 20)
+
+
+def test_previous_session_fails_safe():
+    """Out of calendar range returns None rather than a guess, matching every
+    other query here — the caller falls back to its calendar-less heuristic."""
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.previous_session(date(1800, 1, 2)) is None
+    assert AssetRef("FOO.ZZ").venue is None
+
+
+def test_every_percent_quoted_index_resolves_a_calendar():
+    """A tracked index with no calendar degrades *silently*: classify returns
+    calendar=None, session_gap_days falls back to np.busday_count (weekends but
+    not holidays), so every exchange holiday reads as a session hole and blanks
+    σ-Move on the bar after it — and scan_session_coverage skips venue-less
+    assets, so the hole heal never touches it.
+
+    PERCENT_QUOTED_INDICES and INDEX_CALENDARS are two hand-maintained tables
+    keyed by the same symbols; #633 was the four yield indices being in one and
+    not the other. This pins the invariant so the next addition can't repeat it.
+    """
+    for symbol in sorted(PERCENT_QUOTED_INDICES):
+        assert AssetRef(symbol).calendar_name is not None, (
+            f"{symbol} is tracked as a percent-quoted index but has no calendar "
+            f"— add it to INDEX_CALENDARS"
+        )
+
+
+def test_yield_indices_follow_the_nyse_session_set():
+    """The CBOE yield indices track the bond market, which closes on days NYSE
+    stays open — but exchange_calendars has no SIFMA calendar and Yahoo serves
+    bars on those days (carried forward), so XNYS is the mapping that matches
+    the data. Pinned against 2025 fixtures; see #633 for the measurements."""
+    venue = AssetRef("^TNX").venue
+    assert venue is not None
+    # Bond market closed, NYSE open — Yahoo still has a bar, so it must be a
+    # session or the gap guard fabricates a hole.
+    assert venue.is_session(date(2025, 10, 13)) is True   # Columbus Day
+    assert venue.is_session(date(2025, 11, 11)) is True   # Veterans Day
+    # Both closed — correctly not a session.
+    assert venue.is_session(date(2025, 4, 18)) is False   # Good Friday
+    assert AssetRef("^TNX").calendar_name == AssetRef("^GSPC").calendar_name
 
 
 def test_new_calendar_coverage():

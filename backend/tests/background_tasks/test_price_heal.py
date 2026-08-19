@@ -8,9 +8,11 @@ exact condition under which the frontend blanks σ-Move.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy import update
 
 from app.background_tasks import price_heal
 from app.background_tasks.price_heal import MAX_HEALS_PER_RUN, heal_unreconciled_prices
+from app.models import PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.schemas.quote import Quote
 from tests.helpers import seed_asset_with_prices
@@ -154,6 +156,52 @@ async def test_heal_cooldown_prevents_hammering(db):
     mock_sync.assert_awaited_once()
 
 
+async def test_heal_success_does_not_burn_the_cooldown(db):
+    """The 30-minute lockout exists for "Yahoo is serving unreconcilable data".
+    A heal that actually repaired the symbol must not buy it: before #627 the
+    cooldown was charged on the *attempt*, so a heal that structurally could
+    not work (the orphan purge never fired) locked the symbol out every run
+    while changing nothing."""
+    asset = await seed_asset_with_prices(db, "FIXD.MI", n_days=30)
+    close = await _latest_close(db, asset)
+    fixed_price = close * 0.90
+    provider = _provider_with_quotes([_quote("FIXD.MI", fixed_price, close * 0.95)])
+
+    async def repairing_sync(session, ref, period=None, anchor=None):
+        """Stand in for a sync that genuinely fixes the stored bar."""
+        latest = await PriceRepository(session).get_latest_closes([ref.id])
+        await session.execute(
+            update(PriceHistory)
+            .where(PriceHistory.asset_id == ref.id, PriceHistory.date == latest[ref.id][0])
+            .values(close=fixed_price)
+        )
+        await session.commit()
+        return 1
+
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices", side_effect=repairing_sync):
+        await heal_unreconciled_prices(db)
+
+    assert await _latest_close(db, asset) == pytest.approx(fixed_price)
+    assert "FIXD.MI" not in price_heal._last_attempt
+
+
+async def test_heal_error_still_sets_the_cooldown(db):
+    """A symbol whose refresh raises must still back off, or a persistently
+    failing symbol is retried every run."""
+    asset = await seed_asset_with_prices(db, "BOOM.MI", n_days=30)
+    close = await _latest_close(db, asset)
+    provider = _provider_with_quotes([_quote("BOOM.MI", close * 0.90, close * 0.95)])
+
+    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
+         patch("app.background_tasks.price_heal.sync_asset_prices",
+               new_callable=AsyncMock, side_effect=RuntimeError("yahoo down")):
+        healed = await heal_unreconciled_prices(db)
+
+    assert healed == {}
+    assert "BOOM.MI" in price_heal._last_attempt
+
+
 async def test_heal_caps_per_run_and_defers_rest(db):
     """At most MAX_HEALS_PER_RUN symbols are refreshed per run; the rest follow."""
     n = MAX_HEALS_PER_RUN + 2
@@ -184,7 +232,6 @@ from sqlalchemy import delete  # noqa: E402
 
 from app.background_tasks.price_heal import find_interior_holes, heal_interior_holes  # noqa: E402
 from app.domain import AssetRef  # noqa: E402
-from app.models import PriceHistory  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

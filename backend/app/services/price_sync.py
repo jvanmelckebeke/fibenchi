@@ -10,14 +10,20 @@ from app.domain import AssetRef
 from app.domain.market_state import is_session_forming
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
+from app.services.compute.group import invalidate_indicator_cache
 from app.services.price_providers import PriceProvider, get_price_provider
 
 logger = logging.getLogger(__name__)
 
 # The frontend's σ-Move (vnr) only trusts a stored daily bar when its close
 # reconciles with the live quote — within this tolerance of either the current
-# price (same session) or the previous close (prior session). Keep it in sync
-# with ``SESSION_MATCH_TOL`` in ``frontend/src/lib/indicator-registry.ts``.
+# price (same session) or the previous close (prior session).
+#
+# This is the source of truth for both languages: ``scripts/
+# export_shared_constants.py`` reflects it into
+# ``frontend/src/lib/generated/backend-constants.ts``, and CI fails if that
+# artifact goes stale. Change the number here and re-export; never edit the
+# generated file.
 SESSION_MATCH_TOL = 0.005  # 0.5%
 
 # "Is the current session's daily bar still forming?" now comes from the
@@ -48,7 +54,8 @@ def drop_unsettled_last_bar(
     session, and a sync running mid-session (or before Yahoo settles the bar
     after a market's close) persists that partial value. Once the price moves
     on, the stored close matches neither the live price nor the previous close,
-    so the frontend blanks σ-Move (see ``isStoredVnrStale``).
+    so the frontend blanks σ-Move (the ``behind`` case in ``resolveSigma``,
+    ``frontend/src/lib/sigma.ts``).
 
     This keeps the daily table to *completed* sessions. The last bar is dropped
     when it is identifiably the current session (its predecessor equals the
@@ -76,22 +83,39 @@ def drop_unsettled_last_bar(
 
     last_close = float(df.iloc[-1]["close"])
     prev_bar_close = float(df.iloc[-2]["close"])
+    last_bar_dt = df.index[-1]
+    last_bar_date = last_bar_dt.date() if hasattr(last_bar_dt, "date") else last_bar_dt
 
-    # Only act when the trailing bar is the current session (its predecessor is
-    # the quote's previous close). Otherwise it is already a completed bar.
+    # The bar's own date, where we have it, settles which session it is —
+    # direct evidence, so it is consulted before the close heuristic rather
+    # than behind it. It used to sit *after* the early return below, which made
+    # it unreachable whenever the predecessor didn't match `previous_close`
+    # (e.g. an interior hole right before today), and a still-forming partial
+    # was then persisted as a completed close (#635).
+    if session_date is not None and isinstance(last_bar_date, date):
+        if last_bar_date < session_date:
+            # Yahoo simply hasn't appended today's forming bar yet: this row is
+            # a completed prior session, not an unsettled one.
+            return df
+        if is_session_forming(market_state):
+            logger.debug(
+                "%s: dropping trailing %s bar (dated the live session, market open)",
+                symbol or "?", last_bar_dt,
+            )
+            return df.iloc[:-1]
+        if _reconciles(last_close, price):
+            return df  # closed and settled to the live close
+        logger.info(
+            "%s: dropping trailing %s bar (dated the live session; market %s; "
+            "close=%s hasn't settled to quote %s)",
+            symbol or "?", last_bar_dt, market_state, last_close, price,
+        )
+        return df.iloc[:-1]
+
+    # No session date (degraded quote): fall back to identifying the current
+    # session by its predecessor matching the quote's previous close.
     if not _reconciles(prev_bar_close, previous_close):
         return df
-
-    # If we know the live session's date and the trailing bar predates it, Yahoo
-    # simply hasn't appended today's forming bar yet: this row is a completed
-    # prior session, not an unsettled one — keep it. (Without this a flat prior
-    # day, where the predecessor also matches ``previous_close``, would be
-    # wrongly dropped and blank σ-Move until a heal.)
-    if session_date is not None:
-        last_bar_dt = df.index[-1]
-        last_bar_date = last_bar_dt.date() if hasattr(last_bar_dt, "date") else last_bar_dt
-        if last_bar_date < session_date:
-            return df
 
     # An open session's bar is always a live partial — drop it even though it
     # matches the live price right now, because it will drift as trading goes on.
@@ -186,18 +210,55 @@ def _drop_unanchored_trailing_bar(df: pd.DataFrame, ref: AssetRef) -> pd.DataFra
     return df.iloc[:-1]
 
 
+# How stale the fetched frame's last bar may be before a purge is no longer
+# safe. Every path into ``_drop_and_persist`` fetches *to now*, so a frame
+# ending days ago means the provider truncated rather than that the market was
+# quiet — and rows "past the end" of a truncated frame are real data, not
+# orphans. Wide enough to cover a long weekend plus a holiday.
+PURGE_FRESHNESS_DAYS = 5
+
+
+def _frame_reaches_present(df: pd.DataFrame, ref: AssetRef) -> bool:
+    """Whether the fetched frame is authoritative about *now*.
+
+    Only then can "the DB holds a row past this frame's last bar" be read as
+    "that row is an orphan" rather than "the provider gave us a short answer".
+    """
+    if df.empty:
+        return False
+    last_dt = df.index[-1]
+    last_date = last_dt.date() if hasattr(last_dt, "date") else last_dt
+    if not isinstance(last_date, date):
+        return False
+    venue = getattr(ref, "venue", None)
+    today = (venue.local_date() if venue is not None else None) or date.today()
+    return (today - last_date).days <= PURGE_FRESHNESS_DAYS
+
+
 async def _drop_and_persist(
     db: AsyncSession, ref: AssetRef, df: pd.DataFrame, anchor: Anchor,
 ) -> int:
     """Drop the trailing unsettled bar (if any), upsert the rest, and purge any
     stale copy left behind. Returns the number of rows upserted.
 
-    When the trailing bar is dropped, a partial persisted at that date by an
-    earlier (e.g. quote-degraded) sync would linger in the DB — upsert only
-    touches the completed rows it received, so it can never clear a row it no
-    longer has. That orphan keeps ``get_latest_closes`` returning an unreconciled
-    close and blanks σ-Move for the whole session. Delete any row past the last
-    kept bar so the settled data is authoritative.
+    A partial persisted by an earlier (e.g. quote-degraded) sync lingers in the
+    DB — upsert only touches the rows it received, so it can never clear one it
+    no longer has. That orphan keeps ``get_latest_closes`` returning an
+    unreconciled close and blanks σ-Move for the whole session. Delete any row
+    past the last kept bar so the settled data is authoritative.
+
+    The purge needs proof that this frame is authoritative about the present,
+    or a truncated provider response would delete real data. Two independent
+    proofs, either sufficient (#627):
+
+    * **A bar was dropped.** ``drop_unsettled_last_bar`` only fires on a bar it
+      identified as the *current* session, so the frame demonstrably reached it.
+    * **The frame is fresh.** Its last bar is within ``PURGE_FRESHNESS_DAYS``.
+
+    Gating on the first alone — as this did — meant an orphan whose date the
+    provider had stopped reporting was never purged: nothing was dropped, so
+    nothing was deleted, and ``heal_unreconciled_prices`` re-ran this same path
+    and no-opped identically, forever.
     """
     price, previous_close, market_state, session_date = anchor
     if price is None or previous_close is None:
@@ -211,10 +272,19 @@ async def _drop_and_persist(
         df, price, previous_close, market_state, symbol=ref, session_date=session_date,
     )
     count = await _upsert_prices(db, ref, kept)
-    if not kept.empty and len(kept) < len(df):
+    dropped = len(kept) < len(df)
+    if not kept.empty and (dropped or _frame_reaches_present(df, ref)):
         last_kept = kept.index[-1]
         last_kept = last_kept.date() if hasattr(last_kept, "date") else last_kept
-        await PriceRepository(db).delete_prices_after(ref.id, last_kept)
+        removed = await PriceRepository(db).delete_prices_after(ref.id, last_kept)
+        if removed:
+            invalidate_indicator_cache([ref])
+        if removed and not dropped:
+            logger.info(
+                "%s: purged %d orphaned row(s) after %s — the provider no longer "
+                "reports them and this frame is current",
+                ref, removed, last_kept,
+            )
     return count
 
 
@@ -333,5 +403,14 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
 
 
 async def _upsert_prices(db: AsyncSession, ref: AssetRef, df: pd.DataFrame) -> int:
-    """Upsert price rows from a DataFrame. Returns row count."""
-    return await PriceRepository(db).upsert_prices(ref, df)
+    """Upsert price rows from a DataFrame. Returns row count.
+
+    Every write path funnels through here, so this is where the batch
+    indicator cache learns that a symbol's series changed — its key can't
+    notice a corrected value or a backfilled interior session on its own
+    (#628).
+    """
+    count = await PriceRepository(db).upsert_prices(ref, df)
+    if count:
+        invalidate_indicator_cache([ref])
+    return count

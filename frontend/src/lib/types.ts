@@ -295,6 +295,10 @@ export interface SparklinePoint {
 
 export interface IndicatorSummary {
   close: number | null
+  /** Exchange-local date of the last bar behind this snapshot. Pair with a
+   * quote's `session_date`/`recent_sessions` to identify which session
+   * `close`/`change_pct`/`vnr` describe. Null for a degenerate snapshot. */
+  as_of: string | null
   change_pct: number | null
   /** Price bars behind the snapshot — distinguishes "building baseline" from other null-indicator causes. */
   bars: number | null
@@ -350,6 +354,16 @@ export interface Quote {
   avg_volume: number | null
   currency: string
   market_state: MarketState | null
+  /** Exchange-local ISO date of this quote's live session. */
+  session_date: string | null
+  /** Exchange-local ISO date of the session immediately before `session_date`,
+   * from the venue calendar — the session `previous_close` belongs to. A
+   * snapshot whose `as_of` equals this is the quote's prior bar, exactly.
+   * Null when the venue is unknown; see `resolveSigma`. */
+  /** Venue sessions at or before `session_date`, newest first. Index of a
+   * snapshot's `as_of` = how many sessions behind it is; absent = older than
+   * the window. Null when the venue has no calendar. */
+  recent_sessions: string[] | null
 }
 
 export interface IntradayPoint {

@@ -103,6 +103,19 @@ INDEX_CALENDARS: dict[str, str] = {
     "^VIX": "XNYS",
     "^N225": "XTKS",
     "^HSI": "XHKG",
+    # CBOE Treasury yield indices. They track the *bond* market, which follows
+    # SIFMA and closes on days NYSE stays open (Columbus Day, Veterans Day) —
+    # but exchange_calendars has no SIFMA calendar, so the question is which
+    # existing one matches the bars Yahoo actually serves. Measured: bars on
+    # 2025-10-13 (Columbus) and 2025-11-11 (Veterans), none on Good Friday
+    # 2025-04-18 — i.e. the NYSE session set, same as ^GSPC. On the bond-only
+    # holidays the bar is a carried-forward duplicate (^TNX closed 4.051 on
+    # both 2025-10-10 and 2025-10-13), so it is a flat session rather than a
+    # hole, which is what the gap guard needs. See #633.
+    "^TNX": "XNYS",
+    "^TYX": "XNYS",
+    "^FVX": "XNYS",
+    "^IRX": "XNYS",
 }
 
 # Indices quoted as a rate rather than a level: the number *is* a percentage,

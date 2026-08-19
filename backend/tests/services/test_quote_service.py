@@ -9,8 +9,11 @@ import pytest
 from app.domain import AssetRef
 from app.schemas.intraday import IntradayBar
 from app.schemas.quote import Quote
+from app.services.compute.indicators import VNR_MAX_SESSIONS_BEHIND
 from app.services.quote_service import (
+    QUOTE_SESSION_WINDOW,
     _reset_asset_list_cache,
+    attach_recent_sessions,
     get_quotes,
     quote_event_generator,
 )
@@ -56,6 +59,81 @@ async def test_get_quotes_uppercase_normalization():
 async def test_get_quotes_empty_returns_empty():
     result = await get_quotes("")
     assert result == []
+
+
+# --- recent_sessions: the calendar half of session identity (#626, #642) -----
+
+def test_attach_recent_sessions_skips_a_holiday():
+    """Easter Monday's prior session is the Thursday — Good Friday isn't one.
+    A naive "session_date minus one business day" would name the holiday and
+    the client would then reject a perfectly good stored bar."""
+    quotes = [Quote(symbol="AAPL", session_date="2025-04-21")]
+    sessions = attach_recent_sessions(quotes)[0].recent_sessions
+    assert sessions[:2] == ["2025-04-21", "2025-04-17"]
+
+
+def test_attach_recent_sessions_skips_a_weekend():
+    quotes = [Quote(symbol="AAPL", session_date="2025-04-14")]  # Monday
+    assert attach_recent_sessions(quotes)[0].recent_sessions[:2] == ["2025-04-14", "2025-04-11"]
+
+
+def test_attach_recent_sessions_is_newest_first_and_window_sized():
+    """The client reads the distance off the index, so order and length are the
+    contract, not incidental."""
+    quotes = [Quote(symbol="AAPL", session_date="2025-04-21")]
+    sessions = attach_recent_sessions(quotes)[0].recent_sessions
+    assert len(sessions) == QUOTE_SESSION_WINDOW
+    assert sessions == sorted(sessions, reverse=True)
+    assert sessions[0] == "2025-04-21"
+
+
+def test_window_covers_every_distance_the_client_will_accept():
+    """The frontend scores a bar up to VNR_MAX_SESSIONS_BEHIND back. If the
+    window were ever shorter, those bars would fall off the end and blank —
+    silently undoing #642. Derived, so this asserts the derivation."""
+    assert QUOTE_SESSION_WINDOW > VNR_MAX_SESSIONS_BEHIND
+
+
+def test_attach_recent_sessions_handles_a_247_venue():
+    """Crypto trades every day, so the sessions are simply consecutive."""
+    quotes = [Quote(symbol="BTC-USD", session_date="2025-04-21")]
+    sessions = attach_recent_sessions(quotes)[0].recent_sessions
+    assert sessions[:3] == ["2025-04-21", "2025-04-20", "2025-04-19"]
+
+
+def test_attach_recent_sessions_leaves_unknown_venues_null():
+    """Fail-safe, as everywhere in market_calendar: no calendar, no answer —
+    the client falls back rather than being handed a guess."""
+    quotes = [Quote(symbol="FOO.ZZ", session_date="2025-04-21")]
+    assert attach_recent_sessions(quotes)[0].recent_sessions is None
+
+
+def test_attach_recent_sessions_tolerates_missing_or_bad_session_date():
+    quotes = [
+        Quote(symbol="AAPL"),                              # degraded quote
+        Quote(symbol="MSFT", session_date="not-a-date"),   # provider garbage
+    ]
+    assert [q.recent_sessions for q in attach_recent_sessions(quotes)] == [None, None]
+
+
+def test_attach_recent_sessions_resolves_once_per_calendar():
+    """Dozens of tickers, a handful of venues: the calendar lookup is keyed by
+    (calendar, session_date), not by symbol."""
+    quotes = [Quote(symbol=s, session_date="2025-04-21") for s in ("AAPL", "MSFT", "IBM")]
+    with patch("app.services.quote_service.AssetRef", wraps=AssetRef) as spy:
+        out = attach_recent_sessions(quotes)
+    assert {tuple(q.recent_sessions) for q in out} == {tuple(out[0].recent_sessions)}
+    # One AssetRef per quote is fine; the point is the *calendar* query is shared.
+    assert spy.call_count == 3
+
+
+async def test_get_quotes_attaches_recent_sessions():
+    """The REST path enriches too — it used to strip session_date entirely."""
+    mock_prov = _mock_provider(quotes_return=[Quote(symbol="AAPL", session_date="2025-04-21")])
+    with patch("app.services.quote_service.get_price_provider", return_value=mock_prov):
+        result = await get_quotes("AAPL")
+    assert result[0].session_date == "2025-04-21"
+    assert result[0].recent_sessions[:2] == ["2025-04-21", "2025-04-17"]
 
 
 async def test_stream_emits_full_payload_first():
