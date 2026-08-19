@@ -175,15 +175,3 @@
 /* One shared pulse behind every open-market sun (phase-locked to the wall
    clock via a negative animation-delay) — synchronized reads as one system
    being alive, independently-timed pulses read as twinkling noise. */
-@keyframes board-ping {
-  0%       { transform: scale(1);   opacity: 0.35; }
-  60%, 100% { transform: scale(2.4); opacity: 0; }
-}
-.board-ping {
-  animation: none;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .board-ping {
-    animation: board-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
-  }
-}
