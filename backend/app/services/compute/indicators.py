@@ -128,6 +128,11 @@ VNR_SIGMA_FLOOR_MIN_OBS = 20
 # a 3-bar EWMA emitted a confident number and only the board's `bars` check
 # stood between it and the user (#631). One constant, so the promise the
 # contract publishes is the promise the kernel keeps.
+#
+# Read by three consumers beyond this module: the registry's warmup metadata,
+# ``indicator.contract.json`` (the companion app), and — via
+# ``scripts/export_shared_constants.py`` — the web frontend, which needs it to
+# say *why* σ is blank. All generated, none hand-copied.
 VNR_WARMUP_SESSIONS = 60
 
 

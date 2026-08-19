@@ -27,19 +27,17 @@
 import type { IndicatorSummary, Quote } from "@/lib/types"
 import { getNumericValue } from "@/lib/indicator-registry"
 
-/** Sessions of history before the EWMA vol baseline is trustworthy. Mirrors
- * the backend vnr registry warmup. */
-export const VNR_WARMUP_SESSIONS = 60
+// Both constants are generated from their Python definitions rather than
+// restated here — the backend acts on this module's behalf (its heal loop
+// predicts what this file will refuse to score), so a silent drift shows up as
+// σ blank on symbols the heal reports as repaired, which points at neither
+// file. CI regenerates and fails on any difference.
+import {
+  SESSION_MATCH_TOL,
+  VNR_WARMUP_SESSIONS,
+} from "@/lib/generated/backend-constants"
 
-/**
- * Fractional tolerance for corroborating a session identity from prices.
- *
- * Not the primary test — see the module docstring. Used only when a date is
- * missing: a degraded quote with no `session_date`, or a venue with no
- * calendar (so no `prior_session_date`). Anywhere both dates exist, identity
- * is exact and this constant is never consulted.
- */
-const SESSION_MATCH_TOL = 0.005
+export { VNR_WARMUP_SESSIONS }
 
 export type SigmaSource = "live" | "settled"
 

@@ -17,8 +17,13 @@ logger = logging.getLogger(__name__)
 
 # The frontend's σ-Move (vnr) only trusts a stored daily bar when its close
 # reconciles with the live quote — within this tolerance of either the current
-# price (same session) or the previous close (prior session). Keep it in sync
-# with ``SESSION_MATCH_TOL`` in ``frontend/src/lib/sigma.ts``.
+# price (same session) or the previous close (prior session).
+#
+# This is the source of truth for both languages: ``scripts/
+# export_shared_constants.py`` reflects it into
+# ``frontend/src/lib/generated/backend-constants.ts``, and CI fails if that
+# artifact goes stale. Change the number here and re-export; never edit the
+# generated file.
 SESSION_MATCH_TOL = 0.005  # 0.5%
 
 # "Is the current session's daily bar still forming?" now comes from the
