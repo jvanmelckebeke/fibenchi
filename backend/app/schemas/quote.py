@@ -17,12 +17,16 @@ class QuoteResponse(BaseModel):
         "an indicator snapshot's `as_of` this identifies which session each number "
         "describes, so a client never has to infer it from price similarity.",
     )
-    prior_session_date: str | None = Field(
+    recent_sessions: list[str] | None = Field(
         default=None,
-        description="Exchange-local ISO date of the trading session immediately before "
-        "`session_date`, from the venue calendar — the session `previous_close` belongs "
-        "to. A snapshot whose `as_of` equals this is the quote's prior bar exactly; no "
-        "tolerance, and no calendar needed on the client. None when the venue is unknown.",
+        description="Exchange-local ISO dates of the venue's most recent trading "
+        "sessions at or before `session_date`, newest first — so `recent_sessions[0]` "
+        "is the live session and `[1]` is the one `previous_close` belongs to. A "
+        "client finds how many sessions a stored bar is behind by looking up its "
+        "`as_of` in this list; not present means older than the window, which is all "
+        "the client needs to know. No tolerance, no calendar on the client, and no "
+        "counting of business days (which turns every holiday into a hole). None when "
+        "the venue is unknown.",
     )
 
 

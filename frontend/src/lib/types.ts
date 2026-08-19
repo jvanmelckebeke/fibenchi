@@ -296,7 +296,7 @@ export interface SparklinePoint {
 export interface IndicatorSummary {
   close: number | null
   /** Exchange-local date of the last bar behind this snapshot. Pair with a
-   * quote's `session_date`/`prior_session_date` to identify which session
+   * quote's `session_date`/`recent_sessions` to identify which session
    * `close`/`change_pct`/`vnr` describe. Null for a degenerate snapshot. */
   as_of: string | null
   change_pct: number | null
@@ -360,7 +360,10 @@ export interface Quote {
    * from the venue calendar — the session `previous_close` belongs to. A
    * snapshot whose `as_of` equals this is the quote's prior bar, exactly.
    * Null when the venue is unknown; see `resolveSigma`. */
-  prior_session_date: string | null
+  /** Venue sessions at or before `session_date`, newest first. Index of a
+   * snapshot's `as_of` = how many sessions behind it is; absent = older than
+   * the window. Null when the venue has no calendar. */
+  recent_sessions: string[] | null
 }
 
 export interface IntradayPoint {

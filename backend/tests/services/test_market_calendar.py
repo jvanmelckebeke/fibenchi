@@ -269,6 +269,42 @@ def test_symbol_currency_shapes():
     assert AssetRef("FOO.ZZ").currency is None
 
 
+def test_recent_sessions_is_ordered_and_calendar_exact():
+    """The client reads "how many sessions behind" off this list's index, so the
+    order and the holiday skips are the contract."""
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.recent_sessions(date(2025, 4, 21), 4) == [
+        date(2025, 4, 21),   # Easter Monday — a session
+        date(2025, 4, 17),   # Good Friday is not, so Thursday follows
+        date(2025, 4, 16),
+        date(2025, 4, 15),
+    ]
+
+
+def test_recent_sessions_includes_the_day_itself_only_when_it_is_one():
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.recent_sessions(date(2025, 4, 19), 1) == [date(2025, 4, 17)]  # a Saturday
+
+
+def test_recent_sessions_spans_a_long_shutdown():
+    """The lookback has to clear the longest holiday any mapped calendar has,
+    or a window that lands on one silently comes back short."""
+    tokyo = AssetRef("7203.T").venue
+    assert tokyo is not None
+    sessions = tokyo.recent_sessions(date(2025, 5, 7), 6)  # just after Golden Week
+    assert len(sessions) == 6
+    assert sessions == sorted(sessions, reverse=True)
+
+
+def test_recent_sessions_fails_safe():
+    nyse = AssetRef("^GSPC").venue
+    assert nyse is not None
+    assert nyse.recent_sessions(date(1800, 1, 2), 3) is None
+    assert nyse.recent_sessions(date(2025, 4, 21), 0) == []
+
+
 def test_previous_session_is_calendar_exact():
     """The exact answer the σ-Move display used to approximate by comparing two
     closes within 0.5% — a test of how far the price moved, not of which
