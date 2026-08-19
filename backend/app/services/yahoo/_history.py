@@ -6,6 +6,7 @@ from datetime import date
 
 import pandas as pd
 
+from app.services.compute.splits import normalize_splits
 from app.services.yahoo._base import _YahooBase
 from app.services.yahoo._parsers import PERIOD_MAP, normalize_date_index
 from app.services.yahoo.currency import _normalize_ohlcv_df, resolve_currency
@@ -48,7 +49,10 @@ class _HistoryMixin(_YahooBase):
     ) -> pd.DataFrame:
         """Fetch OHLCV history for a single symbol.
 
-        Subunit currencies (e.g. ``GBp``) are converted to main units.
+        Subunit currencies (e.g. ``GBp``) are converted to main units, and
+        pre-split bars are rebased onto the current share basis, so the frame
+        is continuous in one unit end to end (#648).
+
         Raises :class:`ValueError` when Yahoo returns no data or the
         breaker is open.
         """
@@ -80,6 +84,7 @@ class _HistoryMixin(_YahooBase):
             info = price_info if isinstance(price_info, dict) else {}
             _, divisor = resolve_currency(info, symbol)
             df = _normalize_ohlcv_df(df, divisor)
+            df = normalize_splits(df, symbol)
             return normalize_date_index(df)
 
         def _fallback() -> pd.DataFrame:
@@ -92,8 +97,9 @@ class _HistoryMixin(_YahooBase):
     ) -> dict[str, pd.DataFrame]:
         """Fetch OHLCV for many symbols in one batch.
 
-        Subunit currencies are converted. Returns ``{}`` when the breaker
-        is open or Yahoo returns no data.
+        Subunit currencies are converted and splits rebased, as in
+        :meth:`history`. Returns ``{}`` when the breaker is open or Yahoo
+        returns no data.
         """
         if not symbols:
             return {}
@@ -131,6 +137,7 @@ class _HistoryMixin(_YahooBase):
                     info = info if isinstance(info, dict) else {}
                     _, divisor = resolve_currency(info, sym)
                     df = _normalize_ohlcv_df(df, divisor)
+                    df = normalize_splits(df, sym)
                     out[sym] = normalize_date_index(df)
                 except KeyError:
                     logger.debug("batch_history: %s missing from Yahoo batch response", sym)
