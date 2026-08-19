@@ -1,8 +1,9 @@
 import logging
+from collections.abc import Iterator
 from datetime import date
 
 import pandas as pd
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import AssetRef
@@ -45,6 +46,20 @@ def _ohlc_fault(row) -> str | None:
     if min(o, h, low, c) <= 0:
         return f"non-positive price (o={o} h={h} l={low} c={c})"
     return None
+
+
+# One bind parameter per column per row, against a hard PostgreSQL ceiling of
+# 32767 per statement. A year of daily bars fits comfortably in one statement,
+# which is why this went unnoticed until the split heal started re-fetching
+# whole histories: MNST's 10,249 bars needed 71,743 parameters and asyncpg
+# refused the insert outright, so the repair silently failed on exactly the
+# symbols with the most history to repair.
+UPSERT_CHUNK_ROWS = 2000
+
+
+def _chunked(rows: list[dict], size: int) -> Iterator[list[dict]]:
+    for start in range(0, len(rows), size):
+        yield rows[start:start + size]
 
 
 class PriceRepository:
@@ -179,6 +194,79 @@ class PriceRepository:
         await self.db.commit()
         return result.rowcount or 0
 
+    async def find_price_steps(
+        self, factor: float, asset_ids: list[int] | None = None,
+    ) -> list[tuple[int, date, float, float]]:
+        """Find adjacent stored bars whose close jumps by more than ``factor``.
+
+        Returns ``(asset_id, date, previous_close, close)`` for the *later* bar
+        of each pair, oldest first. A step this large is not a session — it is
+        the two bars being priced in different units, most often because a
+        split landed and nobody rebased the series (#648).
+
+        Detection only. What the step *means* cannot be read off its shape: a
+        scan of every stored bar found MNST's 2:1 split (0.498), our own
+        GBp/GBP divisor flip on RR.L (0.010, #654) and OKLO's real -54% SPAC
+        reprice (0.464) all inside the same band. The caller has to ask the
+        provider which one it is looking at.
+        """
+        prev = func.lag(PriceHistory.close).over(
+            partition_by=PriceHistory.asset_id, order_by=PriceHistory.date,
+        ).label("prev")
+        stepped = select(
+            PriceHistory.asset_id, PriceHistory.date, PriceHistory.close, prev,
+        )
+        if asset_ids:
+            stepped = stepped.where(PriceHistory.asset_id.in_(asset_ids))
+        stepped = stepped.subquery()
+
+        result = await self.db.execute(
+            select(stepped.c.asset_id, stepped.c.date, stepped.c.prev, stepped.c.close)
+            .where(
+                stepped.c.prev.is_not(None),
+                stepped.c.prev > 0,
+                or_(
+                    stepped.c.close > stepped.c.prev * factor,
+                    stepped.c.close * factor < stepped.c.prev,
+                ),
+            )
+            .order_by(stepped.c.date)
+        )
+        return [
+            (row[0], row[1], float(row[2]), float(row[3])) for row in result.all()
+        ]
+
+    async def get_oldest_date(self, asset_id: int) -> date | None:
+        """Date of the asset's earliest stored bar, or None if it has none."""
+        result = await self.db.execute(
+            select(func.min(PriceHistory.date)).where(PriceHistory.asset_id == asset_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_dates(self, asset_id: int, start: date, end: date) -> set[date]:
+        """Stored bar dates for one asset within an inclusive range."""
+        result = await self.db.execute(
+            select(PriceHistory.date).where(
+                PriceHistory.asset_id == asset_id,
+                PriceHistory.date >= start,
+                PriceHistory.date <= end,
+            )
+        )
+        return set(result.scalars().all())
+
+    async def delete_prices_on(self, asset_id: int, dates: list[date]) -> int:
+        """Delete specific stored bars for one asset. Returns rows deleted."""
+        if not dates:
+            return 0
+        result = await self.db.execute(
+            delete(PriceHistory).where(
+                PriceHistory.asset_id == asset_id,
+                PriceHistory.date.in_(dates),
+            )
+        )
+        await self.db.commit()
+        return result.rowcount or 0
+
     @staticmethod
     def build_price_rows(ref: AssetRef, df: pd.DataFrame) -> list[dict]:
         """Convert a price DataFrame to insertable row dicts.
@@ -248,8 +336,8 @@ class PriceRepository:
     async def upsert_prices(self, ref: AssetRef, df: pd.DataFrame) -> int:
         """Upsert price rows from a DataFrame. Returns row count.
 
-        Uses PostgreSQL ON CONFLICT DO UPDATE. For SQLite (tests), this
-        method is typically mocked.
+        Uses PostgreSQL ON CONFLICT DO UPDATE, in chunks. For SQLite (tests),
+        this method is typically mocked.
         """
         if df.empty:
             return 0
@@ -260,17 +348,18 @@ class PriceRepository:
         if not rows:
             return 0
 
-        stmt = pg_insert(PriceHistory).values(rows)
-        stmt = stmt.on_conflict_do_update(
-            constraint="uq_asset_date",
-            set_={
-                "open": stmt.excluded.open,
-                "high": stmt.excluded.high,
-                "low": stmt.excluded.low,
-                "close": stmt.excluded.close,
-                "volume": stmt.excluded.volume,
-            },
-        )
-        await self.db.execute(stmt)
+        for chunk in _chunked(rows, UPSERT_CHUNK_ROWS):
+            stmt = pg_insert(PriceHistory).values(chunk)
+            stmt = stmt.on_conflict_do_update(
+                constraint="uq_asset_date",
+                set_={
+                    "open": stmt.excluded.open,
+                    "high": stmt.excluded.high,
+                    "low": stmt.excluded.low,
+                    "close": stmt.excluded.close,
+                    "volume": stmt.excluded.volume,
+                },
+            )
+            await self.db.execute(stmt)
         await self.db.commit()
         return len(rows)

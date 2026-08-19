@@ -80,6 +80,7 @@ Two long-lived branches: `main` (production, `fibenchi:latest`) and `dev` (stagi
 - `services/compute/` — Computational logic, separated from I/O:
   - `indicators.py` — `INDICATOR_REGISTRY` dict mapping indicator IDs to `IndicatorDef` (func, params, output_fields, warmup_periods, snapshot_derived). Computes RSI, SMA, EMA, Bollinger Bands, MACD, ATR, ADX.
   - `group.py` — Batch indicator snapshots with in-memory `TTLCache` (600s). `compute_and_cache_indicators()` caches by `(symbols, latest_date, group_id)`.
+  - `splits.py` — `normalize_splits(df)` rebases a provider frame onto the asset's current share basis. Pure, and deliberately stateless: it re-decides from the frame's own step across each ex-date every fetch, so it is idempotent and self-corrects when the provider changes its mind about whether history is adjusted. Also owns `SPLIT_STEP_FACTOR`, the one definition of "split-sized".
   - `pseudo_etf.py` — Equal-weight performance with quarterly rebalancing. Two modes: `_calc_static` (all constituents from day 1) and `_calc_dynamic` (assets join when price ≥ threshold, prevents penny-stock distortion).
   - `portfolio.py` — Portfolio index using dynamic entry with `min_entry_price=10.0`.
   - `utils.py` — Shared `prices_to_df()` converting ORM objects to indexed DataFrame.
@@ -133,7 +134,7 @@ The charting layer has four architectural tiers:
 
 On startup (`main.py` lifespan):
 1. `load_currency_cache(db)` — populates in-memory currency lookup to avoid per-request DB hits
-2. APScheduler schedules everything in `app/background_tasks/` — jobs live in `jobs.py` and self-register via the `@background_task(id=..., trigger=...)` decorator (registry pattern, like `INDICATOR_REGISTRY`); adding a job never touches `main.py`. A trigger may be a factory returning `None` to disable just that job (e.g. malformed `REFRESH_CRON` disables `price_refresh` with a warning; everything else still runs). Placement rule: code reachable *only* from the scheduler lives in this package (e.g. `price_heal.py`, the heal-job logic) — `services/` is for logic that requests or multiple entry points share. Pure vocabulary/trait tables with no I/O (e.g. `market_state.py`) live in `app/domain/`.
+2. APScheduler schedules everything in `app/background_tasks/` — jobs live in `jobs.py` and self-register via the `@background_task(id=..., trigger=...)` decorator (registry pattern, like `INDICATOR_REGISTRY`); adding a job never touches `main.py`. A trigger may be a factory returning `None` to disable just that job (e.g. malformed `REFRESH_CRON` disables `price_refresh` with a warning; everything else still runs). Placement rule: code reachable *only* from the scheduler lives in this package (e.g. `price_heal.py` and `split_heal.py`, the heal-job logic) — `services/` is for logic that requests or multiple entry points share. Pure vocabulary/trait tables with no I/O (e.g. `market_state.py`) live in `app/domain/`.
 3. `scheduled_refresh()` job: `sync_all_prices` → `compute_and_cache_indicators` (pre-warms cache so first group page load is instant)
 
 ## Key Patterns

@@ -13,6 +13,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.background_tasks.price_heal import heal_interior_holes, heal_unreconciled_prices
 from app.background_tasks.registry import background_task
+from app.background_tasks.split_heal import heal_split_discontinuities
 from app.config import settings as app_settings
 from app.database import async_session
 from app.services.compute.group import compute_and_cache_indicators
@@ -128,6 +129,25 @@ async def scheduled_refresh():
                 logger.info(f"Cleaned up {deleted} old intraday bars")
         except Exception:
             logger.exception("Intraday cleanup failed (non-fatal)")
+
+
+# Splits are rare and their damage is durable: the EWMA carries a fake -50%
+# return for ~11 days while a corrupted SMA50 and Bollinger band persist until
+# the pre-split window rolls off, ~50 sessions later. So this runs on its own
+# slow clock rather than piggybacking on the 10-minute price heal, which gates
+# itself on a venue being open and would skip whole weekends.
+@background_task("split_heal", trigger=IntervalTrigger(hours=6))
+async def scheduled_split_heal():
+    """Re-fetch full history for assets whose stored bars change share basis."""
+    async with async_session() as db:
+        try:
+            healed = await heal_split_discontinuities(db)
+            if healed:
+                logger.info(
+                    f"Split heal: rebased {len(healed)} symbol(s): {', '.join(sorted(healed))}"
+                )
+        except Exception:
+            logger.exception("Split heal failed")
 
 
 @background_task("symbol_directory_sync", trigger=CronTrigger(minute="0", hour="2", day_of_week="sun"))
