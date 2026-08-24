@@ -75,7 +75,7 @@ def _poll_interval(market_states: set[str], symbols: Sequence[str], at=None) -> 
 # Sessions of history to ship on each quote. Derived from the client's own
 # tolerance rather than picked, so the window is structurally guaranteed to
 # contain every distance the client will accept — a hand-chosen number here
-# could silently fall short and blank exactly the bars #642 set out to score.
+# could silently fall short and blank exactly the bars worth scoring.
 # The margin covers the boundary itself plus room for the tolerance to grow.
 QUOTE_SESSION_WINDOW = VNR_MAX_SESSIONS_BEHIND + 3
 
@@ -87,7 +87,7 @@ def attach_recent_sessions(quotes: list[Quote]) -> list[Quote]:
     what came before it. Shipping an ordered window (rather than raw dates for
     the client to count between) keeps the client free of calendar logic: it
     finds how far behind a stored bar is by looking ``as_of`` up in the list,
-    and "not in the list" is the answer for anything older (#626, #642).
+    and "not in the list" is the answer for anything older.
 
     Resolved per ``(calendar, session_date)`` rather than per symbol — a
     portfolio is dozens of tickers across a handful of venues, and the answer
@@ -133,7 +133,7 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
 
     **Intraday is opt-in and scoped.** Quotes are small and every page shows
     them, so they go to everyone; a full bar set is not — measured at 738 KiB
-    for 78 symbols (#615), re-sent on every reconnect. Only two views draw
+    for 78 symbols, re-sent on every reconnect. Only two views draw
     bars, and each wants a handful of symbols, so a connection that doesn't ask
     gets none. Passing ``None`` is therefore *silence*, not *everything*: the
     saving is automatic and a caller cannot forget to ask for less.

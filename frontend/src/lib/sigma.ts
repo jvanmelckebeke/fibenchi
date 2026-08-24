@@ -10,18 +10,17 @@
  * stored σ describes a completed daily bar, and rendering it next to a live
  * change % from a different session can show green σ on a red day.
  *
- * The old cascade answered "which session is this bar?" by comparing two
- * closes within 0.5%. That is a test of how far the price moved, not of which
- * session it was, and it failed precisely on the days worth looking at. Since
- * #626 the snapshot carries `as_of` and the quote carries `session_date` +
+ * "Which session is this bar?" is answered on dates, not on prices: the
+ * snapshot carries `as_of` and the quote carries `session_date` +
  * `prior_session_date` (venue-calendar exact), so the primary test is date
- * equality. The tolerance survives only as *corroboration* where a date is
- * genuinely unavailable.
+ * equality. Comparing two closes within a tolerance measures how far the price
+ * moved, not which session it was, and fails precisely on the days worth
+ * looking at — it survives only as *corroboration* where a date is genuinely
+ * unavailable.
  *
- * Every consumer goes through {@link resolveSigma}: previously the group
- * table, the board and the sort key each implemented their own ordering of
- * these decisions and agreed only because gap and staleness rarely co-occur
- * (#629).
+ * Every consumer goes through {@link resolveSigma}. Sites that order these
+ * decisions for themselves agree only by luck, because gap and staleness
+ * rarely co-occur.
  */
 
 import type { IndicatorSummary, Quote } from "@/lib/types"
@@ -77,14 +76,13 @@ function near(a: number | null | undefined, b: number | null | undefined): boole
  *
  * 0 means the bar *is* the live session, 1 the session before it, and so on.
  * A distance rather than a category, because that is what the decision below
- * actually needs: the old five-value enum could say "yesterday" or "older",
- * and everything past yesterday collapsed into one bucket that had to be
- * refused wholesale (#642).
+ * actually needs. A category can say "yesterday" or "older", and everything
+ * past yesterday collapses into one bucket that has to be refused wholesale.
  *
  * `null` is *unknowable*, not far: no quote at all, or a provider placeholder
  * carrying neither dates nor prices. Absence of evidence is not evidence of
- * staleness — reading it as such blanked every symbol at once whenever the
- * provider hiccuped (#632).
+ * staleness — reading it as such blanks every symbol at once whenever the
+ * provider hiccups.
  */
 function sessionsBehind(snapshot: IndicatorSummary, quote: Quote | undefined): number | null {
   if (!quote) return null
@@ -95,7 +93,7 @@ function sessionsBehind(snapshot: IndicatorSummary, quote: Quote | undefined): n
     if (asOf === session) return 0
     // The calendar already counted the sessions, in order — read the distance
     // off the index. Counting business days here instead is the heuristic that
-    // turns every holiday into a hole (#559, #633).
+    // turns every holiday into a hole.
     if (quote.recent_sessions?.length) {
       const i = quote.recent_sessions.indexOf(asOf)
       return i >= 0 ? i : BEYOND_WINDOW
@@ -106,7 +104,8 @@ function sessionsBehind(snapshot: IndicatorSummary, quote: Quote | undefined): n
     return near(quote.previous_close, snapshot.close) ? 1 : BEYOND_WINDOW
   }
 
-  // Pre-#626 cached snapshot, or a quote the provider couldn't date.
+  // A cached snapshot from before `as_of` existed, or a quote the provider
+  // couldn't date.
   if (near(quote.price, snapshot.close)) return 0
   if (near(quote.previous_close, snapshot.close)) return 1
   if (quote.price == null && quote.previous_close == null) return null
@@ -123,10 +122,9 @@ type Plan = "live" | "settled" | "too-behind"
  * the forecast for session t+1, so:
  *
  * - **d = 0** — the stored `vnr` already scores this session, and its forecast
- *   is for *tomorrow*; dividing today's move by it is the mis-denomination
- *   #626 describes. Show the stored value. The exception is a gap-flagged bar,
- *   whose `vnr` is null while the quote's own single-session return stays
- *   perfectly sound (#625).
+ *   is for *tomorrow*, so dividing today's move by it mis-denominates. Show
+ *   the stored value. The exception is a gap-flagged bar, whose `vnr` is null
+ *   while the quote's own single-session return stays perfectly sound.
  * - **d >= 1** — the stored `vnr` describes a session that has since been
  *   superseded, so it must not be shown next to a live price. But the quote's
  *   `change_percent` is measured against the true previous close, making it a
@@ -144,10 +142,9 @@ function planFor(behind: number | null, gapFlagged: boolean): Plan {
  * Resolve what the σ column should show for one asset.
  *
  * Three steps, deliberately separate: locate the bar, choose what that entitles
- * us to compute, then either compute it or explain the absence. Every consumer
- * goes through here — the group table, the board, the sort key and the detail
- * page each used to order these decisions their own way and agreed only
- * because gap and staleness rarely co-occur (#629).
+ * us to compute, then either compute it or explain the absence. The group
+ * table, the board, the sort key and the detail page all come through here, so
+ * none of them can order these decisions its own way and disagree.
  */
 export function resolveSigma(
   quote: Quote | undefined,

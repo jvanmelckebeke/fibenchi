@@ -1,7 +1,6 @@
 // The homepage dense board: every tracked asset as a σ-Move-coloured tile in
-// one screen, with a rail of summary cards. Replaces the old index-chart +
-// 1y-performers Overview (a history page, not a today page). Design spec:
-// GitHub epic #512.
+// one screen, with a rail of summary cards. It answers what moved today, not
+// what happened over the last year.
 
 import { useMemo, useState } from "react"
 import { Board } from "./board/board"
@@ -40,10 +39,11 @@ export function PortfolioPage() {
           coverage={coverage}
         />
         {isLoading ? (
-          // Only the roster request is worth a shapeless skeleton — until it
-          // lands there is nothing to know the shape of. Indicators, sparklines
-          // and the first quote frame all arrive into the real board, each tile
-          // carrying its own pending state, so nothing reflows under the cursor.
+          // Only the roster request is worth a shapeless skeleton, because
+          // until it lands there is nothing to know the shape of. Indicators,
+          // sparklines and the first quote frame all arrive into the real
+          // board, each tile carrying its own pending state, so nothing
+          // reflows under the cursor.
           <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-[3px] 2xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] 2xl:gap-1">
             {Array.from({ length: 24 }, (_, i) => (
               <div key={i} className="h-[62px] animate-pulse 2xl:h-[80px] rounded-[3px] bg-muted/40" />

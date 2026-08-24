@@ -9,7 +9,7 @@ and which phase (premarket / open / aftermarket / closed) an instant falls
 in. Ticker shape itself is interpreted in ``app.domain.instrument`` — this
 package holds the venue *data* and *schedule* machinery underneath it.
 
-The primary consumer is the σ-Move gap guard (issue #559) — with real
+The primary consumer is the σ-Move gap guard — with real
 session dates (``exchange_calendars``) a missing bar can be distinguished
 from an exchange holiday. The schedule side feeds the scheduler gates
 (``any_venue_open``), the SSE poll cadence (``schedule_poll_hint``), and

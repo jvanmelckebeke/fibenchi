@@ -24,7 +24,7 @@ of the per-run cap.
 
 Detection is a plain SQL scan for a step no session makes, which is cheap and
 runs over everything. It proves nothing on its own — the current book's nine
-candidates are one split, one currency rebasing (#654) and seven ordinary
+candidates are one split, one currency rebasing and seven ordinary
 earnings days — so the provider's own frame is what settles each one.
 """
 
@@ -187,7 +187,7 @@ async def heal_split_discontinuities(db: AsyncSession) -> dict[str, int]:
             logger.warning(
                 "%s: the %s step survived a full re-fetch — the provider prices "
                 "both bars and no split explains the jump, so it is a real "
-                "session. Not retrying; if this is a currency rebasing see #654",
+                "session. Not retrying; a currency rebasing looks like this too",
                 ref, boundary,
             )
             continue

@@ -13,7 +13,7 @@ Two independent repair loops:
   scheduled sync, this detects the broken invariant server-side and refreshes
   just the affected symbols.
 
-- ``heal_interior_holes`` — the *mid-series* heal (issue #559 fix 3): a
+- ``heal_interior_holes`` — the *mid-series* heal: a
   scheduled session with no stored bar (upstream feed hole, NaN-skipped
   upsert, failed nightly sync) silently blanks σ-Move on the bar after it and
   degrades gap-aware indicators. The venue calendar makes such holes exactly
@@ -126,8 +126,8 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
         # Cooldown is for "Yahoo is serving data we cannot reconcile", so spend
         # it on that outcome rather than on the attempt: a heal that *worked*
         # should not lock the symbol out for 30 minutes if it breaks again, and
-        # (before #627) a heal that structurally *could not* work was buying the
-        # lockout every time while changing nothing.
+        # a heal that structurally *cannot* work would otherwise buy the lockout
+        # every time while changing nothing.
         price, previous_close = anchor[0], anchor[1]
         stored = (await PriceRepository(db).get_latest_closes([ref.id])).get(ref.id)
         if stored is None or not (

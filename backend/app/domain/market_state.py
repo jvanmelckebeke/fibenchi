@@ -26,8 +26,7 @@ class MarketStateInfo:
     # Quotes are worth polling in this state. PREPRE ("overnight, pre-market
     # hasn't started") and POSTPOST ("after-hours has ended") are NOT active:
     # nothing trades in either, and for European venues PREPRE lasts the whole
-    # night — polling fast there only burned API calls. (They historically
-    # counted as active; changed deliberately, see PR #568.)
+    # night — polling fast there only burns API calls.
     active: bool
     # The current session's daily bar is still building, so the trailing bar
     # Yahoo returns is a live partial (see drop_unsettled_last_bar).

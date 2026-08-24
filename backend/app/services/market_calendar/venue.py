@@ -89,9 +89,9 @@ class Venue:
         the question the σ-Move display needs and cannot ask from two dates
         alone: a client that only knows the current and prior session can
         distinguish "yesterday" from "older", but not "older" from "far too
-        old" (#642). Shipping an ordered window lets it read the distance off
-        an index instead of counting business days — the heuristic that makes
-        every holiday look like a hole (#559, #633).
+        old". Shipping an ordered window lets it read the distance off an index
+        instead of counting business days — the heuristic that makes every
+        holiday look like a hole.
 
         ``d`` need not itself be a session. None when the calendar can't answer
         (unknown venue, out of range), and the caller falls back to its
@@ -113,9 +113,8 @@ class Venue:
         """The trading session immediately before ``d`` (exclusive).
 
         The exact answer to "is this stored bar the session before that quote?"
-        — the question the σ-Move display used to approximate by comparing two
-        closes within 0.5%, which is a test of how far the price moved rather
-        than of which session it was (#626).
+        Comparing two closes within a tolerance instead answers how far the
+        price moved, not which session it was.
 
         A one-session specialisation of :meth:`recent_sessions`, shifted a day
         to make the bound exclusive, so there is a single lookback

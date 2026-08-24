@@ -52,7 +52,7 @@ SHARED = [
         doc=(
             "Fractional tolerance for corroborating a session identity from prices.\n"
             "\n"
-            "Not the primary test — since #626 both sides carry explicit session\n"
+            "Not the primary test — both sides carry explicit session\n"
             "dates and identity is exact. This is the fallback for a degraded quote\n"
             "with no `session_date`, or a venue with no calendar.\n"
             "\n"

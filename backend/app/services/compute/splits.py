@@ -2,8 +2,8 @@
 
 A stock split makes two adjacent bars incomparable: MNST's 2026-08-11 2:1
 split put 90.36 next to 45.53, and every indicator that reads a return, a
-moving average or a band across that boundary computed on two different units
-(#648). The -49% pseudo-return squared into the EWMA variance pinned
+moving average or a band across that boundary computed on two different
+units. The -49% pseudo-return squared into the EWMA variance pinned
 ``vnr_sigma`` at 10.7% daily against a true ~1.5%, so a genuine +4.09% day
 scored 0.37σ and ranked near the *bottom* of a σ-ranked scan.
 
@@ -75,7 +75,7 @@ SPLIT_CORROBORATION_LOG_TOL = 0.25
 # ~7% of headroom on the split side and ~30% on the ordinary-move side.
 #
 # At this value the current book yields 9 candidates: MNST's split, RR.L's
-# currency rebasing (#654) and 7 real earnings moves, each of which costs one
+# currency rebasing and 7 real earnings moves, each of which costs one
 # re-fetch once and is then remembered as unexplained.
 #
 # Lives here rather than in the heal job so "split-sized" has one definition.

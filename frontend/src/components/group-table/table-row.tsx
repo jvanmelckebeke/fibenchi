@@ -284,7 +284,7 @@ export const TableRow = memo(function TableRow({
             // value describes a completed daily bar, which during market hours
             // is *yesterday* and can contradict the live change % beside it.
             // The shared resolver (lib/sigma) decides — same call the board and
-            // the sort key make, so the three can't disagree (#629).
+            // the sort key make, so the three can't disagree.
             const sigma = field === "vnr" ? resolveSigma(quote, indicator) : null
             const withheld = sigma?.status === "withheld" ? sigma.reason : null
             const values = sigma?.status === "ok"

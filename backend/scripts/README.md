@@ -11,7 +11,7 @@ docker compose exec backend python scripts/<name>.py
 
 - `probe_sse_first_frame.py` — measures the first `event: intraday` frame
   the quote stream pushes, by replaying the generator's first iteration
-  against the live DB. Reads only; no upstream calls. Added for #615.
+  against the live DB. Reads only; no upstream calls.
 
 ## Yahoo Finance probes
 

@@ -168,8 +168,8 @@
 }
 
 /* Waiting-on-the-batch tiles: the no-reading fill without the hatch, since the
-   hatch means the answer came back empty. The bar sits where the value will,
-   so it reads as that value pending rather than as a spinner. */
+   hatch means the answer came back empty. The bar sits where the value will
+   land, so it reads as that value pending rather than as a spinner. */
 .board-tile-pending {
   color: oklch(0.62 0.01 280);
   background-color: oklch(0.23 0.008 280);

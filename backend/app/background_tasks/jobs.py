@@ -216,7 +216,7 @@ async def scheduled_price_heal():
         except Exception:
             logger.exception("Price heal failed")
         try:
-            # Mid-series holes (issue #559): self-throttled to one scan per
+            # Mid-series holes: self-throttled to one scan per
             # HOLE_SCAN_INTERVAL, so piggybacking on this job costs nothing.
             filled = await heal_interior_holes(db)
             if filled:

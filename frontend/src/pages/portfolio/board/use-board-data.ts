@@ -3,8 +3,8 @@
 //
 // σ resolution calls the shared resolver (lib/sigma) rather than restating the
 // cascade, so the board and the group table cannot disagree about an asset.
-// They used to agree only by luck: each site ordered the same decisions
-// differently, and gap-vs-stale simply rarely co-occurred (#629).
+// Two sites restating it agree only by luck, since gap-vs-stale rarely
+// co-occurs.
 
 import { useMemo } from "react"
 import { type Asset, type SparklinePoint } from "@/lib/api"
@@ -27,10 +27,10 @@ export type Phase = "premarket" | "open" | "aftermarket" | "closed"
  * two the board adds: one extra field on `gap` (when the next hole scan runs),
  * and `pending`.
  *
- * `pending` is not a withholding, which is why it can't live in lib/sigma: the
- * resolver answers what a snapshot entitles us to show, and a snapshot in
- * flight isn't one. It is what separates a batch that hasn't landed from a
- * backend with nothing to say — the tile draws those differently.
+ * `pending` can't live in lib/sigma. That resolver reads a snapshot and says
+ * what it supports; a snapshot still in flight isn't one, so the resolver has
+ * nothing to read. `pending` is what separates a batch that hasn't landed from
+ * a backend with nothing to say, and the tile draws those differently.
  *
  * The variants stay discriminated even though the tooltip only shapes
  * `warmup`: they decide *whether* σ is withheld at all. Nothing downstream

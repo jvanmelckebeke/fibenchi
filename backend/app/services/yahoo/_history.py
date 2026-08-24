@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def padded_history_frame(ticker, data, params: dict, symbols: list[str]) -> pd.DataFrame:
-    """``Ticker._historical_data_to_dataframe`` minus the KeyError (#593).
+    """``Ticker._historical_data_to_dataframe`` minus the KeyError.
 
     yahooquery indexes ``data[symbol]`` for every requested symbol, so a
     symbol Yahoo omitted *entirely* from the chart response — distinct from
@@ -51,7 +51,7 @@ class _HistoryMixin(_YahooBase):
 
         Subunit currencies (e.g. ``GBp``) are converted to main units, and
         pre-split bars are rebased onto the current share basis, so the frame
-        is continuous in one unit end to end (#648).
+        is continuous in one unit end to end.
 
         Raises :class:`ValueError` when Yahoo returns no data or the
         breaker is open.
@@ -65,8 +65,8 @@ class _HistoryMixin(_YahooBase):
                     normalized = PERIOD_MAP.get(period.lower(), period)
                     df = ticker.history(period=normalized, interval=interval)
             except KeyError:
-                # Yahoo omitted the (only) symbol from its own chart response
-                # (#593) — for a single-symbol fetch that simply is "no data".
+                # Yahoo omitted the (only) symbol from its own chart response —
+                # for a single-symbol fetch that simply is "no data".
                 raise ValueError(f"No data found for {symbol}") from None
 
             if isinstance(df, dict):
@@ -114,7 +114,7 @@ class _HistoryMixin(_YahooBase):
             # does internally for a period fetch) so the raw response can be
             # padded before frame-building — one symbol Yahoo omitted must
             # degrade to that symbol missing, not a KeyError that costs the
-            # whole batch (#593).
+            # whole batch.
             params = {"range": normalized.lower(), "interval": "1d"}
             data = ticker._get_data("chart", params)
             check_crumb(data)
