@@ -138,8 +138,8 @@ function useWindowReturns(symbols: string[]) {
 const EMPTY_WINDOWS: Record<PctWindow, number | null> = { "1wk": null, "2wk": null, "1mo": null }
 
 export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all") {
-  const { data: groups, isLoading: groupsLoading } = useGroups()
-  const { data: theses } = useTheses()
+  const { data: groups, isLoading: groupsLoading, isPending: groupsPending } = useGroups()
+  const { data: theses, isPending: thesesPending } = useTheses()
   const quotes = useQuotes()
   const { data: phases } = useMarketPhases()
   const { data: health } = useDataHealth()
@@ -162,12 +162,22 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   //
   // This is why useTheses() is not gated to thesis mode: the union needs it in
   // both. Gating it would save one ~4 KB request and reintroduce the refetch.
+  //
+  // The union is only *stable* once both halves have settled, and groups and
+  // theses are independent queries landing on different ticks. Emitting a
+  // groups-only union in between made the key change twice per cold load: two
+  // ~84-symbol batches, the first one thrown away, with the board blanked
+  // between them (#658). So hold the key back until neither is pending —
+  // `isPending`, not `data`, so a failed /api/theses releases the gate instead
+  // of stranding the board with nothing to fetch.
+  const rosterSettled = !groupsPending && !thesesPending
   const fetchSymbols = useMemo(() => {
+    if (!rosterSettled) return []
     const all = new Set<string>()
     for (const g of groups ?? []) for (const a of g.assets) all.add(a.symbol)
     for (const t of theses ?? []) for (const a of t.assets) all.add(a.symbol)
     return [...all].sort()
-  }, [groups, theses])
+  }, [groups, theses, rosterSettled])
 
   const { data: snapshots } = useIndicators(fetchSymbols)
   const { windows: windowReturns, series } = useWindowReturns(fetchSymbols)

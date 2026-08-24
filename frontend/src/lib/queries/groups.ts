@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api, type Group, type GroupCreate, type GroupUpdate } from "../api"
 import { keys, STALE_5MIN, useInvalidatingMutation } from "./shared"
 
@@ -103,13 +103,25 @@ export function useGroupIndicators(id: number) {
 
 /** Indicator snapshots for an arbitrary set of tracked symbols, keyed by symbol.
  * Used to fill indicator columns for thesis members living in other groups —
- * the per-group batch only covers the current group. */
+ * the per-group batch only covers the current group.
+ *
+ * `keepPreviousData` because the symbol set *is* the cache key: every caller
+ * grows or shrinks it while the view is on screen (a roster that gains the
+ * thesis-only members, a table row being expanded), and without it each such
+ * change empties `data` for a whole round-trip. On the board that blanked every
+ * tile to "no reading" mid-load, which reads as breakage rather than as loading
+ * (#658). A superset's snapshots are still correct for the subset — the extra
+ * keys are simply never looked up — so showing the previous batch while the new
+ * one flies is honest, not merely convenient. Pair it with `isPlaceholderData`
+ * where the distinction matters.
+ */
 export function useIndicators(symbols: string[], enabled = true) {
   return useQuery({
     queryKey: keys.indicators(symbols),
     queryFn: () => api.indicators.batch(symbols),
     enabled: enabled && symbols.length > 0,
     staleTime: STALE_5MIN,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -122,6 +134,8 @@ export function useSparklines(symbols: string[], period?: string, enabled = true
     queryFn: () => api.sparklines.batch(symbols, period),
     enabled: enabled && symbols.length > 0,
     staleTime: STALE_5MIN,
+    // Same reasoning as useIndicators above — the symbol set is the key.
+    placeholderData: keepPreviousData,
   })
 }
 
