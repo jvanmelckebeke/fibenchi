@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api, type Group, type GroupCreate, type GroupUpdate } from "../api"
 import { keys, STALE_5MIN, useInvalidatingMutation } from "./shared"
 
@@ -103,13 +103,21 @@ export function useGroupIndicators(id: number) {
 
 /** Indicator snapshots for an arbitrary set of tracked symbols, keyed by symbol.
  * Used to fill indicator columns for thesis members living in other groups —
- * the per-group batch only covers the current group. */
+ * the per-group batch only covers the current group.
+ *
+ * The symbol set is the cache key, and callers grow it while the view is on
+ * screen, so `keepPreviousData` holds the last batch across the change. A
+ * superset's snapshots stay correct for the subset — the extra keys are never
+ * looked up — so the held data is right, not merely present. Read
+ * `isPlaceholderData` where "this symbol has no answer yet" matters.
+ */
 export function useIndicators(symbols: string[], enabled = true) {
   return useQuery({
     queryKey: keys.indicators(symbols),
     queryFn: () => api.indicators.batch(symbols),
     enabled: enabled && symbols.length > 0,
     staleTime: STALE_5MIN,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -122,6 +130,8 @@ export function useSparklines(symbols: string[], period?: string, enabled = true
     queryFn: () => api.sparklines.batch(symbols, period),
     enabled: enabled && symbols.length > 0,
     staleTime: STALE_5MIN,
+    // Keyed on the symbol set, like useIndicators above.
+    placeholderData: keepPreviousData,
   })
 }
 

@@ -167,6 +167,25 @@
   );
 }
 
+/* Waiting-on-the-batch tiles: the no-reading fill without the hatch, since the
+   hatch means the answer came back empty. The bar sits where the value will,
+   so it reads as that value pending rather than as a spinner. */
+.board-tile-pending {
+  color: oklch(0.62 0.01 280);
+  background-color: oklch(0.23 0.008 280);
+}
+.board-tile-pending .board-tile-bar {
+  display: block;
+  height: 0.5rem;
+  width: 60%;
+  border-radius: 2px;
+  background-color: oklch(0.32 0.01 280 / 55%);
+  animation: stale-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-tile-pending .board-tile-bar { animation: none; }
+}
+
 /* Slight shadow keeps the stroke-only phase icons legible on any tile hue. */
 .phase-icon {
   filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 0.7));
