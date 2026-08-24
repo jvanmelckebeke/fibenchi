@@ -106,10 +106,10 @@ export function useGroupIndicators(id: number) {
  * the per-group batch only covers the current group.
  *
  * The symbol set is the cache key, and callers grow it while the view is on
- * screen, so `keepPreviousData` holds the last batch across the change. A
- * superset's snapshots stay correct for the subset — the extra keys are never
- * looked up — so the held data is right, not merely present. Read
- * `isPlaceholderData` where "this symbol has no answer yet" matters.
+ * screen, so `keepPreviousData` holds the last batch across the change. The
+ * held batch is still accurate for every symbol it covers; a wider set only
+ * adds keys nobody looks up yet. Read `isPlaceholderData` where "this symbol
+ * has no answer yet" matters.
  */
 export function useIndicators(symbols: string[], enabled = true) {
   return useQuery({

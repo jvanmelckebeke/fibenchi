@@ -15,10 +15,10 @@ import type { Tile as TileData } from "./use-board-data"
 export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: boolean }) {
   if (phase == null) return null
   if (phase === "open") {
-    // Deliberately static. The glyph is distinctive enough without an animated
-    // halo behind it, and it would be the only one of the four phase icons
-    // that moved — on a board built to be scanned that reads as noise rather
-    // than signal, worst around midday when most tiles are open.
+    // Deliberately static. An animated halo behind the sun would be the only
+    // moving thing among the four phase icons, and around midday most tiles
+    // are open, so it moves on most of the board at once. The glyph is
+    // distinctive enough without it.
     //
     // Still no native `title`: this renders inside the Radix TooltipTrigger, so
     // the browser's own tooltip would surface on top of the styled card ~500 ms

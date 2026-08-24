@@ -18,9 +18,9 @@
  * looking at — it survives only as *corroboration* where a date is genuinely
  * unavailable.
  *
- * Every consumer goes through {@link resolveSigma}. Ordering these decisions
- * per site instead agrees only by luck, since gap and staleness rarely
- * co-occur.
+ * Every consumer goes through {@link resolveSigma}. Sites that order these
+ * decisions for themselves agree only by luck, because gap and staleness
+ * rarely co-occur.
  */
 
 import type { IndicatorSummary, Quote } from "@/lib/types"
@@ -144,7 +144,7 @@ function planFor(behind: number | null, gapFlagged: boolean): Plan {
  * Three steps, deliberately separate: locate the bar, choose what that entitles
  * us to compute, then either compute it or explain the absence. The group
  * table, the board, the sort key and the detail page all come through here, so
- * they cannot order these decisions differently and disagree.
+ * none of them can order these decisions its own way and disagree.
  */
 export function resolveSigma(
   quote: Quote | undefined,

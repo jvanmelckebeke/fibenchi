@@ -88,8 +88,8 @@ def drop_unsettled_last_bar(
 
     # The bar's own date, where we have it, settles which session it is —
     # direct evidence, so it is consulted before the close heuristic rather
-    # than behind it. It has to stay *ahead* of the early return below: behind
-    # it, it is unreachable whenever the predecessor doesn't match
+    # than behind it. This check must also stay *ahead* of the early return
+    # below. Placed after it, it never runs when the predecessor doesn't match
     # `previous_close` (e.g. an interior hole right before today), and a
     # still-forming partial gets persisted as a completed close.
     if session_date is not None and isinstance(last_bar_date, date):

@@ -35,9 +35,9 @@ class Quote(QuoteResponse):
 
     This is what circulates through the app (price-sync anchors, price heal,
     the SSE ``quotes`` event, ``SymbolBatchData.quote``) and what the REST
-    boundary serves too. ``session_date`` is not stripped there as an internal
-    reconciliation aid: the display needs the same session identity the sync
-    does.
+    boundary serves too. ``session_date`` crosses that boundary intact. It
+    looks like an internal reconciliation aid, but the display needs the same
+    session identity the sync does.
 
     ``market_state`` stays a raw string on purpose: it's Yahoo's open-world
     vocabulary, canonically interpreted by the ``app.domain.market_state``

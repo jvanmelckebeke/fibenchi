@@ -3,8 +3,8 @@
 Background: `quote_event_generator` pushes deltas, except on its first
 iteration — there `last_intraday_ts` is empty so the whole bar set for every
 grouped asset goes out in one `event: intraday`. Every browser tab that opens
-(or reconnects) pays that frame. This puts a number on it, so the question of
-whether it needs windowing can be decided on measurement.
+(or reconnects) pays that frame. This measures it, so the question of whether
+it needs windowing has a number behind it.
 
 This reproduces the first iteration exactly: the same roster query, the same
 `get_intraday_bars`, the same `TypeAdapter.dump_json`. It reads the live DB

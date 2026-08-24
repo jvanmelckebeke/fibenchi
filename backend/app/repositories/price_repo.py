@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 def _ohlc_fault(row) -> str | None:
     """Describe why a bar cannot describe any real session, or None.
 
-    Deliberately narrow. The obvious extra check — reject a close outside its
-    own bar's ``[low, high]``, on the grounds that it is arithmetically
-    impossible — does not survive contact with the data. Measured against a
-    year of real provider data for every tracked asset (19,055 bars), **182 of
-    them (~1%) violate exactly that**, by up to 4.4% of price:
+    Deliberately narrow. The obvious extra check is to reject a close outside
+    its own bar's ``[low, high]``, on the grounds that it is arithmetically
+    impossible. Real data says otherwise. Across a year of provider data for
+    every tracked asset (19,055 bars), **182 of them (~1%) violate exactly
+    that**, by up to 4.4% of price:
 
         p50 0.18%   p75 0.50%   p90 0.92%   p95 1.42%   p99 2.64%   max 4.40%
 

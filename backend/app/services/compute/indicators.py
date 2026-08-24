@@ -144,8 +144,8 @@ VNR_SIGMA_FLOOR_MIN_OBS = 20
 # registry's `warmup_periods` for vnr *and* the kernel's own gate. As metadata
 # alone it would size the history fetch without ever blanking an output, and a
 # 3-bar EWMA would emit a confident number with only the board's `bars` check
-# between it and the user. One constant, so the promise the contract publishes
-# is the promise the kernel keeps.
+# between it and the user. One constant, so the contract and the kernel cannot
+# publish different warmup rules.
 #
 # Read by three consumers beyond this module: the registry's warmup metadata,
 # ``indicator.contract.json`` (the companion app), and — via
