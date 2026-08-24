@@ -272,7 +272,7 @@ export function useIntraday(): IntradayMap {
 /** Ask the stream for 1-minute bars while this component is mounted.
  *
  * Bars are opt-in: a connection that doesn't ask receives none, because the
- * first frame is large (738 KiB for the full roster, #615) and most views
+ * first frame is large (738 KiB for the full roster) and most views
  * never draw one. Call this from anything that renders an `IntradayChart`,
  * then read the data with `useIntraday()`.
  *

@@ -111,7 +111,7 @@ INDEX_CALENDARS: dict[str, str] = {
     # 2025-04-18 — i.e. the NYSE session set, same as ^GSPC. On the bond-only
     # holidays the bar is a carried-forward duplicate (^TNX closed 4.051 on
     # both 2025-10-10 and 2025-10-13), so it is a flat session rather than a
-    # hole, which is what the gap guard needs. See #633.
+    # hole, which is what the gap guard needs.
     "^TNX": "XNYS",
     "^TYX": "XNYS",
     "^FVX": "XNYS",

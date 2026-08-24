@@ -51,7 +51,7 @@ describe("computeMovementStats — max daily gain/loss sign guards", () => {
   })
 })
 
-describe("computeMovementStats — gap awareness (issue #559)", () => {
+describe("computeMovementStats — gap awareness", () => {
   it("excludes a multi-session step from daily extremes and counts", () => {
     // Fri 2026-07-31 -> Tue 2026-08-04 with Mon 2026-08-03 missing: the +2.75%
     // step spans two sessions and must not be filed as the max daily gain.

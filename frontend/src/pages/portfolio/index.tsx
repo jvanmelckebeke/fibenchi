@@ -1,7 +1,6 @@
 // The homepage dense board: every tracked asset as a σ-Move-coloured tile in
-// one screen, with a rail of summary cards. Replaces the old index-chart +
-// 1y-performers Overview (a history page, not a today page). Design spec:
-// GitHub epic #512.
+// one screen, with a rail of summary cards. A today page — what moved, right
+// now — rather than a history page.
 
 import { useMemo, useState } from "react"
 import { Board } from "./board/board"

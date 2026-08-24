@@ -103,7 +103,7 @@ VNR_LAMBDA = 0.94
 # The numerator is unaffected at any distance — the quote's `change_percent` is
 # measured against the true previous close, so it stays a verified
 # single-session return no matter how stale our own bars are. Only the
-# denominator ages, which is why this is a bound and not a blank (#642).
+# denominator ages, which is why this is a bound and not a blank.
 #
 # Exported to the frontend by scripts/export_shared_constants.py.
 VNR_MAX_SESSIONS_BEHIND = 3
@@ -141,11 +141,11 @@ VNR_SIGMA_FLOOR_FRAC = 0.15
 VNR_SIGMA_FLOOR_MIN_OBS = 20
 
 # Sessions of history before the vol baseline means anything. This is the
-# registry's `warmup_periods` for vnr *and* the kernel's own gate — it used to
-# be metadata only, sizing the history fetch but never blanking an output, so
-# a 3-bar EWMA emitted a confident number and only the board's `bars` check
-# stood between it and the user (#631). One constant, so the promise the
-# contract publishes is the promise the kernel keeps.
+# registry's `warmup_periods` for vnr *and* the kernel's own gate. As metadata
+# alone it would size the history fetch without ever blanking an output, and a
+# 3-bar EWMA would emit a confident number with only the board's `bars` check
+# between it and the user. One constant, so the promise the contract publishes
+# is the promise the kernel keeps.
 #
 # Read by three consumers beyond this module: the registry's warmup metadata,
 # ``indicator.contract.json`` (the companion app), and — via
@@ -275,7 +275,7 @@ def volatility_normalized_return(
     Gap guard: ``pct_change`` is positional, so when a session is missing from
     the stored series the "daily" return actually spans several sessions while
     the denominator stays a one-day forecast — inflating the score by ~√N for
-    an N-session hole (issue #559). Bars whose previous stored bar is more than
+    an N-session hole. Bars whose previous stored bar is more than
     one session back are therefore NaN'd rather than reported: the honest
     statement is "this is not a verified single-day return", not a fabricated
     single-day figure. ``gaps`` is a precomputed :func:`session_gap_days`
@@ -808,7 +808,7 @@ def compute_indicators(
     ``session_dates`` — the venue's trading sessions covering the index range
     (from ``AssetRef(...).venue``) — makes the σ-Move gap guard exact:
     holidays are recognized as non-sessions instead of tripping the
-    business-day fallback (issue #559).
+    business-day fallback.
     """
     closes = df["close"]
 

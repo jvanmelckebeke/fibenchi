@@ -3,8 +3,7 @@
 //
 // σ resolution calls the shared resolver (lib/sigma) rather than restating the
 // cascade, so the board and the group table cannot disagree about an asset.
-// They used to agree only by luck: each site ordered the same decisions
-// differently, and gap-vs-stale simply rarely co-occurred (#629).
+// Restating it agrees only by luck — gap-vs-stale rarely co-occurs.
 
 import { useMemo } from "react"
 import { type Asset, type SparklinePoint } from "@/lib/api"

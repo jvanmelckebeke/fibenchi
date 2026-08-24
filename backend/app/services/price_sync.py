@@ -88,10 +88,10 @@ def drop_unsettled_last_bar(
 
     # The bar's own date, where we have it, settles which session it is —
     # direct evidence, so it is consulted before the close heuristic rather
-    # than behind it. It used to sit *after* the early return below, which made
-    # it unreachable whenever the predecessor didn't match `previous_close`
-    # (e.g. an interior hole right before today), and a still-forming partial
-    # was then persisted as a completed close (#635).
+    # than behind it. It has to stay *ahead* of the early return below: behind
+    # it, it is unreachable whenever the predecessor doesn't match
+    # `previous_close` (e.g. an interior hole right before today), and a
+    # still-forming partial gets persisted as a completed close.
     if session_date is not None and isinstance(last_bar_date, date):
         if last_bar_date < session_date:
             # Yahoo simply hasn't appended today's forming bar yet: this row is
@@ -249,7 +249,7 @@ async def _drop_and_persist(
 
     The purge needs proof that this frame is authoritative about the present,
     or a truncated provider response would delete real data. Two independent
-    proofs, either sufficient (#627):
+    proofs, either sufficient:
 
     * **A bar was dropped.** ``drop_unsettled_last_bar`` only fires on a bar it
       identified as the *current* session, so the frame demonstrably reached it.
@@ -263,8 +263,8 @@ async def _drop_and_persist(
     price, previous_close, market_state, session_date = anchor
     if price is None or previous_close is None:
         # No anchor (quote batch failed / symbol missing from it). Failing
-        # fully open here once stored every open market's live partial as that
-        # session's close, portfolio-wide (#586). Persist the settled bars but
+        # fully open here stores every open market's live partial as that
+        # session's close, portfolio-wide. Persist the settled bars but
         # withhold a trailing current-session bar — and never purge: without a
         # quote, a stored later row can't be proven stale.
         return await _upsert_prices(db, ref, _drop_unanchored_trailing_bar(df, ref))
@@ -407,8 +407,7 @@ async def _upsert_prices(db: AsyncSession, ref: AssetRef, df: pd.DataFrame) -> i
 
     Every write path funnels through here, so this is where the batch
     indicator cache learns that a symbol's series changed — its key can't
-    notice a corrected value or a backfilled interior session on its own
-    (#628).
+    notice a corrected value or a backfilled interior session on its own.
     """
     count = await PriceRepository(db).upsert_prices(ref, df)
     if count:

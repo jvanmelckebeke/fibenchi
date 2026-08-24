@@ -15,20 +15,20 @@ logger = logging.getLogger(__name__)
 def _ohlc_fault(row) -> str | None:
     """Describe why a bar cannot describe any real session, or None.
 
-    Deliberately narrow, and narrower than #635 first proposed. That issue
-    suggested rejecting a close outside its own bar's ``[low, high]`` on the
-    grounds that it is arithmetically impossible. Measured against a year of
-    real provider data for every tracked asset — 19,055 bars — **182 of them
-    (~1%) violate exactly that**, by up to 4.4% of price:
+    Deliberately narrow. The obvious extra check — reject a close outside its
+    own bar's ``[low, high]``, on the grounds that it is arithmetically
+    impossible — does not survive contact with the data. Measured against a
+    year of real provider data for every tracked asset (19,055 bars), **182 of
+    them (~1%) violate exactly that**, by up to 4.4% of price:
 
         p50 0.18%   p75 0.50%   p90 0.92%   p95 1.42%   p99 2.64%   max 4.40%
 
     Those are auction/official closes printed outside the intraday range, not
     corruption. Rejecting them would punch ~182 holes a year into the series
-    and blank σ-Move on the bar after each one — manufacturing the very defect
-    this batch has been removing. And because the real violations reach 4.4%,
-    no tolerance separates them from a plausibly-wrong close, so the check
-    cannot be rescued by loosening it.
+    and blank σ-Move on the bar after each one — manufacturing exactly the
+    defect the heal jobs exist to remove. And because the real violations
+    reach 4.4%, no tolerance separates them from a plausibly-wrong close, so
+    the check cannot be rescued by loosening it.
 
     What survives is what the same scan never saw violated: ``high < low`` is
     a contradiction in the bar's own definition rather than a reconciliation
@@ -202,11 +202,11 @@ class PriceRepository:
         Returns ``(asset_id, date, previous_close, close)`` for the *later* bar
         of each pair, oldest first. A step this large is not a session — it is
         the two bars being priced in different units, most often because a
-        split landed and nobody rebased the series (#648).
+        split landed and nobody rebased the series.
 
         Detection only. What the step *means* cannot be read off its shape: a
         scan of every stored bar found MNST's 2:1 split (0.498), our own
-        GBp/GBP divisor flip on RR.L (0.010, #654) and OKLO's real -54% SPAC
+        GBp/GBP divisor flip on RR.L (0.010) and OKLO's real -54% SPAC
         reprice (0.464) all inside the same band. The caller has to ask the
         provider which one it is looking at.
         """
@@ -273,16 +273,16 @@ class PriceRepository:
 
         Rows with a NaN in any OHLC column are skipped — but never silently:
         a skipped bar leaves a hole in price_history that is indistinguishable
-        from a market holiday downstream (it inflates σ-Move, issue #559), so
-        every skip is logged with its dates.
+        from a market holiday downstream (it inflates σ-Move), so every skip is
+        logged with its dates.
 
-        Bars that are internally impossible are skipped the same way (#635).
-        Until this, NaN was the *only* thing checked: a wrong close on a date
-        that exists passed every downstream guard, because they all reason
-        about dates or about the latest bar rather than about values. A hole is
-        strictly better than a lie — the gap guard reports it honestly, and the
-        hole heal re-fetches it — whereas a corrupt close silently distorts
-        every σ-Move within the EWMA's memory of it.
+        Bars that are internally impossible are skipped the same way. Checking
+        NaN alone would not catch them: a wrong close on a date that exists
+        passes every downstream guard, since they all reason about dates or
+        about the latest bar rather than about values. A hole is strictly
+        better than a lie — the gap guard reports it honestly, and the hole
+        heal re-fetches it — whereas a corrupt close silently distorts every
+        σ-Move within the EWMA's memory of it.
 
         Only *impossible* is rejected, never merely surprising: a close outside
         its own bar's [low, high], a high below its low, or a non-positive
