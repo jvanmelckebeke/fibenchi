@@ -30,7 +30,7 @@ export type Phase = "premarket" | "open" | "aftermarket" | "closed"
  * `pending` is not a withholding, which is why it can't live in lib/sigma: the
  * resolver answers what a snapshot entitles us to show, and a snapshot in
  * flight isn't one. It is what separates a batch that hasn't landed from a
- * backend with nothing to say — the tile draws those differently (#659).
+ * backend with nothing to say — the tile draws those differently.
  *
  * The variants stay discriminated even though the tooltip only shapes
  * `warmup`: they decide *whether* σ is withheld at all. Nothing downstream
@@ -173,7 +173,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   //
   // The union is only stable once both halves have settled, so the key is held
   // back until then — otherwise a groups-only union goes out first and the same
-  // ~84 symbols are fetched twice per cold load (#658). Gated on `isPending`,
+  // ~84 symbols are fetched twice per cold load. Gated on `isPending`,
   // not `data`, so a failed /api/theses releases it rather than leaving the
   // board with nothing to fetch.
   const rosterSettled = !groupsPending && !thesesPending
