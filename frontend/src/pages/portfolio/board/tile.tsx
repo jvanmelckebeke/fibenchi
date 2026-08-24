@@ -57,12 +57,18 @@ export const BoardTile = memo(function BoardTile({
   // % mode is *today's* move — the multi-day windows live in the Movers card.
   const value = mode === "sigma" ? tile.sigma : tile.todayPct
   const noReading = value == null
+  // Waiting on the batch, not withheld by it. A quote can arrive before the
+  // snapshot does, so a pending tile may already have a real % to print — then
+  // it isn't waiting for anything the eye can see, and the bar would be a lie.
+  const pending = noReading && tile.reason?.kind === "pending" && tile.todayPct == null
   const stop = noReading ? null : rampColor(value, span)
 
   // Every tile prints its own value as text — nothing on the board is
   // encoded by colour alone. A no-reading tile still shows the raw % move,
   // in its up/down colour: the reading is missing, the day is not.
-  const valueEl = noReading ? (
+  const valueEl = pending ? (
+    <span aria-hidden className="board-tile-bar" />
+  ) : noReading ? (
     <>
       {mode === "sigma" ? "—σ" : "—%"}
       {mode === "sigma" && tile.todayPct != null && (
@@ -82,14 +88,19 @@ export const BoardTile = memo(function BoardTile({
       <TooltipTrigger asChild>
         <Link
           to={`/asset/${tile.symbol}`}
-          className={`board-tile flex h-[62px] flex-col justify-between rounded-[3px] px-2 py-1.5 2xl:h-[80px] 2xl:px-3 2xl:py-2.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${noReading ? "board-tile-unread" : ""}`}
+          className={`board-tile flex h-[62px] flex-col justify-between rounded-[3px] px-2 py-1.5 2xl:h-[80px] 2xl:px-3 2xl:py-2.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${pending ? "board-tile-pending" : noReading ? "board-tile-unread" : ""}`}
           style={stop ? { backgroundColor: stop.color, color: stop.ink } : undefined}
         >
           <span className="flex items-center justify-between gap-1">
             <span className="truncate font-mono text-[12px] font-semibold 2xl:text-[14px] leading-none">{tile.symbol}</span>
             <PhaseIcon phase={tile.phase} live={tile.liveState} />
           </span>
-          <span className="text-[11px] leading-none tabular-nums 2xl:text-[13px] opacity-90">{valueEl}</span>
+          <span
+            className="flex items-center text-[11px] leading-none tabular-nums 2xl:text-[13px] opacity-90"
+            aria-busy={pending || undefined}
+          >
+            {valueEl}
+          </span>
         </Link>
       </TooltipTrigger>
       {/* The default TooltipContent surface is bg-foreground/text-background —

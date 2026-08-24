@@ -167,6 +167,28 @@
   );
 }
 
+/* Waiting-on-the-batch tiles. Same fill as no-reading so the grid keeps its
+   weight and nothing shifts when the value lands, but no hatch and no ink: the
+   hatch means "we asked and there is nothing", and a tile whose request is
+   still in flight has not asked yet. The bar is the only moving thing —
+   sized and placed where the value will be, so it reads as that value
+   arriving rather than as a separate spinner. */
+.board-tile-pending {
+  color: oklch(0.62 0.01 280);
+  background-color: oklch(0.23 0.008 280);
+}
+.board-tile-pending .board-tile-bar {
+  display: block;
+  height: 0.5rem;
+  width: 60%;
+  border-radius: 2px;
+  background-color: oklch(0.32 0.01 280 / 55%);
+  animation: stale-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-tile-pending .board-tile-bar { animation: none; }
+}
+
 /* Slight shadow keeps the stroke-only phase icons legible on any tile hue. */
 .phase-icon {
   filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 0.7));

@@ -24,7 +24,14 @@ import { type PctWindow, PCT_WINDOWS } from "./color-scale"
 export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 
 /** Why a tile has no σ reading — the shared {@link WithheldReason}, plus the
- * one field only the board has: when the next hole scan runs.
+ * two the board adds: one extra field on `gap` (when the next hole scan runs),
+ * and `pending`.
+ *
+ * `pending` is not a withholding at all, which is exactly why it can't live in
+ * lib/sigma: the resolver answers "what does this snapshot entitle us to show",
+ * and a snapshot still in flight isn't a snapshot. Without it, a batch that
+ * hasn't landed and a backend with genuinely nothing to say are the same value,
+ * and a cold load renders as the board's failure state (#659).
  *
  * The variants stay discriminated even though the tooltip only shapes
  * `warmup`: they decide *whether* σ is withheld at all. Nothing downstream
@@ -34,6 +41,8 @@ export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 export type NoReadingReason =
   | Exclude<WithheldReason, { kind: "gap" }>
   | { kind: "gap"; sessions: number; nextScanSeconds: number | null }
+  /** No snapshot *yet* — the batch covering this symbol is still in flight. */
+  | { kind: "pending" }
 
 export interface Tile {
   /** The tile's identity — also its React key, route param and lookup key. */
@@ -179,7 +188,16 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
     return [...all].sort()
   }, [groups, theses, rosterSettled])
 
-  const { data: snapshots } = useIndicators(fetchSymbols)
+  // `isPlaceholderData` as well as `isPending`: with keepPreviousData (#658) a
+  // key change keeps the previous batch on screen, so the symbols it covers are
+  // answered and the ones it doesn't are still waiting. Both cases are "this
+  // batch hasn't landed", and the per-symbol lookup below separates them.
+  const {
+    data: snapshots,
+    isPending: snapshotsFetching,
+    isPlaceholderData: snapshotsStale,
+  } = useIndicators(fetchSymbols)
+  const snapshotsPending = snapshotsFetching || snapshotsStale
   const { windows: windowReturns, series } = useWindowReturns(fetchSymbols)
 
   // Which sections each symbol sits in, under the active grouping — the one
@@ -212,14 +230,18 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
 
       const resolved = resolveSigma(quote, snap)
       const sigma = resolved.status === "ok" ? resolved.sigma : null
-      // The board adds one field the shared resolver has no business knowing:
-      // when the next hole scan runs. Widen the reason here rather than
-      // pushing a board concern into lib/sigma.
-      const reason: NoReadingReason | null = resolved.status === "withheld"
-        ? resolved.reason.kind === "gap"
-          ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
-          : resolved.reason
-        : null
+      // The board widens the resolver's answer with the two things it knows and
+      // lib/sigma has no business knowing: when the next hole scan runs, and
+      // whether the snapshot is merely late. `pending` is checked first — the
+      // resolver's `no_data` for an absent snapshot cannot tell "not fetched"
+      // from "nothing to fetch", and only the caller holding the query can.
+      const reason: NoReadingReason | null = resolved.status !== "withheld"
+        ? null
+        : snap == null && snapshotsPending
+          ? { kind: "pending" }
+          : resolved.reason.kind === "gap"
+            ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
+            : resolved.reason
 
       const scheduled = symbolPhase[symbol]
       const liveState = quote?.market_state != null
@@ -244,7 +266,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       })
     }
     return out
-  }, [roster, quotes, snapshots, windowReturns, series, sectionsBySymbol, symbolPhase, health])
+  }, [roster, quotes, snapshots, snapshotsPending, windowReturns, series, sectionsBySymbol, symbolPhase, health])
 
   // Filtering happens on the tile map, before sections are assembled: the
   // lookups below then drop the hidden symbols by themselves, the
@@ -281,6 +303,10 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       total: all.length,
       scored: all.filter((t) => t.sigma != null).length,
       open: all.filter((t) => t.phase === "open").length,
+      // Counted so the badge can say "still counting" rather than "0 of 84
+      // scored", which is the same sentence the board uses for a real coverage
+      // collapse.
+      pending: all.filter((t) => t.reason?.kind === "pending").length,
     }
   }, [tiles])
 

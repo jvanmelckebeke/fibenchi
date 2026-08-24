@@ -17,7 +17,7 @@ export function FilterBar({
   onMode: (v: ColorMode) => void
   phaseFilter: PhaseFilter
   onPhaseFilter: (v: PhaseFilter) => void
-  coverage: { total: number; scored: number; open: number }
+  coverage: { total: number; scored: number; open: number; pending: number }
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -62,7 +62,10 @@ export function FilterBar({
         />
       </span>
       <span className="ml-auto rounded-full border border-border px-2.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">
-        {coverage.open} open · {coverage.scored} of {coverage.total} scored
+        {coverage.open} open ·{" "}
+        {coverage.pending > 0
+          ? `scoring ${coverage.total}…`
+          : `${coverage.scored} of ${coverage.total} scored`}
       </span>
     </div>
   )
