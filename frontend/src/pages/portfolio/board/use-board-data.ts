@@ -27,11 +27,10 @@ export type Phase = "premarket" | "open" | "aftermarket" | "closed"
  * two the board adds: one extra field on `gap` (when the next hole scan runs),
  * and `pending`.
  *
- * `pending` is not a withholding at all, which is exactly why it can't live in
- * lib/sigma: the resolver answers "what does this snapshot entitle us to show",
- * and a snapshot still in flight isn't a snapshot. Without it, a batch that
- * hasn't landed and a backend with genuinely nothing to say are the same value,
- * and a cold load renders as the board's failure state (#659).
+ * `pending` is not a withholding, which is why it can't live in lib/sigma: the
+ * resolver answers what a snapshot entitles us to show, and a snapshot in
+ * flight isn't one. It is what separates a batch that hasn't landed from a
+ * backend with nothing to say — the tile draws those differently (#659).
  *
  * The variants stay discriminated even though the tooltip only shapes
  * `warmup`: they decide *whether* σ is withheld at all. Nothing downstream
@@ -172,13 +171,11 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   // This is why useTheses() is not gated to thesis mode: the union needs it in
   // both. Gating it would save one ~4 KB request and reintroduce the refetch.
   //
-  // The union is only *stable* once both halves have settled, and groups and
-  // theses are independent queries landing on different ticks. Emitting a
-  // groups-only union in between made the key change twice per cold load: two
-  // ~84-symbol batches, the first one thrown away, with the board blanked
-  // between them (#658). So hold the key back until neither is pending —
-  // `isPending`, not `data`, so a failed /api/theses releases the gate instead
-  // of stranding the board with nothing to fetch.
+  // The union is only stable once both halves have settled, so the key is held
+  // back until then — otherwise a groups-only union goes out first and the same
+  // ~84 symbols are fetched twice per cold load (#658). Gated on `isPending`,
+  // not `data`, so a failed /api/theses releases it rather than leaving the
+  // board with nothing to fetch.
   const rosterSettled = !groupsPending && !thesesPending
   const fetchSymbols = useMemo(() => {
     if (!rosterSettled) return []
@@ -188,10 +185,9 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
     return [...all].sort()
   }, [groups, theses, rosterSettled])
 
-  // `isPlaceholderData` as well as `isPending`: with keepPreviousData (#658) a
-  // key change keeps the previous batch on screen, so the symbols it covers are
-  // answered and the ones it doesn't are still waiting. Both cases are "this
-  // batch hasn't landed", and the per-symbol lookup below separates them.
+  // "The current batch hasn't landed" — either nothing has, or what's on screen
+  // is the previous key's data held by keepPreviousData. Symbols that batch
+  // covers are answered anyway; the per-symbol lookup below sorts them out.
   const {
     data: snapshots,
     isPending: snapshotsFetching,
@@ -230,11 +226,10 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
 
       const resolved = resolveSigma(quote, snap)
       const sigma = resolved.status === "ok" ? resolved.sigma : null
-      // The board widens the resolver's answer with the two things it knows and
-      // lib/sigma has no business knowing: when the next hole scan runs, and
-      // whether the snapshot is merely late. `pending` is checked first — the
-      // resolver's `no_data` for an absent snapshot cannot tell "not fetched"
-      // from "nothing to fetch", and only the caller holding the query can.
+      // The board widens the resolver's answer with the two things only it
+      // knows: when the next hole scan runs, and whether the snapshot is merely
+      // late. `pending` wins — the resolver reports an absent snapshot as
+      // `no_data`, and cannot tell "not fetched" from "nothing to fetch".
       const reason: NoReadingReason | null = resolved.status !== "withheld"
         ? null
         : snap == null && snapshotsPending
@@ -303,9 +298,8 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       total: all.length,
       scored: all.filter((t) => t.sigma != null).length,
       open: all.filter((t) => t.phase === "open").length,
-      // Counted so the badge can say "still counting" rather than "0 of 84
-      // scored", which is the same sentence the board uses for a real coverage
-      // collapse.
+      // Lets the badge say "still counting" rather than "0 of 84 scored" —
+      // the same sentence it uses for a real coverage collapse.
       pending: all.filter((t) => t.reason?.kind === "pending").length,
     }
   }, [tiles])

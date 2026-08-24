@@ -105,15 +105,11 @@ export function useGroupIndicators(id: number) {
  * Used to fill indicator columns for thesis members living in other groups —
  * the per-group batch only covers the current group.
  *
- * `keepPreviousData` because the symbol set *is* the cache key: every caller
- * grows or shrinks it while the view is on screen (a roster that gains the
- * thesis-only members, a table row being expanded), and without it each such
- * change empties `data` for a whole round-trip. On the board that blanked every
- * tile to "no reading" mid-load, which reads as breakage rather than as loading
- * (#658). A superset's snapshots are still correct for the subset — the extra
- * keys are simply never looked up — so showing the previous batch while the new
- * one flies is honest, not merely convenient. Pair it with `isPlaceholderData`
- * where the distinction matters.
+ * The symbol set is the cache key, and callers grow it while the view is on
+ * screen, so `keepPreviousData` holds the last batch across the change. A
+ * superset's snapshots stay correct for the subset — the extra keys are never
+ * looked up — so the held data is right, not merely present. Read
+ * `isPlaceholderData` where "this symbol has no answer yet" matters.
  */
 export function useIndicators(symbols: string[], enabled = true) {
   return useQuery({
@@ -134,7 +130,7 @@ export function useSparklines(symbols: string[], period?: string, enabled = true
     queryFn: () => api.sparklines.batch(symbols, period),
     enabled: enabled && symbols.length > 0,
     staleTime: STALE_5MIN,
-    // Same reasoning as useIndicators above — the symbol set is the key.
+    // Keyed on the symbol set, like useIndicators above.
     placeholderData: keepPreviousData,
   })
 }

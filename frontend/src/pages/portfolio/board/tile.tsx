@@ -57,9 +57,9 @@ export const BoardTile = memo(function BoardTile({
   // % mode is *today's* move — the multi-day windows live in the Movers card.
   const value = mode === "sigma" ? tile.sigma : tile.todayPct
   const noReading = value == null
-  // Waiting on the batch, not withheld by it. A quote can arrive before the
-  // snapshot does, so a pending tile may already have a real % to print — then
-  // it isn't waiting for anything the eye can see, and the bar would be a lie.
+  // Waiting on the batch, not withheld by it. A quote can beat the snapshot, so
+  // a pending tile may already have a real % to print — nothing visible is
+  // missing then, and the bar would say otherwise.
   const pending = noReading && tile.reason?.kind === "pending" && tile.todayPct == null
   const stop = noReading ? null : rampColor(value, span)
 

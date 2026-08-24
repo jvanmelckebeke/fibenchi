@@ -167,12 +167,9 @@
   );
 }
 
-/* Waiting-on-the-batch tiles. Same fill as no-reading so the grid keeps its
-   weight and nothing shifts when the value lands, but no hatch and no ink: the
-   hatch means "we asked and there is nothing", and a tile whose request is
-   still in flight has not asked yet. The bar is the only moving thing —
-   sized and placed where the value will be, so it reads as that value
-   arriving rather than as a separate spinner. */
+/* Waiting-on-the-batch tiles: the no-reading fill without the hatch, since the
+   hatch means the answer came back empty. The bar sits where the value will,
+   so it reads as that value pending rather than as a spinner. */
 .board-tile-pending {
   color: oklch(0.62 0.01 280);
   background-color: oklch(0.23 0.008 280);
