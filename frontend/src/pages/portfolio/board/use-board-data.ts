@@ -20,6 +20,7 @@ import { useQuotes } from "@/lib/quote-stream"
 import { resolveSigma, type WithheldReason } from "@/lib/sigma"
 import { marketState } from "@/lib/market-state"
 import { type PctWindow, PCT_WINDOWS } from "./color-scale"
+import { windowCutoffs, windowPct } from "./window-returns"
 
 export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 
@@ -114,26 +115,14 @@ function useWindowReturns(symbols: string[]) {
   const quotes = useQuotes()
   const windows = useMemo(() => {
     const out: Record<string, Record<PctWindow, number | null>> = {}
-    const today = new Date()
+    const cutoffs = windowCutoffs()
     for (const sym of symbols) {
       const points = series?.[sym]
       const per = {} as Record<PctWindow, number | null>
       for (const w of PCT_WINDOWS) {
-        per[w.value] = null
-        if (!points?.length) continue
-        const cutoff = new Date(today)
-        cutoff.setDate(cutoff.getDate() - w.days)
-        const cutoffIso = cutoff.toISOString().slice(0, 10)
-        // Baseline = last close at or before the window start; a series that
-        // doesn't reach back that far has no honest answer for this window.
-        let base: SparklinePoint | null = null
-        for (const p of points) {
-          if (p.date <= cutoffIso) base = p
-          else break
-        }
-        if (!base || base.close === 0) continue
-        const last = quotes[sym]?.price ?? points[points.length - 1].close
-        per[w.value] = ((last - base.close) / base.close) * 100
+        const last = quotes[sym]?.price ?? points?.[points.length - 1]?.close
+        per[w.value] =
+          points?.length && last != null ? windowPct(points, last, cutoffs[w.value]) : null
       }
       out[sym] = per
     }
