@@ -148,6 +148,29 @@ On startup (`main.py` lifespan):
 - **Price flash:** `usePriceFlash` hook triggers green/red background fade animation (1.8s) on price tick changes, using a reflow trick to restart CSS animations on repeated same-direction ticks.
 - **SPA fallback:** In production, the root `Dockerfile` copies the built SPA into `static/`. `main.py` mounts it and serves `index.html` for all non-API, non-asset routes. In dev, this directory doesn't exist so the mount is skipped.
 
+## Comments
+
+Most files carry few comments, and that is the norm. Two things earn a long
+one:
+
+**A measurement.** A constant picked by sweeping the real book keeps the
+numbers that picked it. `SPLIT_STEP_FACTOR` names the genuine 0.75 sessions it
+has to clear; without them the next reader rounds it to something tidier and
+the split heal quietly stops examining 3:2 splits.
+
+**A rejected design.** Say why the obvious alternative fails, once, where
+someone would reach for it. `splits.py` explains why there is no applied-splits
+table — that paragraph is the reason nobody has added one.
+
+Nothing else does. In particular: don't restate the mechanism beside the
+mechanism, and don't state one idea in the module docstring, again above the
+constant, and a third time in the function that uses it. Pick the single place
+a reader arrives from.
+
+Code that infers something from ambiguous provider data runs heavier, because
+a wrong inference there is silent and permanent. That is a ceiling for those
+files, not a target for new code.
+
 ## Testing
 
 Backend tests use **SQLite in-memory** (`sqlite+aiosqlite:///:memory:`) — no database service needed. The `conftest.py` overrides `get_db()` with a test session. Note: SQLite doesn't support `pg_insert` (PostgreSQL-specific `ON CONFLICT`), so tests that exercise upsert logic mock `_upsert_prices` instead.
