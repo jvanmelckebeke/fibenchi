@@ -18,6 +18,13 @@ class PriceHistory(Base):
     low: Mapped[float] = mapped_column(Numeric(12, 4, asdecimal=False))
     close: Mapped[float] = mapped_column(Numeric(12, 4, asdecimal=False))
     volume: Mapped[int] = mapped_column(BigInteger)
+    # Cash paid per share with this bar as its ex-date, in the same unit as
+    # ``close``. None means unknown (the bar predates the column, or the
+    # provider frame carried no event data), which the compute path reads as
+    # zero — see ``daily_total_returns``.
+    dividend: Mapped[float | None] = mapped_column(
+        Numeric(12, 6, asdecimal=False), nullable=True, default=None
+    )
 
     asset: Mapped["Asset"] = relationship(back_populates="prices")
 

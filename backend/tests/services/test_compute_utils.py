@@ -9,7 +9,10 @@ import pytest
 from app.services.compute.utils import prices_to_df
 
 
-def _make_price(d: date, open_: float, high: float, low: float, close: float, volume: int):
+def _make_price(
+    d: date, open_: float, high: float, low: float, close: float, volume: int,
+    dividend: float | None = None,
+):
     """Create a mock PriceHistory object."""
     p = MagicMock()
     p.date = d
@@ -18,6 +21,7 @@ def _make_price(d: date, open_: float, high: float, low: float, close: float, vo
     p.low = low
     p.close = close
     p.volume = volume
+    p.dividend = dividend
     return p
 
 
@@ -31,7 +35,9 @@ class TestPricesToDf:
 
         assert isinstance(df, pd.DataFrame)
         assert df.index.name == "date"
-        assert list(df.columns) == ["open", "high", "low", "close", "volume"]
+        assert list(df.columns) == [
+            "open", "high", "low", "close", "volume", "dividends",
+        ]
         assert len(df) == 2
 
     def test_values_correct(self):
@@ -43,6 +49,17 @@ class TestPricesToDf:
         assert df.iloc[0]["low"] == 99.0
         assert df.iloc[0]["close"] == 102.0
         assert df.iloc[0]["volume"] == 1_000_000
+
+    def test_dividend_carried_and_null_reads_as_zero(self):
+        """A null stored dividend is 'unknown'; the return kernel needs a number."""
+        prices = [
+            _make_price(date(2025, 1, 2), 100.0, 105.0, 99.0, 102.0, 1_000_000, 0.55),
+            _make_price(date(2025, 1, 3), 102.0, 106.0, 101.0, 104.0, 1_200_000),
+        ]
+        df = prices_to_df(prices)
+
+        assert df.iloc[0]["dividends"] == 0.55
+        assert df.iloc[1]["dividends"] == 0.0
 
     def test_date_as_index(self):
         prices = [

@@ -11,6 +11,11 @@ from app.models import PriceHistory
 
 logger = logging.getLogger(__name__)
 
+# The provider's per-bar cash-dividend column, as it arrives on a history
+# frame. One name for it, shared with ``compute.splits`` (which rebases it) and
+# ``compute.utils`` (which reads it back out of storage).
+DIVIDEND_COLUMN = "dividends"
+
 
 def _ohlc_fault(row) -> str | None:
     """Describe why a bar cannot describe any real session, or None.
@@ -287,8 +292,17 @@ class PriceRepository:
         Only *impossible* is rejected, never merely surprising: a close outside
         its own bar's [low, high], a high below its low, or a non-positive
         price. A real crash must always store.
+
+        ``dividend`` is written only when the frame carried the provider's
+        ``dividends`` column; otherwise the key is absent from every row and
+        the stored value is left alone. The provider joins that column onto a
+        frame only when the requested range contains a payout, so its absence
+        is "this fetch says nothing about dividends", not "no dividends" — and
+        writing a 0 for it would erase a real amount every time a short window
+        happens to re-fetch a bar it can no longer see the event for.
         """
         ohlc_cols = ["open", "high", "low", "close"]
+        has_dividends = DIVIDEND_COLUMN in df.columns
         rows = []
         skipped: list[date] = []
         impossible: list[tuple[date, str]] = []
@@ -315,6 +329,9 @@ class PriceRepository:
                 "close": round(float(row["close"]), 4),
                 "volume": int(row["volume"]) if pd.notna(row["volume"]) else 0,
             })
+            if has_dividends:
+                cash = row[DIVIDEND_COLUMN]
+                rows[-1]["dividend"] = round(float(cash), 6) if pd.notna(cash) else 0.0
 
         if skipped:
             logger.warning(
@@ -348,17 +365,15 @@ class PriceRepository:
         if not rows:
             return 0
 
+        updated = ["open", "high", "low", "close", "volume"]
+        if "dividend" in rows[0]:
+            updated.append("dividend")
+
         for chunk in _chunked(rows, UPSERT_CHUNK_ROWS):
             stmt = pg_insert(PriceHistory).values(chunk)
             stmt = stmt.on_conflict_do_update(
                 constraint="uq_asset_date",
-                set_={
-                    "open": stmt.excluded.open,
-                    "high": stmt.excluded.high,
-                    "low": stmt.excluded.low,
-                    "close": stmt.excluded.close,
-                    "volume": stmt.excluded.volume,
-                },
+                set_={col: getattr(stmt.excluded, col) for col in updated},
             )
             await self.db.execute(stmt)
         await self.db.commit()

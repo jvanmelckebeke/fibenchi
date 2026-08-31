@@ -49,6 +49,12 @@ SPLIT_COLUMN = "splits"
 
 PRICE_COLUMNS = ("open", "high", "low", "close", "adjclose")
 
+# Cash-per-share columns, rebased by the same divisor as the prices. A 1.00
+# dividend paid before a 2:1 split is 0.50 per share in the current basis, and
+# σ-Move divides it by a rebased close — leaving it in the old basis would
+# hand the total-return numerator two different units.
+CASH_COLUMNS = ("dividends",)
+
 # How far the frame's own step across an ex-date may sit from the split ratio
 # and still corroborate it, as an absolute log-ratio distance (~28%).
 #
@@ -151,7 +157,7 @@ def normalize_splits(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFram
 
     out = df.copy()
     factor = divisor.to_numpy()
-    for col in PRICE_COLUMNS:
+    for col in (*PRICE_COLUMNS, *CASH_COLUMNS):
         if col in out.columns:
             out[col] = pd.to_numeric(out[col], errors="coerce") / factor
     if "volume" in out.columns:

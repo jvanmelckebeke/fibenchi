@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { resolveSigma, sigmaSortKey, VNR_WARMUP_SESSIONS } from "./sigma"
+import { resolveSigma, sigmaExDiv, sigmaSortKey, VNR_WARMUP_SESSIONS } from "./sigma"
 import { VNR_MAX_SESSIONS_BEHIND } from "@/lib/generated/backend-constants"
 import type { IndicatorSummary, Quote } from "@/lib/types"
 
@@ -254,5 +254,34 @@ describe("sigmaSortKey", () => {
       snap({ close: 30250, as_of: "2026-08-01", values: { vnr: 1.56 } }),
     )
     expect(sigmaSortKey(withheld)).toBeNull()
+  })
+})
+
+describe("sigmaExDiv", () => {
+  it("reports the payout behind a settled σ that disagrees with the change %", () => {
+    const settled = snap({
+      close: 95, as_of: SESSIONS[0], change_pct: -4.8,
+      values: { vnr: 0.1, vnr_ex_div: 5.0 },
+    })
+    const r = resolveSigma(undefined, settled)
+    expect(r).toEqual({ status: "ok", sigma: 0.1, source: "settled" })
+    expect(sigmaExDiv(r, settled)).toBe(5.0)
+  })
+
+  it("says nothing on an ordinary bar", () => {
+    const ordinary = snap({ close: 100, values: { vnr: 0.9 } })
+    expect(sigmaExDiv(resolveSigma(undefined, ordinary), ordinary)).toBeNull()
+  })
+
+  it("says nothing about a live σ, which never applied the correction", () => {
+    // The live number divides the quote's own change %, and that carries the
+    // ex-date drop uncorrected — the stored bar's dividend does not describe it.
+    const s = snap({
+      close: 28300, as_of: "2026-08-10",
+      values: { vnr: 1.56, vnr_sigma: 0.0576, vnr_ex_div: 0.42 },
+    })
+    const r = resolveSigma(dated({ change_percent: -1.06, price: 28000 }), s)
+    expect(r).toMatchObject({ status: "ok", source: "live" })
+    expect(sigmaExDiv(r, s)).toBeNull()
   })
 })

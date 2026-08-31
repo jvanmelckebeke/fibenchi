@@ -183,6 +183,28 @@ export function resolveSigma(
   return { status: "withheld", reason: { kind: "no_data" } }
 }
 
+/**
+ * The per-share cash a shown σ added back, or null when there is none.
+ *
+ * σ-Move scores a total return, so an ex-dividend date reads as the non-event
+ * it is. The change % beside it is still a price move, which means the two
+ * disagree by exactly the dividend on that one bar — on a large payout by
+ * enough to flip the sign, a green σ next to a red day. That is the right
+ * answer twice over and still needs saying out loud, so surfaces that render
+ * both call this and name the amount.
+ *
+ * Only for a settled σ. A live one is scored from the quote's own
+ * `change_percent`, which carries the ex-date drop uncorrected — the stored
+ * bar's dividend says nothing about it.
+ */
+export function sigmaExDiv(
+  resolution: SigmaResolution,
+  snapshot: IndicatorSummary | undefined,
+): number | null {
+  if (resolution.status !== "ok" || resolution.source !== "settled") return null
+  return getNumericValue(snapshot?.values, "vnr_ex_div")
+}
+
 /** Sort key: the resolved σ, or null so unresolvable rows sort last. Keeps the
  * ordering identical to what the row renders. */
 export function sigmaSortKey(resolution: SigmaResolution): number | null {

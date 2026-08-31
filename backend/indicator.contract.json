@@ -279,12 +279,14 @@
       ],
       "deltaFields": [
         "vnr_sigma",
-        "vnr_gap_sessions"
+        "vnr_gap_sessions",
+        "vnr_ex_div"
       ],
       "decimals": 2,
       "fieldDecimals": {
         "vnr_sigma": 6,
-        "vnr_gap_sessions": 0
+        "vnr_gap_sessions": 0,
+        "vnr_ex_div": 6
       },
       "warmup": 60,
       "usesOhlc": false,

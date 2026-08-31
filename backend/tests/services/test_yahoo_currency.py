@@ -180,3 +180,16 @@ class TestNormalizeOhlcvDf:
         result = _normalize_ohlcv_df(df, 100)
         assert result["adjclose"].tolist() == [32.5]
         assert result["volume"].tolist() == [1_000_000]
+
+    def test_converts_dividends_with_the_prices(self):
+        """A GBp dividend left in pence beside a GBP close is a 100x σ-Move."""
+        df = pd.DataFrame({
+            "open": [3200.0],
+            "high": [3300.0],
+            "low": [3100.0],
+            "close": [3250.0],
+            "volume": [1_000_000],
+            "dividends": [8.5],
+        })
+        result = _normalize_ohlcv_df(df, 100)
+        assert result["dividends"].tolist() == [0.085]

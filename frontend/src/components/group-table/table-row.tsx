@@ -9,7 +9,12 @@ import { TagBadge } from "@/components/tags/tag-badge"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { ExpandedAssetChart } from "@/components/chart/expanded-asset-chart"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
-import { formatAssetPriceWithSettings, formatCompactNumber, readableTextColor } from "@/lib/format"
+import {
+  formatAssetPriceWithSettings,
+  formatCompactNumber,
+  formatPrice,
+  readableTextColor,
+} from "@/lib/format"
 import { ChangePct } from "@/components/change-pct"
 import {
   getNumericValue,
@@ -18,7 +23,7 @@ import {
   getDescriptorByField,
   formatIndicatorField,
 } from "@/lib/indicator-registry"
-import { resolveSigma, sigmaWithheldTitle } from "@/lib/sigma"
+import { resolveSigma, sigmaExDiv, sigmaWithheldTitle } from "@/lib/sigma"
 import { marketState as marketStateInfo } from "@/lib/market-state"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -287,6 +292,9 @@ export const TableRow = memo(function TableRow({
             // the sort key make, so the three can't disagree.
             const sigma = field === "vnr" ? resolveSigma(quote, indicator) : null
             const withheld = sigma?.status === "withheld" ? sigma.reason : null
+            // On an ex-date the σ and the change % beside it disagree by the
+            // dividend, because only one of them counts the cash.
+            const exDiv = sigma ? sigmaExDiv(sigma, indicator) : null
             const values = sigma?.status === "ok"
               ? { ...indicator?.values, vnr: sigma.sigma }
               : indicator?.values
@@ -302,7 +310,12 @@ export const TableRow = memo(function TableRow({
                 {formatted ? (
                   <span
                     className={formatted.colorClass}
-                    title={desc?.compactFormat && val != null ? val.toLocaleString() : undefined}
+                    title={[
+                      desc?.compactFormat && val != null ? val.toLocaleString() : null,
+                      exDiv != null
+                        ? `Ex-dividend ${formatPrice(exDiv, asset.currency)} per share. σ-Move scores the total return, so the payout's price drop is not counted as a move; the change % beside it still is a price move.`
+                        : null,
+                    ].filter(Boolean).join(" — ") || undefined}
                   >
                     {formatted.text}
                   </span>

@@ -151,6 +151,15 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
           )}
         </div>
         {warmup && <WarmupBar bars={warmup.bars} needed={warmup.needed} />}
+        {/* The two numbers above are a price move and a total return, so on an
+            ex-date they disagree by the payout — loudly enough to flip a sign
+            on a big one. Naming the amount is the difference between an
+            explained reading and a broken-looking one. */}
+        {tile.exDiv != null && (
+          <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+            Ex-dividend {formatAssetPrice(tile.exDiv, tile.asset)} — σ counts it, the % change doesn't.
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3 border-t border-border px-3 py-2">
