@@ -27,15 +27,13 @@ the frame's own step across the ex-date is either ~0.5 (nobody adjusted, so we
 do) or ~1.0 (already adjusted, so we don't). No stored state can go stale, and
 the day Yahoo finally adjusts its history, this stops adjusting with it.
 
-**What the frame has to prove.** Those two readings sit ``log(r)`` apart, which
-for a 5:4 split is 0.22 rather than 0.69 — close enough that a band wide enough
-to recognise one recognises both. So the test is not "is the step near the
-split?" but "can this frame tell the two apart?", and it is the asset's own
-session-to-session noise that decides. Exactly one reading may fall inside a
-band scaled from that noise; both or neither means undecidable, and the frame
-is left alone. Idempotency cuts both ways — a wrong adjustment is re-derived
-identically on every fetch and never heals — so refusing is the only safe
-answer to a frame that cannot settle the question.
+**What the frame has to prove.** The two readings sit ``log(r)`` apart — 0.69
+for a 2:1 but 0.22 for a 5:4 — so a band wide enough to recognise one reading
+of a small split recognises both. The test is therefore whether the frame can
+tell them apart, judged against the asset's own noise: exactly one reading may
+fall inside the band, and both or neither leaves the frame alone. Idempotency
+cuts both ways, since a wrong adjustment is re-derived identically forever, so
+refusing is the only safe answer to a frame that cannot settle the question.
 """
 
 import logging
@@ -65,48 +63,23 @@ PRICE_COLUMNS = ("open", "high", "low", "close", "adjclose")
 # hand the total-return numerator two different units.
 CASH_COLUMNS = ("dividends",)
 
-# How close the frame's step has to sit to a hypothesis to be said to match it,
-# as a log-ratio distance — sized from the frame's own noise rather than fixed.
+# How close a step has to sit to a reading to match it, as a log-ratio
+# distance. Measured over 46,217 stored bars: per-asset median absolute log
+# return is 1.14% for the median asset, 2.29% at p90, 5.4% at p99, so NOISE_K=3
+# gives a band of ~3.4% for a typical name and ~16% for the noisiest one held.
 #
-# There are two hypotheses on every ex-date: the provider left the frame
-# unadjusted (step ~ 1/r) or it already adjusted (step ~ 1). They sit log(r)
-# apart, so how far apart they are depends on the split. A fixed band sized for
-# a 2:1 (0.69 apart) admits both hypotheses for a 5:4 (0.22 apart) and applies
-# the divisor to a frame that was already in the new basis — a fabricated +25%
-# step, below the heal's 1.4 detection threshold, permanent because the
-# stateless design re-decides the same way on every fetch.
-#
-# So the question is not "is the step near the split?" but "can this frame tell
-# the two apart?", and what limits that is how much the price moves on its own.
-# The band is therefore NOISE_K times the frame's own median absolute log
-# return, and a hypothesis is accepted only when it is the *only* one inside
-# it. Both inside means the frame cannot distinguish them; neither inside means
-# the step is something else entirely (the real -30% day a bare
-# nearest-hypothesis rule would "correct" into +40%). Both outcomes leave the
-# frame alone.
-#
-# NOISE_K = 3 covers an ordinary session comfortably. Measured over the book's
-# 46,217 stored bars, per-asset median absolute log return runs 1.14% (median
-# asset), 2.29% (p90), 5.4% (p99 and max) — so the band is ~3.4% for a typical
-# name and ~16% for the most volatile one held.
-#
-# The floor matters for the other end: a series that barely moves (an ETC that
-# stops repricing, anything gone stale) yields a band near zero, and then a
-# single real 6% day sits "far" from both hypotheses and every split on that
-# symbol becomes undecidable. 0.05 is above the p99 asset's typical session.
+# The floor is for the other end. A series that stops repricing decays its own
+# noise toward zero, and then a single real 6% day sits far from both readings
+# and every split on that symbol becomes undecidable.
 NOISE_K = 3.0
 MIN_SEPARATION_BAND = 0.05
 
-# A ratio is decidable when the hypotheses are more than two bands apart, i.e.
-# ``log(r) > 2 * band``: above ~1.11:1 for a typical name, ~1.38:1 for the
-# noisiest. Below that an unadjusted split and an ordinary down day are the
-# same evidence, and no other signal rescues it — a 5:4 split moves share
-# volume by 25% against daily volume noise several times that, and Yahoo's
-# ``adjclose`` matched the unadjusted ``close`` right through MNST's split.
-# Nor can the heal cover it: at SPLIT_STEP_FACTOR 1.4 the book yields 11
-# candidates, at 1.2 it yields 81 and at 1.1 it yields 610, against a cap of
-# 10 re-fetches per run. Sub-1.1 splits are outside what price evidence
-# settles, and this module says so rather than guessing.
+# Which leaves splits under ~1.11:1 (typical name) to ~1.38:1 (noisiest) beyond
+# what price evidence settles — log(r) has to clear two bands. Nothing rescues
+# those: a 5:4 moves share volume by 25% against daily volume noise several
+# times that, Yahoo's adjclose matched the unadjusted close right through
+# MNST's split, and the heal cannot widen its net (11 candidates at 1.4, 81 at
+# 1.2, 610 at 1.1, against 10 re-fetches per run).
 
 # A bar-to-bar step large enough to be worth asking the provider about, as a
 # factor in either direction. Used only by ``heal_split_discontinuities`` to
@@ -129,15 +102,11 @@ MIN_SEPARATION_BAND = 0.05
 SPLIT_STEP_FACTOR = 1.4
 
 def _separation_band(closes: pd.Series, events: pd.Series) -> float:
-    """How close a step has to sit to a hypothesis to be said to match it.
+    """The frame's own median absolute log return, scaled by ``NOISE_K``.
 
-    The frame's own median absolute log return, scaled by ``NOISE_K`` — an
-    estimate of how far this asset moves in an ordinary session, which is
-    exactly what limits how well any step can be attributed. Median rather
-    than stdev, and ex-date bars excluded, so the split's own step and a
-    couple of earnings days cannot inflate the band that judges them.
-
-    Falls back to the floor when the frame is too short to say anything.
+    Median rather than stdev, and ex-date bars excluded, so the split's own
+    step and a couple of earnings days cannot inflate the band that judges
+    them. Falls back to the floor when the frame is too short to say anything.
     """
     log_returns = (closes / closes.shift(1)).apply(
         lambda v: math.log(v) if v and v > 0 else float("nan")
@@ -157,10 +126,8 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
 
     1.0 everywhere else, so the result composes by multiplication.
 
-    "Back it up" means the frame distinguishes the two hypotheses — unadjusted
-    (step ~ 1/r) and already adjusted (step ~ 1) — not merely that it is near
-    one of them. Exactly one must fall inside the band; see
-    :data:`MIN_SEPARATION_BAND`.
+    "Back it up" means the frame distinguishes unadjusted (step ~ 1/r) from
+    already adjusted (step ~ 1), not merely that it lands near one of them.
     """
     raw = pd.to_numeric(df[SPLIT_COLUMN], errors="coerce")
     closes = pd.to_numeric(df["close"], errors="coerce")
@@ -186,8 +153,6 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
 
         observed = here / earlier.iat[-1]
         step = math.log(observed)
-        # Distance to each hypothesis: the frame is unadjusted and we must
-        # divide, or it is already adjusted and we must not.
         to_unadjusted = abs(step - math.log(1.0 / ratio))
         to_adjusted = abs(step)
 
@@ -207,10 +172,9 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
             )
             continue
 
-        # Neither hypothesis fits, or both do. Undecidable either way, and the
-        # two are worth telling apart in the log: "both" is a split too small
-        # for this frame's noise to resolve, "neither" is a step that no split
-        # explains.
+        # Undecidable either way, but worth telling apart in the log: "both"
+        # is a split too small for this frame's noise, "neither" is a step no
+        # split explains.
         both = to_unadjusted <= band and to_adjusted <= band
         level = logger.info if both else logger.warning
         level(
