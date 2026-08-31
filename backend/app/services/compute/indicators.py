@@ -192,6 +192,34 @@ def session_gap_days(index: pd.Index, session_dates: set[date] | None = None) ->
     return gaps
 
 
+def daily_total_returns(
+    closes: pd.Series, dividends: pd.Series | None = None,
+) -> pd.Series:
+    """Bar-to-bar total return: price move plus the cash paid to hold it.
+
+    On an ex-dividend date the price opens lower by roughly the dividend and
+    nothing has happened — the holder's cash position is unchanged. A price
+    return calls that a loss, which σ-Move then reports twice: once as the
+    day's score, and for weeks afterwards through the EWMA variance the drop
+    was squared into (λ=0.94, ~11-day half-life). A 5% special dividend is a
+    multi-σ red flag on a day the market did nothing.
+
+    ``dividends`` is cash per share with that bar as its ex-date, in the same
+    unit as ``closes``; missing or null entries are zero, which makes this
+    identical to ``pct_change`` for every asset that never pays out — indices,
+    crypto, accumulating ETFs, and the synthetic series pseudo-ETFs build.
+
+    Only the return is corrected. Stored closes stay the prices the asset
+    actually traded at, so the chart, the quote and ``change_pct`` continue to
+    agree with the provider; the difference between them and this number is
+    exactly the dividend, and ``vnr_ex_div`` reports it.
+    """
+    cash = 0.0
+    if dividends is not None:
+        cash = pd.to_numeric(dividends, errors="coerce").fillna(0.0)
+    return (closes + cash) / closes.shift(1) - 1
+
+
 def _ewma_daily_vol(
     closes: pd.Series,
     lam: float,
@@ -199,6 +227,7 @@ def _ewma_daily_vol(
     sigma_floor_frac: float = VNR_SIGMA_FLOOR_FRAC,
     sigma_floor_min_obs: int = VNR_SIGMA_FLOOR_MIN_OBS,
     warmup: int = VNR_WARMUP_SESSIONS,
+    dividends: pd.Series | None = None,
 ) -> pd.Series:
     """Forward EWMA volatility forecast (RiskMetrics zero-mean).
 
@@ -235,7 +264,7 @@ def _ewma_daily_vol(
     denominator. Below ``VNR_SIGMA_FLOOR_MIN_OBS`` observations the estimate is
     NaN and no floor applies.
     """
-    returns = closes.pct_change()
+    returns = daily_total_returns(closes, dividends)
     if gaps is not None:
         returns = returns.where(~(gaps > 1))
     # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
@@ -256,6 +285,7 @@ def volatility_normalized_return(
     sigma_floor_frac: float = VNR_SIGMA_FLOOR_FRAC,
     sigma_floor_min_obs: int = VNR_SIGMA_FLOOR_MIN_OBS,
     warmup: int = VNR_WARMUP_SESSIONS,
+    dividends: pd.Series | None = None,
 ) -> pd.Series:
     """Volatility-normalized daily return — a "sigma move" / return z-score.
 
@@ -283,15 +313,22 @@ def volatility_normalized_return(
     omitted, the business-day fallback is derived from the index, in which
     case exchange holidays trip the guard too and conservatively blank the
     bar after a holiday.
+
+    ``dividends`` makes the numerator a total return, so an ex-date's
+    mechanical price drop scores as the non-event it is — see
+    :func:`daily_total_returns`. Omitting it reproduces the price-return
+    behaviour exactly.
     """
     if gaps is None:
         gaps = session_gap_days(closes.index)
-    returns = closes.pct_change()
+    returns = daily_total_returns(closes, dividends)
     # Forecast vol from data through the previous day; guard flat series (0 -> NaN).
     # The forecast gets the same gap series so gap-spanning returns can't
     # contaminate the denominator either (they would understate later σ-moves).
+    # It gets the same dividends for the same reason: an ex-date drop left in
+    # the variance overstates σ for weeks, understating every score after it.
     sigma_forecast = _ewma_daily_vol(
-        closes, lam, gaps, sigma_floor_frac, sigma_floor_min_obs, warmup,
+        closes, lam, gaps, sigma_floor_frac, sigma_floor_min_obs, warmup, dividends,
     ).shift(1)
     return (returns / sigma_forecast).where(~(gaps > 1))
 
@@ -540,6 +577,8 @@ class IndicatorDef:
     post_compute: Callable[[pd.DataFrame], None] | None = None
     # When True, func receives the precomputed session-gap series as `gaps=`.
     needs_gaps: bool = False
+    # When True, func receives the frame's per-bar cash dividends as `dividends=`.
+    needs_dividends: bool = False
 
 
 INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
@@ -666,13 +705,14 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
             "sigma_floor_frac": VNR_SIGMA_FLOOR_FRAC,
             "sigma_floor_min_obs": VNR_SIGMA_FLOOR_MIN_OBS,
         },
-        # vnr_sigma and vnr_gap_sessions are gap-aware companions set directly
-        # by compute_indicators, which owns the session-gap series.
-        output_fields=["vnr", "vnr_sigma", "vnr_gap_sessions"],
+        # Companions set directly by compute_indicators, which owns the
+        # session-gap series and the frame the dividends arrive on.
+        output_fields=["vnr", "vnr_sigma", "vnr_gap_sessions", "vnr_ex_div"],
         decimals=2,
         warmup_periods=VNR_WARMUP_SESSIONS,
-        field_decimals={"vnr_sigma": 6, "vnr_gap_sessions": 0},
+        field_decimals={"vnr_sigma": 6, "vnr_gap_sessions": 0, "vnr_ex_div": 6},
         needs_gaps=True,
+        needs_dividends=True,
     ),
 }
 
@@ -815,6 +855,11 @@ def compute_indicators(
     # One gap series shared by the vnr guard and the vnr_gap_sessions flag.
     gap_series = session_gap_days(df.index, session_dates)
 
+    # Cash dividends, when the frame carries them. Absent for a synthetic
+    # series (pseudo-ETFs, tests) and for any provider frame with no payout in
+    # range — both mean "no cash to add back", which is what None does.
+    dividends = df["dividends"] if "dividends" in df.columns else None
+
     result = pd.DataFrame(index=df.index)
     result["close"] = closes
 
@@ -822,7 +867,11 @@ def compute_indicators(
         # OHLC indicators (ATR, ADX) receive the full DataFrame;
         # close-only indicators receive just the close Series.
         input_data = df if defn.uses_ohlc else closes
-        kwargs = {**defn.params, "gaps": gap_series} if defn.needs_gaps else defn.params
+        kwargs = dict(defn.params)
+        if defn.needs_gaps:
+            kwargs["gaps"] = gap_series
+        if defn.needs_dividends:
+            kwargs["dividends"] = dividends
         output = defn.func(input_data, **kwargs)
 
         if isinstance(output, pd.Series):
@@ -841,8 +890,18 @@ def compute_indicators(
     # series keeps hole-spanning returns out of the variance). vnr_gap_sessions
     # flags the bars the gap guard suppressed with the gap width, so the UI can
     # explain the blank (NaN everywhere else → None in responses).
-    result["vnr_sigma"] = _ewma_daily_vol(closes, VNR_LAMBDA, gap_series)
+    result["vnr_sigma"] = _ewma_daily_vol(
+        closes, VNR_LAMBDA, gap_series, dividends=dividends,
+    )
     result["vnr_gap_sessions"] = gap_series.where(gap_series > 1)
+    # The cash σ-Move added back on this bar, NaN elsewhere. Published because
+    # the correction makes σ and the change % beside it disagree by exactly
+    # this much — on a large payout by enough to flip the sign — and a reader
+    # is owed the reason rather than left to call one of them broken.
+    result["vnr_ex_div"] = (
+        dividends.where(dividends > 0) if dividends is not None
+        else pd.Series(np.nan, index=df.index)
+    )
 
     _compute_deltas(result, gaps=gap_series)
 

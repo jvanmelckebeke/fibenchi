@@ -17,7 +17,7 @@ import {
   useTheses,
 } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
-import { resolveSigma, type WithheldReason } from "@/lib/sigma"
+import { resolveSigma, sigmaExDiv, type WithheldReason } from "@/lib/sigma"
 import { marketState } from "@/lib/market-state"
 import { type PctWindow, PCT_WINDOWS } from "./color-scale"
 import { windowCutoffs, windowPct } from "./window-returns"
@@ -55,6 +55,10 @@ export interface Tile {
   /** σ-Move via the live-first cascade; null → see reason. */
   sigma: number | null
   reason: NoReadingReason | null
+  /** Cash per share this bar's σ added back, when it is an ex-dividend date.
+   * The tooltip shows σ and today's % together, and on this one bar they
+   * disagree by exactly this much — only σ counts the payout. */
+  exDiv: number | null
   /** Today's % change (live quote first, stored bar fallback). */
   todayPct: number | null
   /** Last price — the magnitude behind the dimensionless σ (tooltip). */
@@ -215,6 +219,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
 
       const resolved = resolveSigma(quote, snap)
       const sigma = resolved.status === "ok" ? resolved.sigma : null
+      const exDiv = sigmaExDiv(resolved, snap)
       // The board widens the resolver's answer with the two things only it
       // knows: when the next hole scan runs, and whether the snapshot is merely
       // late. `pending` wins — the resolver reports an absent snapshot as
@@ -238,6 +243,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
         asset,
         sigma,
         reason,
+        exDiv,
         todayPct: quote?.change_percent ?? snap?.change_pct ?? null,
         price: quote?.price ?? snap?.close ?? null,
         windowPct: windowReturns[symbol] ?? EMPTY_WINDOWS,

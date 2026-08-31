@@ -32,10 +32,18 @@ def resolve_currency(info: dict, symbol: str) -> tuple[str, int]:
 
 
 def _normalize_ohlcv_df(df: pd.DataFrame, divisor: int) -> pd.DataFrame:
-    """Divide OHLCV price columns by divisor. Volume is left unchanged."""
+    """Divide price and cash columns by divisor. Volume is left unchanged.
+
+    ``dividends`` is cash per share, quoted in the same subunit as the prices
+    it accompanies, so it converts with them — a GBp dividend left in pence
+    beside a GBP close would be a 100x total-return spike on the ex-date.
+    """
     if divisor == 1:
         return df
-    price_cols = [c for c in ("open", "high", "low", "close", "adjclose") if c in df.columns]
+    price_cols = [
+        c for c in ("open", "high", "low", "close", "adjclose", "dividends")
+        if c in df.columns
+    ]
     df = df.copy()
     df[price_cols] = df[price_cols] / divisor
     return df

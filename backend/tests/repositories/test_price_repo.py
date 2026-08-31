@@ -194,3 +194,32 @@ async def test_build_price_rows_clean_df_no_warning(caplog):
         rows = PriceRepository.build_price_rows(AssetRef("AAPL", 1), df)
     assert len(rows) == 3
     assert not caplog.records
+
+
+async def test_build_price_rows_carries_dividends():
+    idx = pd.bdate_range(end=date.today(), periods=3)
+    df = pd.DataFrame({
+        "open": [100.0] * 3, "high": [101.0] * 3, "low": [99.0] * 3,
+        "close": [100.5] * 3, "volume": [1_000] * 3,
+        "dividends": [0.0, 0.62, 0.0],
+    }, index=idx)
+
+    rows = PriceRepository.build_price_rows(AssetRef("AAPL", 1), df)
+    assert [r["dividend"] for r in rows] == [0.0, 0.62, 0.0]
+
+
+async def test_build_price_rows_omits_dividend_when_the_frame_has_none():
+    """A frame with no events column says nothing about dividends.
+
+    Yahoo joins the column only when the requested range contains a payout, so
+    writing 0 here would erase a stored amount every time a short window
+    re-fetches a bar whose event it can no longer see.
+    """
+    idx = pd.bdate_range(end=date.today(), periods=2)
+    df = pd.DataFrame({
+        "open": [100.0] * 2, "high": [101.0] * 2, "low": [99.0] * 2,
+        "close": [100.5] * 2, "volume": [1_000] * 2,
+    }, index=idx)
+
+    rows = PriceRepository.build_price_rows(AssetRef("AAPL", 1), df)
+    assert all("dividend" not in r for r in rows)

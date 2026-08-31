@@ -6,20 +6,24 @@ import pytest
 from app.services.compute.splits import SPLIT_STEP_FACTOR, normalize_splits
 
 
-def frame(closes: list[float], splits: list[float] | None = None) -> pd.DataFrame:
+def frame(
+    closes: list[float],
+    splits: list[float] | None = None,
+    dividends: list[float] | None = None,
+) -> pd.DataFrame:
     """A minimal daily frame: closes, matching OHLC, volume, split events."""
     dates = pd.date_range("2026-01-01", periods=len(closes), freq="D").date
-    return pd.DataFrame(
-        {
-            "open": closes,
-            "high": [c * 1.01 for c in closes],
-            "low": [c * 0.99 for c in closes],
-            "close": closes,
-            "volume": [1_000_000] * len(closes),
-            "splits": splits if splits is not None else [0.0] * len(closes),
-        },
-        index=pd.Index(dates, name="date"),
-    )
+    data = {
+        "open": closes,
+        "high": [c * 1.01 for c in closes],
+        "low": [c * 0.99 for c in closes],
+        "close": closes,
+        "volume": [1_000_000] * len(closes),
+        "splits": splits if splits is not None else [0.0] * len(closes),
+    }
+    if dividends is not None:
+        data["dividends"] = dividends
+    return pd.DataFrame(data, index=pd.Index(dates, name="date"))
 
 
 class TestUnadjustedFrames:
@@ -113,3 +117,15 @@ class TestStepFactor:
         smallest_split_step = 1.5  # 3:2
         largest_real_move = 1 / 0.75
         assert largest_real_move < SPLIT_STEP_FACTOR < smallest_split_step
+
+
+def test_dividends_rebase_with_the_prices():
+    """Cash per share is quoted in the basis of its own bar.
+
+    A 1.00 dividend paid before a 2:1 split is 0.50 per share today, and
+    σ-Move divides it by a rebased close — the two have to be in one unit.
+    """
+    df = frame([90.0, 91.0, 45.5], splits=[0, 0, 2.0], dividends=[0.0, 1.0, 0.0])
+    out = normalize_splits(df, "X")
+
+    assert out["dividends"].tolist() == pytest.approx([0.0, 0.5, 0.0])
