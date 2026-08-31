@@ -1,9 +1,16 @@
 """Split normalization: rebasing a frame onto the current share basis (#648)."""
 
+import math
+
 import pandas as pd
 import pytest
 
-from app.services.compute.splits import SPLIT_STEP_FACTOR, normalize_splits
+from app.services.compute.splits import (
+    MIN_SEPARATION_BAND,
+    NOISE_K,
+    SPLIT_STEP_FACTOR,
+    normalize_splits,
+)
 
 
 def frame(
@@ -129,3 +136,85 @@ def test_dividends_rebase_with_the_prices():
     out = normalize_splits(df, "X")
 
     assert out["dividends"].tolist() == pytest.approx([0.0, 0.5, 0.0])
+
+
+def quiet_frame(splits: list[float], adjusted: bool, ratio: float) -> pd.DataFrame:
+    """A ~0.5%/day series around one ex-date, in one basis or the other.
+
+    ``adjusted`` builds the frame the provider already rebased (no step across
+    the ex-date); otherwise the pre-split bars sit ``ratio`` higher.
+    """
+    tail = [101.0, 101.5]
+    head = [100.0, 100.5] if adjusted else [100.0 * ratio, 100.5 * ratio]
+    return frame([*head, *tail], splits=splits)
+
+
+class TestSmallSplitsAreNotAppliedTwice:
+    """Below ~1.28:1 a fixed corroboration band admitted *both* hypotheses, so
+    an already-adjusted frame was adjusted a second time — a fabricated step,
+    under the heal's detection threshold, and permanent because the stateless
+    design re-decides the same way on every fetch.
+    """
+
+    @pytest.mark.parametrize("ratio", [1.25, 1.5, 2.0])
+    def test_already_adjusted_frame_is_left_alone(self, ratio):
+        df = quiet_frame([0, 0, ratio, 0], adjusted=True, ratio=ratio)
+        assert normalize_splits(df, "X") is df
+
+    @pytest.mark.parametrize("ratio", [1.25, 1.5, 2.0])
+    def test_unadjusted_frame_is_still_rebased(self, ratio):
+        """The small-ratio case has to be decided, not refused wholesale."""
+        df = quiet_frame([0, 0, ratio, 0], adjusted=False, ratio=ratio)
+        out = normalize_splits(df, "X")
+        assert list(out["close"].round(2)) == [100.0, 100.5, 101.0, 101.5]
+
+    def test_a_ten_percent_stock_dividend_is_decided_both_ways(self):
+        already = quiet_frame([0, 0, 1.1, 0], adjusted=True, ratio=1.1)
+        assert normalize_splits(already, "X") is already
+
+        unadjusted = quiet_frame([0, 0, 1.1, 0], adjusted=False, ratio=1.1)
+        assert list(normalize_splits(unadjusted, "X")["close"].round(2)) == [
+            100.0, 100.5, 101.0, 101.5,
+        ]
+
+
+class TestUndecidableFrames:
+    """Both hypotheses inside the band means the frame cannot tell them apart,
+    and the honest answer is to leave it alone in either direction.
+    """
+
+    def test_a_ratio_below_the_floor_is_refused_on_a_quiet_frame(self):
+        # log(1.05) = 0.049, under 2 x MIN_SEPARATION_BAND: an unadjusted 1.05
+        # split and an ordinary -5% day are the same evidence.
+        assert math.log(1.05) < 2 * MIN_SEPARATION_BAND
+        df = quiet_frame([0, 0, 1.05, 0], adjusted=False, ratio=1.05)
+        assert normalize_splits(df, "X") is df
+
+    def test_a_noisy_frame_widens_the_band_and_refuses_more(self):
+        # The same 1.25 event that resolves on a quiet series. Here the asset
+        # moves ~8% a session, so the band exceeds half the separation and
+        # neither hypothesis wins.
+        closes = [100.0, 108.0, 100.0, 108.0, 100.0, 108.0, 86.4, 93.3]
+        df = frame(closes, splits=[0, 0, 0, 0, 0, 0, 1.25, 0])
+        assert normalize_splits(df, "NOISY") is df
+
+    def test_the_band_never_falls_below_the_floor(self):
+        # A series that stops repricing would otherwise yield a band near zero,
+        # and then a single real move makes every split on it undecidable.
+        flat = frame([50.0] * 6 + [25.0, 25.1], splits=[0] * 6 + [2.0, 0])
+        out = normalize_splits(flat, "FLAT")
+        assert list(out["close"].round(2))[:2] == [25.0, 25.0]
+
+
+class TestBandConstants:
+    def test_the_band_covers_an_ordinary_session_for_the_whole_book(self):
+        # Measured over 46,217 stored bars: per-asset median absolute log
+        # return is 1.14% for the median asset and 5.4% at p99. The band has to
+        # clear an ordinary session for both, or a real day reads as evidence.
+        assert NOISE_K * 0.0114 > 0.03
+        assert max(NOISE_K * 0.054, MIN_SEPARATION_BAND) > 0.15
+
+    def test_a_typical_name_can_still_resolve_a_five_to_four_split(self):
+        # Decidable when the hypotheses are more than two bands apart.
+        band = max(NOISE_K * 0.0114, MIN_SEPARATION_BAND)
+        assert math.log(1.25) > 2 * band

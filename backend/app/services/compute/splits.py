@@ -26,6 +26,14 @@ because the evidence and the decision live in the same frame: a 2:1 split means
 the frame's own step across the ex-date is either ~0.5 (nobody adjusted, so we
 do) or ~1.0 (already adjusted, so we don't). No stored state can go stale, and
 the day Yahoo finally adjusts its history, this stops adjusting with it.
+
+**What the frame has to prove.** The two readings sit ``log(r)`` apart — 0.69
+for a 2:1 but 0.22 for a 5:4 — so a band wide enough to recognise one reading
+of a small split recognises both. The test is therefore whether the frame can
+tell them apart, judged against the asset's own noise: exactly one reading may
+fall inside the band, and both or neither leaves the frame alone. Idempotency
+cuts both ways, since a wrong adjustment is re-derived identically forever, so
+refusing is the only safe answer to a frame that cannot settle the question.
 """
 
 import logging
@@ -55,17 +63,23 @@ PRICE_COLUMNS = ("open", "high", "low", "close", "adjclose")
 # hand the total-return numerator two different units.
 CASH_COLUMNS = ("dividends",)
 
-# How far the frame's own step across an ex-date may sit from the split ratio
-# and still corroborate it, as an absolute log-ratio distance (~28%).
+# How close a step has to sit to a reading to match it, as a log-ratio
+# distance. Measured over 46,217 stored bars: per-asset median absolute log
+# return is 1.14% for the median asset, 2.29% at p90, 5.4% at p99, so NOISE_K=3
+# gives a band of ~3.4% for a typical name and ~16% for the noisiest one held.
 #
-# The two hypotheses are far apart — for a 2:1 split the step is either 0.5 or
-# 1.0, 0.69 apart in log space — so this band separates them with room to
-# spare while still refusing an ambiguous middle. Refusing matters: a bare
-# nearest-hypothesis rule would read a real -30% day as a 2:1 split and
-# "correct" it into +40%. Anything this cannot corroborate is left alone, and
-# the volatility model's own guard is what keeps the uncorrected step from
-# being scored.
-SPLIT_CORROBORATION_LOG_TOL = 0.25
+# The floor is for the other end. A series that stops repricing decays its own
+# noise toward zero, and then a single real 6% day sits far from both readings
+# and every split on that symbol becomes undecidable.
+NOISE_K = 3.0
+MIN_SEPARATION_BAND = 0.05
+
+# Which leaves splits under ~1.11:1 (typical name) to ~1.38:1 (noisiest) beyond
+# what price evidence settles — log(r) has to clear two bands. Nothing rescues
+# those: a 5:4 moves share volume by 25% against daily volume noise several
+# times that, Yahoo's adjclose matched the unadjusted close right through
+# MNST's split, and the heal cannot widen its net (11 candidates at 1.4, 81 at
+# 1.2, 610 at 1.1, against 10 re-fetches per run).
 
 # A bar-to-bar step large enough to be worth asking the provider about, as a
 # factor in either direction. Used only by ``heal_split_discontinuities`` to
@@ -87,14 +101,38 @@ SPLIT_CORROBORATION_LOG_TOL = 0.25
 # Lives here rather than in the heal job so "split-sized" has one definition.
 SPLIT_STEP_FACTOR = 1.4
 
+def _separation_band(closes: pd.Series, events: pd.Series) -> float:
+    """The frame's own median absolute log return, scaled by ``NOISE_K``.
+
+    Median rather than stdev, and ex-date bars excluded, so the split's own
+    step and a couple of earnings days cannot inflate the band that judges
+    them. Falls back to the floor when the frame is too short to say anything.
+    """
+    log_returns = (closes / closes.shift(1)).apply(
+        lambda v: math.log(v) if v and v > 0 else float("nan")
+    )
+    # Drop the ex-date steps themselves and their carry into the next bar.
+    on_event = events > 0
+    log_returns = log_returns.where(~(on_event | on_event.shift(-1, fill_value=False)))
+
+    usable = log_returns.abs().dropna()
+    if usable.empty:
+        return MIN_SEPARATION_BAND
+    return max(NOISE_K * float(usable.median()), MIN_SEPARATION_BAND)
+
+
 def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
     """Per-bar split ratio, but only where the frame's own prices back it up.
 
     1.0 everywhere else, so the result composes by multiplication.
+
+    "Back it up" means the frame distinguishes unadjusted (step ~ 1/r) from
+    already adjusted (step ~ 1), not merely that it lands near one of them.
     """
     raw = pd.to_numeric(df[SPLIT_COLUMN], errors="coerce")
     closes = pd.to_numeric(df["close"], errors="coerce")
     ratios = pd.Series(1.0, index=range(len(df)))
+    band = _separation_band(closes, raw.fillna(0.0))
 
     for pos in range(len(df)):
         ratio = raw.iat[pos]
@@ -114,17 +152,38 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
             continue
 
         observed = here / earlier.iat[-1]
-        drift = abs(math.log(observed) - math.log(1.0 / ratio))
-        if drift > SPLIT_CORROBORATION_LOG_TOL:
-            level = logger.warning if abs(math.log(observed)) > 0.1 else logger.debug
-            level(
-                "%s: split %s on %s not corroborated (step %.4f, expected ~%.4f); "
-                "treating the frame as already adjusted",
-                symbol or "?", ratio, df.index[pos], observed, 1.0 / ratio,
+        step = math.log(observed)
+        to_unadjusted = abs(step - math.log(1.0 / ratio))
+        to_adjusted = abs(step)
+
+        if to_unadjusted <= band < to_adjusted:
+            ratios.iat[pos] = float(ratio)
+            logger.info(
+                "%s: split %s on %s corroborated (step %.4f, expected ~%.4f, "
+                "band %.4f); rebasing the bars before it",
+                symbol or "?", ratio, df.index[pos], observed, 1.0 / ratio, band,
             )
             continue
 
-        ratios.iat[pos] = float(ratio)
+        if to_adjusted <= band < to_unadjusted:
+            logger.debug(
+                "%s: split %s on %s already applied by the provider (step %.4f, band %.4f)",
+                symbol or "?", ratio, df.index[pos], observed, band,
+            )
+            continue
+
+        # Undecidable either way, but worth telling apart in the log: "both"
+        # is a split too small for this frame's noise, "neither" is a step no
+        # split explains.
+        both = to_unadjusted <= band and to_adjusted <= band
+        level = logger.info if both else logger.warning
+        level(
+            "%s: split %s on %s %s (step %.4f, expected ~%.4f, band %.4f); "
+            "leaving the frame alone",
+            symbol or "?", ratio, df.index[pos],
+            "is too small for this frame to resolve" if both else "is not corroborated",
+            observed, 1.0 / ratio, band,
+        )
 
     return ratios
 
