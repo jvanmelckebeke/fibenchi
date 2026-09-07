@@ -6,10 +6,10 @@ from datetime import date
 
 import pandas as pd
 
-from app.services.compute.splits import normalize_splits
 from app.services.yahoo._base import _YahooBase
 from app.services.yahoo._parsers import PERIOD_MAP, normalize_date_index
 from app.services.yahoo.currency import _normalize_ohlcv_df, resolve_currency
+from app.services.yahoo.normalize import normalize_frame
 from app.services.yahoo.rate_limit import check_crumb
 
 logger = logging.getLogger(__name__)
@@ -49,9 +49,10 @@ class _HistoryMixin(_YahooBase):
     ) -> pd.DataFrame:
         """Fetch OHLCV history for a single symbol.
 
-        Subunit currencies (e.g. ``GBp``) are converted to main units, and
-        pre-split bars are rebased onto the current share basis, so the frame
-        is continuous in one unit end to end.
+        Subunit currencies (e.g. ``GBp``) are converted to main units, then
+        ``normalize_frame`` applies every provider-quirk fix this symbol's
+        instrument kind calls for — so the frame is continuous in one unit
+        end to end and carries no quirk a caller has to know about.
 
         Raises :class:`ValueError` when Yahoo returns no data or the
         breaker is open.
@@ -84,7 +85,7 @@ class _HistoryMixin(_YahooBase):
             info = price_info if isinstance(price_info, dict) else {}
             _, divisor = resolve_currency(info, symbol)
             df = _normalize_ohlcv_df(df, divisor)
-            df = normalize_splits(df, symbol)
+            df = normalize_frame(df, symbol)
             return normalize_date_index(df)
 
         def _fallback() -> pd.DataFrame:
@@ -97,7 +98,7 @@ class _HistoryMixin(_YahooBase):
     ) -> dict[str, pd.DataFrame]:
         """Fetch OHLCV for many symbols in one batch.
 
-        Subunit currencies are converted and splits rebased, as in
+        Currency conversion and ``normalize_frame`` run per symbol, as in
         :meth:`history`. Returns ``{}`` when the breaker is open or Yahoo
         returns no data.
         """
@@ -137,7 +138,7 @@ class _HistoryMixin(_YahooBase):
                     info = info if isinstance(info, dict) else {}
                     _, divisor = resolve_currency(info, sym)
                     df = _normalize_ohlcv_df(df, divisor)
-                    df = normalize_splits(df, sym)
+                    df = normalize_frame(df, sym)
                     out[sym] = normalize_date_index(df)
                 except KeyError:
                     logger.debug("batch_history: %s missing from Yahoo batch response", sym)

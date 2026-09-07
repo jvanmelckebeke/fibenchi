@@ -74,13 +74,15 @@ Two long-lived branches: `main` (production, `fibenchi:latest`) and `dev` (stagi
 - `models/` — SQLAlchemy declarative models with `Mapped[]` type hints. Asset has a `type` enum (stock/etf/index). Group has an `is_default` bool — exactly one row should carry it (the seeded "Watchlist" group); migration 0014 repairs drift.
 - `schemas/` — Pydantic v2 request/response models with `from_attributes` config. All router endpoints use `response_model` for typed OpenAPI schemas.
 - `routers/` — FastAPI routers, all prefixed under `/api`. Dependency-injected `AsyncSession` via `get_db()`. Period params use `PeriodType = Literal["1mo","3mo","6mo","1y","2y","5y"]` with `Query()` for automatic 422 validation.
-- `services/yahoo.py` — Yahoo Finance integration via `yahooquery`. Fetches OHLCV history, validates symbols, detects asset types, fetches ETF holdings.
+- `services/yahoo/` — Yahoo integration via `yahooquery`; all Yahoo HTTP goes through the one `yahoo_client`. Fetches OHLCV history, validates symbols, detects asset types, fetches ETF holdings.
+  - `normalize/` — what we do to a Yahoo frame before it leaves the package: Yahoo's defects, so they live with the provider that has them. `normalize_frame(df, symbol)` is the one entry point and runs a list of pure `(df, symbol) -> df` steps — `UNIVERSAL` for every frame, `BY_KIND` for the ones a single `AssetKind` needs (registry pattern, like `INDICATOR_REGISTRY`). A new quirk is one entry plus a function; never a kind test scattered into the fetch path.
+    - `splits.py` — `normalize_splits(df)` rebases pre-split bars onto the current share basis (Yahoo reports a split and declines to apply it, in either direction). Deliberately stateless: it re-decides from the frame's own step across each ex-date every fetch, so it is idempotent and self-corrects when the provider changes its mind. Owns `SPLIT_STEP_FACTOR`, the one definition of "split-sized".
+    - `fx_close.py` — `recover_fx_close(df)` rewrites an FX frame's closes as the following bar's open. Yahoo's settled `=X` bar puts the session open in its `close` field, so candles are bodyless and every close-based indicator runs a session stale. Stateless the same way, re-deciding from the frame's own median candle body, so it stops firing if Yahoo starts publishing a real close.
 - `services/price_sync.py` — Upserts price data using PostgreSQL `ON CONFLICT DO UPDATE`.
 - `services/price_service.py` — Orchestrates price fetching with `_ensure_warmup_prices` for indicator warmup.
 - `services/compute/` — Computational logic, separated from I/O:
   - `indicators.py` — `INDICATOR_REGISTRY` dict mapping indicator IDs to `IndicatorDef` (func, params, output_fields, warmup_periods, snapshot_derived). Computes RSI, SMA, EMA, Bollinger Bands, MACD, ATR, ADX.
   - `group.py` — Batch indicator snapshots with in-memory `TTLCache` (600s). `compute_and_cache_indicators()` caches by `(symbols, latest_date, group_id)`.
-  - `splits.py` — `normalize_splits(df)` rebases a provider frame onto the asset's current share basis. Pure, and deliberately stateless: it re-decides from the frame's own step across each ex-date every fetch, so it is idempotent and self-corrects when the provider changes its mind about whether history is adjusted. Also owns `SPLIT_STEP_FACTOR`, the one definition of "split-sized".
   - `pseudo_etf.py` — Equal-weight performance with quarterly rebalancing. Two modes: `_calc_static` (all constituents from day 1) and `_calc_dynamic` (assets join when price ≥ threshold, prevents penny-stock distortion).
   - `portfolio.py` — Portfolio index using dynamic entry with `min_entry_price=10.0`.
   - `utils.py` — Shared `prices_to_df()` converting ORM objects to indexed DataFrame.
@@ -159,7 +161,7 @@ has to clear; without them the next reader rounds it to something tidier and
 the split heal quietly stops examining 3:2 splits.
 
 **A rejected design.** Say why the obvious alternative fails, once, where
-someone would reach for it. `splits.py` explains why there is no applied-splits
+someone would reach for it. `normalize/splits.py` explains why there is no applied-splits
 table — that paragraph is the reason nobody has added one.
 
 Nothing else does. In particular: don't restate the mechanism beside the

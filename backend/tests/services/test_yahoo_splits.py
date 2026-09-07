@@ -5,12 +5,13 @@ import math
 import pandas as pd
 import pytest
 
-from app.services.compute.splits import (
+from app.services.yahoo.normalize.splits import (
     MIN_SEPARATION_BAND,
     NOISE_K,
     SPLIT_STEP_FACTOR,
     normalize_splits,
 )
+from tests.helpers import daily_date_index
 
 
 def frame(
@@ -19,7 +20,6 @@ def frame(
     dividends: list[float] | None = None,
 ) -> pd.DataFrame:
     """A minimal daily frame: closes, matching OHLC, volume, split events."""
-    dates = pd.date_range("2026-01-01", periods=len(closes), freq="D").date
     data = {
         "open": closes,
         "high": [c * 1.01 for c in closes],
@@ -30,7 +30,7 @@ def frame(
     }
     if dividends is not None:
         data["dividends"] = dividends
-    return pd.DataFrame(data, index=pd.Index(dates, name="date"))
+    return pd.DataFrame(data, index=daily_date_index(len(closes)))
 
 
 class TestUnadjustedFrames:

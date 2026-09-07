@@ -37,9 +37,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain import AssetRef
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
-from app.services.compute.splits import SPLIT_STEP_FACTOR
 from app.services.price_providers import get_price_provider
 from app.services.price_sync import _NO_ANCHOR, _drop_and_persist, _quote_anchors
+from app.services.yahoo.normalize import SPLIT_STEP_FACTOR
 
 logger = logging.getLogger(__name__)
 
