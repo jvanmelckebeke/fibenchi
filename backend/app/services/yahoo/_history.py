@@ -6,10 +6,10 @@ from datetime import date
 
 import pandas as pd
 
-from app.services.compute.normalize import normalize_frame
 from app.services.yahoo._base import _YahooBase
 from app.services.yahoo._parsers import PERIOD_MAP, normalize_date_index
 from app.services.yahoo.currency import _normalize_ohlcv_df, resolve_currency
+from app.services.yahoo.normalize import normalize_frame
 from app.services.yahoo.rate_limit import check_crumb
 
 logger = logging.getLogger(__name__)

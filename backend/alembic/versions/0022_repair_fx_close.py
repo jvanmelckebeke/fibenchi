@@ -44,7 +44,7 @@ WITH recovered AS (
 )
 UPDATE price_history p
 SET close = r.true_close,
-    -- Widened, not clamped: see the note in fx_close.py.
+    -- Widened, not clamped: see the note in yahoo/normalize/fx_close.py.
     high = GREATEST(r.bar_high, r.true_close),
     low = LEAST(r.bar_low, r.true_close)
 FROM recovered r

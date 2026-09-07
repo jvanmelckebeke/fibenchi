@@ -1,9 +1,14 @@
-"""Everything Fibenchi does to a provider frame before anyone reads it.
+"""Everything Fibenchi does to a Yahoo frame before anyone reads it.
 
-One pipeline, so a quirk is patched at the boundary and nothing downstream
-has to know the provider has quirks. Steps are ordinary
-``(df, symbol) -> df`` functions and each one decides for itself whether it
-applies, so composing them is just running them in order.
+These are Yahoo's defects, not the market's — a split Yahoo reports and
+declines to apply, a close it fills with the session's open — so they live
+with the provider that has them and are patched before a frame leaves this
+package. Nothing downstream knows the provider has quirks, and a second
+provider would bring its own set rather than inherit these.
+
+Pure functions with no I/O, like ``currency`` and ``_parsers`` alongside
+them: steps are ordinary ``(df, symbol) -> df`` and each decides for itself
+whether it applies, so composing them is just running them in order.
 
 Instrument kinds differ in what they need. Splits are universal — an FX pair
 simply never carries a split event. An FX close has to be recovered from the
@@ -22,8 +27,8 @@ from collections.abc import Callable
 import pandas as pd
 
 from app.domain.instrument import AssetKind, classify
-from app.services.compute.fx_close import recover_fx_close
-from app.services.compute.splits import normalize_splits
+from app.services.yahoo.normalize.fx_close import recover_fx_close
+from app.services.yahoo.normalize.splits import SPLIT_STEP_FACTOR, normalize_splits
 
 FrameStep = Callable[[pd.DataFrame, str | None], pd.DataFrame]
 
@@ -48,3 +53,15 @@ def normalize_frame(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame
     for step in steps_for(symbol):
         df = step(df, symbol)
     return df
+
+
+__all__ = [
+    "BY_KIND",
+    "UNIVERSAL",
+    "FrameStep",
+    "SPLIT_STEP_FACTOR",
+    "normalize_frame",
+    "normalize_splits",
+    "recover_fx_close",
+    "steps_for",
+]

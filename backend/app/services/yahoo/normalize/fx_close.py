@@ -7,8 +7,8 @@ market that trades around the clock the two are the same number, which
 BTC-USD confirms where both are correct — ``|close - next_open| / (high-low)``
 is 0.001 over 731 bars.
 
-Which kinds of instrument get this is ``normalize.BY_KIND``'s call, not this
-module's.
+Which kinds of instrument get this is ``BY_KIND``'s call in the package
+``__init__``, not this module's.
 """
 
 import logging

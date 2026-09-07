@@ -7,7 +7,7 @@ test_normalize.py. These tests are about what it does once it is reached.
 import pandas as pd
 import pytest
 
-from app.services.compute.fx_close import (
+from app.services.yahoo.normalize.fx_close import (
     FX_BODY_CEILING,
     MIN_BODY_SAMPLE,
     recover_fx_close,

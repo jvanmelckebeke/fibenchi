@@ -12,7 +12,7 @@ from app.models import PriceHistory
 logger = logging.getLogger(__name__)
 
 # The provider's per-bar cash-dividend column, as it arrives on a history
-# frame. One name for it, shared with ``compute.splits`` (which rebases it) and
+# frame. One name for it, shared with ``yahoo.normalize.splits`` (which rebases it) and
 # ``compute.utils`` (which reads it back out of storage).
 DIVIDEND_COLUMN = "dividends"
 

@@ -5,7 +5,7 @@ import math
 import pandas as pd
 import pytest
 
-from app.services.compute.splits import (
+from app.services.yahoo.normalize.splits import (
     MIN_SEPARATION_BAND,
     NOISE_K,
     SPLIT_STEP_FACTOR,

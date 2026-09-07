@@ -4,14 +4,14 @@ import pandas as pd
 import pytest
 
 from app.domain.instrument import AssetKind
-from app.services.compute.fx_close import recover_fx_close
-from app.services.compute.normalize import (
+from app.services.yahoo.normalize import (
     BY_KIND,
     UNIVERSAL,
     normalize_frame,
+    normalize_splits,
+    recover_fx_close,
     steps_for,
 )
-from app.services.compute.splits import normalize_splits
 from tests.helpers import daily_date_index
 
 
