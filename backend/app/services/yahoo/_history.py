@@ -6,6 +6,7 @@ from datetime import date
 
 import pandas as pd
 
+from app.services.compute.fx_close import normalize_fx_close
 from app.services.compute.splits import normalize_splits
 from app.services.yahoo._base import _YahooBase
 from app.services.yahoo._parsers import PERIOD_MAP, normalize_date_index
@@ -51,7 +52,9 @@ class _HistoryMixin(_YahooBase):
 
         Subunit currencies (e.g. ``GBp``) are converted to main units, and
         pre-split bars are rebased onto the current share basis, so the frame
-        is continuous in one unit end to end.
+        is continuous in one unit end to end. An FX frame's closes are
+        recovered from the following bar's open, which is where Yahoo leaves
+        them (``normalize_fx_close``).
 
         Raises :class:`ValueError` when Yahoo returns no data or the
         breaker is open.
@@ -85,6 +88,7 @@ class _HistoryMixin(_YahooBase):
             _, divisor = resolve_currency(info, symbol)
             df = _normalize_ohlcv_df(df, divisor)
             df = normalize_splits(df, symbol)
+            df = normalize_fx_close(df, symbol)
             return normalize_date_index(df)
 
         def _fallback() -> pd.DataFrame:
@@ -97,9 +101,9 @@ class _HistoryMixin(_YahooBase):
     ) -> dict[str, pd.DataFrame]:
         """Fetch OHLCV for many symbols in one batch.
 
-        Subunit currencies are converted and splits rebased, as in
-        :meth:`history`. Returns ``{}`` when the breaker is open or Yahoo
-        returns no data.
+        Subunit currencies are converted, splits rebased and FX closes
+        recovered, as in :meth:`history`. Returns ``{}`` when the breaker is
+        open or Yahoo returns no data.
         """
         if not symbols:
             return {}
@@ -138,6 +142,7 @@ class _HistoryMixin(_YahooBase):
                     _, divisor = resolve_currency(info, sym)
                     df = _normalize_ohlcv_df(df, divisor)
                     df = normalize_splits(df, sym)
+                    df = normalize_fx_close(df, sym)
                     out[sym] = normalize_date_index(df)
                 except KeyError:
                     logger.debug("batch_history: %s missing from Yahoo batch response", sym)
