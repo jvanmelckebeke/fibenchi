@@ -1,25 +1,15 @@
 """price_history: recover the FX closes Yahoo never sent
 
-Yahoo's settled daily bar for an ``=X`` pair carries the session's *open* in
-its ``close`` field, so every stored FX close is one session stale and every
-candle is a hairline body under a full-height wick. ``normalize_fx_close``
-fixes the fetch path from here on, but a fetch only rewrites what it refetches
-— the nightly sync covers 1y, leaving anything older wrong forever.
+``recover_fx_close`` fixes the fetch path, but a fetch only rewrites what it
+refetches and the nightly sync covers 1y — older FX bars would keep the
+session open in their ``close`` column forever.
 
-The recovery is the same one the service does: in a market that trades around
-the clock, the next bar's open is this bar's close. Written as SQL rather than
-by importing the service, because a migration has to keep meaning the same
-thing after the app moves on.
-
-Per-row rather than per-frame: the service judges a whole frame by its median
-body, but this can afford to ask each row whether it individually shows the
-defect, so a genuinely flat session in an otherwise healthy series is never
-touched. ``0.10`` is ``FX_BODY_CEILING`` — see that constant for the
-measurement that picked it.
-
-High/low are widened to contain the recovered close (it lands outside the
-provider's own range on ~25% of FX bars), or the repaired bar would print a
-body outside its own wick.
+Written as SQL rather than by importing the service, because a migration has
+to keep meaning the same thing after the app moves on. Per-row rather than
+per-frame: the service judges a whole frame by its median body, but this can
+afford to ask each row whether it individually shows the defect, so a
+genuinely flat session is never touched. ``0.10`` is ``FX_BODY_CEILING`` —
+that constant carries the measurement behind it.
 
 No downgrade: the old closes were wrong rather than different.
 
@@ -54,6 +44,7 @@ WITH recovered AS (
 )
 UPDATE price_history p
 SET close = r.true_close,
+    -- Widened, not clamped: see the note in fx_close.py.
     high = GREATEST(r.bar_high, r.true_close),
     low = LEAST(r.bar_low, r.true_close)
 FROM recovered r

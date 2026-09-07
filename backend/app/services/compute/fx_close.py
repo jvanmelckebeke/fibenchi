@@ -1,58 +1,37 @@
-"""Recover the session close that FX daily bars don't carry.
+"""Recover the session close Yahoo's FX daily bars don't carry.
 
-Yahoo's settled daily bar for an ``=X`` pair reports ``close`` within a pip or
-two of its own ``open``. Measured over 2y of bars for eight pairs (JPY=X,
-EURUSD=X, GBPUSD=X, EURJPY=X, AUDUSD=X, USDCHF=X, EURGBP=X, MXN=X, 4,128 bars):
-median body ``|close-open| / (high-low)`` is 0.000-0.016 and p90 is 0.056. The
-same measure over the instruments Fibenchi actually holds sits at 0.43-0.50
-(AAPL 0.433, IWDA.AS 0.433, 7203.T 0.500), and the two continuous markets that
-are the closest analogue to FX — crypto and futures — sit there too (BTC-USD
-0.430, GC=F 0.645, CL=F 0.452, ES=F 0.468). So the defect is FX-shaped, not
-"continuous market"-shaped, and nothing else needs this.
+A settled ``=X`` bar reports ``close`` within a pip or two of its own
+``open``, so candles are bodyless and every close-based indicator runs on a
+series of opens, a session stale. The real close is the next bar's open: in a
+market that trades around the clock the two are the same number, which
+BTC-USD confirms where both are correct — ``|close - next_open| / (high-low)``
+is 0.001 over 731 bars.
 
-Stored verbatim, that makes every close-based reading — MACD, RSI, the moving
-averages, σ-Move — run on a series of *opens*, i.e. one session stale, and
-leaves candles as hairline bodies under full-height wicks.
-
-**Where the real close comes from.** In a market that trades around the clock,
-the next bar's open *is* this bar's close. The check on that claim is BTC-USD,
-where both numbers are correct: ``|close - next_open| / (high-low)`` is 0.001
-over 731 bars. So the shift is not an approximation FX forces on us; it is what
-the two quantities mean in a continuous market.
-
-Against a close reconstructed from ``interval="1h"`` bars over 1y and six
-pairs, the shift cuts the median error from 0.238% to 0.016% and p90 from
-0.673% to 0.104%. The residual is Yahoo's daily window ending before the next
-one starts, mostly across a weekend.
-
-**Why the close is not clamped into the provider's high/low.** It lands outside
-them on 25.5% of bars (p75 of the excursion is 0.006 of the range, p99 is 1.26
-ranges), so clamping is a real choice rather than a formality — and it is the
-worse one, losing on every percentile against the same hourly truth (median
-0.020% vs 0.016%, p90 0.168% vs 0.104%). The range is widened to contain the
-recovered close instead, which also keeps a candle from printing a body outside
-its own wick.
-
-**Why this re-decides from the frame every fetch rather than recording what it
-did.** Same reasoning as ``normalize_splits``: the evidence and the decision
-live in the same frame, so no stored state can go stale, and the day Yahoo
-starts publishing a real FX close the body test stops matching and this stops
-firing on its own.
+Which kinds of instrument get this is ``normalize.BY_KIND``'s call, not this
+module's.
 """
 
 import logging
 
 import pandas as pd
 
-from app.domain.instrument import classify
-
 logger = logging.getLogger(__name__)
 
 # How small a frame's median candle body has to be before its closes are read
-# as opens in disguise. The two populations measured in the module docstring
-# are 0.016 (worst FX) and 0.430 (healthiest non-FX), so this sits ~6x above
-# one and ~4x below the other; anything in between is a frame neither reading
-# explains, which is left alone.
+# as opens in disguise.
+#
+# Two measured populations, 2y of daily bars. FX medians run 0.000-0.016 with
+# p90 at 0.056 (8 pairs, 4,128 bars). Everything else sits an order of
+# magnitude up: AAPL 0.433, IWDA.AS 0.433, 7203.T 0.500 — and so do the two
+# continuous markets that would otherwise be the suspects, crypto and futures
+# (BTC-USD 0.430, GC=F 0.645, CL=F 0.452, ES=F 0.468). The defect is
+# FX-shaped, not "24-hour market"-shaped. This sits ~6x above one population
+# and ~4x below the other; a frame landing between them is one neither
+# reading explains and is left alone.
+#
+# Testing the frame rather than trusting the ticker is what makes this
+# self-correcting: the day Yahoo publishes a real FX close, bodies cross the
+# ceiling and this stops firing without anyone noticing it had to.
 FX_BODY_CEILING = 0.10
 
 # Below this many bars with a non-zero range, a median body says nothing — a
@@ -73,32 +52,35 @@ def _reads_as_opens(df: pd.DataFrame) -> bool:
     return float(usable.median()) <= FX_BODY_CEILING
 
 
-def normalize_fx_close(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame:
-    """Rewrite an FX frame's closes as the next bar's open.
+def recover_fx_close(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame:
+    """Rewrite a frame's closes as the following bar's open.
 
-    Returns ``df`` unchanged for anything that isn't an ``=X`` pair, and for an
-    FX frame whose bodies show it already carries real closes. The trailing bar
-    has no successor and keeps the provider's value — which is the right one
-    while it is still forming, since Yahoo tracks the live price there.
+    Returns ``df`` unchanged when its bodies show it already carries real
+    closes. The trailing bar has no successor and keeps the provider's value,
+    which is the right one while it is still forming — Yahoo tracks the live
+    price there.
     """
-    if df.empty or not classify(symbol or "").kind.is_fx:
-        return df
-    if not {"open", "high", "low", "close"} <= set(df.columns):
+    if df.empty or not {"open", "high", "low", "close"} <= set(df.columns):
         return df
     if not _reads_as_opens(df):
         return df
 
     out = df.copy()
-    opens = pd.to_numeric(out["open"], errors="coerce")
     close = pd.to_numeric(out["close"], errors="coerce")
-    recovered = opens.shift(-1).fillna(close)
+    recovered = pd.to_numeric(out["open"], errors="coerce").shift(-1).fillna(close)
 
+    # The recovered close lands outside the bar's own high/low on 25.5% of FX
+    # bars, where Yahoo's daily window ends before the next one opens. Widening
+    # the range beats the obvious alternative of clamping the close into it:
+    # against a close rebuilt from hourly bars, clamping loses at every
+    # percentile (median error 0.020% vs 0.016%, p90 0.168% vs 0.104%). It also
+    # keeps a candle from printing a body outside its own wick.
     out["close"] = recovered
     out["high"] = pd.to_numeric(out["high"], errors="coerce").combine(recovered, max)
     out["low"] = pd.to_numeric(out["low"], errors="coerce").combine(recovered, min)
 
     logger.info(
-        "%s: recovered %d FX close(s) from the following bar's open",
+        "%s: recovered %d close(s) from the following bar's open",
         symbol or "?", len(out) - 1,
     )
     return out
