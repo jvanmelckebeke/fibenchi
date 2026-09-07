@@ -8,6 +8,7 @@ from app.services.compute.fx_close import (
     MIN_BODY_SAMPLE,
     normalize_fx_close,
 )
+from tests.helpers import daily_date_index
 
 
 def frame(opens: list[float], closes: list[float] | None = None) -> pd.DataFrame:
@@ -26,9 +27,7 @@ def frame(opens: list[float], closes: list[float] | None = None) -> pd.DataFrame
             "close": closes,
             "volume": [0] * len(opens),
         },
-        index=pd.Index(
-            pd.date_range("2026-01-01", periods=len(opens), freq="D").date, name="date"
-        ),
+        index=daily_date_index(len(opens)),
     )
 
 
@@ -122,10 +121,7 @@ class TestGating:
                     "close": [o + span * factor for o in opens],
                     "volume": [0] * len(opens),
                 },
-                index=pd.Index(
-                    pd.date_range("2026-01-01", periods=len(opens), freq="D").date,
-                    name="date",
-                ),
+                index=daily_date_index(len(opens)),
             )
             out = normalize_fx_close(df, "EURUSD=X")
             assert (out is not df) is repaired
