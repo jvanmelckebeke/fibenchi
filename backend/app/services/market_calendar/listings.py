@@ -17,11 +17,27 @@ class Listing:
     ``calendar`` is None for venues exchange_calendars doesn't model (their
     symbols keep the business-day fallback); ``currency`` is the *venue*
     currency, used only as a fallback when Yahoo doesn't report one (see
-    ``resolve_currency`` — subunits like GBp are Yahoo-side and handled there).
+    ``resolve_currency``).
+
+    ``quote_divisor`` is how many quoted units make one unit of ``currency``,
+    as far as the suffix alone can tell. It is 1 wherever the venue quotes in
+    the main unit, and **None** where the suffix does not settle the question,
+    which means callers must decline to rescale rather than pick a divisor.
+
+    Measured against /v7/finance/quote on 2026-09-11, London is genuinely
+    mixed and the split is not equity-vs-ETF: RR.L is GBp, ISF.L (an ETF) is
+    GBp, VUSA.L and VUKE.L (also ETFs) are GBP. So ``.L`` decides neither 1
+    nor 100 and only the quote can. Johannesburg came back ZAc on every
+    symbol probed, ETFs included (NPN.JO, STX40.JO, STXWDM.JO), so a flat 100
+    would probably be right there — it is None because "every symbol I tried"
+    is not "every listing", and being wrong costs a silent 100x. Tel Aviv
+    (ILA) was not probed at all. ``.IL`` shares London's currency codes;
+    the IOB symbols tried no longer resolve on Yahoo.
     """
 
     calendar: str | None
     currency: str | None
+    quote_divisor: int | None = 1
 
 
 # The one venue table: Yahoo suffix (the part after the last '.') →
@@ -39,8 +55,8 @@ SUFFIX_LISTINGS: dict[str, Listing] = {
     "DE": Listing("XETR", "EUR"),   # Xetra
     "F": Listing("XFRA", "EUR"),    # Frankfurt floor
     "MI": Listing("XMIL", "EUR"),   # Borsa Italiana
-    "L": Listing("XLON", "GBP"),    # London
-    "IL": Listing("XLON", "GBP"),   # London IOB
+    "L": Listing("XLON", "GBP", quote_divisor=None),   # London — mixed GBp/GBP
+    "IL": Listing("XLON", "GBP", quote_divisor=None),  # London IOB
     "SW": Listing("XSWX", "CHF"),   # SIX Swiss
     "MC": Listing("XMAD", "EUR"),   # Madrid
     "VI": Listing("XWBO", "EUR"),   # Vienna
@@ -55,10 +71,10 @@ SUFFIX_LISTINGS: dict[str, Listing] = {
     "AT": Listing("ASEX", "EUR"),   # Athens
     "IS": Listing("XIST", "TRY"),   # Istanbul
     # Middle East & Africa
-    "TA": Listing("XTAE", "ILS"),   # Tel Aviv
+    "TA": Listing("XTAE", "ILS", quote_divisor=None),   # Tel Aviv — ILA (agorot)
     "SR": Listing("XSAU", "SAR"),   # Saudi (Tadawul)
     "QA": Listing(None, "QAR"),     # Qatar — no exchange_calendars calendar
-    "JO": Listing("XJSE", "ZAR"),   # Johannesburg
+    "JO": Listing("XJSE", "ZAR", quote_divisor=None),   # Johannesburg — ZAc (cents)
     # Americas
     "TO": Listing("XTSE", "CAD"),   # Toronto
     "V": Listing("XTSE", "CAD"),    # TSX Venture — shares Toronto's schedule

@@ -78,6 +78,7 @@ class Instrument:
     calendar: str | None = None
     currency: str | None = None
     unit: UnitKind = UnitKind.CURRENCY
+    quote_divisor: int | None = 1
 
 
 def classify(ticker: str) -> Instrument:
@@ -124,5 +125,10 @@ def classify(ticker: str) -> Instrument:
             )
     if "." in sym:
         listing = SUFFIX_LISTINGS.get(sym.rsplit(".", 1)[1], Listing(None, None))
-        return Instrument(AssetKind.EQUITY, listing.calendar, listing.currency)
+        return Instrument(
+            AssetKind.EQUITY,
+            listing.calendar,
+            listing.currency,
+            quote_divisor=listing.quote_divisor,
+        )
     return Instrument(AssetKind.EQUITY, DEFAULT_US_CALENDAR, "USD")

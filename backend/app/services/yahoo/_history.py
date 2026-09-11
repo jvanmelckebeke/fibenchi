@@ -84,6 +84,10 @@ class _HistoryMixin(_YahooBase):
             price_info = quote_data.get(symbol, {}) if isinstance(quote_data, dict) else {}
             info = price_info if isinstance(price_info, dict) else {}
             _, divisor = resolve_currency(info, symbol)
+            if divisor is None:
+                raise ValueError(
+                    f"Unknown currency basis for {symbol} — Yahoo sent no currency"
+                )
             df = _normalize_ohlcv_df(df, divisor)
             df = normalize_frame(df, symbol)
             return normalize_date_index(df)
@@ -137,6 +141,12 @@ class _HistoryMixin(_YahooBase):
                     info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
                     info = info if isinstance(info, dict) else {}
                     _, divisor = resolve_currency(info, sym)
+                    if divisor is None:
+                        logger.warning(
+                            "batch_history: no currency for %s and its venue quotes in "
+                            "subunits; skipping rather than guessing a basis", sym,
+                        )
+                        continue
                     df = _normalize_ohlcv_df(df, divisor)
                     df = normalize_frame(df, sym)
                     out[sym] = normalize_date_index(df)

@@ -11,23 +11,25 @@ from app.domain import AssetRef
 from app.services.currency_service import lookup as currency_lookup
 
 
-def resolve_currency(info: dict, symbol: str) -> tuple[str, int]:
+def resolve_currency(info: dict, symbol: str) -> tuple[str, int | None]:
     """Resolve display currency and subunit divisor from Yahoo price info.
 
     Applies the standard fallback chain:
       1. Extract raw currency from the price info dict
       2. Look it up in the currency cache (handles subunits like GBp -> GBP/100)
-      3. Fall back to the ticker's venue currency (Symbol.currency)
+      3. Fall back to the ticker's venue currency and its shape-derived divisor
       4. Default to ("USD", 1)
 
-    Returns (display_code, divisor).
+    Returns ``(display_code, divisor)``, where a ``None`` divisor means the
+    basis is unknown and the caller must skip the symbol rather than rescale
+    it. See ``Listing.quote_divisor`` for when that happens and why.
     """
     raw = info.get("currency") if isinstance(info, dict) else None
     if raw:
         return currency_lookup(raw)
-    venue_currency = AssetRef(symbol).currency
-    if venue_currency:
-        return (venue_currency, 1)
+    ref = AssetRef(symbol)
+    if ref.currency:
+        return (ref.currency, ref.quote_divisor)
     return ("USD", 1)
 
 

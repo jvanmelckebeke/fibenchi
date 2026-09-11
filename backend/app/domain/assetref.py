@@ -89,6 +89,12 @@ class AssetRef(str):
         """
         return self._instrument.currency
 
+    @property
+    def quote_divisor(self) -> int | None:
+        """Quoted units per unit of :attr:`currency`, from ticker shape alone;
+        ``None`` when the suffix doesn't settle it (see ``Listing``)."""
+        return self._instrument.quote_divisor
+
     @cached_property
     def venue(self) -> Venue | None:
         """This ticker's trading venue, or None when it can't be resolved."""
