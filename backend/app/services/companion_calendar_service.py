@@ -11,6 +11,7 @@ We already own the authoritative copy, so we serve it.
 from __future__ import annotations
 
 import datetime
+import functools
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,13 +36,23 @@ LOOKAHEAD_WEEKS = 3
 Window = tuple[datetime.date, datetime.date]
 
 
+@functools.cache
+def known_calendar_names() -> frozenset[str]:
+    """Every calendar name exchange_calendars can build."""
+    import exchange_calendars as xcals
+
+    return frozenset(xcals.get_calendar_names())
+
+
 def default_window(today: datetime.date | None = None) -> Window:
     """The default window, anchored to Monday of the current week.
 
     Anchoring to the week rather than to today is what makes the endpoint's
-    ETag hold still: a window recomputed per day changes the payload daily and
-    the app's weekly re-sync would never see a 304, even though the underlying
-    calendar changes about once a year.
+    ETag hold still. The underlying calendar changes about once a year, but a
+    window recomputed per day changes the payload per day, so the app's weekly
+    re-sync would never see a 304. For the same reason the router keeps
+    ``generatedAt`` out of the ETag digest: it moves on every request, and an
+    ETag that can never match is the same as having none.
     """
     today = today or datetime.datetime.now(datetime.UTC).date()
     monday = today - datetime.timedelta(days=today.weekday())
@@ -57,16 +68,16 @@ def build_venue_calendar(name: str, window: Window) -> VenueCalendar | None:
     if venue is None:
         return None
     start, end = window
-    timezone = venue.timezone
-    weekdays = venue.trading_weekdays(end)
-    closures = venue.closures(start, end)
-    if timezone is None or not weekdays or closures is None:
+    tz_name = venue.tz_name
+    week = venue.trading_week(start, end)
+    if tz_name is None or week is None:
         return None
     return VenueCalendar(
-        timezone=timezone,
+        timezone=tz_name,
         # ISO numbering (1 = Monday) on the wire; Python's weekday() is 0-based.
-        trading_days=sorted(d + 1 for d in weekdays),
-        closures=closures,
+        trading_days=sorted(d + 1 for d in week.weekdays),
+        closures=week.closures,
+        extra_sessions=week.extra_sessions,
         half_days=[
             HalfDay(date=day, close=close) for day, close in (venue.early_closes(start, end) or [])
         ],
@@ -78,12 +89,7 @@ async def build_calendar(
     venues: list[str] | None = None,
     window: Window | None = None,
 ) -> CompanionCalendar:
-    """Build the calendar bundle for the tracked book, or for ``venues``.
-
-    ``symbols`` always covers the whole tracked book regardless of the venue
-    filter: it is the only place the ticker -> venue mapping exists, and making
-    it follow the filter would give one field two meanings.
-    """
+    """Build the calendar bundle for the tracked book, or for ``venues``."""
     window = window or default_window()
     refs: list[AssetRef] = await AssetRepository(db).list_in_any_group_refs()
     symbols = {str(ref): ref.calendar_name for ref in sorted(refs)}
@@ -91,7 +97,11 @@ async def build_calendar(
     if venues is None:
         names = sorted({name for name in symbols.values() if name})
     else:
-        names = sorted({name.strip().upper() for name in venues if name.strip()})
+        # Intersected with the known names rather than passed through: venue_for
+        # caches a None per name it fails to build, so unrecognised input would
+        # grow that cache and log a traceback each time.
+        requested = {name.strip().upper() for name in venues}
+        names = sorted(requested & known_calendar_names())
 
     built = {name: build_venue_calendar(name, window) for name in names}
 

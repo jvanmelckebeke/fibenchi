@@ -59,8 +59,9 @@ class CompanionConfig(_CamelModel):
 
 
 #: Current calendar-contract version. Deliberately independent of
-#: ``CONFIG_VERSION``: the two bundles are fetched and cached separately, so a
-#: calendar change must not invalidate the app's cached group config.
+#: ``CONFIG_VERSION``: the calendar changes about once a year and the group
+#: config whenever a group is touched, so the app fetches and caches the two
+#: bundles separately and a change to one must not invalidate the other.
 CALENDAR_VERSION = 1
 
 
@@ -79,18 +80,27 @@ class HalfDay(_CamelModel):
 
 
 class VenueCalendar(_CamelModel):
-    """One venue's trading week, holidays, and half-days over the window."""
+    """One venue's trading week, holidays, and half-days over the window.
+
+    Together the first three fields describe the window exactly: a date in it
+    is a session iff it appears in ``extraSessions``, or its weekday is in
+    ``tradingDays`` and it is not in ``closures``.
+    """
 
     timezone: str = Field(description="IANA timezone of the venue's local clock")
     trading_days: list[int] = Field(
-        description="Weekdays the venue normally trades, ISO numbering (1 = Monday .. 7 = Sunday). "
-        "Not always Mon-Fri: XSAU and XTAE run Sun-Thu, and 24/7 trades every day"
+        description="Weekdays the venue currently trades, ISO numbering (1 = Monday .. 7 = Sunday). "
+        "Read from the venue's recent sessions, so do not assume Mon-Fri: some venues trade a "
+        "different week, and a venue can change its week mid-window (see extraSessions)"
     )
     closures: list[datetime.date] = Field(
-        default_factory=list,
-        description="Dates in the window that fall on a trading day but had no session",
+        description="Dates in the window that fall on a tradingDays weekday but had no session"
     )
-    half_days: list[HalfDay] = Field(default_factory=list, description="Early-closing sessions in the window")
+    extra_sessions: list[datetime.date] = Field(
+        description="Sessions in the window on a weekday outside tradingDays — normally empty, "
+        "non-empty when the venue changed its trading week during the window"
+    )
+    half_days: list[HalfDay] = Field(description="Sessions in the window that close early")
 
 
 class CompanionCalendar(_CamelModel):
@@ -100,10 +110,12 @@ class CompanionCalendar(_CamelModel):
     generated_at: datetime.datetime = Field(description="When this bundle was produced (UTC)")
     window: CalendarWindow = Field(description="Date range the closures and half-days cover")
     venues: dict[str, VenueCalendar] = Field(
-        default_factory=dict, description="exchange_calendars name -> calendar; unresolvable venues are absent"
+        description="exchange_calendars name -> calendar. A venue whose calendar can't be built is "
+        "absent rather than guessed at"
     )
     symbols: dict[str, str | None] = Field(
-        default_factory=dict,
         description="symbol -> exchange_calendars name, null when the ticker maps to no modelled venue. "
-        "Always the full tracked book, even when the venues map is filtered",
+        "Always the full tracked book, even when the venues map is filtered, since this is the only "
+        "place the mapping is published. A name here may be absent from venues (filtered out, or its "
+        "calendar failed to build) — fall back to the calendar-less approximation for those symbols"
     )

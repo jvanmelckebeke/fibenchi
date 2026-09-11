@@ -30,20 +30,16 @@ async def get_companion_calendar(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    """Venue closures and half-days the companion can't compute for itself.
-
-    Separate from ``/config`` on purpose: the calendar changes about once a
-    year and group config whenever a group is touched, so the two want
-    different cache lifetimes and must not invalidate each other.
-    """
+    """Venue closures, half-days and trading week the companion can't compute
+    for itself. Carries its own version, and is cached separately from
+    ``/config`` (see ``CALENDAR_VERSION``)."""
     bundle = await companion_calendar_service.build_calendar(
         db, venues=venues.split(",") if venues else None
     )
     body = bundle.model_dump(by_alias=True, mode="json")
 
-    # generatedAt is excluded from the digest: it moves on every request, and an
-    # ETag that never matches is the same as having none. What identifies the
-    # payload is the window plus the calendar data in it.
+    # generatedAt is excluded because it moves on every request; see
+    # companion_calendar_service.default_window for why the rest holds still.
     digest = json.dumps(
         {k: v for k, v in body.items() if k != "generatedAt"}, sort_keys=True, separators=(",", ":")
     )

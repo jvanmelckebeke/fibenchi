@@ -23,6 +23,10 @@ async def test_calendar_endpoint_shape(client):
     assert xnys["timezone"] == "America/New_York"
     assert xnys["tradingDays"] == [1, 2, 3, 4, 5]
     assert all(isinstance(d, str) for d in xnys["closures"])
+    # Every list field is always sent, so "empty" and "absent" can't be confused
+    # by a consumer merging this over a stale cache.
+    assert xnys["extraSessions"] == []
+    assert isinstance(xnys["halfDays"], list)
 
 
 async def test_unmapped_venue_is_null_and_absent(client):
@@ -41,14 +45,19 @@ async def test_venues_filter(client):
 
     body = (await client.get("/api/companion/calendar?venues=XPAR,XETR")).json()
     assert set(body["venues"]) == {"XPAR", "XETR"}
-    # The symbol map ignores the filter: it is the only place the ticker -> venue
-    # mapping exists, and a client needs all of it to use any of it.
     assert body["symbols"] == {"AAPL": "XNYS", "NCLR.PA": "XPAR"}
 
-    # An unknown name in the filter is dropped, not a 400 — same fail-safe
-    # posture as the rest of market_calendar.
     body = (await client.get("/api/companion/calendar?venues=XPAR,NOPE")).json()
     assert set(body["venues"]) == {"XPAR"}
+
+
+async def test_unknown_venue_names_never_reach_the_calendar_cache(client):
+    from app.services.market_calendar.venue import _venues
+
+    before = set(_venues)
+    garbage = ",".join(f"JUNK{n}" for n in range(20))
+    assert (await client.get(f"/api/companion/calendar?venues={garbage}")).status_code == 200
+    assert set(_venues) == before
 
 
 async def test_etag_round_trip(client):
@@ -62,6 +71,16 @@ async def test_etag_round_trip(client):
     assert again.status_code == 304
     assert again.headers["etag"] == etag
 
-    # generatedAt moves every request and must not be part of the identity,
-    # otherwise the ETag would never match and the app would re-download weekly.
     assert first.json()["generatedAt"] != (await client.get("/api/companion/calendar")).json()["generatedAt"]
+
+
+async def test_etag_changes_when_the_book_changes(client):
+    await create_asset_via_api(client, "AAPL", "Apple Inc.")
+    etag = (await client.get("/api/companion/calendar")).headers["etag"]
+
+    # Adding a symbol on a new venue must invalidate: the digest has to cover
+    # everything a client would act on, symbols and venues included.
+    await create_asset_via_api(client, "NCLR.PA", "Nuclear SA")
+    resp = await client.get("/api/companion/calendar", headers={"If-None-Match": etag})
+    assert resp.status_code == 200
+    assert resp.headers["etag"] != etag

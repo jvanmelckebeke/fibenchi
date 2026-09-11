@@ -7,9 +7,6 @@ and copy the output into the app repo:
     python -m scripts.export_companion_schema
     # -> backend/companion.schema.json           (copy to fibenchi-app/schema/)
     # -> backend/companion.calendar.schema.json
-
-Two artifacts, because the two bundles are independently versioned and
-independently cached by the app.
 """
 
 import json

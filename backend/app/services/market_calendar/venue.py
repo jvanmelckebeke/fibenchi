@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any
+from typing import Any, NamedTuple
 
 import pandas as pd
 
@@ -17,6 +17,14 @@ from app.domain.phases import Phase
 from app.services.market_calendar.listings import EXTENDED_HOURS, ExtendedHours
 
 logger = logging.getLogger(__name__)
+
+
+class TradingWeek(NamedTuple):
+    """A venue's trading week over a date range, plus its exceptions."""
+
+    weekdays: set[int]          # date.weekday() values, 0 = Monday
+    closures: list[date]        # trading weekdays in the range with no session
+    extra_sessions: list[date]  # sessions on a weekday outside the week
 
 
 def _as_utc(at: datetime | None) -> pd.Timestamp:
@@ -124,52 +132,63 @@ class Venue:
         return sessions[0] if sessions else None
 
     @property
-    def timezone(self) -> str | None:
+    def tz_name(self) -> str | None:
         """IANA timezone the venue's local clock runs on."""
         try:
             return str(self._cal.tz)
         except Exception:
             return None
 
-    def trading_weekdays(self, on: date) -> set[int] | None:
-        """Which weekdays (``date.weekday()``, 0 = Monday) the venue normally
-        trades, read off the year of sessions ending at ``on``.
+    def trading_week(self, start: date, end: date) -> TradingWeek | None:
+        """The venue's trading week over [start, end], with the exceptions to it.
 
-        Never assume Monday-Friday: XSAU and XTAE run Sunday-Thursday, and the
-        24/7 crypto calendar has no weekend at all. Reading the week off the
-        calendar means a venue with an unusual week needs no table entry.
-        """
-        sessions = self.session_dates(on - timedelta(days=365), on)
-        if not sessions:
-            return None
-        return {d.weekday() for d in sessions}
+        Together the three fields describe the window exactly: a date in it is
+        a session iff it is in ``extra_sessions``, or its weekday is in
+        ``weekdays`` and it is not in ``closures``. That is what a client
+        without a trading calendar needs to tell an exchange holiday from a
+        hole in a price feed.
 
-    def closures(self, start: date, end: date) -> list[date] | None:
-        """Normal trading weekdays in [start, end] that were not sessions.
+        The week is read off the venue's own recent sessions rather than
+        assumed Monday-Friday, because several mapped venues don't trade one
+        and a venue may change its week: Tel Aviv moved from Sunday-Thursday to
+        Monday-Friday in January 2026. A union over the whole window would then
+        report a week that was never simultaneously true, and every Sunday
+        after the switch would come back as a closure. So the week is the
+        *recent* one and the sessions that predate the change fall out as
+        ``extra_sessions``, which keeps the description honest and the payload
+        small while leaving the derived session set unchanged.
 
-        The complement of :meth:`session_dates` restricted to the venue's own
-        trading week, which is what a client needs to tell a holiday apart from
-        a hole in a price feed. Clamped to the calendar's range like every
-        other query here, so a window reaching past the published sessions
-        yields fewer closures rather than a run of false ones.
+        The query is clamped to [first_session, last_session] like everything
+        else here, but ``end`` is reported back unadjusted by callers: a window
+        reaching past the published sessions yields no closures for those dates
+        rather than a run of false ones.
         """
         try:
             first = max(pd.Timestamp(start), self._cal.first_session)
             last = min(pd.Timestamp(end), self._cal.last_session)
             if first > last:
                 return None
-            weekdays = self.trading_weekdays(last.date())
+            sessions = {ts.date() for ts in self._cal.sessions_in_range(first, last)}
+            # A quarter is long enough for every weekday of the current week to
+            # appear even across the longest shutdown a mapped calendar has
+            # (Golden Week, Lunar New Year), and short enough that a week
+            # change mid-window doesn't leak the old week into the answer.
+            probe = max(last - timedelta(weeks=13), first)
+            weekdays = {ts.weekday() for ts in self._cal.sessions_in_range(probe, last)}
             if not weekdays:
                 return None
-            sessions = {ts.date() for ts in self._cal.sessions_in_range(first, last)}
-            return [
-                d.date()
-                for d in pd.date_range(first, last, freq="D")
-                if d.weekday() in weekdays and d.date() not in sessions
-            ]
+            return TradingWeek(
+                weekdays=weekdays,
+                closures=[
+                    d.date()
+                    for d in pd.date_range(first, last, freq="D")
+                    if d.weekday() in weekdays and d.date() not in sessions
+                ],
+                extra_sessions=sorted(d for d in sessions if d.weekday() not in weekdays),
+            )
         except Exception:
             logger.warning(
-                "Closure query failed for %s (%s..%s)", self.name, start, end, exc_info=True
+                "Trading-week query failed for %s (%s..%s)", self.name, start, end, exc_info=True
             )
             return None
 
