@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "CalendarWindow": {
+      "description": "The date range the calendar body covers, inclusive on both ends.",
+      "properties": {
+        "from": {
+          "description": "First date covered (inclusive)",
+          "format": "date",
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last date covered (inclusive)",
+          "format": "date",
+          "title": "To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "title": "CalendarWindow",
+      "type": "object"
+    },
+    "HalfDay": {
+      "description": "A session that closes before its usual time.",
+      "properties": {
+        "date": {
+          "description": "Session date",
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "close": {
+          "description": "Closing time in the venue's local timezone",
+          "format": "time",
+          "title": "Close",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "close"
+      ],
+      "title": "HalfDay",
+      "type": "object"
+    },
+    "VenueCalendar": {
+      "description": "One venue's trading week, holidays, and half-days over the window.",
+      "properties": {
+        "timezone": {
+          "description": "IANA timezone of the venue's local clock",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "tradingDays": {
+          "description": "Weekdays the venue normally trades, ISO numbering (1 = Monday .. 7 = Sunday). Not always Mon-Fri: XSAU and XTAE run Sun-Thu, and 24/7 trades every day",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tradingdays",
+          "type": "array"
+        },
+        "closures": {
+          "description": "Dates in the window that fall on a trading day but had no session",
+          "items": {
+            "format": "date",
+            "type": "string"
+          },
+          "title": "Closures",
+          "type": "array"
+        },
+        "halfDays": {
+          "description": "Early-closing sessions in the window",
+          "items": {
+            "$ref": "#/$defs/HalfDay"
+          },
+          "title": "Halfdays",
+          "type": "array"
+        }
+      },
+      "required": [
+        "timezone",
+        "tradingDays"
+      ],
+      "title": "VenueCalendar",
+      "type": "object"
+    }
+  },
+  "description": "The venue-calendar bundle the companion app pulls and caches.",
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Calendar contract version the app gates on (separate from config's)",
+      "title": "Version",
+      "type": "integer"
+    },
+    "generatedAt": {
+      "description": "When this bundle was produced (UTC)",
+      "format": "date-time",
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "window": {
+      "$ref": "#/$defs/CalendarWindow",
+      "description": "Date range the closures and half-days cover"
+    },
+    "venues": {
+      "additionalProperties": {
+        "$ref": "#/$defs/VenueCalendar"
+      },
+      "description": "exchange_calendars name -> calendar; unresolvable venues are absent",
+      "title": "Venues",
+      "type": "object"
+    },
+    "symbols": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "description": "symbol -> exchange_calendars name, null when the ticker maps to no modelled venue. Always the full tracked book, even when the venues map is filtered",
+      "title": "Symbols",
+      "type": "object"
+    }
+  },
+  "required": [
+    "version",
+    "generatedAt",
+    "window"
+  ],
+  "title": "CompanionCalendar",
+  "type": "object"
+}

@@ -57,10 +57,10 @@ jobs:
           # files, so an exporter that starts emitting a *new* artifact would
           # leave it untracked and the check would pass while the consumer has
           # nothing to read. status reports untracked paths too.
-          DRIFT=$(git status --porcelain -- :/backend/companion.schema.json :/backend/indicator.contract.json :/backend/indicator.fixtures.json :/frontend/src/lib/generated/)
+          DRIFT=$(git status --porcelain -- :/backend/companion.schema.json :/backend/companion.calendar.schema.json :/backend/indicator.contract.json :/backend/indicator.fixtures.json :/frontend/src/lib/generated/)
           if [ -n "$DRIFT" ]; then
             echo "$DRIFT"
-            git diff -- :/backend/companion.schema.json :/backend/indicator.contract.json :/backend/indicator.fixtures.json :/frontend/src/lib/generated/
+            git diff -- :/backend/companion.schema.json :/backend/companion.calendar.schema.json :/backend/indicator.contract.json :/backend/indicator.fixtures.json :/frontend/src/lib/generated/
             echo "::error::Contract artifacts are stale. Run the three export scripts in backend/ and commit the result (then copy the companion/indicator ones into fibenchi-app/)."
             exit 1
           fi

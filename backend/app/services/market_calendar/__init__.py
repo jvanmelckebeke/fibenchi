@@ -37,7 +37,7 @@ from app.services.market_calendar.listings import (
     Listing,
 )
 from app.services.market_calendar.schedule import any_venue_open, schedule_poll_hint
-from app.services.market_calendar.venue import Venue
+from app.services.market_calendar.venue import Venue, venue_for
 
 __all__ = [
     "CRYPTO_QUOTE_CURRENCIES",
@@ -51,4 +51,5 @@ __all__ = [
     "Venue",
     "any_venue_open",
     "schedule_poll_hint",
+    "venue_for",
 ]

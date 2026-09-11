@@ -8,7 +8,7 @@ lifetime and shared by every Symbol that resolves to it. All methods return
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 import pandas as pd
@@ -123,6 +123,72 @@ class Venue:
         sessions = self.recent_sessions(d - timedelta(days=1), 1)
         return sessions[0] if sessions else None
 
+    @property
+    def timezone(self) -> str | None:
+        """IANA timezone the venue's local clock runs on."""
+        try:
+            return str(self._cal.tz)
+        except Exception:
+            return None
+
+    def trading_weekdays(self, on: date) -> set[int] | None:
+        """Which weekdays (``date.weekday()``, 0 = Monday) the venue normally
+        trades, read off the year of sessions ending at ``on``.
+
+        Never assume Monday-Friday: XSAU and XTAE run Sunday-Thursday, and the
+        24/7 crypto calendar has no weekend at all. Reading the week off the
+        calendar means a venue with an unusual week needs no table entry.
+        """
+        sessions = self.session_dates(on - timedelta(days=365), on)
+        if not sessions:
+            return None
+        return {d.weekday() for d in sessions}
+
+    def closures(self, start: date, end: date) -> list[date] | None:
+        """Normal trading weekdays in [start, end] that were not sessions.
+
+        The complement of :meth:`session_dates` restricted to the venue's own
+        trading week, which is what a client needs to tell a holiday apart from
+        a hole in a price feed. Clamped to the calendar's range like every
+        other query here, so a window reaching past the published sessions
+        yields fewer closures rather than a run of false ones.
+        """
+        try:
+            first = max(pd.Timestamp(start), self._cal.first_session)
+            last = min(pd.Timestamp(end), self._cal.last_session)
+            if first > last:
+                return None
+            weekdays = self.trading_weekdays(last.date())
+            if not weekdays:
+                return None
+            sessions = {ts.date() for ts in self._cal.sessions_in_range(first, last)}
+            return [
+                d.date()
+                for d in pd.date_range(first, last, freq="D")
+                if d.weekday() in weekdays and d.date() not in sessions
+            ]
+        except Exception:
+            logger.warning(
+                "Closure query failed for %s (%s..%s)", self.name, start, end, exc_info=True
+            )
+            return None
+
+    def early_closes(self, start: date, end: date) -> list[tuple[date, time]] | None:
+        """Sessions in [start, end] that close early, with their venue-local
+        close time (half-days: Christmas Eve, US day-after-Thanksgiving)."""
+        try:
+            tz = self._cal.tz
+            return [
+                (ts.date(), self._cal.session_close(ts).tz_convert(tz).time())
+                for ts in self._cal.early_closes
+                if start <= ts.date() <= end
+            ]
+        except Exception:
+            logger.warning(
+                "Early-close query failed for %s (%s..%s)", self.name, start, end, exc_info=True
+            )
+            return None
+
     def local_date(self, at: datetime | None = None) -> date | None:
         """The venue's local calendar date at ``at`` (UTC now by default).
 
@@ -234,7 +300,7 @@ class Venue:
 _venues: dict[str, Venue | None] = {}
 
 
-def _venue_for(name: str) -> Venue | None:
+def venue_for(name: str) -> Venue | None:
     if name not in _venues:
         try:
             import exchange_calendars as xcals

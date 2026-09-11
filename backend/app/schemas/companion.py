@@ -56,3 +56,54 @@ class CompanionConfig(_CamelModel):
     groups: list[ConfigGroup] = Field(default_factory=list, description="User groups, ordered")
     tickers: dict[str, ConfigTicker] = Field(default_factory=dict, description="symbol -> metadata")
     tags: dict[str, str] = Field(default_factory=dict, description="tag name -> hex colour")
+
+
+#: Current calendar-contract version. Deliberately independent of
+#: ``CONFIG_VERSION``: the two bundles are fetched and cached separately, so a
+#: calendar change must not invalidate the app's cached group config.
+CALENDAR_VERSION = 1
+
+
+class CalendarWindow(_CamelModel):
+    """The date range the calendar body covers, inclusive on both ends."""
+
+    from_: datetime.date = Field(alias="from", description="First date covered (inclusive)")
+    to: datetime.date = Field(description="Last date covered (inclusive)")
+
+
+class HalfDay(_CamelModel):
+    """A session that closes before its usual time."""
+
+    date: datetime.date = Field(description="Session date")
+    close: datetime.time = Field(description="Closing time in the venue's local timezone")
+
+
+class VenueCalendar(_CamelModel):
+    """One venue's trading week, holidays, and half-days over the window."""
+
+    timezone: str = Field(description="IANA timezone of the venue's local clock")
+    trading_days: list[int] = Field(
+        description="Weekdays the venue normally trades, ISO numbering (1 = Monday .. 7 = Sunday). "
+        "Not always Mon-Fri: XSAU and XTAE run Sun-Thu, and 24/7 trades every day"
+    )
+    closures: list[datetime.date] = Field(
+        default_factory=list,
+        description="Dates in the window that fall on a trading day but had no session",
+    )
+    half_days: list[HalfDay] = Field(default_factory=list, description="Early-closing sessions in the window")
+
+
+class CompanionCalendar(_CamelModel):
+    """The venue-calendar bundle the companion app pulls and caches."""
+
+    version: Literal[1] = Field(description="Calendar contract version the app gates on (separate from config's)")
+    generated_at: datetime.datetime = Field(description="When this bundle was produced (UTC)")
+    window: CalendarWindow = Field(description="Date range the closures and half-days cover")
+    venues: dict[str, VenueCalendar] = Field(
+        default_factory=dict, description="exchange_calendars name -> calendar; unresolvable venues are absent"
+    )
+    symbols: dict[str, str | None] = Field(
+        default_factory=dict,
+        description="symbol -> exchange_calendars name, null when the ticker maps to no modelled venue. "
+        "Always the full tracked book, even when the venues map is filtered",
+    )
