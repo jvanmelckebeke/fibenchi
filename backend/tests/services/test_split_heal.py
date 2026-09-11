@@ -9,6 +9,7 @@ import pytest
 
 from app.background_tasks import split_heal
 from app.background_tasks.split_heal import heal_split_discontinuities
+from app.domain import AssetRef
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.price_repo import PriceRepository
 
@@ -289,3 +290,27 @@ class TestStepsInsideASplitWindow:
         with _provider(rebased, persist=_apply):
             assert "MNST" in await heal_split_discontinuities(db)
         assert not split_heal._unresolved
+
+
+class TestTheRetryBudgetIsPerSplit:
+    """A re-fetch that only moves the cliff to the neighbouring session
+    resolves the old boundary and raises a new one. Counted per step, that
+    symbol takes a heal slot every run forever.
+    """
+
+    def test_boundaries_under_one_ex_date_share_the_count(self):
+        ref = AssetRef("MNST")
+        for boundary in (D[1], D[2], D[3]):
+            split_heal._write_off(ref, boundary, D[4])
+
+        assert split_heal._unresolved == {("MNST", D[4].isoformat()): 3}
+        assert ("MNST", D[3].isoformat()) in split_heal._unexplained
+        assert ("MNST", D[1].isoformat()) not in split_heal._unexplained
+
+    def test_a_boundary_arriving_after_the_write_off_is_not_given_a_fresh_budget(self):
+        ref = AssetRef("MNST")
+        for _ in range(split_heal.MAX_UNRESOLVED_ATTEMPTS):
+            split_heal._write_off(ref, D[1], D[4])
+
+        split_heal._write_off(ref, D[2], D[4])
+        assert ("MNST", D[2].isoformat()) in split_heal._unexplained

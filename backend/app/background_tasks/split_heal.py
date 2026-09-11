@@ -60,16 +60,14 @@ MAX_SPLIT_HEALS_PER_RUN = 10
 # one more piece of durable state to keep honest for no benefit.
 _unexplained: set[tuple[str, str]] = set()
 
-# How many runs a step gets before it joins them anyway, while the provider's
-# own frame still reports a split over it.
+# How many runs a step inside a split window gets before it joins them anyway.
 #
-# A survived re-fetch is only evidence of a real session when nothing in the
-# frame could explain the step. Inside a split window it is evidence of
-# nothing: the provider quotes the same date in either basis from one response
-# to the next, so the frame that came back may simply have been a bad draw.
-# Writing the symbol off there is how MNST stayed broken while its bars kept
-# churning. Retrying is bounded because an unbounded retry would hold a slot
-# under ``MAX_SPLIT_HEALS_PER_RUN`` forever.
+# Keyed on the ex-date rather than the step, because a re-fetch that only moves
+# the cliff to the neighbouring session resolves the old boundary and raises a
+# new one. Counting per step, that symbol takes a slot under
+# ``MAX_SPLIT_HEALS_PER_RUN`` every run forever; counting per ex-date, the
+# whole window is one budget. The count outlives the write-off for the same
+# reason — a later boundary under that ex-date must not restart it.
 MAX_UNRESOLVED_ATTEMPTS = 3
 _unresolved: dict[tuple[str, str], int] = {}
 
@@ -87,18 +85,17 @@ def _usable_dates(df: pd.DataFrame) -> set[date]:
     return {d for d, c in zip(df.index, closes, strict=False) if pd.notna(c)}
 
 
-def _declares_split_over(df: pd.DataFrame, boundary: date) -> bool:
-    """Whether the frame reports a split whose pre-split region holds ``boundary``.
-
-    Yahoo's adjustment state is unstable for exactly those bars, so a step that
-    survives one re-fetch there has not been explained, only not resolved.
-    """
+def _split_over(df: pd.DataFrame, boundary: date) -> date | None:
+    """The ex-date of the oldest split whose pre-split region holds ``boundary``."""
     if df.empty or SPLIT_COLUMN not in df.columns:
-        return False
+        return None
     ratios = pd.to_numeric(df[SPLIT_COLUMN], errors="coerce").fillna(0.0)
-    return any(
-        ratio > 0 and not math.isclose(float(ratio), 1.0) and when >= boundary
-        for when, ratio in zip(df.index, ratios, strict=False)
+    return min(
+        (
+            when for when, ratio in zip(df.index, ratios, strict=False)
+            if ratio > 0 and not math.isclose(float(ratio), 1.0) and when >= boundary
+        ),
+        default=None,
     )
 
 
@@ -212,11 +209,13 @@ async def heal_split_discontinuities(db: AsyncSession) -> dict[str, int]:
         if await _still_stepped(repo, ref, boundary):
             count += await _drop_unrebasable_bars(db, ref, df, boundary)
 
+        ex_date = _split_over(df, boundary)
         if await _still_stepped(repo, ref, boundary):
-            _write_off(ref, boundary, df)
+            _write_off(ref, boundary, ex_date)
             continue
 
-        _unresolved.pop((str(ref), boundary.isoformat()), None)
+        if ex_date is not None:
+            _unresolved.pop((str(ref), ex_date.isoformat()), None)
         healed[str(ref)] = count
         logger.info(
             "%s: rebased onto one share basis, %d bars re-stored (%s resolved)",
@@ -232,11 +231,16 @@ async def _still_stepped(repo: PriceRepository, ref: AssetRef, boundary: date) -
     return any(d == boundary for _, d, _, _ in steps)
 
 
-def _write_off(ref: AssetRef, boundary: date, df: pd.DataFrame) -> None:
-    """Decide whether a step that survived a re-fetch is settled or just unlucky."""
-    key = (str(ref), boundary.isoformat())
-    if not _declares_split_over(df, boundary):
-        _unexplained.add(key)
+def _write_off(ref: AssetRef, boundary: date, ex_date: date | None) -> None:
+    """Decide whether a step that survived a re-fetch is settled or just unlucky.
+
+    A survived re-fetch is evidence of a real session only when nothing in the
+    frame explains the step. Where the provider reports a split over it, the
+    frame is one draw from a source that quotes those bars in either basis from
+    one response to the next, so it settles nothing.
+    """
+    if ex_date is None:
+        _unexplained.add((str(ref), boundary.isoformat()))
         logger.warning(
             "%s: the %s step survived a full re-fetch — the provider prices "
             "both bars and no split explains the jump, so it is a real "
@@ -245,20 +249,21 @@ def _write_off(ref: AssetRef, boundary: date, df: pd.DataFrame) -> None:
         )
         return
 
+    key = (str(ref), ex_date.isoformat())
     attempts = _unresolved.get(key, 0) + 1
     _unresolved[key] = attempts
     if attempts < MAX_UNRESOLVED_ATTEMPTS:
         logger.warning(
             "%s: the %s step survived a full re-fetch, but the provider reports "
-            "a split over it and quotes those bars in either basis from one "
-            "response to the next. Retrying (attempt %d of %d)",
-            ref, boundary, attempts, MAX_UNRESOLVED_ATTEMPTS,
+            "the %s split over it and quotes those bars in either basis from "
+            "one response to the next. Retrying (attempt %d of %d)",
+            ref, boundary, ex_date, attempts, MAX_UNRESOLVED_ATTEMPTS,
         )
         return
 
-    _unexplained.add(key)
+    _unexplained.add((str(ref), boundary.isoformat()))
     logger.warning(
-        "%s: the %s step survived %d full re-fetches inside a split window. "
-        "Not retrying; the stored bars there need looking at by hand",
-        ref, boundary, attempts,
+        "%s: the %s step survived %d full re-fetches inside the %s split "
+        "window. Not retrying; the stored bars there need looking at by hand",
+        ref, boundary, attempts, ex_date,
     )

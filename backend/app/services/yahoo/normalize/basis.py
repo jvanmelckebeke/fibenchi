@@ -1,38 +1,44 @@
-"""Put the bars of one frame in one share basis before anything reads the step.
+"""Requote bars the provider sent in the wrong share basis, judged by neighbours.
 
 ``normalize_splits`` reads a single step — the one across the ex-date — and
-applies its verdict to every bar before it. That is only sound if the frame's
-pre-split bars already agree with each other, and around a split Yahoo's do
-not. It serves a date adjusted in one response and unadjusted in the next, so
-a frame can arrive with isolated bars sitting a full split factor away from
-their own neighbours.
+applies its verdict to every bar before it. That holds only while those bars
+agree with each other, and around a split Yahoo's do not: it serves a date
+adjusted in one response and unadjusted in the next. Each fetch window then
+upserts whatever basis its own frame decided, so overlapping jobs rewrite
+overlapping subsets of a range run after run and the stored series ends up with
+bars a full split factor off their neighbours. A re-fetch reproduces them.
 
-Left alone that turns into the cross-frame failure, because each fetch window
-covers a different set of dates and each upsert writes whatever basis its own
-frame decided. MNST's stored series two weeks after its 2026-08-11 2:1 split
-held 48.83, 24.10, 46.78, 47.09, 94.46, 47.08 on consecutive sessions — four
-fabricated 2x steps, each of which σ-Move squares into the EWMA variance. Two
-reads minutes apart returned different numbers for the same dates, because
-background jobs were rewriting overlapping subsets of the range run after run.
+**What this decides.** A group of bars that steps away from its neighbours by
+the declared ratio and steps straight back on the far side is not a session
+anyone traded; it is those bars quoted in the other basis, and two matched
+steps say so without a re-fetch and without any record of what an earlier fetch
+wrote. Like everything else in this package it is a pure function of the frame,
+so it re-derives the same answer every time and stops firing on its own once
+the provider settles.
 
-**What the repair is.** A bar that is a split factor away from the bar before
-it *and* a split factor back on the bar after it is not a session anyone
-traded; it is one bar quoted in the other basis. That is decidable from the
-frame alone, without a re-fetch and without any record of what a previous fetch
-wrote, so this stays a pure function of the frame like everything else here.
+**What it does not decide — and this is the whole of it.** A group needs a step
+on *both* sides. A group running to either edge of the frame's pre-split region
+has one step, which is what a genuine crash and a mis-quote share, so it is left
+alone. That is a refusal to add a wrong answer, not a repair:
 
-**What it refuses.** Only a group bounded on *both* sides qualifies. A group
-running to either edge of the pre-split region has one piece of evidence
-instead of two, and a genuine crash of the same size is indistinguishable from
-it — so those are left for the wide-window re-fetch in
-``heal_split_discontinuities``. The step also has to land on the ratio the
-provider itself declared, not merely be large: a real move within the noise
-band of exactly log(2) days before a 2:1 split is far rarer than a move that is
-merely big.
+- A window whose oldest bars are mid-group loses the left step. The group stays
+  displaced, ``normalize_splits`` rebases the region around it, and those bars
+  end up a further factor out. ``price_heal`` fetches ``period="1mo"``, so a
+  run three weeks after an ex-date reaches this.
+- A group ending on the bar immediately *before* the ex-date loses the right
+  step, because the right step is the split's own. ``normalize_splits`` then
+  measures the ex-date against a bar in the other basis, reads ~1, and records
+  the split as already applied — storing a full cliff. MNST's 2026-08-10 bar
+  was exactly that draw.
+
+Both are the same missing evidence, and answering them means teaching
+``_confirmed_ratios`` to judge the ex-date step against a robust pre-split
+level instead of the single bar before it. That is not this module's to do.
 """
 
 import logging
 import math
+from bisect import bisect_left
 
 import pandas as pd
 
@@ -44,14 +50,20 @@ from app.services.yahoo.normalize.splits import (
 
 logger = logging.getLogger(__name__)
 
-# How long a wrongly-based group may be before it is left to the re-fetch.
+# How long a displaced group may be, and how far before the ex-date it may sit.
 #
-# The bound is what stops two *unrelated* moves of the split's size from being
-# paired: a name that halves in March and doubles in June, then splits 2:1 in
-# August, offers exactly the same two steps as a displaced group, and the only
-# thing separating them is that the real pair sits months apart. The observed
-# artifact is per-bar flip-flopping over days, so a fortnight of sessions is
-# already generous.
+# Both bound the same risk: two *unrelated* real moves of the split's size, one
+# down and one up, are a matched pair too, and only distance separates them
+# from the artifact. A heal re-fetch spans every bar we hold, so an unbounded
+# scan offers ~1250 steps to pair across five years, against the single step
+# ``normalize_splits`` weighs.
+#
+# MNST's churn ran 2026-07-30 to 2026-08-10, 8 sessions ending on the ex-date.
+# The window has to clear that with room and stop well short of a year; 30
+# sessions is ~4x the one run measured and ~40x fewer chances to pair than the
+# unbounded scan. The group bound is tighter because the observed artifact is
+# per-bar flip-flopping inside that window, not a solid fortnight.
+DISPLACED_WINDOW_SESSIONS = 30
 MAX_DISPLACED_BARS = 10
 
 
@@ -74,25 +86,28 @@ def _priced(closes: pd.Series) -> list[int]:
 
 
 def _breaks(
-    closes: pd.Series, priced: list[int], band: float, ratio: float, before: int
+    closes: pd.Series,
+    priced: list[int],
+    band: float,
+    ratio: float,
+    ex_positions: set[int],
+    ex_pos: int,
 ) -> list[tuple[int, float]]:
-    """Steps that land on the declared ratio, as ``(index into priced, factor)``.
+    """Steps that land on the ratio, as ``(index into priced, factor)``.
 
-    A step counts only when it is near the ratio *and* too far from zero to be
-    an ordinary session — the same two-sided test ``_confirmed_ratios`` uses, and
-    for the same reason. A frame whose own noise is wide enough to admit both
-    readings has not told us anything, and reading it either way would be a
-    guess re-derived identically on every later fetch.
+    A step qualifies when it is within ``band`` of the ratio *and* further than
+    ``band`` from zero — the two-sided test ``_confirmed_ratios`` uses, so a
+    frame whose own noise admits both readings yields nothing.
 
-    Bounded by ``before`` — the ex-date's position — so neither end of a pair
-    can be the split's own step, which belongs to ``normalize_splits``.
+    Every ex-date step is skipped, not only this ratio's: in a frame spanning
+    two splits the older one's step is otherwise a candidate here.
     """
     found: list[tuple[int, float]] = []
-    for k in range(1, len(priced)):
-        pos = priced[k]
-        if pos >= before:
-            break
-        step = math.log(float(closes.iat[pos]) / float(closes.iat[priced[k - 1]]))
+    last = bisect_left(priced, ex_pos)
+    for k in range(max(1, last - DISPLACED_WINDOW_SESSIONS), last):
+        if priced[k] in ex_positions:
+            continue
+        step = math.log(float(closes.iat[priced[k]]) / float(closes.iat[priced[k - 1]]))
         for factor in (ratio, 1.0 / ratio):
             if abs(step - math.log(factor)) <= band < abs(step):
                 found.append((k, factor))
@@ -100,12 +115,14 @@ def _breaks(
     return found
 
 
-def _displaced(breaks: list[tuple[int, float]], priced: list[int]) -> list[tuple[list[int], float]]:
-    """Groups of bars that step away by a factor and step straight back.
+def _displaced(
+    breaks: list[tuple[int, float]], priced: list[int]
+) -> list[tuple[list[int], float]]:
+    """Groups that step away by a factor and step straight back.
 
     Both factors come from ``{ratio, 1/ratio}``, so "steps back" is the exact
-    test that they are not the same one — no second tolerance to choose, and
-    the drift the group accumulates while displaced never enters the decision.
+    test that they are not the same one, and the drift a group accumulates
+    while displaced never enters the decision.
     """
     runs: list[tuple[list[int], float]] = []
     j = 0
@@ -131,25 +148,27 @@ def normalize_basis(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame
     if not declared:
         return df
 
-    # Copied: the loop below requotes bars as it decides them, so that later
-    # groups are judged against repaired neighbours, and ``pd.to_numeric``
-    # hands back the frame's own column when it is already numeric.
+    # Copied because the loop requotes bars in it as it goes, so a frame
+    # spanning two splits weighs the second against bars the first repaired —
+    # and ``pd.to_numeric`` hands back the frame's own column when it is
+    # already numeric.
     closes = pd.to_numeric(df["close"], errors="coerce").astype(float).copy()
     band = separation_band(closes, pd.to_numeric(df[SPLIT_COLUMN], errors="coerce").fillna(0.0))
     divisor = pd.Series(1.0, index=range(len(df)))
+    ex_positions = {pos for pos, _ in declared}
 
     for ex_pos, ratio in declared:
         priced = _priced(closes)
         for positions, factor in _displaced(
-            _breaks(closes, priced, band, ratio, ex_pos), priced
+            _breaks(closes, priced, band, ratio, ex_positions, ex_pos), priced
         ):
             for pos in positions:
                 divisor.iat[pos] *= factor
                 closes.iat[pos] = float(closes.iat[pos]) / factor
             logger.info(
                 "%s: %d bar(s) from %s sit %.4fx off their neighbours and step "
-                "straight back, which no session does; requoting them in the "
-                "basis around them (split %s on %s, band %.4f)",
+                "straight back; requoting them in the basis around them "
+                "(split %s on %s, band %.4f)",
                 symbol or "?", len(positions), df.index[positions[0]], factor,
                 ratio, df.index[ex_pos], band,
             )
