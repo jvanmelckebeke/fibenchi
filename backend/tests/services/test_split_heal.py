@@ -34,8 +34,10 @@ async def _asset(db, symbol: str, closes: list[float]) -> Asset:
 def _forget_unexplained():
     """The memo is process-wide, so tests must not inherit each other's."""
     split_heal._unexplained.clear()
+    split_heal._unresolved.clear()
     yield
     split_heal._unexplained.clear()
+    split_heal._unresolved.clear()
 
 
 class TestDetection:
@@ -73,14 +75,14 @@ class TestDetection:
         assert [s[0] for s in steps] == [b.id]
 
 
-def _frame(closes: dict) -> pd.DataFrame:
+def _frame(closes: dict, splits: dict | None = None) -> pd.DataFrame:
     """A provider frame: {date: close}, already normalized by the fetch path."""
     vals = list(closes.values())
-    return pd.DataFrame(
-        {"open": vals, "high": vals, "low": vals, "close": vals,
-         "volume": [1_000_000] * len(vals)},
-        index=pd.Index(list(closes), name="date"),
-    )
+    data = {"open": vals, "high": vals, "low": vals, "close": vals,
+            "volume": [1_000_000] * len(vals)}
+    if splits is not None:
+        data["splits"] = [splits.get(d, 0.0) for d in closes]
+    return pd.DataFrame(data, index=pd.Index(list(closes), name="date"))
 
 
 @contextmanager
@@ -223,3 +225,67 @@ class TestUnrebasableBars:
         with _provider(_frame({D[0]: 3.99, D[1]: 5.96, D[2]: 6.0})):
             assert await heal_split_discontinuities(db) == {}
         assert len(await PriceRepository(db).list_by_asset(asset.id)) == 3
+
+
+class TestStepsInsideASplitWindow:
+    """A survived re-fetch means a real session only when nothing in the frame
+    could explain the step. Where the provider reports a split over it, the
+    frame that came back is one draw from a source that quotes those bars in
+    either basis, so writing the symbol off there is how it stays broken.
+    """
+
+    async def test_the_step_is_retried_rather_than_written_off(self, db):
+        await _asset(db, "MNST", [94.4, 91.43, 45.53])
+        still_stepped = _frame(
+            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53}, splits={D[2]: 2.0},
+        )
+
+        with _provider(still_stepped) as calls:
+            assert await heal_split_discontinuities(db) == {}
+            assert await heal_split_discontinuities(db) == {}
+
+        assert calls == ["MNST", "MNST"]
+        assert not split_heal._unexplained
+
+    async def test_it_is_written_off_once_the_retries_run_out(self, db):
+        await _asset(db, "MNST", [94.4, 91.43, 45.53])
+        still_stepped = _frame(
+            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53}, splits={D[2]: 2.0},
+        )
+
+        with _provider(still_stepped) as calls:
+            for _ in range(split_heal.MAX_UNRESOLVED_ATTEMPTS + 2):
+                await heal_split_discontinuities(db)
+
+        assert len(calls) == split_heal.MAX_UNRESOLVED_ATTEMPTS
+        assert ("MNST", D[2].isoformat()) in split_heal._unexplained
+
+    async def test_a_split_older_than_the_step_does_not_excuse_it(self, db):
+        # The provider only misquotes bars *before* an ex-date, so a split that
+        # already happened says nothing about a step after it.
+        await _asset(db, "OKLO", [18.23, 8.45, 8.6])
+        frame = _frame({D[0]: 18.23, D[1]: 8.45, D[2]: 8.6}, splits={D[0]: 2.0})
+
+        with _provider(frame) as calls:
+            await heal_split_discontinuities(db)
+            await heal_split_discontinuities(db)
+
+        assert calls == ["OKLO"]
+        assert ("OKLO", D[1].isoformat()) in split_heal._unexplained
+
+    async def test_a_resolved_step_forgets_its_attempts(self, db):
+        await _asset(db, "MNST", [94.4, 91.43, 45.53, 46.0])
+        stepped = _frame(
+            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53, D[3]: 46.0}, splits={D[2]: 2.0},
+        )
+        rebased = _frame(
+            {D[0]: 47.20, D[1]: 45.715, D[2]: 45.53, D[3]: 46.0}, splits={D[2]: 2.0},
+        )
+
+        with _provider(stepped):
+            await heal_split_discontinuities(db)
+        assert split_heal._unresolved
+
+        with _provider(rebased, persist=_apply):
+            assert "MNST" in await heal_split_discontinuities(db)
+        assert not split_heal._unresolved

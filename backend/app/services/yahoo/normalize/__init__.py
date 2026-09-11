@@ -27,13 +27,16 @@ from collections.abc import Callable
 import pandas as pd
 
 from app.domain.instrument import AssetKind, classify
+from app.services.yahoo.normalize.basis import normalize_basis
 from app.services.yahoo.normalize.fx_close import recover_fx_close
 from app.services.yahoo.normalize.splits import SPLIT_STEP_FACTOR, normalize_splits
 
 FrameStep = Callable[[pd.DataFrame, str | None], pd.DataFrame]
 
-# Applied to every frame, in order.
-UNIVERSAL: tuple[FrameStep, ...] = (normalize_splits,)
+# Applied to every frame, in order. ``normalize_basis`` runs first because
+# the step ``normalize_splits`` reads across the ex-date only means what it
+# looks like once the bars behind it agree with each other.
+UNIVERSAL: tuple[FrameStep, ...] = (normalize_basis, normalize_splits)
 
 # Applied only to the kind that names them. A kind absent here needs none,
 # which is most of them.
@@ -60,6 +63,7 @@ __all__ = [
     "UNIVERSAL",
     "FrameStep",
     "SPLIT_STEP_FACTOR",
+    "normalize_basis",
     "normalize_frame",
     "normalize_splits",
     "recover_fx_close",

@@ -34,6 +34,10 @@ tell them apart, judged against the asset's own noise: exactly one reading may
 fall inside the band, and both or neither leaves the frame alone. Idempotency
 cuts both ways, since a wrong adjustment is re-derived identically forever, so
 refusing is the only safe answer to a frame that cannot settle the question.
+
+One step stands for the whole pre-split region, which holds only while those
+bars agree with each other. Making them agree is ``normalize_basis``, which
+runs ahead of this.
 """
 
 import logging
@@ -101,7 +105,7 @@ MIN_SEPARATION_BAND = 0.05
 # Lives here rather than in the heal job so "split-sized" has one definition.
 SPLIT_STEP_FACTOR = 1.4
 
-def _separation_band(closes: pd.Series, events: pd.Series) -> float:
+def separation_band(closes: pd.Series, events: pd.Series) -> float:
     """The frame's own median absolute log return, scaled by ``NOISE_K``.
 
     Median rather than stdev, and ex-date bars excluded, so the split's own
@@ -132,7 +136,7 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
     raw = pd.to_numeric(df[SPLIT_COLUMN], errors="coerce")
     closes = pd.to_numeric(df["close"], errors="coerce")
     ratios = pd.Series(1.0, index=range(len(df)))
-    band = _separation_band(closes, raw.fillna(0.0))
+    band = separation_band(closes, raw.fillna(0.0))
 
     for pos in range(len(df)):
         ratio = raw.iat[pos]
@@ -199,6 +203,23 @@ def _divisor(ratios: pd.Series) -> pd.Series:
     return ratios[::-1].shift(1).fillna(1.0).cumprod()[::-1]
 
 
+def rescale(df: pd.DataFrame, divisor: pd.Series) -> pd.DataFrame:
+    """Divide a frame's prices by a per-bar factor, multiplying its volume.
+
+    Shared with ``normalize_basis``, so "what it means to move a bar onto
+    another share basis" has one definition and neither step can forget the
+    volume or a cash column the other remembers.
+    """
+    out = df.copy()
+    factor = divisor.to_numpy()
+    for col in (*PRICE_COLUMNS, *CASH_COLUMNS):
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce") / factor
+    if "volume" in out.columns:
+        out["volume"] = pd.to_numeric(out["volume"], errors="coerce") * factor
+    return out
+
+
 def normalize_splits(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame:
     """Rescale pre-split bars so the whole frame is in the current share basis.
 
@@ -214,14 +235,7 @@ def normalize_splits(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFram
     if (divisor == 1.0).all():
         return df
 
-    out = df.copy()
-    factor = divisor.to_numpy()
-    for col in (*PRICE_COLUMNS, *CASH_COLUMNS):
-        if col in out.columns:
-            out[col] = pd.to_numeric(out[col], errors="coerce") / factor
-    if "volume" in out.columns:
-        out["volume"] = pd.to_numeric(out["volume"], errors="coerce") * factor
-
+    out = rescale(df, divisor)
     adjusted = int((divisor != 1.0).sum())
     logger.info(
         "%s: rebased %d pre-split bar(s) onto the current share basis (factor %.4f)",

@@ -29,6 +29,7 @@ earnings days — so the provider's own frame is what settles each one.
 """
 
 import logging
+import math
 from datetime import date, timedelta
 
 import pandas as pd
@@ -40,6 +41,7 @@ from app.repositories.price_repo import PriceRepository
 from app.services.price_providers import get_price_provider
 from app.services.price_sync import _NO_ANCHOR, _drop_and_persist, _quote_anchors
 from app.services.yahoo.normalize import SPLIT_STEP_FACTOR
+from app.services.yahoo.normalize.splits import SPLIT_COLUMN
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,19 @@ MAX_SPLIT_HEALS_PER_RUN = 10
 # one more piece of durable state to keep honest for no benefit.
 _unexplained: set[tuple[str, str]] = set()
 
+# How many runs a step gets before it joins them anyway, while the provider's
+# own frame still reports a split over it.
+#
+# A survived re-fetch is only evidence of a real session when nothing in the
+# frame could explain the step. Inside a split window it is evidence of
+# nothing: the provider quotes the same date in either basis from one response
+# to the next, so the frame that came back may simply have been a bad draw.
+# Writing the symbol off there is how MNST stayed broken while its bars kept
+# churning. Retrying is bounded because an unbounded retry would hold a slot
+# under ``MAX_SPLIT_HEALS_PER_RUN`` forever.
+MAX_UNRESOLVED_ATTEMPTS = 3
+_unresolved: dict[tuple[str, str], int] = {}
+
 
 def _usable_dates(df: pd.DataFrame) -> set[date]:
     """Dates the frame actually prices.
@@ -70,6 +85,21 @@ def _usable_dates(df: pd.DataFrame) -> set[date]:
         return set()
     closes = pd.to_numeric(df["close"], errors="coerce")
     return {d for d, c in zip(df.index, closes, strict=False) if pd.notna(c)}
+
+
+def _declares_split_over(df: pd.DataFrame, boundary: date) -> bool:
+    """Whether the frame reports a split whose pre-split region holds ``boundary``.
+
+    Yahoo's adjustment state is unstable for exactly those bars, so a step that
+    survives one re-fetch there has not been explained, only not resolved.
+    """
+    if df.empty or SPLIT_COLUMN not in df.columns:
+        return False
+    ratios = pd.to_numeric(df[SPLIT_COLUMN], errors="coerce").fillna(0.0)
+    return any(
+        ratio > 0 and not math.isclose(float(ratio), 1.0) and when >= boundary
+        for when, ratio in zip(df.index, ratios, strict=False)
+    )
 
 
 async def _drop_unrebasable_bars(
@@ -183,15 +213,10 @@ async def heal_split_discontinuities(db: AsyncSession) -> dict[str, int]:
             count += await _drop_unrebasable_bars(db, ref, df, boundary)
 
         if await _still_stepped(repo, ref, boundary):
-            _unexplained.add((str(ref), boundary.isoformat()))
-            logger.warning(
-                "%s: the %s step survived a full re-fetch — the provider prices "
-                "both bars and no split explains the jump, so it is a real "
-                "session. Not retrying; a currency rebasing looks like this too",
-                ref, boundary,
-            )
+            _write_off(ref, boundary, df)
             continue
 
+        _unresolved.pop((str(ref), boundary.isoformat()), None)
         healed[str(ref)] = count
         logger.info(
             "%s: rebased onto one share basis, %d bars re-stored (%s resolved)",
@@ -205,3 +230,35 @@ async def _still_stepped(repo: PriceRepository, ref: AssetRef, boundary: date) -
     """Whether the stored series still jumps into ``boundary``."""
     steps = await repo.find_price_steps(SPLIT_STEP_FACTOR, asset_ids=[ref.id])
     return any(d == boundary for _, d, _, _ in steps)
+
+
+def _write_off(ref: AssetRef, boundary: date, df: pd.DataFrame) -> None:
+    """Decide whether a step that survived a re-fetch is settled or just unlucky."""
+    key = (str(ref), boundary.isoformat())
+    if not _declares_split_over(df, boundary):
+        _unexplained.add(key)
+        logger.warning(
+            "%s: the %s step survived a full re-fetch — the provider prices "
+            "both bars and no split explains the jump, so it is a real "
+            "session. Not retrying; a currency rebasing looks like this too",
+            ref, boundary,
+        )
+        return
+
+    attempts = _unresolved.get(key, 0) + 1
+    _unresolved[key] = attempts
+    if attempts < MAX_UNRESOLVED_ATTEMPTS:
+        logger.warning(
+            "%s: the %s step survived a full re-fetch, but the provider reports "
+            "a split over it and quotes those bars in either basis from one "
+            "response to the next. Retrying (attempt %d of %d)",
+            ref, boundary, attempts, MAX_UNRESOLVED_ATTEMPTS,
+        )
+        return
+
+    _unexplained.add(key)
+    logger.warning(
+        "%s: the %s step survived %d full re-fetches inside a split window. "
+        "Not retrying; the stored bars there need looking at by hand",
+        ref, boundary, attempts,
+    )
