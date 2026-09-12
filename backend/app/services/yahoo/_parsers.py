@@ -129,6 +129,8 @@ def normalize_date_index(df: pd.DataFrame) -> pd.DataFrame:
 def parse_quote_row(sym: str, info: dict) -> Quote:
     """Build one :class:`Quote` from Yahoo's per-symbol price-info dict."""
     currency, divisor = resolve_currency(info, sym)
+    if divisor is None:
+        return Quote.placeholder(sym)
 
     price = sanitize_float(info.get("regularMarketPrice"))
     prev_close = sanitize_float(info.get("regularMarketPreviousClose"))

@@ -136,6 +136,22 @@ class TestResolveCurrency:
         assert display == "GBP"
         assert divisor == 100
 
+    @pytest.mark.parametrize("symbol", ["RR.L", "HSBA.IL", "TEVA.TA", "NPN.JO"])
+    def test_subunit_venue_fallback_refuses_a_divisor(self, symbol):
+        """A dropped quote must not let a subunit venue fall through as 1:1."""
+        _, divisor = resolve_currency({}, symbol)
+        assert divisor is None
+
+    def test_subunit_venue_fallback_still_names_the_currency(self):
+        """Refusing the divisor doesn't cost the display code."""
+        display, _ = resolve_currency({}, "RR.L")
+        assert display == "GBP"
+
+    def test_main_unit_venue_fallback_keeps_divisor_one(self):
+        """Only the subunit venues refuse; Amsterdam still resolves fully."""
+        display, divisor = resolve_currency({}, "IWDA.AS")
+        assert (display, divisor) == ("EUR", 1)
+
 
 class TestNormalizeOhlcvDf:
     @pytest.fixture

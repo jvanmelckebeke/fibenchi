@@ -52,6 +52,12 @@ class TestSessionDate:
         })
         assert row.session_date == "2024-01-02"
 
+    def test_parse_quote_row_placeholder_when_basis_unknown(self):
+        """A currency-less payload for a pence-quoted listing carries no
+        readable price, so the row degrades instead of publishing 1535.48."""
+        row = parse_quote_row("RR.L", {"regularMarketPrice": 1535.4})
+        assert row.is_placeholder
+
 
 class TestSanitize:
     def test_none_returns_none(self):

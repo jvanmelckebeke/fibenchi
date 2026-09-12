@@ -207,6 +207,21 @@ class TestClientIntraday:
 
         assert result["VOD.L"][0].price == 85.0
 
+    async def test_skips_subunit_venue_when_quote_is_missing(self):
+        """No quote for a pence-quoted listing means no derivable basis."""
+        ts_list = [datetime(2026, 2, 25, 10, 0, tzinfo=ZoneInfo("Europe/London"))]
+        hist = _make_hist_df("VOD.L", ts_list, [8500.0])
+
+        mock_ticker = MagicMock()
+        mock_ticker.price = {}
+        mock_ticker._get_data.return_value = {}
+        mock_ticker._historical_data_to_dataframe.return_value = hist
+
+        with patch("app.services.yahoo.client.Ticker", return_value=mock_ticker):
+            result = await yahoo_client.intraday(["VOD.L"])
+
+        assert "VOD.L" not in result
+
     async def test_filters_synthetic_non_minute_boundary_bars(self):
         """Yahoo echo bars at non-minute-boundary timestamps are dropped."""
         ts_list = [

@@ -84,6 +84,12 @@ class _IntradayMixin(_YahooBase):
                     info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
                     info = info if isinstance(info, dict) else {}
                     _, divisor = resolve_currency(info, sym)
+                    if divisor is None:
+                        logger.warning(
+                            "intraday: no currency for %s and its venue quotes in "
+                            "subunits; skipping rather than guessing a basis", sym,
+                        )
+                        continue
                     tz_name = info.get("exchangeTimezoneName")
 
                     if not tz_name and len(df) > 0:
