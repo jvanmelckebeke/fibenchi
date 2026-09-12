@@ -24,15 +24,13 @@ class Listing:
     the main unit, and **None** where the suffix does not settle the question,
     which means callers must decline to rescale rather than pick a divisor.
 
-    Measured against /v7/finance/quote on 2026-09-11, London is genuinely
-    mixed and the split is not equity-vs-ETF: RR.L is GBp, ISF.L (an ETF) is
-    GBp, VUSA.L and VUKE.L (also ETFs) are GBP. So ``.L`` decides neither 1
-    nor 100 and only the quote can. Johannesburg came back ZAc on every
-    symbol probed, ETFs included (NPN.JO, STX40.JO, STXWDM.JO), so a flat 100
-    would probably be right there — it is None because "every symbol I tried"
-    is not "every listing", and being wrong costs a silent 100x. Tel Aviv
-    (ILA) was not probed at all. ``.IL`` shares London's currency codes;
-    the IOB symbols tried no longer resolve on Yahoo.
+    London is genuinely mixed, and the split is not equity-vs-ETF: RR.L and
+    ISF.L quote in GBp while VUSA.L and VUKE.L quote in GBP, ETFs on both
+    sides. ``.L`` and ``.IL`` therefore decide neither 1 nor 100, and only
+    the quote can. Johannesburg is None for a weaker reason. Every symbol
+    sampled there quoted in cents, ETFs included, so a flat 100 is probably
+    right, but a sample is not the listing and guessing wrong costs a silent
+    100x. Tel Aviv is None because nothing there was checked at all.
     """
 
     calendar: str | None
