@@ -8,8 +8,8 @@ lifetime and shared by every Symbol that resolves to it. All methods return
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
-from typing import Any
+from datetime import date, datetime, time, timedelta, timezone
+from typing import Any, NamedTuple
 
 import pandas as pd
 
@@ -17,6 +17,14 @@ from app.domain.phases import Phase
 from app.services.market_calendar.listings import EXTENDED_HOURS, ExtendedHours
 
 logger = logging.getLogger(__name__)
+
+
+class TradingWeek(NamedTuple):
+    """A venue's trading week over a date range, plus its exceptions."""
+
+    weekdays: set[int]          # date.weekday() values, 0 = Monday
+    closures: list[date]        # trading weekdays in the range with no session
+    extra_sessions: list[date]  # sessions on a weekday outside the week
 
 
 def _as_utc(at: datetime | None) -> pd.Timestamp:
@@ -122,6 +130,83 @@ class Venue:
         """
         sessions = self.recent_sessions(d - timedelta(days=1), 1)
         return sessions[0] if sessions else None
+
+    @property
+    def tz_name(self) -> str | None:
+        """IANA timezone the venue's local clock runs on."""
+        try:
+            return str(self._cal.tz)
+        except Exception:
+            return None
+
+    def trading_week(self, start: date, end: date) -> TradingWeek | None:
+        """The venue's trading week over [start, end], with the exceptions to it.
+
+        Together the three fields describe the window exactly: a date in it is
+        a session iff it is in ``extra_sessions``, or its weekday is in
+        ``weekdays`` and it is not in ``closures``. That is what a client
+        without a trading calendar needs to tell an exchange holiday from a
+        hole in a price feed.
+
+        The week is read off the venue's own recent sessions rather than
+        assumed Monday-Friday, because several mapped venues don't trade one
+        and a venue may change its week: Tel Aviv moved from Sunday-Thursday to
+        Monday-Friday in January 2026. A union over the whole window would then
+        report a week that was never simultaneously true, and every Sunday
+        after the switch would come back as a closure. So the week is the
+        *recent* one and the sessions that predate the change fall out as
+        ``extra_sessions``, which keeps the description honest and the payload
+        small while leaving the derived session set unchanged.
+
+        The query is clamped to [first_session, last_session] like everything
+        else here, but ``end`` is reported back unadjusted by callers: a window
+        reaching past the published sessions yields no closures for those dates
+        rather than a run of false ones.
+        """
+        try:
+            first = max(pd.Timestamp(start), self._cal.first_session)
+            last = min(pd.Timestamp(end), self._cal.last_session)
+            if first > last:
+                return None
+            sessions = {ts.date() for ts in self._cal.sessions_in_range(first, last)}
+            # A quarter is long enough for every weekday of the current week to
+            # appear even across the longest shutdown a mapped calendar has
+            # (Golden Week, Lunar New Year), and short enough that a week
+            # change mid-window doesn't leak the old week into the answer.
+            probe = max(last - timedelta(weeks=13), first)
+            weekdays = {ts.weekday() for ts in self._cal.sessions_in_range(probe, last)}
+            if not weekdays:
+                return None
+            return TradingWeek(
+                weekdays=weekdays,
+                closures=[
+                    d.date()
+                    for d in pd.date_range(first, last, freq="D")
+                    if d.weekday() in weekdays and d.date() not in sessions
+                ],
+                extra_sessions=sorted(d for d in sessions if d.weekday() not in weekdays),
+            )
+        except Exception:
+            logger.warning(
+                "Trading-week query failed for %s (%s..%s)", self.name, start, end, exc_info=True
+            )
+            return None
+
+    def early_closes(self, start: date, end: date) -> list[tuple[date, time]] | None:
+        """Sessions in [start, end] that close early, with their venue-local
+        close time (half-days: Christmas Eve, US day-after-Thanksgiving)."""
+        try:
+            tz = self._cal.tz
+            return [
+                (ts.date(), self._cal.session_close(ts).tz_convert(tz).time())
+                for ts in self._cal.early_closes
+                if start <= ts.date() <= end
+            ]
+        except Exception:
+            logger.warning(
+                "Early-close query failed for %s (%s..%s)", self.name, start, end, exc_info=True
+            )
+            return None
 
     def local_date(self, at: datetime | None = None) -> date | None:
         """The venue's local calendar date at ``at`` (UTC now by default).
@@ -234,7 +319,7 @@ class Venue:
 _venues: dict[str, Venue | None] = {}
 
 
-def _venue_for(name: str) -> Venue | None:
+def venue_for(name: str) -> Venue | None:
     if name not in _venues:
         try:
             import exchange_calendars as xcals

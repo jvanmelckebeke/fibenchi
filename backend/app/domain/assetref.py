@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import cached_property
 
 from app.domain.instrument import AssetKind, Instrument, UnitKind, classify
-from app.services.market_calendar.venue import Venue, _venue_for
+from app.services.market_calendar.venue import Venue, venue_for
 
 
 class AssetRef(str):
@@ -99,4 +99,4 @@ class AssetRef(str):
     def venue(self) -> Venue | None:
         """This ticker's trading venue, or None when it can't be resolved."""
         name = self.calendar_name
-        return _venue_for(name) if name else None
+        return venue_for(name) if name else None
