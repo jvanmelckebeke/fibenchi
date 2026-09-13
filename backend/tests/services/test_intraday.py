@@ -1,6 +1,6 @@
 """Tests for intraday price fetching and session classification."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -9,6 +9,8 @@ import pytest
 
 from app.domain import AssetRef
 from app.services.intraday import (
+    INTRADAY_UPSERT_CHUNK_ROWS,
+    _changed_rows,
     _classify_session,
     fetch_and_store_intraday,
 )
@@ -271,30 +273,146 @@ class TestClientIntraday:
 # per-exchange trading hours) on top of the client's raw bars.
 
 
+def _bar(minute, price=30.0, volume=100, hour=9):
+    return ProviderIntradayBar(
+        timestamp=datetime(2026, 2, 25, hour, minute, tzinfo=ET),
+        price=price,
+        volume=volume,
+        tz_name="America/New_York",
+    )
+
+
+def _stored(bars, session="pre"):
+    """Storage shape matching what _load_stored_window returns for one asset."""
+    return {b.timestamp: (b.price, b.volume, session) for b in bars}
+
+
+class TestChangedRows:
+    """Only bars absent from storage or with moved values get written."""
+
+    async def test_identical_rows_are_dropped(self):
+        rows = [
+            {"timestamp": _bar(0).timestamp, "price": 30.0, "volume": 100, "session": "pre"},
+        ]
+        assert _changed_rows(rows, _stored([_bar(0)])) == []
+
+    async def test_new_timestamp_is_kept(self):
+        rows = [
+            {"timestamp": _bar(1).timestamp, "price": 30.0, "volume": 100, "session": "pre"},
+        ]
+        assert len(_changed_rows(rows, _stored([_bar(0)]))) == 1
+
+    async def test_moved_price_is_kept(self):
+        rows = [
+            {"timestamp": _bar(0).timestamp, "price": 31.0, "volume": 100, "session": "pre"},
+        ]
+        assert len(_changed_rows(rows, _stored([_bar(0)]))) == 1
+
+    async def test_moved_volume_is_kept(self):
+        rows = [
+            {"timestamp": _bar(0).timestamp, "price": 30.0, "volume": 900, "session": "pre"},
+        ]
+        assert len(_changed_rows(rows, _stored([_bar(0)]))) == 1
+
+    async def test_reclassified_session_is_kept(self):
+        rows = [
+            {"timestamp": _bar(0).timestamp, "price": 30.0, "volume": 100, "session": "regular"},
+        ]
+        assert len(_changed_rows(rows, _stored([_bar(0)]))) == 1
+
+    async def test_stored_timestamp_in_another_zone_still_matches(self):
+        """Storage hands back UTC; the fetch classifies in exchange-local time."""
+        bar = _bar(0)
+        stored = {bar.timestamp.astimezone(timezone.utc): (30.0, 100, "pre")}
+        rows = [{"timestamp": bar.timestamp, "price": 30.0, "volume": 100, "session": "pre"}]
+        assert _changed_rows(rows, stored) == []
+
+
 class TestFetchAndStoreIntraday:
-    """Tests for DB storage: stale-bar cleanup and upsert."""
+    """DB storage: stale-bar cleanup, no-op suppression, chunked upserts."""
 
     async def test_deletes_stale_bars_before_upsert(self):
         """Bars older than the oldest fresh bar should be deleted."""
-        fresh_bars = [
-            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 9, 0, tzinfo=ET), price=30.0, volume=100, tz_name="America/New_York"),
-            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 10, 0, tzinfo=ET), price=31.0, volume=200, tz_name="America/New_York"),
-        ]
+        fresh_bars = [_bar(0, 30.0, 100), _bar(0, 31.0, 200, hour=10)]
+        stale_ts = datetime(2026, 2, 24, 10, 0, tzinfo=ET)
 
         mock_db = AsyncMock()
+        stored = {1: {stale_ts: (1.0, 1, "regular")}}
 
-        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}):
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
+             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == 2
 
-        # Should have 2 execute calls: 1 delete + 1 upsert
         calls = mock_db.execute.call_args_list
         assert len(calls) == 2
+        assert "DELETE" in str(calls[0].args[0]).upper()
+        assert "INSERT" in str(calls[1].args[0]).upper()
 
-        # First call is the delete for stale bars
-        delete_sql = str(calls[0].args[0])
-        assert "DELETE" in delete_sql.upper()
+    async def test_no_stale_bars_issues_no_delete(self):
+        """The delete is skipped when nothing stored predates the fetch."""
+        fresh_bars = [_bar(0, 30.0, 100)]
+        mock_db = AsyncMock()
+
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
+             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}):
+            count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
+
+        assert count == 1
+        calls = mock_db.execute.call_args_list
+        assert len(calls) == 1
+        assert "INSERT" in str(calls[0].args[0]).upper()
+
+    async def test_unchanged_bars_write_nothing(self):
+        """A poll that returns the same bars again must not touch the table."""
+        fresh_bars = [_bar(0, 30.0, 100), _bar(1, 30.5, 120)]
+        stored = {1: _stored(fresh_bars)}
+
+        mock_db = AsyncMock()
+
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
+             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored):
+            count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
+
+        assert count == 0
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_awaited()
+
+    async def test_only_the_moved_bar_is_written(self):
+        """The steady state: one new bar per minute, not the whole day."""
+        settled = [_bar(m, 30.0 + m, 100) for m in range(5)]
+        stored = {1: _stored(settled)}
+        fresh_bars = settled + [_bar(5, 35.0, 100)]
+
+        mock_db = AsyncMock()
+
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
+             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored):
+            count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
+
+        assert count == 1
+
+    async def test_large_fetch_is_chunked(self):
+        """A full session's bars are split across statements, not sent as one."""
+        fresh_bars = [
+            ProviderIntradayBar(
+                timestamp=datetime(2026, 2, 25, 4, 0, tzinfo=ET) + timedelta(minutes=m),
+                price=30.0,
+                volume=100,
+                tz_name="America/New_York",
+            )
+            for m in range(INTRADAY_UPSERT_CHUNK_ROWS * 2 + 10)
+        ]
+
+        mock_db = AsyncMock()
+
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
+             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}):
+            count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
+
+        assert count == len(fresh_bars)
+        assert mock_db.execute.await_count == 3
 
     async def test_no_data_returns_zero(self):
         mock_db = AsyncMock()
@@ -307,12 +425,10 @@ class TestFetchAndStoreIntraday:
 
     async def test_skips_refs_without_stored_id(self):
         """Bars for refs not bound to a stored asset row are skipped."""
-        fresh_bars = [
-            ProviderIntradayBar(timestamp=datetime(2026, 2, 25, 9, 0, tzinfo=ET), price=30.0, volume=100, tz_name="America/New_York"),
-        ]
         mock_db = AsyncMock()
 
-        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"UNKNOWN": fresh_bars}):
+        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"UNKNOWN": [_bar(0)]}):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("UNKNOWN")])
 
         assert count == 0
+        mock_db.execute.assert_not_called()
