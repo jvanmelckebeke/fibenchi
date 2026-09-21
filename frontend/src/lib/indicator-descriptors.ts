@@ -210,6 +210,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     ],
     decimals: 2,
     suffix: "σ",
+    live: { field: "vnr", resolver: "sigma" },
     holdingSummary: { label: "σ-Move", field: "vnr", format: "numeric" },
   },
   {
