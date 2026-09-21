@@ -2,16 +2,14 @@
 
 Two independent repair loops:
 
-- ``heal_unreconciled_prices`` — the *trailing-bar* heal: the frontend blanks
-  σ-Move when an asset's latest stored close reconciles with neither the live
-  price nor the quote's previous close (``resolveSigma`` in
-  ``frontend/src/lib/sigma.ts`` reads that as ``behind`` and withholds with
-  ``feed_behind``). That state means the stored data is at least two sessions
-  behind the quote — e.g.
-  ``drop_unsettled_last_bar`` discarded a lagging bar and every scheduled sync
-  since missed the symbol. Rather than waiting up to a day for the next
-  scheduled sync, this detects the broken invariant server-side and refreshes
-  just the affected symbols.
+- ``heal_unreconciled_prices`` — the *trailing-bar* heal: an asset whose latest
+  stored bar is older than the session before the live quote, or whose close
+  contradicts that quote, has stored data the frontend will refuse to score
+  (``resolveSigma`` in ``frontend/src/lib/sigma.ts`` withholds σ-Move as
+  ``feed_behind``). It happens when ``drop_unsettled_last_bar`` discarded a
+  lagging bar and every scheduled sync since missed the symbol. Rather than
+  waiting up to a day for the next scheduled sync, this detects it server-side
+  and refreshes just the affected symbols.
 
 - ``heal_interior_holes`` — the *mid-series* heal: a
   scheduled session with no stored bar (upstream feed hole, NaN-skipped
@@ -54,6 +52,47 @@ MAX_HEALS_PER_RUN = 10
 _last_attempt: dict[str, float] = {}
 
 
+def _is_behind(ref: AssetRef, bar_date: date, session_date: date | None) -> bool:
+    """Whether the stored bar predates the session before the quote's."""
+    if session_date is None or bar_date >= session_date:
+        return False
+    venue = ref.venue
+    if venue is None:
+        return False
+    previous = venue.previous_session(session_date)
+    return previous is not None and bar_date < previous
+
+
+def _is_stale(
+    ref: AssetRef,
+    stored: tuple[date, float],
+    price: float | None,
+    previous_close: float | None,
+    session_date: date | None,
+) -> bool:
+    """Whether a symbol's latest stored bar needs refetching.
+
+    Two tests, because they answer different questions and each misses what the
+    other catches.
+
+    The date test asks *which session* the bar is. A close comparison cannot:
+    it measures how far the price moved, so a market that barely moved across a
+    missing stretch reads as no gap at all and the heal declines exactly when it
+    is needed. `Venue.previous_session` answers exactly, holidays included.
+
+    The price test asks whether the bar is *right*. A bar dated correctly can
+    still hold a partial close that was persisted mid-session, which no date
+    tells you.
+
+    Both fail safe: with no session date or no venue calendar the price test is
+    in sole charge, as it was before the date test existed.
+    """
+    bar_date, bar_close = stored
+    if _is_behind(ref, bar_date, session_date):
+        return True
+    return not (_reconciles(bar_close, price) or _reconciles(bar_close, previous_close))
+
+
 async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
     """Refresh grouped assets whose latest stored bar contradicts the live quote.
 
@@ -84,14 +123,15 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
         price, previous_close = q.price, q.previous_close
         if price is None and previous_close is None:  # dead quote, nothing to anchor on
             continue
-        bar_date, bar_close = stored
-        if _reconciles(bar_close, price) or _reconciles(bar_close, previous_close):
+        session_date = _as_date(q.session_date)
+        if not _is_stale(ref, stored, price, previous_close, session_date):
             continue
         logger.info(
-            "%s: stored %s close %s reconciles with neither price %s nor previous_close %s",
-            sym, bar_date, bar_close, price, previous_close,
+            "%s: stored bar %s (close %s) is stale against the %s quote "
+            "(price %s, previous_close %s)",
+            sym, stored[0], stored[1], session_date, price, previous_close,
         )
-        anchor: Anchor = (price, previous_close, q.market_state, _as_date(q.session_date))
+        anchor: Anchor = (price, previous_close, q.market_state, session_date)
         stale.append((sym, anchor))
 
     if not stale:
@@ -128,14 +168,12 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
         # should not lock the symbol out for 30 minutes if it breaks again, and
         # a heal that structurally *cannot* work would otherwise buy the lockout
         # every time while changing nothing.
-        price, previous_close = anchor[0], anchor[1]
+        price, previous_close, _, session_date = anchor
         stored = (await PriceRepository(db).get_latest_closes([ref.id])).get(ref.id)
-        if stored is None or not (
-            _reconciles(stored[1], price) or _reconciles(stored[1], previous_close)
-        ):
+        if stored is None or _is_stale(ref, stored, price, previous_close, session_date):
             _last_attempt[sym] = now
             logger.info(
-                "%s: still unreconciled after heal — backing off %d min",
+                "%s: still stale after heal — backing off %d min",
                 sym, HEAL_COOLDOWN_SECONDS // 60,
             )
     return healed

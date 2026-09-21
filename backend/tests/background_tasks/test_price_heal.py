@@ -1,17 +1,20 @@
 """Tests for the price self-heal service.
 
-``heal_unreconciled_prices`` refreshes grouped assets whose latest stored bar
-reconciles with neither the live quote price nor its previous close — the
-exact condition under which the frontend blanks σ-Move.
+``heal_unreconciled_prices`` refreshes grouped assets whose latest stored bar is
+older than the session before the live quote, or whose close reconciles with
+neither that quote's price nor its previous close — the conditions under which
+the frontend blanks σ-Move.
 """
 
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import delete, update
 
 from app.background_tasks import price_heal
 from app.background_tasks.price_heal import MAX_HEALS_PER_RUN, heal_unreconciled_prices
+from app.domain import AssetRef
 from app.models import PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.schemas.quote import Quote
@@ -222,16 +225,129 @@ async def test_heal_caps_per_run_and_defers_rest(db):
     assert mock_sync.await_count == n
 
 
+class TestDateBasedStaleness:
+    """The date test catches what the price test structurally cannot.
+
+    A close comparison measures how far the price moved, not which session the
+    bar is. Across a missing stretch the market barely moved, so the stored bar
+    sits inside tolerance of the live quote's previous close and the heal
+    declines — precisely when it is needed.
+    """
+
+    @staticmethod
+    def _sessions(symbol: str = "PRY.MI") -> list[date]:
+        """The venue's recent sessions, newest first. Derived rather than
+        hardcoded so the test doesn't expire."""
+        venue = AssetRef(symbol).venue
+        assert venue is not None
+        sessions = venue.recent_sessions(date.today(), 6)
+        assert sessions and len(sessions) >= 4
+        return sessions
+
+    @staticmethod
+    async def _stored_at(db, asset, bar_date: date, close: float) -> None:
+        """Make ``bar_date`` the asset's latest stored bar."""
+        await db.execute(delete(PriceHistory).where(PriceHistory.asset_id == asset.id))
+        for day in (bar_date - timedelta(days=7), bar_date):
+            db.add(PriceHistory(
+                asset_id=asset.id, date=day, open=close, high=close,
+                low=close, close=close, volume=1000,
+            ))
+        await db.flush()
+
+    async def test_heals_a_stale_bar_a_flat_market_hides(self, db):
+        sessions = self._sessions()
+        asset = await seed_asset_with_prices(db, "PRY.MI", n_days=30)
+        await self._stored_at(db, asset, sessions[3], 122.20)
+
+        # 0.2% from the quote's previous close — well inside SESSION_MATCH_TOL,
+        # so the price test alone reads this three-session-old bar as current.
+        quote = _quote("PRY.MI", 124.60, 122.45)
+        quote.session_date = sessions[0].isoformat()
+
+        with patch("app.background_tasks.price_heal.get_price_provider",
+                   return_value=_provider_with_quotes([quote])), \
+             patch("app.background_tasks.price_heal.sync_asset_prices",
+                   new_callable=AsyncMock, return_value=3) as mock_sync:
+            healed = await heal_unreconciled_prices(db)
+
+        assert healed == {"PRY.MI": 3}
+        mock_sync.assert_awaited_once()
+
+    async def test_leaves_the_prior_session_bar_alone(self, db):
+        """The ordinary mid-session state: the stored bar is the session before
+        the quote's. Healing it every 10 minutes would be the opposite bug."""
+        sessions = self._sessions()
+        asset = await seed_asset_with_prices(db, "NEX.PA", n_days=30)
+        await self._stored_at(db, asset, sessions[1], 136.60)
+
+        quote = _quote("NEX.PA", 140.10, 136.80)
+        quote.session_date = sessions[0].isoformat()
+
+        with patch("app.background_tasks.price_heal.get_price_provider",
+                   return_value=_provider_with_quotes([quote])), \
+             patch("app.background_tasks.price_heal.sync_asset_prices",
+                   new_callable=AsyncMock) as mock_sync:
+            assert await heal_unreconciled_prices(db) == {}
+        mock_sync.assert_not_awaited()
+
+    async def test_still_catches_a_wrong_close_on_a_correctly_dated_bar(self, db):
+        """A partial close persisted mid-session: the date is right and only
+        the price test can tell."""
+        sessions = self._sessions()
+        asset = await seed_asset_with_prices(db, "PRY.MI", n_days=30)
+        await self._stored_at(db, asset, sessions[1], 100.00)
+
+        quote = _quote("PRY.MI", 124.60, 122.45)
+        quote.session_date = sessions[0].isoformat()
+
+        with patch("app.background_tasks.price_heal.get_price_provider",
+                   return_value=_provider_with_quotes([quote])), \
+             patch("app.background_tasks.price_heal.sync_asset_prices",
+                   new_callable=AsyncMock, return_value=1) as mock_sync:
+            assert await heal_unreconciled_prices(db) == {"PRY.MI": 1}
+        mock_sync.assert_awaited_once()
+
+    async def test_without_a_session_date_the_price_test_is_in_sole_charge(self, db):
+        """Fail-safe: a degraded quote must not start healing everything."""
+        sessions = self._sessions()
+        asset = await seed_asset_with_prices(db, "PRY.MI", n_days=30)
+        await self._stored_at(db, asset, sessions[3], 122.20)
+
+        with patch("app.background_tasks.price_heal.get_price_provider",
+                   return_value=_provider_with_quotes([_quote("PRY.MI", 124.60, 122.45)])), \
+             patch("app.background_tasks.price_heal.sync_asset_prices",
+                   new_callable=AsyncMock) as mock_sync:
+            assert await heal_unreconciled_prices(db) == {}
+        mock_sync.assert_not_awaited()
+
+    async def test_a_date_stale_symbol_yahoo_cannot_fix_backs_off(self, db):
+        """The cooldown must be charged on the same predicate the detection
+        uses, or a symbol whose stale bar keeps reconciling on price is retried
+        every run forever."""
+        sessions = self._sessions()
+        asset = await seed_asset_with_prices(db, "PRY.MI", n_days=30)
+        await self._stored_at(db, asset, sessions[3], 122.20)
+
+        quote = _quote("PRY.MI", 124.60, 122.45)
+        quote.session_date = sessions[0].isoformat()
+
+        with patch("app.background_tasks.price_heal.get_price_provider",
+                   return_value=_provider_with_quotes([quote])), \
+             patch("app.background_tasks.price_heal.sync_asset_prices",
+                   new_callable=AsyncMock, return_value=0) as mock_sync:
+            await heal_unreconciled_prices(db)
+            await heal_unreconciled_prices(db)
+
+        mock_sync.assert_awaited_once()
+        assert "PRY.MI" in price_heal._last_attempt
+
+
 # ---------------------------------------------------------------------------
 # Interior-hole heal (issue #559 fix 3)
 # ---------------------------------------------------------------------------
 
-from datetime import date, timedelta  # noqa: E402
-
-from sqlalchemy import delete  # noqa: E402
-
 from app.background_tasks.price_heal import find_interior_holes, heal_interior_holes  # noqa: E402
-from app.domain import AssetRef  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
