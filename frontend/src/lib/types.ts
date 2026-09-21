@@ -364,6 +364,11 @@ export interface Quote {
    * snapshot's `as_of` = how many sessions behind it is; absent = older than
    * the window. Null when the venue has no calendar. */
   recent_sessions: string[] | null
+  /** Fraction of a normal session's volume this venue has traded by now, from
+   * its fitted intraday volume curve. Divides `volume` into a figure
+   * comparable with a completed session's; see `lib/rvol.ts`. Null outside
+   * regular hours or when the venue has no curve. */
+  volume_pace: number | null
 }
 
 export interface IntradayPoint {

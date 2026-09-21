@@ -11,3 +11,4 @@ from app.models.symbol_source import SymbolSource  # noqa: F401
 from app.models.tag import Tag, tag_assets  # noqa: F401
 from app.models.thesis import Thesis, ThesisStatus, thesis_assets  # noqa: F401
 from app.models.user_settings import UserSettings  # noqa: F401
+from app.models.volume_curve import VolumeCurvePoint  # noqa: F401

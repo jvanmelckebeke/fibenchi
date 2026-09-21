@@ -14,7 +14,7 @@ export type IndicatorPlacement = "overlay" | "subchart" | "card"
 /** Which resolver recomputes an indicator against the live session. A name,
  * not a function, so the descriptor data file stays pure data; the table it
  * indexes lives in lib/indicator-value.ts. */
-export type LiveResolverId = "sigma"
+export type LiveResolverId = "sigma" | "rvol"
 
 export type IndicatorCategory = "technical" | "volatility" | "fundamentals" | "market_data"
 

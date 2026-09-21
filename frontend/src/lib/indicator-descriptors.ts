@@ -273,7 +273,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     label: "RVOL (20)",
     shortLabel: "RVOL",
     description:
-      "Relative Volume — last session's volume vs its 20-day average. 1× is a normal day, above 1.5× elevated, above 2× unusually heavy, below 0.5× quiet.",
+      "Relative Volume — volume vs its 20-day average. 1× is a normal day, above 1.5× elevated, above 2× unusually heavy, below 0.5× quiet. During a venue's regular session it scores the day in progress, stated in whole-day terms via that venue's intraday volume curve; outside one it is the last completed session's.",
     category: "market_data",
     placement: "card",
     capabilities: ["group_table", "group_card", "detail_card", "detail_stats"],
@@ -295,6 +295,7 @@ export const INDICATOR_REGISTRY: IndicatorDescriptor[] = [
     ],
     decimals: 2,
     suffix: "×",
+    live: { field: "rvol", resolver: "rvol" },
     holdingSummary: {
       label: "RVOL",
       field: "rvol_state",

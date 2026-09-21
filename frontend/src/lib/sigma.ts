@@ -24,6 +24,7 @@
  */
 
 import type { IndicatorSummary, Quote } from "@/lib/types"
+import type { ValueSource, WithheldReason } from "@/lib/live-resolution"
 import { getNumericValue } from "@/lib/indicator-registry"
 
 // Both constants are generated from their Python definitions rather than
@@ -38,29 +39,7 @@ import {
 } from "@/lib/generated/backend-constants"
 
 export { VNR_WARMUP_SESSIONS }
-
-/** Whether a rendered value was recomputed against the live session or read
- * straight off the settled snapshot. Shared: every indicator that can be
- * scored live reports the same two words (see lib/indicator-value.ts). */
-export type ValueSource = "live" | "settled"
-
-/** Why no σ is shown. Kept discriminated even where the UI collapses them:
- * the distinction decides *whether* to withhold, and the tooltip explains it. */
-export type WithheldReason =
-  /** The stored bar is further behind the live session than the vol forecast
-   * can bridge. `sessions` is the measured distance, or null when the venue
-   * has no calendar and all we know is "further back than the prior one". */
-  | { kind: "feed_behind"; sessions: number | null }
-  /** The stored series is missing sessions, so its own return spans a hole. */
-  | { kind: "gap"; sessions: number }
-  /** Too little history for the vol baseline to mean anything. */
-  | { kind: "warmup"; bars: number; needed: number }
-  /** The bar is identified, but there is no usable vol forecast to divide by.
-   * Distinct from the others because showing the stored σ here is exactly the
-   * sign-contradiction bug — it must blank, not fall back. */
-  | { kind: "cannot_score" }
-  /** No snapshot, or nothing to say about it. */
-  | { kind: "no_data" }
+export type { ValueSource, WithheldReason }
 
 export type SigmaResolution =
   | { status: "ok"; sigma: number; source: ValueSource }

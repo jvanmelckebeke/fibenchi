@@ -11,7 +11,7 @@ import type { IndicatorSummary, Quote } from "@/lib/types"
 const q = (over: Partial<Quote> = {}): Quote => ({
   symbol: "X", price: null, previous_close: null, change: null, change_percent: null,
   volume: null, avg_volume: null, currency: "USD", market_state: null,
-  session_date: null, recent_sessions: null, ...over,
+  session_date: null, recent_sessions: null, volume_pace: null, ...over,
 })
 
 const snap = (over: Partial<IndicatorSummary> = {}): IndicatorSummary => ({
