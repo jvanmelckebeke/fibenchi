@@ -19,6 +19,7 @@ from app.services.compute.indicators import VNR_MAX_SESSIONS_BEHIND
 from app.services.intraday import get_intraday_bars
 from app.services.market_calendar import schedule_poll_hint
 from app.services.price_providers import get_price_provider
+from app.services.volume_curve_service import volume_pace
 
 logger = logging.getLogger(__name__)
 
@@ -113,11 +114,38 @@ def attach_recent_sessions(quotes: list[Quote]) -> list[Quote]:
     return quotes
 
 
+def attach_volume_pace(quotes: list[Quote]) -> list[Quote]:
+    """Fill each quote's ``volume_pace`` from its venue's fitted volume curve.
+
+    Resolved per calendar, like the session window above: the answer depends on
+    where the *venue* is in its session, not on the symbol.
+    """
+    resolved: dict[str, float | None] = {}
+    for q in quotes:
+        ref = AssetRef(q.symbol)
+        calendar = ref.calendar_name
+        if calendar is None:
+            continue
+        if calendar not in resolved:
+            resolved[calendar] = volume_pace(ref)
+        q.volume_pace = resolved[calendar]
+    return quotes
+
+
+def enrich_quotes(quotes: list[Quote]) -> list[Quote]:
+    """Everything the calendar knows and the provider doesn't, in one pass.
+
+    Both quote paths (REST and the SSE stream) come through here so a new
+    calendar-derived field can't reach one and not the other.
+    """
+    return attach_volume_pace(attach_recent_sessions(quotes))
+
+
 async def get_quotes(symbols: str) -> list[Quote]:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
-    return attach_recent_sessions(await get_price_provider().batch_fetch_quotes(symbol_list))
+    return enrich_quotes(await get_price_provider().batch_fetch_quotes(symbol_list))
 
 
 async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
@@ -161,7 +189,7 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
                 await asyncio.sleep(60)
                 continue
 
-            quotes = attach_recent_sessions(
+            quotes = enrich_quotes(
                 await get_price_provider().batch_fetch_quotes(list(refs))
             )
 

@@ -22,23 +22,26 @@ import {
   getNumericValue,
   type LiveResolverId,
 } from "@/lib/indicator-registry"
-import {
-  resolveSigma,
-  sessionsBehind,
-  sigmaWithheldTitle,
-  type SigmaResolution,
-  type ValueSource,
-  type WithheldReason,
-} from "@/lib/sigma"
+import type { LiveResolution, ValueSource, WithheldReason } from "@/lib/live-resolution"
+import { resolveRvol, rvolWithheldTitle } from "@/lib/rvol"
+import { resolveSigma, sessionsBehind, sigmaWithheldTitle } from "@/lib/sigma"
 
 /** A resolver turns quote + snapshot into one live-or-settled number. */
 type LiveResolver = (
   quote: Quote | undefined,
   snapshot: IndicatorSummary | undefined,
-) => SigmaResolution
+) => LiveResolution
 
 const LIVE_RESOLVERS: Record<LiveResolverId, LiveResolver> = {
-  sigma: resolveSigma,
+  // resolveSigma predates the shared shape and names its number `sigma`;
+  // adapting it here is cheaper than renaming through its test suite.
+  sigma: (quote, snapshot) => {
+    const r = resolveSigma(quote, snapshot)
+    return r.status === "ok"
+      ? { status: "ok", value: r.sigma, source: r.source }
+      : r
+  },
+  rvol: resolveRvol,
 }
 
 /** Why a resolver blanked its cell, in that resolver's own terms. Only a live
@@ -46,6 +49,7 @@ const LIVE_RESOLVERS: Record<LiveResolverId, LiveResolver> = {
  * and "absent" has no explanation beyond itself. */
 const WITHHELD_TITLES: Record<LiveResolverId, (reason: WithheldReason) => string | null> = {
   sigma: sigmaWithheldTitle,
+  rvol: rvolWithheldTitle,
 }
 
 export type IndicatorValueResolution =
@@ -81,7 +85,7 @@ export function resolveIndicatorValue(
   if (live && live.field === field) {
     const resolved = LIVE_RESOLVERS[live.resolver](quote, snapshot)
     return resolved.status === "ok"
-      ? { status: "ok", value: resolved.sigma, source: resolved.source, behind }
+      ? { status: "ok", value: resolved.value, source: resolved.source, behind }
       : { status: "withheld", reason: resolved.reason, behind }
   }
 

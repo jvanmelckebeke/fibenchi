@@ -19,7 +19,7 @@ const SESSIONS = [
 const q = (over: Partial<Quote> = {}): Quote => ({
   symbol: "X", price: null, previous_close: null, change: null, change_percent: null,
   volume: null, avg_volume: null, currency: "USD", market_state: null,
-  session_date: SESSIONS[0], recent_sessions: SESSIONS, ...over,
+  session_date: SESSIONS[0], recent_sessions: SESSIONS, volume_pace: null, ...over,
 })
 
 const snap = (over: Partial<IndicatorSummary> = {}): IndicatorSummary => ({

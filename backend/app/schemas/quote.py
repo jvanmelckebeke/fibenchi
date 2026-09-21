@@ -28,6 +28,16 @@ class QuoteResponse(BaseModel):
         "counting of business days (which turns every holiday into a hole). None when "
         "the venue is unknown.",
     )
+    volume_pace: float | None = Field(
+        default=None,
+        description="Fraction of a normal session's volume this venue has traded by "
+        "now, from its fitted intraday volume curve. Divides `volume` into a figure "
+        "comparable with a completed session's — without it, volume-so-far over a "
+        "whole-day average reads a fraction of where the day will finish, and two "
+        "venues at different points in their sessions cannot be ranked against each "
+        "other. None outside regular hours, or when no curve is fitted for the venue; "
+        "the client then shows the last settled RVOL rather than an invented one.",
+    )
 
 
 class Quote(QuoteResponse):
