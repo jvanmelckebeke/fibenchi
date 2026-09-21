@@ -11,6 +11,11 @@
 
 export type IndicatorPlacement = "overlay" | "subchart" | "card"
 
+/** Which resolver recomputes an indicator against the live session. A name,
+ * not a function, so the descriptor data file stays pure data; the table it
+ * indexes lives in lib/indicator-value.ts. */
+export type LiveResolverId = "sigma"
+
 export type IndicatorCategory = "technical" | "volatility" | "fundamentals" | "market_data"
 
 export const CATEGORY_ORDER: IndicatorCategory[] = ["fundamentals", "market_data", "technical", "volatility"]
@@ -99,6 +104,21 @@ export interface IndicatorDescriptor {
   suffix?: string
   /** When true, table values use formatCompactNumber (K/M/B) instead of toFixed. */
   compactFormat?: boolean
+  /**
+   * Declares this indicator scorable against the session still in progress.
+   *
+   * Most indicators are not. A snapshot describes the last *settled* daily bar
+   * (`drop_unsettled_last_bar` discards the forming one), so while a venue is
+   * open the stored RSI, MACD and RVOL all describe yesterday, and there is no
+   * honest way to advance them without today's OHLC. The few that can be
+   * advanced hold a settled *baseline* the live quote supplies the other half
+   * of — σ-Move's vol forecast divided into the quote's own change %.
+   *
+   * `field` is the one value the resolver produces, which is not always the
+   * descriptor's only field: σ-Move's `vnr_sigma` and `vnr_gap_sessions` are
+   * inputs to the resolution, not outputs of it.
+   */
+  live?: { field: string; resolver: LiveResolverId }
 }
 
 /** Narrowed descriptor where holdingSummary is guaranteed present. */

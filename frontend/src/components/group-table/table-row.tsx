@@ -17,13 +17,18 @@ import {
 } from "@/lib/format"
 import { ChangePct } from "@/components/change-pct"
 import {
-  getNumericValue,
   extractMacdValues,
   formatDeltaAnnotation,
   getDescriptorByField,
   formatIndicatorField,
 } from "@/lib/indicator-registry"
-import { resolveSigma, sigmaExDiv, sigmaWithheldTitle } from "@/lib/sigma"
+import { sigmaExDiv } from "@/lib/sigma"
+import {
+  indicatorWithheldTitle,
+  isAbnormallyBehind,
+  resolveIndicatorValue,
+  settledSessionTitle,
+} from "@/lib/indicator-value"
 import { marketState as marketStateInfo } from "@/lib/market-state"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -285,33 +290,39 @@ export const TableRow = memo(function TableRow({
                 </td>
               )
             }
-            // σ-Move needs session identity, not just a number: its stored
-            // value describes a completed daily bar, which during market hours
-            // is *yesterday* and can contradict the live change % beside it.
-            // The shared resolver (lib/sigma) decides — same call the board and
-            // the sort key make, so the three can't disagree.
-            const sigma = field === "vnr" ? resolveSigma(quote, indicator) : null
-            const withheld = sigma?.status === "withheld" ? sigma.reason : null
+            // Every indicator cell needs session identity, not just a number:
+            // a snapshot describes the last *settled* bar, so during market
+            // hours its values are yesterday's next to a live price. The shared
+            // resolver decides what this field is entitled to show and how far
+            // behind it is — same call the sort key makes, so the two can't
+            // disagree about which number the row is ordered by.
+            const resolved = resolveIndicatorValue(field, quote, indicator)
+            const withheld = resolved.status === "withheld" ? resolved.reason : null
+            const val = resolved.status === "ok" ? resolved.value : null
+            const desc = getDescriptorByField(field)
             // On an ex-date the σ and the change % beside it disagree by the
             // dividend, because only one of them counts the cash.
-            const exDiv = sigma ? sigmaExDiv(sigma, indicator) : null
-            const values = sigma?.status === "ok"
-              ? { ...indicator?.values, vnr: sigma.sigma }
-              : indicator?.values
-            const val = getNumericValue(values, field)
-            const desc = getDescriptorByField(field)
+            const exDiv = field === "vnr" ? sigmaExDiv(resolved, indicator) : null
             // Route through the shared registry formatter so the table matches the
             // card/detail rendering (decimals, threshold colours, currency prefix).
-            const formatted = !withheld && val != null && desc && values
-              ? formatIndicatorField(field, desc, values, asset.currency)
+            const formatted = val != null && desc
+              ? formatIndicatorField(field, desc, { ...indicator?.values, [field]: val }, asset.currency)
+              : null
+            const behindTitle = desc
+              ? settledSessionTitle(desc.shortLabel, resolved, indicator)
               : null
             return (
               <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
                 {formatted ? (
                   <span
-                    className={formatted.colorClass}
+                    className={`${formatted.colorClass} ${
+                      isAbnormallyBehind(resolved)
+                        ? "opacity-60 underline decoration-dotted underline-offset-4"
+                        : ""
+                    }`}
                     title={[
                       desc?.compactFormat && val != null ? val.toLocaleString() : null,
+                      behindTitle,
                       exDiv != null
                         ? `Ex-dividend ${formatPrice(exDiv, asset.currency)} per share. σ-Move scores the total return, so the payout's price drop is not counted as a move; the change % beside it still is a price move.`
                         : null,
@@ -322,7 +333,7 @@ export const TableRow = memo(function TableRow({
                 ) : (
                   <span
                     className="text-muted-foreground"
-                    title={withheld ? sigmaWithheldTitle(withheld) ?? undefined : undefined}
+                    title={withheld ? indicatorWithheldTitle(field, withheld) ?? undefined : undefined}
                   >
                     &mdash;
                   </span>

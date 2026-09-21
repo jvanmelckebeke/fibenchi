@@ -39,7 +39,10 @@ import {
 
 export { VNR_WARMUP_SESSIONS }
 
-export type SigmaSource = "live" | "settled"
+/** Whether a rendered value was recomputed against the live session or read
+ * straight off the settled snapshot. Shared: every indicator that can be
+ * scored live reports the same two words (see lib/indicator-value.ts). */
+export type ValueSource = "live" | "settled"
 
 /** Why no σ is shown. Kept discriminated even where the UI collapses them:
  * the distinction decides *whether* to withhold, and the tooltip explains it. */
@@ -60,11 +63,11 @@ export type WithheldReason =
   | { kind: "no_data" }
 
 export type SigmaResolution =
-  | { status: "ok"; sigma: number; source: SigmaSource }
+  | { status: "ok"; sigma: number; source: ValueSource }
   | { status: "withheld"; reason: WithheldReason }
 
 /** The stored bar is further back than any window we ship or could score. */
-const BEYOND_WINDOW = Number.POSITIVE_INFINITY
+export const BEYOND_WINDOW = Number.POSITIVE_INFINITY
 
 function near(a: number | null | undefined, b: number | null | undefined): boolean {
   if (a == null || b == null || b === 0) return false
@@ -84,7 +87,7 @@ function near(a: number | null | undefined, b: number | null | undefined): boole
  * staleness — reading it as such blanks every symbol at once whenever the
  * provider hiccups.
  */
-function sessionsBehind(snapshot: IndicatorSummary, quote: Quote | undefined): number | null {
+export function sessionsBehind(snapshot: IndicatorSummary, quote: Quote | undefined): number | null {
   if (!quote) return null
   const asOf = snapshot.as_of
   const session = quote.session_date
@@ -198,7 +201,7 @@ export function resolveSigma(
  * bar's dividend says nothing about it.
  */
 export function sigmaExDiv(
-  resolution: SigmaResolution,
+  resolution: { status: "ok"; source: ValueSource } | { status: "withheld" },
   snapshot: IndicatorSummary | undefined,
 ): number | null {
   if (resolution.status !== "ok" || resolution.source !== "settled") return null
