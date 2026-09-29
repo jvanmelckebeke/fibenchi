@@ -1,11 +1,12 @@
 """Emit the companion JSON Schemas — the single source of truth artifacts.
 
-These JSON Schemas are what the companion app's Zod codegen consumes
-(json-schema-to-zod). Regenerate after any change to ``app/schemas/companion.py``
-and copy the output into the app repo:
+The contract package (``contract/``) turns these JSON Schemas into the Zod schemas
+the companion app validates with. Regenerate after any change to
+``app/schemas/companion.py``, commit the output, and bump the version in
+``contract/package.json``:
 
     python -m scripts.export_companion_schema
-    # -> backend/companion.schema.json           (copy to fibenchi-app/schema/)
+    # -> backend/companion.schema.json
     # -> backend/companion.calendar.schema.json
 """
 

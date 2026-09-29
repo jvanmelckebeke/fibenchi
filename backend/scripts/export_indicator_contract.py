@@ -3,22 +3,24 @@
 ``indicators.py`` is the source of truth for technical-indicator definitions and
 their numeric kernels. The companion app (fibenchi-app, React Native/TS) re-
 implements a subset of these kernels by hand. To keep the two from drifting,
-this script reflects the registry outward as two language-neutral artifacts:
+this script reflects the registry outward as language-neutral artifacts:
 
   1. ``indicator.contract.json`` — registry *metadata* (no Python callables):
      which indicators exist, their kernel id, params, kernel output fields,
      warmup, decimals, a snapshot-derived tag, and a ``platforms`` tag so the app
-     can implement a deliberate subset without silent drift.
+     can implement a deliberate subset without silent drift. Its shape is the
+     ``IndicatorContract`` model, exported as ``indicator.contract.schema.json``.
   2. ``indicator.fixtures.json`` — a fixed synthetic OHLC series run through the
      pandas reference, with expected per-bar series + snapshot. The app golden-
      tests its TS kernels against this (pins EMA ``adjust=False`` / Wilder alpha).
 
-Regenerate after changing ``indicators.py``, commit both, and bump the version in
+Regenerate after changing ``indicators.py``, commit the output, and bump the version in
 ``contract/package.json``. CI publishes them to the app as part of
 ``@jvanmelckebeke/fibenchi-contract``:
 
     python -m scripts.export_indicator_contract
     # -> backend/indicator.contract.json
+    # -> backend/indicator.contract.schema.json
     # -> backend/indicator.fixtures.json
 """
 
@@ -31,6 +33,7 @@ import pathlib
 import numpy as np
 import pandas as pd
 
+from app.schemas.indicator_contract import IndicatorContract, IndicatorSpec
 from app.services.compute.indicators import (
     INDICATOR_REGISTRY,
     IndicatorDef,
@@ -54,7 +57,6 @@ APP_INDICATORS = {"rsi", "sma_20", "sma_50", "macd", "vnr"}
 APP_SERIES_FIELDS = ["rsi", "sma_20", "sma_50", "macd", "macd_signal", "macd_hist", "vnr", "vnr_sigma"]
 APP_SNAPSHOT_FIELDS = [*APP_SERIES_FIELDS, "macd_signal_dir"]
 
-CONTRACT_VERSION = 1
 FIXTURE_BARS = 160
 
 
@@ -72,27 +74,26 @@ def _snapshot_tag(defn: IndicatorDef) -> str | None:
     return defn.snapshot_derived.__name__.strip("_").removesuffix("_snapshot_derived")
 
 
-def _build_contract() -> dict:
+def _build_contract() -> IndicatorContract:
     indicators = []
     for key, defn in INDICATOR_REGISTRY.items():
         kernel_fields = _kernel_fields(defn)
-        delta_fields = [f for f in defn.output_fields if f not in kernel_fields]
         indicators.append(
-            {
-                "key": key,
-                "kernel": defn.func.__name__,
-                "params": dict(defn.params),
-                "outputFields": kernel_fields,
-                "deltaFields": delta_fields,
-                "decimals": defn.decimals,
-                "fieldDecimals": dict(defn.field_decimals),
-                "warmup": defn.warmup_periods,
-                "usesOhlc": defn.uses_ohlc,
-                "snapshotDerived": _snapshot_tag(defn),
-                "platforms": ["web", "app"] if key in APP_INDICATORS else ["web"],
-            }
+            IndicatorSpec(
+                key=key,
+                kernel=defn.func.__name__,
+                params=dict(defn.params),
+                output_fields=kernel_fields,
+                delta_fields=[f for f in defn.output_fields if f not in kernel_fields],
+                decimals=defn.decimals,
+                field_decimals=dict(defn.field_decimals),
+                warmup=defn.warmup_periods,
+                uses_ohlc=defn.uses_ohlc,
+                snapshot_derived=_snapshot_tag(defn),
+                platforms=["web", "app"] if key in APP_INDICATORS else ["web"],
+            )
         )
-    return {"version": CONTRACT_VERSION, "indicators": indicators}
+    return IndicatorContract(version=1, indicators=indicators)
 
 
 def _synthetic_ohlc(n: int = FIXTURE_BARS) -> pd.DataFrame:
@@ -150,12 +151,15 @@ def _build_fixtures() -> dict:
 
 def main() -> None:
     out_dir = pathlib.Path(__file__).resolve().parent.parent
-    contract = out_dir / "indicator.contract.json"
-    fixtures = out_dir / "indicator.fixtures.json"
-    contract.write_text(json.dumps(_build_contract(), indent=2) + "\n")
-    fixtures.write_text(json.dumps(_build_fixtures(), indent=2) + "\n")
-    print(f"wrote {contract}")
-    print(f"wrote {fixtures}")
+    artifacts = {
+        "indicator.contract.json": _build_contract().model_dump(by_alias=True),
+        "indicator.contract.schema.json": IndicatorContract.model_json_schema(by_alias=True),
+        "indicator.fixtures.json": _build_fixtures(),
+    }
+    for filename, data in artifacts.items():
+        out = out_dir / filename
+        out.write_text(json.dumps(data, indent=2) + "\n")
+        print(f"wrote {out}")
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ const ARTIFACTS = [
   'companion.schema.json',
   'companion.calendar.schema.json',
   'indicator.contract.json',
+  'indicator.contract.schema.json',
   'indicator.fixtures.json',
 ];
 
@@ -56,54 +57,16 @@ function zodModule(source, name) {
   return HEADER(source) + code + '\n';
 }
 
-// The interface is written out rather than inferred so a new or renamed field in the
-// exporter fails this build instead of silently widening the type.
-const INDICATOR_FIELDS = [
-  'decimals',
-  'deltaFields',
-  'fieldDecimals',
-  'kernel',
-  'key',
-  'outputFields',
-  'params',
-  'platforms',
-  'snapshotDerived',
-  'usesOhlc',
-  'warmup',
-];
-
+// Typed against the schema's inferred type, so tsc rejects contract data that does not
+// match its own schema and the app pays no runtime parse.
 function indicatorModule() {
   const contract = readArtifact('indicator.contract.json');
-  for (const indicator of contract.indicators) {
-    const keys = Object.keys(indicator).sort();
-    if (keys.join() !== INDICATOR_FIELDS.join()) {
-      throw new Error(
-        `indicator ${indicator.key} has fields [${keys}], expected [${INDICATOR_FIELDS}]. ` +
-          'Update IndicatorSpec in contract/scripts/build.mjs to match the exporter.',
-      );
-    }
-  }
   return (
     HEADER('indicator.contract.json') +
-    `export type Platform = 'web' | 'app';\n\n` +
-    `export interface IndicatorSpec {\n` +
-    `  key: string;\n` +
-    `  kernel: string;\n` +
-    `  params: Record<string, number>;\n` +
-    `  outputFields: string[];\n` +
-    `  deltaFields: string[];\n` +
-    `  decimals: number;\n` +
-    `  fieldDecimals: Record<string, number>;\n` +
-    `  warmup: number;\n` +
-    `  usesOhlc: boolean;\n` +
-    `  snapshotDerived: string | null;\n` +
-    `  platforms: Platform[];\n` +
-    `}\n\n` +
-    `export interface IndicatorContract {\n` +
-    `  version: number;\n` +
-    `  indicators: IndicatorSpec[];\n` +
-    `}\n\n` +
-    `export const INDICATOR_CONTRACT: IndicatorContract = ${JSON.stringify(contract, null, 2)};\n`
+    `import type { z } from 'zod';\n` +
+    `import type { indicatorContractSchema } from './indicator.schema.js';\n\n` +
+    `export const INDICATOR_CONTRACT: z.infer<typeof indicatorContractSchema> = ` +
+    `${JSON.stringify(contract, null, 2)};\n`
   );
 }
 
@@ -118,6 +81,10 @@ writeFileSync(
 writeFileSync(
   join(GENERATED, 'calendar.schema.ts'),
   zodModule('companion.calendar.schema.json', 'companionCalendarSchema'),
+);
+writeFileSync(
+  join(GENERATED, 'indicator.schema.ts'),
+  zodModule('indicator.contract.schema.json', 'indicatorContractSchema'),
 );
 writeFileSync(join(GENERATED, 'indicators.ts'), indicatorModule());
 

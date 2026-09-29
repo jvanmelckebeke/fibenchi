@@ -23,6 +23,7 @@ const SHIPPED = [
   ':/backend/companion.schema.json',
   ':/backend/companion.calendar.schema.json',
   ':/backend/indicator.contract.json',
+  ':/backend/indicator.contract.schema.json',
   ':/backend/indicator.fixtures.json',
   ':/contract/src/index.ts',
   ':/contract/scripts/build.mjs',
