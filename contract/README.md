@@ -5,12 +5,13 @@ The contract between the fibenchi backend and the companion app
 
 - `companionConfigSchema` and `companionCalendarSchema`, Zod schemas for
   `GET /api/companion/config` and `GET /api/companion/calendar`
-- `INDICATOR_CONTRACT`, the indicator registry metadata
+- `indicatorContractSchema` and `INDICATOR_CONTRACT`, the indicator registry metadata
+  and its Zod schema
 - the raw artifacts as JSON subpaths, including
   `@jvanmelckebeke/fibenchi-contract/indicator.fixtures.json`, the golden
   fixtures that pin the app's kernels to the pandas reference
 
-The backend exporters in `backend/scripts/` write the four JSON artifacts, and
+The backend exporters in `backend/scripts/` write the JSON artifacts, and
 `npm run build` generates everything else from them. Zod is a peer dependency, so
 the schemas run on the consumer's own `zod` 3 instance.
 

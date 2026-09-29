@@ -1,6 +1,6 @@
 {
   "name": "@jvanmelckebeke/fibenchi-contract",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "The contract between the fibenchi backend and its companion app: config and calendar Zod schemas, the indicator contract and its golden fixtures.",
   "license": "Apache-2.0",
   "repository": {
@@ -19,6 +19,7 @@
     "./companion.schema.json": "./dist/companion.schema.json",
     "./companion.calendar.schema.json": "./dist/companion.calendar.schema.json",
     "./indicator.contract.json": "./dist/indicator.contract.json",
+    "./indicator.contract.schema.json": "./dist/indicator.contract.schema.json",
     "./indicator.fixtures.json": "./dist/indicator.fixtures.json"
   },
   "files": [
