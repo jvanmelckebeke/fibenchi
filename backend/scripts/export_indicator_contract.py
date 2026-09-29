@@ -13,11 +13,13 @@ this script reflects the registry outward as two language-neutral artifacts:
      pandas reference, with expected per-bar series + snapshot. The app golden-
      tests its TS kernels against this (pins EMA ``adjust=False`` / Wilder alpha).
 
-Regenerate after changing ``indicators.py``, then copy both into the app repo:
+Regenerate after changing ``indicators.py``, commit both, and bump the version in
+``contract/package.json``. CI publishes them to the app as part of
+``@jvanmelckebeke/fibenchi-contract``:
 
     python -m scripts.export_indicator_contract
-    # -> backend/indicator.contract.json   (copy to fibenchi-app/schema/)
-    # -> backend/indicator.fixtures.json    (copy to fibenchi-app/lib/compute/__fixtures__/)
+    # -> backend/indicator.contract.json
+    # -> backend/indicator.fixtures.json
 """
 
 from __future__ import annotations
