@@ -34,28 +34,5 @@ PR that changes the artifacts without a bump. Use major when a bundle version
 (a new indicator or field), and patch otherwise. The two bundles version
 independently at runtime, but the package has only one major.
 
-## Bootstrapping the registry
-
-npm trusted publishing can only be configured on a package that already exists,
-so the first version goes up by hand. Until then CI skips the publish with a
-notice. Run this once with npm 11.15 or later, on an account with 2FA enabled:
-
-```bash
-mkdir -p /tmp/fibenchi-contract-bootstrap && cd /tmp/fibenchi-contract-bootstrap
-cat > package.json <<'EOF'
-{
-  "name": "@jvanmelckebeke/fibenchi-contract",
-  "version": "0.0.0",
-  "description": "Placeholder. Real versions are published by fibenchi CI.",
-  "license": "Apache-2.0"
-}
-EOF
-npm login
-npm publish --access public
-npm trust github @jvanmelckebeke/fibenchi-contract \
-  --repo jvanmelckebeke/fibenchi --file ci.yaml --allow-publish
-```
-
-The web form under the package's Settings > Trusted Publisher does the same:
-owner `jvanmelckebeke`, repository `fibenchi`, workflow `ci.yaml`, no
-environment. After that, re-run the `contract` job on the latest `dev` push.
+The first version was published by hand, because npm can only configure trusted
+publishing on a package that already exists.

@@ -58,10 +58,10 @@ const target = channel === 'dev' ? `${pkg.version}-dev.${hash}` : pkg.version;
 const versions = publishedVersions();
 
 // Trusted publishing can only be configured on a package that already exists, so the
-// first version is published by hand (steps in contract/README.md). Until then there
-// is nothing CI is allowed to publish to.
+// first version is published by hand. Until then there is nothing CI is allowed to
+// publish to.
 if (versions === null) {
-  console.log(`::notice::${pkg.name} is not on the registry yet; skipping publish. See contract/README.md.`);
+  console.log(`::notice::${pkg.name} is not on the registry yet; skipping publish until the first version is published by hand.`);
   process.exit(0);
 }
 
