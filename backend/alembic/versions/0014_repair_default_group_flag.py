@@ -3,8 +3,7 @@
 Migration 0004 originally seeded ``is_default = true`` on the Watchlist
 group, but at least one production database has drifted such that no
 group carries the flag. ``GroupRepository.get_default()`` then returns
-``None`` and ``DELETE /api/assets/{symbol}`` becomes a silent no-op
-(see issue #507).
+``None`` and ``DELETE /api/assets/{symbol}`` becomes a silent no-op.
 
 This migration is idempotent and self-healing:
 

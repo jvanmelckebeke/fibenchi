@@ -73,7 +73,7 @@ describe("formatCompactPrice", () => {
   })
 })
 
-// --- Unit-aware asset prices (#617) ---
+// --- Unit-aware asset prices ---
 //
 // `currency` only ever answers *which* currency, so an index was forced to
 // claim a denomination it doesn't have — the S&P 500 rendered as "$6,912.34"

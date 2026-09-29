@@ -31,13 +31,36 @@ export function pctWindowDef(w: PctWindow) {
   return PCT_WINDOWS.find((d) => d.value === w) ?? PCT_WINDOWS[0]
 }
 
+// The day-adaptive scales below may only tighten over a board that was
+// actually read. The max over a subset can never exceed the max over the whole
+// set, so calibrating on the tiles that resolved returns a span at most as wide
+// as the true one, and every tile that did resolve is painted louder than it
+// is. A partial set can only ever over-tighten, whatever caused the blanks —
+// which is why the gate is a coverage test and not a test of why a tile blanked.
+//
+// The threshold brackets the observed book: the normal state is 77 of 78
+// scored (one warmup blank), while the two coverage collapses seen in practice
+// left 18 of 70 and 43 of 78 with no reading — coverage 0.74 and 0.45. Any
+// threshold above 0.74 and at or below 0.99 separates them.
+//
+// Freezing the scale at its canonical width outright is the obvious
+// alternative and costs more than it saves: on a genuinely quiet, fully-read
+// day the tightening is the only thing that gives relative outliers any colour
+// at all. Gating it keeps the quiet day and disarms the adaptation only when
+// the input cannot support it.
+const TIGHTENING_COVERAGE = 0.9
+
+/** Whether enough of the board resolved for the day-adaptive scales to tighten. */
+export function hasTighteningCoverage(resolved: number, total: number): boolean {
+  return resolved > 0 && resolved >= total * TIGHTENING_COVERAGE
+}
+
 /** σ-mode ramp unit adapted to the day's actual spread: on a quiet day the
  * scale tightens so relative outliers still get colour, but never below a
  * ±1.5σ full range (a dead-calm day must not scream) and never looser than
- * the canonical ±3σ. The legend prints the resulting range, so the scale
- * stays honest about what it's doing. */
-export function sigmaUnit(sigmas: number[]): number {
-  if (!sigmas.length) return 1
+ * the canonical ±3σ. `total` is the tile count `sigmas` was read from. */
+export function sigmaUnit(sigmas: number[], total: number): number {
+  if (!hasTighteningCoverage(sigmas.length, total)) return 1
   const maxAbs = Math.max(...sigmas.map(Math.abs))
   return Math.min(1, Math.max(0.5, maxAbs / 3))
 }
@@ -54,13 +77,43 @@ function lerpHex(a: string, b: string, t: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`
 }
 
-/** Day-adaptive span for %-of-today mode: tightens to the day's biggest
- * move but never below ±2% (a flat day must not scream) and never beyond
- * ±7% (past that, more red doesn't add information). */
-export function pctSpan(pcts: number[]): number {
-  if (!pcts.length) return 7
+/** Day-adaptive span for %-of-today mode: tightens to the day's biggest move
+ * but never below ±2% (a flat day must not scream) and never beyond ±7% (past
+ * that, more red doesn't add information). `total` as in `sigmaUnit`. */
+export function pctSpan(pcts: number[], total: number): number {
+  if (!hasTighteningCoverage(pcts.length, total)) return 7
   const maxAbs = Math.max(...pcts.map(Math.abs))
   return Math.min(7, Math.max(2, maxAbs))
+}
+
+/** The tile fields the board's scale reads. Structural rather than an import
+ * of `Tile`, because use-board-data imports this module. */
+export interface ScaleTile {
+  sigma: number | null
+  todayPct: number | null
+  reason: { kind: string } | null
+}
+
+/** The one ramp the whole board shares, over the *unfiltered* tile map: every
+ * page and section paints on the same scale, and the tiles with no reading are
+ * counted rather than dropped, since they decide whether it may tighten. */
+export function boardScale(
+  tiles: ScaleTile[],
+  mode: ColorMode,
+): { span: number; unread: number; pending: number; tightened: boolean } {
+  const readings = tiles
+    .map((t) => (mode === "sigma" ? t.sigma : t.todayPct))
+    .filter((v): v is number => v != null)
+  const pending = tiles.filter((t) => t.reason?.kind === "pending").length
+  return {
+    span:
+      mode === "sigma"
+        ? 3 * sigmaUnit(readings, tiles.length)
+        : pctSpan(readings, tiles.length),
+    unread: tiles.length - readings.length - pending,
+    pending,
+    tightened: hasTighteningCoverage(readings.length, tiles.length),
+  }
 }
 
 /** Resolve a value to its tile colour + legible ink, interpolating linearly

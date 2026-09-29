@@ -19,6 +19,7 @@ from app.services.compute.indicators import VNR_MAX_SESSIONS_BEHIND
 from app.services.intraday import get_intraday_bars
 from app.services.market_calendar import schedule_poll_hint
 from app.services.price_providers import get_price_provider
+from app.services.volume_curve_service import volume_pace
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def _poll_interval(market_states: set[str], symbols: Sequence[str], at=None) -> 
 # Sessions of history to ship on each quote. Derived from the client's own
 # tolerance rather than picked, so the window is structurally guaranteed to
 # contain every distance the client will accept — a hand-chosen number here
-# could silently fall short and blank exactly the bars #642 set out to score.
+# could silently fall short and blank exactly the bars worth scoring.
 # The margin covers the boundary itself plus room for the tolerance to grow.
 QUOTE_SESSION_WINDOW = VNR_MAX_SESSIONS_BEHIND + 3
 
@@ -87,7 +88,7 @@ def attach_recent_sessions(quotes: list[Quote]) -> list[Quote]:
     what came before it. Shipping an ordered window (rather than raw dates for
     the client to count between) keeps the client free of calendar logic: it
     finds how far behind a stored bar is by looking ``as_of`` up in the list,
-    and "not in the list" is the answer for anything older (#626, #642).
+    and "not in the list" is the answer for anything older.
 
     Resolved per ``(calendar, session_date)`` rather than per symbol — a
     portfolio is dozens of tickers across a handful of venues, and the answer
@@ -113,11 +114,38 @@ def attach_recent_sessions(quotes: list[Quote]) -> list[Quote]:
     return quotes
 
 
+def attach_volume_pace(quotes: list[Quote]) -> list[Quote]:
+    """Fill each quote's ``volume_pace`` from its venue's fitted volume curve.
+
+    Resolved per calendar, like the session window above: the answer depends on
+    where the *venue* is in its session, not on the symbol.
+    """
+    resolved: dict[str, float | None] = {}
+    for q in quotes:
+        ref = AssetRef(q.symbol)
+        calendar = ref.calendar_name
+        if calendar is None:
+            continue
+        if calendar not in resolved:
+            resolved[calendar] = volume_pace(ref)
+        q.volume_pace = resolved[calendar]
+    return quotes
+
+
+def enrich_quotes(quotes: list[Quote]) -> list[Quote]:
+    """Everything the calendar knows and the provider doesn't, in one pass.
+
+    Both quote paths (REST and the SSE stream) come through here so a new
+    calendar-derived field can't reach one and not the other.
+    """
+    return attach_volume_pace(attach_recent_sessions(quotes))
+
+
 async def get_quotes(symbols: str) -> list[Quote]:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return []
-    return attach_recent_sessions(await get_price_provider().batch_fetch_quotes(symbol_list))
+    return enrich_quotes(await get_price_provider().batch_fetch_quotes(symbol_list))
 
 
 async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
@@ -133,7 +161,7 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
 
     **Intraday is opt-in and scoped.** Quotes are small and every page shows
     them, so they go to everyone; a full bar set is not — measured at 738 KiB
-    for 78 symbols (#615), re-sent on every reconnect. Only two views draw
+    for 78 symbols, re-sent on every reconnect. Only two views draw
     bars, and each wants a handful of symbols, so a connection that doesn't ask
     gets none. Passing ``None`` is therefore *silence*, not *everything*: the
     saving is automatic and a caller cannot forget to ask for less.
@@ -161,7 +189,7 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
                 await asyncio.sleep(60)
                 continue
 
-            quotes = attach_recent_sessions(
+            quotes = enrich_quotes(
                 await get_price_provider().batch_fetch_quotes(list(refs))
             )
 

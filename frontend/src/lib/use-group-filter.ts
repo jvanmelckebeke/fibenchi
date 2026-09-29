@@ -1,8 +1,7 @@
 import { useMemo } from "react"
 import type { Asset, Quote, IndicatorSummary } from "@/lib/api"
 import type { AssetTypeFilter, GroupSortBy, SortDir } from "@/lib/settings"
-import { getNumericValue } from "@/lib/indicator-registry"
-import { resolveSigma, sigmaSortKey } from "@/lib/sigma"
+import { indicatorSortKey, resolveIndicatorValue } from "@/lib/indicator-value"
 
 /** A row's value for a given sort field: number for metrics, string for "name". */
 export type SortValue = number | string | null
@@ -27,14 +26,12 @@ export function getSortValue(
     case "change_pct":
       return quotes[asset.symbol]?.change_percent ?? null
     default: {
-      const summary = indicators?.[asset.symbol]
       // Sort by exactly what the row renders — same resolver, so a blanked
       // cell sorts as "no value" and can never order by a number the user
-      // isn't being shown.
-      if (sortBy === "vnr") {
-        return sigmaSortKey(resolveSigma(quotes[asset.symbol], summary))
-      }
-      return getNumericValue(summary?.values, sortBy)
+      // isn't being shown, and a live-scored column sorts on the live number.
+      return indicatorSortKey(
+        resolveIndicatorValue(sortBy, quotes[asset.symbol], indicators?.[asset.symbol]),
+      )
     }
   }
 }

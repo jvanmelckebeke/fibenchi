@@ -22,6 +22,8 @@ class TestRegistry:
             "symbol_directory_sync",
             "intraday_sync",
             "price_heal",
+            "split_heal",
+            "volume_curve_fit",
         }
 
     async def test_duplicate_id_rejected(self):

@@ -56,17 +56,17 @@ async def test_companion_config_empty_is_valid(client):
     assert isinstance(body["tags"], dict)
 
 
-async def test_companion_schema_artifact_is_fresh():
-    """The committed JSON Schema is the codegen input for the companion app, so it
-    must stay in lock-step with the Pydantic SoT. If this fails, regenerate it:
+async def test_companion_schema_artifacts_are_fresh():
+    """The committed JSON Schemas are the codegen input for the companion app, so
+    they must stay in lock-step with the Pydantic SoT. If this fails, regenerate:
 
         python -m scripts.export_companion_schema
     """
-    from app.schemas.companion import CompanionConfig
+    from scripts.export_companion_schema import ARTIFACTS
 
-    current = CompanionConfig.model_json_schema(by_alias=True)
-    artifact = pathlib.Path(__file__).parents[2] / "companion.schema.json"
-    on_disk = json.loads(artifact.read_text())
-    assert current == on_disk, (
-        "companion.schema.json is stale — run: python -m scripts.export_companion_schema"
-    )
+    backend = pathlib.Path(__file__).parents[2]
+    for filename, model in ARTIFACTS.items():
+        on_disk = json.loads((backend / filename).read_text())
+        assert model.model_json_schema(by_alias=True) == on_disk, (
+            f"{filename} is stale — run: python -m scripts.export_companion_schema"
+        )

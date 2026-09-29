@@ -9,10 +9,10 @@ Fibenchi has a **mobile companion app** — a separate repo (`jvanmelckebeke/fib
 The split of responsibilities, so backend changes don't break it:
 
 - **The app gets live market data and computes indicators itself** — it calls Yahoo Finance directly on-device (native, so not CORS-bound) and ports `movement-stats.ts` / `indicators.py` to TypeScript. Fibenchi does **not** serve quotes or charts to the app.
-- **Fibenchi is only the "config plane":** it tells the app *what to track* (groups / tickers / tags) via `GET /api/companion/config`. That endpoint (added in PR #519/#520) is the **only** coupling between the two codebases.
-- **The contract is a single source of truth:** `backend/app/schemas/companion.py` (`CompanionConfig`) is the one definition. `backend/scripts/export_companion_schema.py` emits `backend/companion.schema.json`, which feeds the app's Zod codegen — so the contract can't drift between Python and TypeScript. The model carries a `version: Literal[1]` field the app gates on; any breaking shape change is a version bump (v1 is intentionally minimal: groups/tickers/tags; pseudo-ETFs/settings would be a later version).
+- **Fibenchi is only the "config plane":** it tells the app *what to track* (groups / tickers / tags) via `GET /api/companion/config`, and serves the venue trading calendar the app can't compute (no maintained `exchange_calendars` equivalent exists in JS) via `GET /api/companion/calendar`. Those two endpoints are the **only** coupling between the two codebases, and are deliberately separate bundles with independent version constants (`CONFIG_VERSION` / `CALENDAR_VERSION`) — the reason is on `CALENDAR_VERSION` in `schemas/companion.py`.
+- **The contract is a single source of truth:** `backend/app/schemas/companion.py` (`CompanionConfig`, `CompanionCalendar`) is the one definition. `backend/scripts/export_companion_schema.py` emits `backend/companion.schema.json` and `backend/companion.calendar.schema.json`, which `contract/` packages (with the indicator contract and its golden fixtures) as `@jvanmelckebeke/fibenchi-contract` on npm, the one thing the app installs, so the contract can't drift between Python and TypeScript. A change to any of its artifacts needs a version bump in `contract/package.json`; CI fails the PR without one. `contract/README.md` has the publish flow. Each model carries its own `version: Literal[1]` field the app gates on, bumped independently on any breaking shape change to that bundle (config v1 is intentionally minimal: groups/tickers/tags; pseudo-ETFs/settings would be a later version).
 
-**When touching `app/schemas/companion.py`, `app/services/companion_service.py`, `app/routers/companion.py`, or `companion.schema.json`: remember the consumer is the separate app.** Re-export the schema after model changes, bump `version` on breaking changes, and keep the contract explicit. (Note: `claudedocs/mobile-companion-pwa-design.md` is an earlier PWA/AWS-proxy design that the native app superseded — it's obsolete.)
+**When touching `app/schemas/companion.py`, `app/services/companion_service.py`, `app/services/companion_calendar_service.py`, `app/routers/companion.py`, or either `companion*.schema.json`: remember the consumer is the separate app.** Re-export the schema after model changes, bump `version` on breaking changes, and keep the contract explicit. (Note: `claudedocs/mobile-companion-pwa-design.md` is an earlier PWA/AWS-proxy design that the native app superseded — it's obsolete.)
 
 ## Development Environment
 
@@ -74,7 +74,10 @@ Two long-lived branches: `main` (production, `fibenchi:latest`) and `dev` (stagi
 - `models/` — SQLAlchemy declarative models with `Mapped[]` type hints. Asset has a `type` enum (stock/etf/index). Group has an `is_default` bool — exactly one row should carry it (the seeded "Watchlist" group); migration 0014 repairs drift.
 - `schemas/` — Pydantic v2 request/response models with `from_attributes` config. All router endpoints use `response_model` for typed OpenAPI schemas.
 - `routers/` — FastAPI routers, all prefixed under `/api`. Dependency-injected `AsyncSession` via `get_db()`. Period params use `PeriodType = Literal["1mo","3mo","6mo","1y","2y","5y"]` with `Query()` for automatic 422 validation.
-- `services/yahoo.py` — Yahoo Finance integration via `yahooquery`. Fetches OHLCV history, validates symbols, detects asset types, fetches ETF holdings.
+- `services/yahoo/` — Yahoo integration via `yahooquery`; all Yahoo HTTP goes through the one `yahoo_client`. Fetches OHLCV history, validates symbols, detects asset types, fetches ETF holdings.
+  - `normalize/` — what we do to a Yahoo frame before it leaves the package: Yahoo's defects, so they live with the provider that has them. `normalize_frame(df, symbol)` is the one entry point and runs a list of pure `(df, symbol) -> df` steps — `UNIVERSAL` for every frame, `BY_KIND` for the ones a single `AssetKind` needs (registry pattern, like `INDICATOR_REGISTRY`). A new quirk is one entry plus a function; never a kind test scattered into the fetch path.
+    - `splits.py` — `normalize_splits(df)` rebases pre-split bars onto the current share basis (Yahoo reports a split and declines to apply it, in either direction). Deliberately stateless: it re-decides from the frame's own step across each ex-date every fetch, so it is idempotent and self-corrects when the provider changes its mind. Owns `SPLIT_STEP_FACTOR`, the one definition of "split-sized".
+    - `fx_close.py` — `recover_fx_close(df)` rewrites an FX frame's closes as the following bar's open. Yahoo's settled `=X` bar puts the session open in its `close` field, so candles are bodyless and every close-based indicator runs a session stale. Stateless the same way, re-deciding from the frame's own median candle body, so it stops firing if Yahoo starts publishing a real close.
 - `services/price_sync.py` — Upserts price data using PostgreSQL `ON CONFLICT DO UPDATE`.
 - `services/price_service.py` — Orchestrates price fetching with `_ensure_warmup_prices` for indicator warmup.
 - `services/compute/` — Computational logic, separated from I/O:
@@ -133,7 +136,7 @@ The charting layer has four architectural tiers:
 
 On startup (`main.py` lifespan):
 1. `load_currency_cache(db)` — populates in-memory currency lookup to avoid per-request DB hits
-2. APScheduler schedules everything in `app/background_tasks/` — jobs live in `jobs.py` and self-register via the `@background_task(id=..., trigger=...)` decorator (registry pattern, like `INDICATOR_REGISTRY`); adding a job never touches `main.py`. A trigger may be a factory returning `None` to disable just that job (e.g. malformed `REFRESH_CRON` disables `price_refresh` with a warning; everything else still runs). Placement rule: code reachable *only* from the scheduler lives in this package (e.g. `price_heal.py`, the heal-job logic) — `services/` is for logic that requests or multiple entry points share. Pure vocabulary/trait tables with no I/O (e.g. `market_state.py`) live in `app/domain/`.
+2. APScheduler schedules everything in `app/background_tasks/` — jobs live in `jobs.py` and self-register via the `@background_task(id=..., trigger=...)` decorator (registry pattern, like `INDICATOR_REGISTRY`); adding a job never touches `main.py`. A trigger may be a factory returning `None` to disable just that job (e.g. malformed `REFRESH_CRON` disables `price_refresh` with a warning; everything else still runs). Placement rule: code reachable *only* from the scheduler lives in this package (e.g. `price_heal.py` and `split_heal.py`, the heal-job logic) — `services/` is for logic that requests or multiple entry points share. Pure vocabulary/trait tables with no I/O (e.g. `market_state.py`) live in `app/domain/`.
 3. `scheduled_refresh()` job: `sync_all_prices` → `compute_and_cache_indicators` (pre-warms cache so first group page load is instant)
 
 ## Key Patterns
@@ -146,6 +149,29 @@ On startup (`main.py` lifespan):
 - **Stale price animation:** Group table falls back to DB-cached indicator prices when no live SSE quote is available. During market hours, stale values show a pulsing opacity animation (`.stale-price` CSS class). Suppressed when `market_state` is `CLOSED` or `POSTPOST` (post-market ended).
 - **Price flash:** `usePriceFlash` hook triggers green/red background fade animation (1.8s) on price tick changes, using a reflow trick to restart CSS animations on repeated same-direction ticks.
 - **SPA fallback:** In production, the root `Dockerfile` copies the built SPA into `static/`. `main.py` mounts it and serves `index.html` for all non-API, non-asset routes. In dev, this directory doesn't exist so the mount is skipped.
+
+## Comments
+
+Most files carry few comments, and that is the norm. Two things earn a long
+one:
+
+**A measurement.** A constant picked by sweeping the real book keeps the
+numbers that picked it. `SPLIT_STEP_FACTOR` names the genuine 0.75 sessions it
+has to clear; without them the next reader rounds it to something tidier and
+the split heal quietly stops examining 3:2 splits.
+
+**A rejected design.** Say why the obvious alternative fails, once, where
+someone would reach for it. `normalize/splits.py` explains why there is no applied-splits
+table — that paragraph is the reason nobody has added one.
+
+Nothing else does. In particular: don't restate the mechanism beside the
+mechanism, and don't state one idea in the module docstring, again above the
+constant, and a third time in the function that uses it. Pick the single place
+a reader arrives from.
+
+Code that infers something from ambiguous provider data runs heavier, because
+a wrong inference there is silent and permanent. That is a ceiling for those
+files, not a target for new code.
 
 ## Testing
 

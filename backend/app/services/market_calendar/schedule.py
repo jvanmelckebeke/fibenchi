@@ -14,7 +14,7 @@ from datetime import datetime
 
 from app.domain.instrument import classify
 from app.domain.phases import Phase
-from app.services.market_calendar.venue import _as_utc, _venue_for
+from app.services.market_calendar.venue import _as_utc, venue_for
 
 
 def any_venue_open(symbols, at: datetime | None = None) -> bool:
@@ -37,7 +37,7 @@ def any_venue_open(symbols, at: datetime | None = None) -> bool:
         if name in seen:
             continue
         seen.add(name)
-        venue = _venue_for(name)
+        venue = venue_for(name)
         if venue is None:
             return True  # calendar failed to build — same fail-open rule
         phase = venue.phase(at)
@@ -77,7 +77,7 @@ def schedule_poll_hint(symbols, at: datetime | None = None) -> tuple[Phase, floa
         if name is None or name in seen:
             continue
         seen.add(name)
-        venue = _venue_for(name)
+        venue = venue_for(name)
         if venue is None:
             continue
         phase = venue.phase(ts)

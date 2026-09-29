@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { resolveSigma, sigmaSortKey, VNR_WARMUP_SESSIONS } from "./sigma"
+import { resolveSigma, sigmaExDiv, sigmaSortKey, VNR_WARMUP_SESSIONS } from "./sigma"
 import { VNR_MAX_SESSIONS_BEHIND } from "@/lib/generated/backend-constants"
 import type { IndicatorSummary, Quote } from "@/lib/types"
 
@@ -11,7 +11,7 @@ import type { IndicatorSummary, Quote } from "@/lib/types"
 const q = (over: Partial<Quote> = {}): Quote => ({
   symbol: "X", price: null, previous_close: null, change: null, change_percent: null,
   volume: null, avg_volume: null, currency: "USD", market_state: null,
-  session_date: null, recent_sessions: null, ...over,
+  session_date: null, recent_sessions: null, volume_pace: null, ...over,
 })
 
 const snap = (over: Partial<IndicatorSummary> = {}): IndicatorSummary => ({
@@ -39,9 +39,9 @@ describe("resolveSigma — session identity decides, not price similarity", () =
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(-0.184, 3), source: "live" })
   })
 
-  it("scores a >0.5% mover the old tolerance would have rejected", () => {
-    // Identical to the case above but a 12% day: the price-similarity test
-    // rejected exactly these, i.e. every symbol worth looking at (#626).
+  it("scores a >0.5% mover a price-similarity test would reject", () => {
+    // Identical to the case above but a 12% day: comparing closes within a
+    // tolerance rejects exactly these, i.e. every symbol worth looking at.
     const r = resolveSigma(
       dated({ change_percent: 12.0, previous_close: 100, price: 112 }),
       snap({ close: 100, as_of: "2026-08-10", values: { vnr: 0.2, vnr_sigma: 0.02 } }),
@@ -51,7 +51,7 @@ describe("resolveSigma — session identity decides, not price similarity", () =
 
   it("shows the stored value when the bar IS the quote's session", () => {
     // And does NOT recompute live: the forecast at a settled bar has already
-    // absorbed that bar's own move, so dividing by it understates (#626).
+    // absorbed that bar's own move, so dividing by it understates.
     const r = resolveSigma(
       dated({ change_percent: 0.3, previous_close: 100, price: 100.3 }),
       snap({ close: 100.3, as_of: "2026-08-11", values: { vnr: 0.305, vnr_sigma: 0.01 } }),
@@ -82,7 +82,7 @@ describe("resolveSigma — session identity decides, not price similarity", () =
   })
 })
 
-describe("resolveSigma — gap-flagged snapshots (#625)", () => {
+describe("resolveSigma — gap-flagged snapshots", () => {
   // Real XAIX.DE state: Yahoo's history had no 2026-08-12 bar, so the gap
   // guard NaN'd the stored vnr. The quote still knew the missing session —
   // previous_close 207.45 IS that close — so change_percent is a verified
@@ -116,7 +116,7 @@ describe("resolveSigma — gap-flagged snapshots (#625)", () => {
   })
 })
 
-describe("resolveSigma — a bar several sessions behind (#642)", () => {
+describe("resolveSigma — a bar several sessions behind", () => {
   // PRY.MI on 2026-08-19, measured: our last stored bar was 08-17 while the
   // venue had traded 08-18 (a -4.88% day we never stored). The numerator is
   // unaffected — the quote's change % is measured against 08-18's real close —
@@ -179,8 +179,8 @@ describe("resolveSigma — a bar several sessions behind (#642)", () => {
 
 describe("resolveSigma — degraded inputs", () => {
   it("keeps the stored value when a provider placeholder carries no prices", () => {
-    // Reading "matches neither" as staleness blanked the whole portfolio at
-    // once, blaming the user's data for the provider's hiccup (#632).
+    // Reading "matches neither" as staleness blanks the whole portfolio at
+    // once, blaming the user's data for the provider's hiccup.
     const r = resolveSigma(q(), snap({ close: 100, values: { vnr: 1.2, vnr_sigma: 0.01 } }))
     expect(r).toEqual({ status: "ok", sigma: 1.2, source: "settled" })
   })
@@ -200,7 +200,7 @@ describe("resolveSigma — degraded inputs", () => {
     expect(r).toEqual({ status: "ok", sigma: 0.9, source: "settled" })
   })
 
-  it("falls back to price corroboration for a pre-#626 snapshot", () => {
+  it("falls back to price corroboration for a snapshot with no as_of", () => {
     const r = resolveSigma(
       q({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
       snap({ close: 28300, values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
@@ -254,5 +254,34 @@ describe("sigmaSortKey", () => {
       snap({ close: 30250, as_of: "2026-08-01", values: { vnr: 1.56 } }),
     )
     expect(sigmaSortKey(withheld)).toBeNull()
+  })
+})
+
+describe("sigmaExDiv", () => {
+  it("reports the payout behind a settled σ that disagrees with the change %", () => {
+    const settled = snap({
+      close: 95, as_of: SESSIONS[0], change_pct: -4.8,
+      values: { vnr: 0.1, vnr_ex_div: 5.0 },
+    })
+    const r = resolveSigma(undefined, settled)
+    expect(r).toEqual({ status: "ok", sigma: 0.1, source: "settled" })
+    expect(sigmaExDiv(r, settled)).toBe(5.0)
+  })
+
+  it("says nothing on an ordinary bar", () => {
+    const ordinary = snap({ close: 100, values: { vnr: 0.9 } })
+    expect(sigmaExDiv(resolveSigma(undefined, ordinary), ordinary)).toBeNull()
+  })
+
+  it("says nothing about a live σ, which never applied the correction", () => {
+    // The live number divides the quote's own change %, and that carries the
+    // ex-date drop uncorrected — the stored bar's dividend does not describe it.
+    const s = snap({
+      close: 28300, as_of: "2026-08-10",
+      values: { vnr: 1.56, vnr_sigma: 0.0576, vnr_ex_div: 0.42 },
+    })
+    const r = resolveSigma(dated({ change_percent: -1.06, price: 28000 }), s)
+    expect(r).toMatchObject({ status: "ok", source: "live" })
+    expect(sigmaExDiv(r, s)).toBeNull()
   })
 })

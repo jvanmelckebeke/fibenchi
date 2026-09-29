@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import cached_property
 
 from app.domain.instrument import AssetKind, Instrument, UnitKind, classify
-from app.services.market_calendar.venue import Venue, _venue_for
+from app.services.market_calendar.venue import Venue, venue_for
 
 
 class AssetRef(str):
@@ -89,8 +89,14 @@ class AssetRef(str):
         """
         return self._instrument.currency
 
+    @property
+    def quote_divisor(self) -> int | None:
+        """Quoted units per unit of :attr:`currency`, from ticker shape alone;
+        ``None`` when the suffix doesn't settle it (see ``Listing``)."""
+        return self._instrument.quote_divisor
+
     @cached_property
     def venue(self) -> Venue | None:
         """This ticker's trading venue, or None when it can't be resolved."""
         name = self.calendar_name
-        return _venue_for(name) if name else None
+        return venue_for(name) if name else None

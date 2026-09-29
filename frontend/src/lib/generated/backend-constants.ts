@@ -10,7 +10,7 @@
 /**
  * Fractional tolerance for corroborating a session identity from prices.
  *
- * Not the primary test — since #626 both sides carry explicit session
+ * Not the primary test — both sides carry explicit session
  * dates and identity is exact. This is the fallback for a degraded quote
  * with no `session_date`, or a venue with no calendar.
  *

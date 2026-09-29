@@ -28,16 +28,26 @@ class QuoteResponse(BaseModel):
         "counting of business days (which turns every holiday into a hole). None when "
         "the venue is unknown.",
     )
+    volume_pace: float | None = Field(
+        default=None,
+        description="Fraction of a normal session's volume this venue has traded by "
+        "now, from its fitted intraday volume curve. Divides `volume` into a figure "
+        "comparable with a completed session's — without it, volume-so-far over a "
+        "whole-day average reads a fraction of where the day will finish, and two "
+        "venues at different points in their sessions cannot be ranked against each "
+        "other. None outside regular hours, or when no curve is fitted for the venue; "
+        "the client then shows the last settled RVOL rather than an invented one.",
+    )
 
 
 class Quote(QuoteResponse):
     """The full provider quote as parsed from Yahoo (``parse_quote_row``).
 
     This is what circulates through the app (price-sync anchors, price heal,
-    the SSE ``quotes`` event, ``SymbolBatchData.quote``) and, since #626, what
-    the REST boundary serves too — ``session_date`` used to be stripped there
-    as an internal reconciliation aid, but the display needs the same session
-    identity the sync does.
+    the SSE ``quotes`` event, ``SymbolBatchData.quote``) and what the REST
+    boundary serves too. ``session_date`` crosses that boundary intact. It
+    looks like an internal reconciliation aid, but the display needs the same
+    session identity the sync does.
 
     ``market_state`` stays a raw string on purpose: it's Yahoo's open-world
     vocabulary, canonically interpreted by the ``app.domain.market_state``

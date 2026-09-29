@@ -11,6 +11,7 @@ from app.domain import AssetRef
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.price_repo import PriceRepository
 from app.schemas.quote import Quote
+from app.services.price_providers.yahoo import YahooPriceProvider
 from app.services.price_sync import (
     _NO_ANCHOR,
     _drop_and_persist,
@@ -265,6 +266,49 @@ async def test_sync_all_no_retry_when_batch_entirely_empty(db, caplog):
     mock_prov.fetch_history.assert_not_awaited()
     assert counts == {}
     assert "no data" in caplog.text
+
+
+async def test_sync_all_subunit_venue_survives_a_dropped_quote(db, caplog):
+    """A .L symbol skipped for want of a basis still gets its per-symbol retry.
+
+    Goes through the real Yahoo client rather than a mock provider, because
+    the claim under test is exactly that the batch skip and the individual
+    fetch read two *different* quote responses: the batch one here is empty,
+    so RR.L is skipped, and the retry's own ``ticker.quotes`` is empty too, so
+    it raises and the sync moves on without storing a pence frame as pounds.
+    """
+    a1 = Asset(symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD")
+    a2 = Asset(symbol="RR.L", name="Rolls-Royce", type=AssetType.STOCK, currency="GBP")
+    db.add_all([a1, a2])
+    await db.commit()
+
+    dates = pd.bdate_range(end=date.today(), periods=3)
+    batch_df = pd.DataFrame(
+        {"open": [15000, 15100, 15200] * 2, "high": [15100, 15200, 15300] * 2,
+         "low": [14900, 15000, 15100] * 2, "close": [15050, 15150, 15250] * 2,
+         "volume": [500_000] * 6},
+        index=pd.MultiIndex.from_tuples(
+            [(s, d) for s in ("AAPL", "RR.L") for d in dates], names=["symbol", "date"]
+        ),
+    )
+    ticker = MagicMock()
+    ticker._get_data.return_value = {"AAPL": {"timestamp": [1]}, "RR.L": {"timestamp": [1]}}
+    ticker._historical_data_to_dataframe.return_value = batch_df
+    ticker.history.return_value = batch_df.loc["RR.L"].copy()
+    # AAPL's quote survives; RR.L's is the one Yahoo dropped, in both the batch
+    # response and the retry's own fresh quote call.
+    ticker.quotes = {"AAPL": {"currency": "USD"}}
+
+    upserted = AsyncMock(return_value=10)
+    with patch("app.services.yahoo.client.Ticker", return_value=ticker), \
+         patch("app.services.price_sync.get_price_provider", return_value=YahooPriceProvider()), \
+         patch("app.services.price_sync._upsert_prices", new=upserted), \
+         caplog.at_level(logging.WARNING, logger="app.services.price_sync"):
+        counts = await sync_all_prices(db, period="1y")
+
+    assert "RR.L" not in counts
+    assert "Retry fetch for RR.L failed" in caplog.text
+    assert all(call.args[1] != "RR.L" for call in upserted.await_args_list)
 
 
 async def test_sync_all_retry_failure_is_non_fatal(db):

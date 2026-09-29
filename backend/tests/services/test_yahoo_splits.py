@@ -1,0 +1,220 @@
+"""Split normalization: rebasing a frame onto the current share basis (#648)."""
+
+import math
+
+import pandas as pd
+import pytest
+
+from app.services.yahoo.normalize.splits import (
+    MIN_SEPARATION_BAND,
+    NOISE_K,
+    SPLIT_STEP_FACTOR,
+    normalize_splits,
+)
+from tests.helpers import daily_date_index
+
+
+def frame(
+    closes: list[float],
+    splits: list[float] | None = None,
+    dividends: list[float] | None = None,
+) -> pd.DataFrame:
+    """A minimal daily frame: closes, matching OHLC, volume, split events."""
+    data = {
+        "open": closes,
+        "high": [c * 1.01 for c in closes],
+        "low": [c * 0.99 for c in closes],
+        "close": closes,
+        "volume": [1_000_000] * len(closes),
+        "splits": splits if splits is not None else [0.0] * len(closes),
+    }
+    if dividends is not None:
+        data["dividends"] = dividends
+    return pd.DataFrame(data, index=daily_date_index(len(closes)))
+
+
+class TestUnadjustedFrames:
+    def test_rebases_pre_split_bars_and_leaves_the_rest(self):
+        # The MNST shape: a clean 2:1 step the provider reported but never applied.
+        df = frame([94.4, 90.4, 45.5, 46.0], splits=[0, 0, 2.0, 0])
+        out = normalize_splits(df, "MNST")
+
+        assert list(out["close"].round(2)) == [47.20, 45.20, 45.50, 46.00]
+        assert list(out["open"].round(2)) == [47.20, 45.20, 45.50, 46.00]
+        # High/low ride along, or the bar stops containing its own close.
+        assert out["high"].iloc[0] == pytest.approx(94.4 * 1.01 / 2)
+        assert out["low"].iloc[0] == pytest.approx(94.4 * 0.99 / 2)
+
+    def test_volume_moves_the_other_way(self):
+        # Twice the shares outstanding means the old session's share count has
+        # to double to stay comparable with today's.
+        out = normalize_splits(frame([90.0, 45.0], splits=[0, 2.0]), "X")
+        assert list(out["volume"]) == [2_000_000, 1_000_000]
+
+    def test_reverse_split_scales_up(self):
+        # 1:10 reverse: ratio 0.1, so the pre-split bars multiply by 10.
+        df = frame([2.0, 2.1, 21.0, 20.5], splits=[0, 0, 0.1, 0])
+        out = normalize_splits(df, "X")
+        assert list(out["close"].round(2)) == [20.0, 21.0, 21.0, 20.5]
+
+    def test_several_splits_compose(self):
+        # The oldest bar is behind both, so it carries the product.
+        df = frame([80.0, 40.0, 41.0, 20.5], splits=[0, 2.0, 0, 2.0])
+        out = normalize_splits(df, "X")
+        assert list(out["close"].round(2)) == [20.0, 20.0, 20.5, 20.5]
+
+
+class TestFramesThatMustBeLeftAlone:
+    def test_already_adjusted_frame_is_untouched(self):
+        # Yahoo eventually applies the split itself. The event stays in the
+        # response, so the only thing separating this from the case above is
+        # that the prices are already continuous.
+        df = frame([47.2, 45.2, 45.5, 46.0], splits=[0, 0, 2.0, 0])
+        assert normalize_splits(df, "MNST") is df
+
+    def test_running_twice_changes_nothing(self):
+        # The property the whole design rests on: no record is kept of what was
+        # applied, so a second pass must reach the same answer on its own.
+        df = frame([94.4, 90.4, 45.5, 46.0], splits=[0, 0, 2.0, 0])
+        once = normalize_splits(df, "MNST")
+        twice = normalize_splits(once, "MNST")
+        assert list(twice["close"]) == list(once["close"])
+        assert list(twice["volume"]) == list(once["volume"])
+
+    def test_uncorroborated_split_is_refused(self):
+        # The event says 2:1 but the prices barely moved. Applying it would
+        # manufacture a +100% day. Leave it and let the vol guard withhold.
+        df = frame([90.0, 89.0, 88.0, 87.0], splits=[0, 0, 2.0, 0])
+        assert normalize_splits(df, "X") is df
+
+    def test_a_real_crash_on_an_ex_date_is_refused(self):
+        # -30% is far from both 0.5 and 1.0. Nearest-hypothesis would call it a
+        # split and "correct" it into +40%; the tolerance band refuses instead.
+        df = frame([90.0, 63.0], splits=[0, 2.0])
+        assert normalize_splits(df, "X") is df
+
+    def test_split_on_the_first_bar_has_no_evidence(self):
+        df = frame([45.5, 46.0], splits=[2.0, 0])
+        assert normalize_splits(df, "X") is df
+
+    def test_a_real_crash_with_no_split_event_is_untouched(self):
+        # OKLO's -54% SPAC reprice, 2024-05-10. Split-sized, and real.
+        df = frame([18.23, 8.45])
+        assert normalize_splits(df, "OKLO") is df
+
+    def test_frame_without_a_splits_column_is_untouched(self):
+        # yahooquery omits the column for symbols Yahoo reports no splits for,
+        # which is most of them.
+        df = frame([10.0, 11.0]).drop(columns=["splits"])
+        assert normalize_splits(df, "X") is df
+
+    def test_empty_frame(self):
+        df = frame([])
+        assert normalize_splits(df, "X") is df
+
+
+class TestStepFactor:
+    def test_sits_between_the_smallest_split_and_the_largest_real_move(self):
+        # Both bounds are measured, not chosen. A 3:2 split steps by 1.5x, so
+        # anything at or above that never gets examined. The largest genuine
+        # single-session moves in the book are IBM 2026-07-14 and MDA.TO
+        # 2025-09-08, both 0.75, both confirmed split-free against the
+        # provider; the threshold has to clear them or the heal spends every
+        # run re-fetching ordinary earnings days.
+        smallest_split_step = 1.5  # 3:2
+        largest_real_move = 1 / 0.75
+        assert largest_real_move < SPLIT_STEP_FACTOR < smallest_split_step
+
+
+def test_dividends_rebase_with_the_prices():
+    """Cash per share is quoted in the basis of its own bar.
+
+    A 1.00 dividend paid before a 2:1 split is 0.50 per share today, and
+    σ-Move divides it by a rebased close — the two have to be in one unit.
+    """
+    df = frame([90.0, 91.0, 45.5], splits=[0, 0, 2.0], dividends=[0.0, 1.0, 0.0])
+    out = normalize_splits(df, "X")
+
+    assert out["dividends"].tolist() == pytest.approx([0.0, 0.5, 0.0])
+
+
+def quiet_frame(splits: list[float], adjusted: bool, ratio: float) -> pd.DataFrame:
+    """A ~0.5%/day series around one ex-date, in one basis or the other.
+
+    ``adjusted`` builds the frame the provider already rebased (no step across
+    the ex-date); otherwise the pre-split bars sit ``ratio`` higher.
+    """
+    tail = [101.0, 101.5]
+    head = [100.0, 100.5] if adjusted else [100.0 * ratio, 100.5 * ratio]
+    return frame([*head, *tail], splits=splits)
+
+
+class TestSmallSplitsAreNotAppliedTwice:
+    """Below ~1.28:1 a fixed corroboration band admitted *both* hypotheses, so
+    an already-adjusted frame was adjusted a second time — a fabricated step,
+    under the heal's detection threshold, and permanent because the stateless
+    design re-decides the same way on every fetch.
+    """
+
+    @pytest.mark.parametrize("ratio", [1.25, 1.5, 2.0])
+    def test_already_adjusted_frame_is_left_alone(self, ratio):
+        df = quiet_frame([0, 0, ratio, 0], adjusted=True, ratio=ratio)
+        assert normalize_splits(df, "X") is df
+
+    @pytest.mark.parametrize("ratio", [1.25, 1.5, 2.0])
+    def test_unadjusted_frame_is_still_rebased(self, ratio):
+        """The small-ratio case has to be decided, not refused wholesale."""
+        df = quiet_frame([0, 0, ratio, 0], adjusted=False, ratio=ratio)
+        out = normalize_splits(df, "X")
+        assert list(out["close"].round(2)) == [100.0, 100.5, 101.0, 101.5]
+
+    def test_a_ten_percent_stock_dividend_is_decided_both_ways(self):
+        already = quiet_frame([0, 0, 1.1, 0], adjusted=True, ratio=1.1)
+        assert normalize_splits(already, "X") is already
+
+        unadjusted = quiet_frame([0, 0, 1.1, 0], adjusted=False, ratio=1.1)
+        assert list(normalize_splits(unadjusted, "X")["close"].round(2)) == [
+            100.0, 100.5, 101.0, 101.5,
+        ]
+
+
+class TestUndecidableFrames:
+    """Both hypotheses inside the band means the frame cannot tell them apart,
+    and the honest answer is to leave it alone in either direction.
+    """
+
+    def test_a_ratio_below_the_floor_is_refused_on_a_quiet_frame(self):
+        # log(1.05) = 0.049, under 2 x MIN_SEPARATION_BAND: an unadjusted 1.05
+        # split and an ordinary -5% day are the same evidence.
+        assert math.log(1.05) < 2 * MIN_SEPARATION_BAND
+        df = quiet_frame([0, 0, 1.05, 0], adjusted=False, ratio=1.05)
+        assert normalize_splits(df, "X") is df
+
+    def test_a_noisy_frame_widens_the_band_and_refuses_more(self):
+        # The same 1.25 event that resolves on a quiet series. Here the asset
+        # moves ~8% a session, so the band exceeds half the separation and
+        # neither hypothesis wins.
+        closes = [100.0, 108.0, 100.0, 108.0, 100.0, 108.0, 86.4, 93.3]
+        df = frame(closes, splits=[0, 0, 0, 0, 0, 0, 1.25, 0])
+        assert normalize_splits(df, "NOISY") is df
+
+    def test_the_band_never_falls_below_the_floor(self):
+        # A series that stops repricing would otherwise yield a band near zero,
+        # and then a single real move makes every split on it undecidable.
+        flat = frame([50.0] * 6 + [25.0, 25.1], splits=[0] * 6 + [2.0, 0])
+        out = normalize_splits(flat, "FLAT")
+        assert list(out["close"].round(2))[:2] == [25.0, 25.0]
+
+
+class TestBandConstants:
+    def test_the_band_covers_an_ordinary_session_for_the_whole_book(self):
+        # Measured over 46,217 stored bars: per-asset median absolute log
+        # return is 1.14% for the median asset and 5.4% at p99. The band has to
+        # clear an ordinary session for both, or a real day reads as evidence.
+        assert NOISE_K * 0.0114 > 0.03
+        assert max(NOISE_K * 0.054, MIN_SEPARATION_BAND) > 0.15
+
+    def test_a_typical_name_can_still_resolve_a_five_to_four_split(self):
+        # Decidable when the hypotheses are more than two bands apart.
+        band = max(NOISE_K * 0.0114, MIN_SEPARATION_BAND)
+        assert math.log(1.25) > 2 * band

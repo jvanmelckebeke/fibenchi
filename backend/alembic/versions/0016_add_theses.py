@@ -1,8 +1,8 @@
 """Add the global ``theses`` table and ``thesis_assets`` membership table.
 
 A thesis is a cross-cutting thematic basket of tickers tracked under one
-hypothesis, with a lifecycle status and an open date (see #524). The ``theses``
-name was freed by migration 0015, which renamed the old per-asset note table.
+hypothesis, with a lifecycle status and an open date. The ``theses`` name was
+freed by migration 0015, which renamed the old per-asset note table.
 
 ``status`` is stored as a plain string (not a Postgres ENUM) on purpose — see
 ``ThesisStatus`` in ``app/models/thesis.py``.

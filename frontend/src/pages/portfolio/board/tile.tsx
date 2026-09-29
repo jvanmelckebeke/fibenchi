@@ -7,14 +7,6 @@ import { rampColor, type ColorMode } from "./color-scale"
 import { TileTooltip } from "./tile-tooltip"
 import type { Tile as TileData } from "./use-board-data"
 
-// One shared pulse: every live dot's animation phase is aligned to the wall
-// clock (negative delay = time since the epoch mod the cycle), so the board
-// reads as one system being alive rather than twinkling noise.
-const PING_CYCLE_MS = 2400
-function pingDelay(): string {
-  return `-${Date.now() % PING_CYCLE_MS}ms`
-}
-
 // Venue-phase icons: sun up = open, moon = closed, and the extended sessions
 // read as arrows against the open/close boundary — into the line before it
 // opens, out of the line after it closes. All glyphs render in the tile's own
@@ -23,17 +15,19 @@ function pingDelay(): string {
 export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: boolean }) {
   if (phase == null) return null
   if (phase === "open") {
-    // No native `title` here: this span sits inside the Radix TooltipTrigger,
-    // so the browser's own tooltip would surface on top of the styled card ~500
-    // ms later. The live/scheduled distinction lives in the card's source line.
+    // Deliberately static. An animated halo behind the sun would be the only
+    // moving thing among the four phase icons, and around midday most tiles
+    // are open, so it moves on most of the board at once. The glyph is
+    // distinctive enough without it.
+    //
+    // Still no native `title`: this renders inside the Radix TooltipTrigger, so
+    // the browser's own tooltip would surface on top of the styled card ~500 ms
+    // later. The live/scheduled distinction lives in the card's source line.
     return (
-      <span className="relative shrink-0" aria-label={live ? "Open (live)" : "Open (scheduled)"}>
-        <span
-          className="board-ping absolute inset-0.5 rounded-full bg-current"
-          style={{ animationDelay: pingDelay() }}
-        />
-        <Sun className="phase-icon relative h-3.5 w-3.5 text-current 2xl:h-4 2xl:w-4" />
-      </span>
+      <Sun
+        className="phase-icon h-3.5 w-3.5 shrink-0 text-current 2xl:h-4 2xl:w-4"
+        aria-label={live ? "Open (live)" : "Open (scheduled)"}
+      />
     )
   }
   if (phase === "premarket") {
@@ -62,12 +56,18 @@ export const BoardTile = memo(function BoardTile({
   // % mode is *today's* move — the multi-day windows live in the Movers card.
   const value = mode === "sigma" ? tile.sigma : tile.todayPct
   const noReading = value == null
+  // Waiting on the batch, not withheld by it. A quote can beat the snapshot, so
+  // a pending tile may already have a real % to print — nothing visible is
+  // missing then, and the bar would say otherwise.
+  const pending = noReading && tile.reason?.kind === "pending" && tile.todayPct == null
   const stop = noReading ? null : rampColor(value, span)
 
   // Every tile prints its own value as text — nothing on the board is
   // encoded by colour alone. A no-reading tile still shows the raw % move,
   // in its up/down colour: the reading is missing, the day is not.
-  const valueEl = noReading ? (
+  const valueEl = pending ? (
+    <span aria-hidden className="board-tile-bar" />
+  ) : noReading ? (
     <>
       {mode === "sigma" ? "—σ" : "—%"}
       {mode === "sigma" && tile.todayPct != null && (
@@ -87,14 +87,19 @@ export const BoardTile = memo(function BoardTile({
       <TooltipTrigger asChild>
         <Link
           to={`/asset/${tile.symbol}`}
-          className={`board-tile flex h-[62px] flex-col justify-between rounded-[3px] px-2 py-1.5 2xl:h-[80px] 2xl:px-3 2xl:py-2.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${noReading ? "board-tile-unread" : ""}`}
+          className={`board-tile flex h-[62px] flex-col justify-between rounded-[3px] px-2 py-1.5 2xl:h-[80px] 2xl:px-3 2xl:py-2.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${pending ? "board-tile-pending" : noReading ? "board-tile-unread" : ""}`}
           style={stop ? { backgroundColor: stop.color, color: stop.ink } : undefined}
         >
           <span className="flex items-center justify-between gap-1">
             <span className="truncate font-mono text-[12px] font-semibold 2xl:text-[14px] leading-none">{tile.symbol}</span>
             <PhaseIcon phase={tile.phase} live={tile.liveState} />
           </span>
-          <span className="text-[11px] leading-none tabular-nums 2xl:text-[13px] opacity-90">{valueEl}</span>
+          <span
+            className="flex items-center text-[11px] leading-none tabular-nums 2xl:text-[13px] opacity-90"
+            aria-busy={pending || undefined}
+          >
+            {valueEl}
+          </span>
         </Link>
       </TooltipTrigger>
       {/* The default TooltipContent surface is bg-foreground/text-background —

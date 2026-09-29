@@ -1,0 +1,134 @@
+{
+  "$defs": {
+    "IndicatorSpec": {
+      "description": "One registry entry, with the Python callables reduced to stable string ids.",
+      "properties": {
+        "key": {
+          "description": "Registry key, e.g. sma_20",
+          "title": "Key",
+          "type": "string"
+        },
+        "kernel": {
+          "description": "Id of the numeric kernel that computes it; several keys can share one",
+          "title": "Kernel",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "description": "Kernel parameters",
+          "title": "Params",
+          "type": "object"
+        },
+        "outputFields": {
+          "description": "Fields the kernel produces directly",
+          "items": {
+            "type": "string"
+          },
+          "title": "Outputfields",
+          "type": "array"
+        },
+        "deltaFields": {
+          "description": "Analysis fields the backend post-computes from the kernel output",
+          "items": {
+            "type": "string"
+          },
+          "title": "Deltafields",
+          "type": "array"
+        },
+        "decimals": {
+          "description": "Rounding for the output fields",
+          "title": "Decimals",
+          "type": "integer"
+        },
+        "fieldDecimals": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Per-field rounding overrides",
+          "title": "Fielddecimals",
+          "type": "object"
+        },
+        "warmup": {
+          "description": "Bars needed before the first valid value",
+          "title": "Warmup",
+          "type": "integer"
+        },
+        "usesOhlc": {
+          "description": "Whether the kernel reads high/low as well as close",
+          "title": "Usesohlc",
+          "type": "boolean"
+        },
+        "snapshotDerived": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Id of the snapshot-derived callback, if any",
+          "title": "Snapshotderived"
+        },
+        "platforms": {
+          "description": "Where it is implemented",
+          "items": {
+            "enum": [
+              "web",
+              "app"
+            ],
+            "type": "string"
+          },
+          "title": "Platforms",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key",
+        "kernel",
+        "params",
+        "outputFields",
+        "deltaFields",
+        "decimals",
+        "fieldDecimals",
+        "warmup",
+        "usesOhlc",
+        "snapshotDerived",
+        "platforms"
+      ],
+      "title": "IndicatorSpec",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Contract version",
+      "title": "Version",
+      "type": "integer"
+    },
+    "indicators": {
+      "description": "Every registered indicator, in registry order",
+      "items": {
+        "$ref": "#/$defs/IndicatorSpec"
+      },
+      "title": "Indicators",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "indicators"
+  ],
+  "title": "IndicatorContract",
+  "type": "object"
+}

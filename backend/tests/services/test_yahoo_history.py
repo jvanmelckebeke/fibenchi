@@ -169,6 +169,27 @@ class TestFetchHistory:
         assert result["close"].iloc[0] == 150.50
 
     @patch("app.services.yahoo.client.Ticker")
+    async def test_raises_when_subunit_venue_has_no_quote(self, mock_ticker_cls):
+        """Without a quote, a pence-quoted listing has no derivable basis."""
+        df = pd.DataFrame(
+            {
+                "open": [15000.0],
+                "high": [15100.0],
+                "low": [14900.0],
+                "close": [15050.0],
+                "volume": [500_000],
+            },
+            index=pd.DatetimeIndex([date.today()]),
+        )
+        ticker = MagicMock()
+        ticker.history.return_value = df
+        ticker.quotes = {}
+        mock_ticker_cls.return_value = ticker
+
+        with pytest.raises(ValueError, match="currency basis"):
+            await yahoo_client.history("HSBA.L")
+
+    @patch("app.services.yahoo.client.Ticker")
     async def test_normalizes_period_alias(self, mock_ticker_cls):
         """'1w' should map to '5d'."""
         df = _make_ohlcv_df()
@@ -293,6 +314,22 @@ class TestBatchHistory:
         result = await yahoo_client.batch_history(["HSBA.L"])
         assert "HSBA.L" in result
         assert result["HSBA.L"]["close"].iloc[0] == 150.50
+
+    @patch("app.services.yahoo.client.Ticker")
+    async def test_skips_subunit_venue_when_quote_is_missing(self, mock_ticker_cls):
+        """A dropped quote for a pence-quoted listing must skip, not store 1:1."""
+        dates = pd.bdate_range(end=date.today(), periods=3)
+        df = pd.DataFrame(
+            {"open": [15000, 15100, 15200], "high": [15100, 15200, 15300],
+             "low": [14900, 15000, 15100], "close": [15050, 15150, 15250],
+             "volume": [500_000] * 3},
+            index=pd.MultiIndex.from_tuples(
+                [("HSBA.L", d) for d in dates], names=["symbol", "date"]
+            ),
+        )
+        mock_ticker_cls.return_value = _batch_ticker(["HSBA.L"], df, quotes={})
+
+        assert await yahoo_client.batch_history(["HSBA.L"]) == {}
 
 
 class TestOmittedSymbolPadding:

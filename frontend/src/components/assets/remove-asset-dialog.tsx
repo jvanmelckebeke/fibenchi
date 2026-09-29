@@ -36,7 +36,7 @@ function attachmentLines(a: AssetAttachments): { label: string; value: string }[
  * Confirms removing an asset from a group. When this is the asset's *last* group,
  * it warns that the asset becomes an invisible orphan, lists what stays attached
  * (theses / pseudo-ETFs / tags / note / annotations), and offers a hard delete —
- * so the lifecycle decision is made with the attachments in view (see #536).
+ * so the lifecycle decision is made with the attachments in view.
  */
 export function RemoveAssetDialog({ asset, groupId, groupName, open, onOpenChange }: RemoveAssetDialogProps) {
   const symbol = asset?.symbol ?? ""

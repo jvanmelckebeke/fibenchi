@@ -25,7 +25,7 @@ from app.utils import TTLCache
 # a corrected close, a hole filled at 08-12 while 08-13 already exists — and
 # none of those move the set-wide max. The key is therefore incapable, in
 # principle, of representing the change a heal makes, and the broken snapshot
-# would serve out the rest of its TTL (#628). Writers call
+# would serve out the rest of its TTL. Writers call
 # `invalidate_indicator_cache` instead of waiting.
 _indicator_cache: TTLCache = TTLCache(default_ttl=600)
 

@@ -13,6 +13,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.background_tasks.price_heal import heal_interior_holes, heal_unreconciled_prices
 from app.background_tasks.registry import background_task
+from app.background_tasks.split_heal import heal_split_discontinuities
 from app.config import settings as app_settings
 from app.database import async_session
 from app.services.compute.group import compute_and_cache_indicators
@@ -20,6 +21,7 @@ from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
 from app.services.market_calendar import any_venue_open
 from app.services.price_sync import sync_all_prices
 from app.services.symbol_sync_service import sync_all_enabled as sync_all_symbol_sources
+from app.services.volume_curve_service import curve_cache_size, fit_venue_curves
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,31 @@ async def startup_warmup() -> None:
             logger.info(f"Startup warmup complete: {warmed} groups cached")
     except Exception:
         logger.exception("Startup indicator warmup failed (non-fatal)")
+
+    await bootstrap_volume_curves()
+
+
+async def bootstrap_volume_curves() -> None:
+    """Fit volume curves once at boot if none are stored yet.
+
+    Only when the table is empty. The weekly job keeps them current after
+    that, and without this a fresh instance would show settled RVOL for up to
+    a week for want of one call per venue.
+    """
+    from app.repositories.asset_repo import AssetRepository
+
+    if curve_cache_size():
+        return
+    logger.info("No volume curves stored — fitting from scratch...")
+    async with async_session() as db:
+        try:
+            refs = await AssetRepository(db).list_in_any_group_refs()
+            if not refs:
+                return
+            fitted = await fit_venue_curves(db, refs)
+            logger.info(f"Bootstrapped volume curves for {len(fitted)} venue(s)")
+        except Exception:
+            logger.exception("Volume curve bootstrap failed (non-fatal)")
 
 
 def _refresh_trigger() -> CronTrigger | None:
@@ -130,6 +157,25 @@ async def scheduled_refresh():
             logger.exception("Intraday cleanup failed (non-fatal)")
 
 
+# Splits are rare and their damage is durable: the EWMA carries a fake -50%
+# return for ~11 days while a corrupted SMA50 and Bollinger band persist until
+# the pre-split window rolls off, ~50 sessions later. So this runs on its own
+# slow clock rather than piggybacking on the 10-minute price heal, which gates
+# itself on a venue being open and would skip whole weekends.
+@background_task("split_heal", trigger=IntervalTrigger(hours=6))
+async def scheduled_split_heal():
+    """Re-fetch full history for assets whose stored bars change share basis."""
+    async with async_session() as db:
+        try:
+            healed = await heal_split_discontinuities(db)
+            if healed:
+                logger.info(
+                    f"Split heal: rebased {len(healed)} symbol(s): {', '.join(sorted(healed))}"
+                )
+        except Exception:
+            logger.exception("Split heal failed")
+
+
 @background_task("symbol_directory_sync", trigger=CronTrigger(minute="0", hour="2", day_of_week="sun"))
 async def scheduled_symbol_sync():
     """Weekly sync of all enabled symbol directory sources."""
@@ -141,6 +187,31 @@ async def scheduled_symbol_sync():
             logger.info(f"Symbol sync complete: {len(counts)} sources, {total} symbols")
         except Exception:
             logger.exception("Scheduled symbol sync failed")
+
+
+# A venue's intraday volume shape is its auction structure — the opening
+# cross, the lunch trough, the closing auction — which moves on the timescale
+# of market-structure changes, not of days. Refitting weekly costs one Yahoo
+# call per venue and keeps the curve current through DST shifts and hour
+# changes; refitting more often would only re-median the same 60 days.
+@background_task("volume_curve_fit", trigger=CronTrigger(minute="30", hour="3", day_of_week="sun"))
+async def scheduled_volume_curve_fit():
+    """Refit each in-use venue's intraday volume curve."""
+    from app.repositories.asset_repo import AssetRepository
+
+    async with async_session() as db:
+        try:
+            refs = await AssetRepository(db).list_in_any_group_refs()
+            if not refs:
+                return
+            fitted = await fit_venue_curves(db, refs)
+            if fitted:
+                logger.info(
+                    "Volume curves fitted: %s",
+                    ", ".join(f"{cal} ({n} sessions)" for cal, n in sorted(fitted.items())),
+                )
+        except Exception:
+            logger.exception("Volume curve fit failed")
 
 
 @background_task("intraday_sync", trigger=IntervalTrigger(seconds=60))
@@ -196,7 +267,7 @@ async def scheduled_price_heal():
         except Exception:
             logger.exception("Price heal failed")
         try:
-            # Mid-series holes (issue #559): self-throttled to one scan per
+            # Mid-series holes: self-throttled to one scan per
             # HOLE_SCAN_INTERVAL, so piggybacking on this job costs nothing.
             filled = await heal_interior_holes(db)
             if filled:

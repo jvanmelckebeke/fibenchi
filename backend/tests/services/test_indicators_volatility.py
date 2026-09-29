@@ -17,6 +17,7 @@ from app.services.compute.indicators import (
     build_indicator_snapshot,
     choppiness_index,
     compute_indicators,
+    daily_total_returns,
     get_all_output_fields,
     session_gap_days,
     volatility_normalized_return,
@@ -747,3 +748,93 @@ def test_vnr_kernel_gate_matches_the_published_warmup():
     from app.services.compute.indicators import INDICATOR_REGISTRY
 
     assert INDICATOR_REGISTRY["vnr"].warmup_periods == VNR_WARMUP_SESSIONS
+
+
+# ---------------------------------------------------------------------------
+# Ex-dividend: the price drop that isn't a move
+# ---------------------------------------------------------------------------
+
+
+def _ex_div_series(n: int = 120, yield_pct: float = 0.05) -> tuple[pd.Series, pd.Series]:
+    """A flat-ish series whose last bar drops purely by a dividend.
+
+    Returns ``(closes, dividends)``. The last session's only price action is
+    the payout, so a correct total-return σ-Move there is ~0 and a price-return
+    one is multi-σ.
+    """
+    dates = pd.bdate_range("2025-01-01", periods=n)
+    rng = np.random.default_rng(11)
+    closes = pd.Series(
+        100 * np.cumprod(1 + rng.normal(0, 0.008, n)), index=dates,
+    )
+    cash = closes.iloc[-2] * yield_pct
+    closes.iloc[-1] = closes.iloc[-2] - cash
+    dividends = pd.Series(0.0, index=dates)
+    dividends.iloc[-1] = cash
+    return closes, dividends
+
+
+def test_daily_total_returns_adds_the_cash_back():
+    closes = pd.Series([100.0, 95.0])
+    dividends = pd.Series([0.0, 5.0])
+    assert daily_total_returns(closes, dividends).iloc[-1] == pytest.approx(0.0)
+    # No dividends at all reproduces the price return exactly.
+    pd.testing.assert_series_equal(
+        daily_total_returns(closes), closes.pct_change(), check_names=False,
+    )
+
+
+def test_vnr_scores_an_ex_dividend_drop_as_a_non_event():
+    closes, dividends = _ex_div_series()
+    uncorrected = volatility_normalized_return(closes).iloc[-1]
+    corrected = volatility_normalized_return(closes, dividends=dividends).iloc[-1]
+
+    assert uncorrected < -4  # a 5% payout on a ~0.8%/day name
+    assert corrected == pytest.approx(0.0, abs=0.01)
+
+
+def test_ex_dividend_drop_stays_out_of_the_vol_forecast():
+    """The EWMA has an ~11-day half-life, so the drop would inflate σ for weeks."""
+    closes, dividends = _ex_div_series()
+    uncorrected = _ewma_daily_vol(closes, 0.94).iloc[-1]
+    corrected = _ewma_daily_vol(closes, 0.94, dividends=dividends).iloc[-1]
+    assert uncorrected > corrected * 1.5
+
+
+def test_compute_indicators_reads_dividends_off_the_frame():
+    closes, dividends = _ex_div_series()
+    df = pd.DataFrame({
+        "open": closes, "high": closes, "low": closes, "close": closes,
+        "volume": 1_000_000, "dividends": dividends,
+    })
+    result = compute_indicators(df)
+
+    assert result["vnr"].iloc[-1] == pytest.approx(0.0, abs=0.01)
+    assert result["vnr_ex_div"].iloc[-1] == pytest.approx(dividends.iloc[-1])
+    assert result["vnr_ex_div"].iloc[:-1].isna().all()
+    assert "vnr_ex_div" in get_all_output_fields()
+
+
+def test_frame_without_dividends_is_unchanged():
+    """Indices, crypto, accumulating ETFs and synthetic series carry no column."""
+    df = _make_price_df(120)
+    without = compute_indicators(df)
+    with_zeros = compute_indicators(df.assign(dividends=0.0))
+
+    pd.testing.assert_series_equal(without["vnr"], with_zeros["vnr"])
+    pd.testing.assert_series_equal(without["vnr_sigma"], with_zeros["vnr_sigma"])
+    assert without["vnr_ex_div"].isna().all()
+
+
+def test_ex_div_bar_reaches_the_snapshot():
+    """The board needs the amount to explain σ disagreeing with the change %."""
+    closes, dividends = _ex_div_series()
+    df = pd.DataFrame({
+        "open": closes, "high": closes, "low": closes, "close": closes,
+        "volume": 1_000_000, "dividends": dividends,
+    })
+    snap = build_indicator_snapshot(compute_indicators(df))
+
+    assert snap.values["vnr_ex_div"] == pytest.approx(dividends.iloc[-1], abs=1e-6)
+    # change_pct stays the price move — it must keep agreeing with the chart.
+    assert snap.change_pct < -4

@@ -36,6 +36,7 @@ from app.routers import (
 from app.routers import settings as settings_router
 from app.services.currency_service import load_cache as load_currency_cache
 from app.services.price_providers import init_price_provider
+from app.services.volume_curve_service import load_curve_cache
 
 # App loggers write through the root logger, which neither uvicorn nor docker
 # configures — so every logger.info() (price heal, hole heal, refresh
@@ -60,6 +61,9 @@ async def lifespan(app: FastAPI):
     # Load currency lookup cache from DB
     async with async_session() as db:
         await load_currency_cache(db)
+        venues = await load_curve_cache(db)
+        if venues:
+            logger.info("Loaded volume curves for %d venue(s)", venues)
 
     # Schedule the registered background jobs (app/background_tasks/jobs.py).
     # A task whose trigger factory returns None is disabled — it logged why —

@@ -9,13 +9,14 @@ import pandas as pd
 from app.services.yahoo._base import _YahooBase
 from app.services.yahoo._parsers import PERIOD_MAP, normalize_date_index
 from app.services.yahoo.currency import _normalize_ohlcv_df, resolve_currency
+from app.services.yahoo.normalize import normalize_frame
 from app.services.yahoo.rate_limit import check_crumb
 
 logger = logging.getLogger(__name__)
 
 
 def padded_history_frame(ticker, data, params: dict, symbols: list[str]) -> pd.DataFrame:
-    """``Ticker._historical_data_to_dataframe`` minus the KeyError (#593).
+    """``Ticker._historical_data_to_dataframe`` minus the KeyError.
 
     yahooquery indexes ``data[symbol]`` for every requested symbol, so a
     symbol Yahoo omitted *entirely* from the chart response — distinct from
@@ -48,7 +49,11 @@ class _HistoryMixin(_YahooBase):
     ) -> pd.DataFrame:
         """Fetch OHLCV history for a single symbol.
 
-        Subunit currencies (e.g. ``GBp``) are converted to main units.
+        Subunit currencies (e.g. ``GBp``) are converted to main units, then
+        ``normalize_frame`` applies every provider-quirk fix this symbol's
+        instrument kind calls for — so the frame is continuous in one unit
+        end to end and carries no quirk a caller has to know about.
+
         Raises :class:`ValueError` when Yahoo returns no data or the
         breaker is open.
         """
@@ -61,8 +66,8 @@ class _HistoryMixin(_YahooBase):
                     normalized = PERIOD_MAP.get(period.lower(), period)
                     df = ticker.history(period=normalized, interval=interval)
             except KeyError:
-                # Yahoo omitted the (only) symbol from its own chart response
-                # (#593) — for a single-symbol fetch that simply is "no data".
+                # Yahoo omitted the (only) symbol from its own chart response —
+                # for a single-symbol fetch that simply is "no data".
                 raise ValueError(f"No data found for {symbol}") from None
 
             if isinstance(df, dict):
@@ -79,7 +84,12 @@ class _HistoryMixin(_YahooBase):
             price_info = quote_data.get(symbol, {}) if isinstance(quote_data, dict) else {}
             info = price_info if isinstance(price_info, dict) else {}
             _, divisor = resolve_currency(info, symbol)
+            if divisor is None:
+                raise ValueError(
+                    f"Unknown currency basis for {symbol} — Yahoo sent no currency"
+                )
             df = _normalize_ohlcv_df(df, divisor)
+            df = normalize_frame(df, symbol)
             return normalize_date_index(df)
 
         def _fallback() -> pd.DataFrame:
@@ -92,8 +102,9 @@ class _HistoryMixin(_YahooBase):
     ) -> dict[str, pd.DataFrame]:
         """Fetch OHLCV for many symbols in one batch.
 
-        Subunit currencies are converted. Returns ``{}`` when the breaker
-        is open or Yahoo returns no data.
+        Currency conversion and ``normalize_frame`` run per symbol, as in
+        :meth:`history`. Returns ``{}`` when the breaker is open or Yahoo
+        returns no data.
         """
         if not symbols:
             return {}
@@ -108,7 +119,7 @@ class _HistoryMixin(_YahooBase):
             # does internally for a period fetch) so the raw response can be
             # padded before frame-building — one symbol Yahoo omitted must
             # degrade to that symbol missing, not a KeyError that costs the
-            # whole batch (#593).
+            # whole batch.
             params = {"range": normalized.lower(), "interval": "1d"}
             data = ticker._get_data("chart", params)
             check_crumb(data)
@@ -130,7 +141,14 @@ class _HistoryMixin(_YahooBase):
                     info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
                     info = info if isinstance(info, dict) else {}
                     _, divisor = resolve_currency(info, sym)
+                    if divisor is None:
+                        logger.warning(
+                            "batch_history: no currency for %s and its venue quotes in "
+                            "subunits; skipping rather than guessing a basis", sym,
+                        )
+                        continue
                     df = _normalize_ohlcv_df(df, divisor)
+                    df = normalize_frame(df, sym)
                     out[sym] = normalize_date_index(df)
                 except KeyError:
                     logger.debug("batch_history: %s missing from Yahoo batch response", sym)

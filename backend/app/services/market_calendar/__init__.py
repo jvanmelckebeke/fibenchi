@@ -9,7 +9,7 @@ and which phase (premarket / open / aftermarket / closed) an instant falls
 in. Ticker shape itself is interpreted in ``app.domain.instrument`` — this
 package holds the venue *data* and *schedule* machinery underneath it.
 
-The primary consumer is the σ-Move gap guard (issue #559) — with real
+The primary consumer is the σ-Move gap guard — with real
 session dates (``exchange_calendars``) a missing bar can be distinguished
 from an exchange holiday. The schedule side feeds the scheduler gates
 (``any_venue_open``), the SSE poll cadence (``schedule_poll_hint``), and
@@ -37,7 +37,7 @@ from app.services.market_calendar.listings import (
     Listing,
 )
 from app.services.market_calendar.schedule import any_venue_open, schedule_poll_hint
-from app.services.market_calendar.venue import Venue
+from app.services.market_calendar.venue import Venue, venue_for
 
 __all__ = [
     "CRYPTO_QUOTE_CURRENCIES",
@@ -51,4 +51,5 @@ __all__ = [
     "Venue",
     "any_venue_open",
     "schedule_poll_hint",
+    "venue_for",
 ]

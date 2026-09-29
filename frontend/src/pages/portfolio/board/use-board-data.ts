@@ -3,8 +3,8 @@
 //
 // σ resolution calls the shared resolver (lib/sigma) rather than restating the
 // cascade, so the board and the group table cannot disagree about an asset.
-// They used to agree only by luck: each site ordered the same decisions
-// differently, and gap-vs-stale simply rarely co-occurred (#629).
+// Two sites restating it agree only by luck, since gap-vs-stale rarely
+// co-occurs.
 
 import { useMemo } from "react"
 import { type Asset, type SparklinePoint } from "@/lib/api"
@@ -17,14 +17,21 @@ import {
   useTheses,
 } from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
-import { resolveSigma, type WithheldReason } from "@/lib/sigma"
+import { resolveSigma, sigmaExDiv, type WithheldReason } from "@/lib/sigma"
 import { marketState } from "@/lib/market-state"
 import { type PctWindow, PCT_WINDOWS } from "./color-scale"
+import { windowCutoffs, windowPct } from "./window-returns"
 
 export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 
 /** Why a tile has no σ reading — the shared {@link WithheldReason}, plus the
- * one field only the board has: when the next hole scan runs.
+ * two the board adds: one extra field on `gap` (when the next hole scan runs),
+ * and `pending`.
+ *
+ * `pending` can't live in lib/sigma. That resolver reads a snapshot and says
+ * what it supports; a snapshot still in flight isn't one, so the resolver has
+ * nothing to read. `pending` is what separates a batch that hasn't landed from
+ * a backend with nothing to say, and the tile draws those differently.
  *
  * The variants stay discriminated even though the tooltip only shapes
  * `warmup`: they decide *whether* σ is withheld at all. Nothing downstream
@@ -34,6 +41,8 @@ export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 export type NoReadingReason =
   | Exclude<WithheldReason, { kind: "gap" }>
   | { kind: "gap"; sessions: number; nextScanSeconds: number | null }
+  /** No snapshot *yet* — the batch covering this symbol is still in flight. */
+  | { kind: "pending" }
 
 export interface Tile {
   /** The tile's identity — also its React key, route param and lookup key. */
@@ -46,6 +55,10 @@ export interface Tile {
   /** σ-Move via the live-first cascade; null → see reason. */
   sigma: number | null
   reason: NoReadingReason | null
+  /** Cash per share this bar's σ added back, when it is an ex-dividend date.
+   * The tooltip shows σ and today's % together, and on this one bar they
+   * disagree by exactly this much — only σ counts the payout. */
+  exDiv: number | null
   /** Today's % change (live quote first, stored bar fallback). */
   todayPct: number | null
   /** Last price — the magnitude behind the dimensionless σ (tooltip). */
@@ -106,26 +119,14 @@ function useWindowReturns(symbols: string[]) {
   const quotes = useQuotes()
   const windows = useMemo(() => {
     const out: Record<string, Record<PctWindow, number | null>> = {}
-    const today = new Date()
+    const cutoffs = windowCutoffs()
     for (const sym of symbols) {
       const points = series?.[sym]
       const per = {} as Record<PctWindow, number | null>
       for (const w of PCT_WINDOWS) {
-        per[w.value] = null
-        if (!points?.length) continue
-        const cutoff = new Date(today)
-        cutoff.setDate(cutoff.getDate() - w.days)
-        const cutoffIso = cutoff.toISOString().slice(0, 10)
-        // Baseline = last close at or before the window start; a series that
-        // doesn't reach back that far has no honest answer for this window.
-        let base: SparklinePoint | null = null
-        for (const p of points) {
-          if (p.date <= cutoffIso) base = p
-          else break
-        }
-        if (!base || base.close === 0) continue
-        const last = quotes[sym]?.price ?? points[points.length - 1].close
-        per[w.value] = ((last - base.close) / base.close) * 100
+        const last = quotes[sym]?.price ?? points?.[points.length - 1]?.close
+        per[w.value] =
+          points?.length && last != null ? windowPct(points, last, cutoffs[w.value]) : null
       }
       out[sym] = per
     }
@@ -138,8 +139,8 @@ function useWindowReturns(symbols: string[]) {
 const EMPTY_WINDOWS: Record<PctWindow, number | null> = { "1wk": null, "2wk": null, "1mo": null }
 
 export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all") {
-  const { data: groups, isLoading: groupsLoading } = useGroups()
-  const { data: theses } = useTheses()
+  const { data: groups, isLoading: groupsLoading, isPending: groupsPending } = useGroups()
+  const { data: theses, isPending: thesesPending } = useTheses()
   const quotes = useQuotes()
   const { data: phases } = useMarketPhases()
   const { data: health } = useDataHealth()
@@ -162,14 +163,30 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   //
   // This is why useTheses() is not gated to thesis mode: the union needs it in
   // both. Gating it would save one ~4 KB request and reintroduce the refetch.
+  //
+  // The union is only stable once both halves have settled, so the key is held
+  // back until then — otherwise a groups-only union goes out first and the same
+  // ~84 symbols are fetched twice per cold load. Gated on `isPending`,
+  // not `data`, so a failed /api/theses releases it rather than leaving the
+  // board with nothing to fetch.
+  const rosterSettled = !groupsPending && !thesesPending
   const fetchSymbols = useMemo(() => {
+    if (!rosterSettled) return []
     const all = new Set<string>()
     for (const g of groups ?? []) for (const a of g.assets) all.add(a.symbol)
     for (const t of theses ?? []) for (const a of t.assets) all.add(a.symbol)
     return [...all].sort()
-  }, [groups, theses])
+  }, [groups, theses, rosterSettled])
 
-  const { data: snapshots } = useIndicators(fetchSymbols)
+  // "The current batch hasn't landed" — either nothing has, or what's on screen
+  // is the previous key's data held by keepPreviousData. Symbols that batch
+  // covers are answered anyway; the per-symbol lookup below sorts them out.
+  const {
+    data: snapshots,
+    isPending: snapshotsFetching,
+    isPlaceholderData: snapshotsStale,
+  } = useIndicators(fetchSymbols)
+  const snapshotsPending = snapshotsFetching || snapshotsStale
   const { windows: windowReturns, series } = useWindowReturns(fetchSymbols)
 
   // Which sections each symbol sits in, under the active grouping — the one
@@ -202,14 +219,18 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
 
       const resolved = resolveSigma(quote, snap)
       const sigma = resolved.status === "ok" ? resolved.sigma : null
-      // The board adds one field the shared resolver has no business knowing:
-      // when the next hole scan runs. Widen the reason here rather than
-      // pushing a board concern into lib/sigma.
-      const reason: NoReadingReason | null = resolved.status === "withheld"
-        ? resolved.reason.kind === "gap"
-          ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
-          : resolved.reason
-        : null
+      const exDiv = sigmaExDiv(resolved, snap)
+      // The board widens the resolver's answer with the two things only it
+      // knows: when the next hole scan runs, and whether the snapshot is merely
+      // late. `pending` wins — the resolver reports an absent snapshot as
+      // `no_data`, and cannot tell "not fetched" from "nothing to fetch".
+      const reason: NoReadingReason | null = resolved.status !== "withheld"
+        ? null
+        : snap == null && snapshotsPending
+          ? { kind: "pending" }
+          : resolved.reason.kind === "gap"
+            ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
+            : resolved.reason
 
       const scheduled = symbolPhase[symbol]
       const liveState = quote?.market_state != null
@@ -222,6 +243,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
         asset,
         sigma,
         reason,
+        exDiv,
         todayPct: quote?.change_percent ?? snap?.change_pct ?? null,
         price: quote?.price ?? snap?.close ?? null,
         windowPct: windowReturns[symbol] ?? EMPTY_WINDOWS,
@@ -234,7 +256,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       })
     }
     return out
-  }, [roster, quotes, snapshots, windowReturns, series, sectionsBySymbol, symbolPhase, health])
+  }, [roster, quotes, snapshots, snapshotsPending, windowReturns, series, sectionsBySymbol, symbolPhase, health])
 
   // Filtering happens on the tile map, before sections are assembled: the
   // lookups below then drop the hidden symbols by themselves, the
@@ -271,6 +293,9 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       total: all.length,
       scored: all.filter((t) => t.sigma != null).length,
       open: all.filter((t) => t.phase === "open").length,
+      // Lets the badge say "still counting" rather than "0 of 84 scored" —
+      // the same sentence it uses for a real coverage collapse.
+      pending: all.filter((t) => t.reason?.kind === "pending").length,
     }
   }, [tiles])
 

@@ -69,15 +69,73 @@ def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -
     return Session.REGULAR
 
 
+# One bind parameter per column per row against PostgreSQL's 32767 ceiling,
+# but the binding constraint here is memory, not the ceiling: a backend's
+# parse/plan context for one thousand-row VALUES list grows to ~250 MB and
+# postgres never returns it to the OS, so a pooled connection stays that big
+# for life. Three such connections plus shared_buffers is what walked the
+# 1 GB container into the OOM killer.
+INTRADAY_UPSERT_CHUNK_ROWS = 500
+
+
+async def _load_stored_window(
+    db: AsyncSession, asset_ids: list[int]
+) -> dict[int, dict[datetime, tuple[float, int, str]]]:
+    """Read every stored bar for these assets, keyed by asset then timestamp."""
+    if not asset_ids:
+        return {}
+    result = await db.execute(
+        select(
+            IntradayPrice.asset_id,
+            IntradayPrice.timestamp,
+            IntradayPrice.price,
+            IntradayPrice.volume,
+            IntradayPrice.session,
+        ).where(IntradayPrice.asset_id.in_(asset_ids))
+    )
+    stored: dict[int, dict[datetime, tuple[float, int, str]]] = {}
+    for asset_id, ts, price, volume, session in result:
+        stored.setdefault(asset_id, {})[ts] = (float(price), int(volume or 0), session)
+    return stored
+
+
+def _changed_rows(
+    rows: list[dict], stored: dict[datetime, tuple[float, int, str]]
+) -> list[dict]:
+    """Keep only the rows whose stored counterpart is absent or different.
+
+    A closed 1-minute bar never changes: the price is a close, the volume is
+    settled, and the divisor that normalises it is a per-currency constant,
+    not a live FX rate. Re-upserting the whole day every 60s therefore
+    rewrote ~26,600 identical rows a minute. ON CONFLICT DO UPDATE is a
+    delete-plus-insert in the heap, so that churn showed up as 50,167
+    inserts and 52,177 deletes against 26,636 live rows, generating the WAL
+    and the dead tuples behind it. It had already cost one incident before
+    this one: the surrogate id's int32 sequence exhausted at ~20M values a
+    day, because ON CONFLICT burns a sequence value per *attempted* row
+    (migrations 0018/0019 dropped the id rather than slow the churn).
+
+    Comparing against what is stored costs one indexed SELECT per poll and
+    leaves only the handful of bars that genuinely moved.
+    """
+    changed = []
+    for row in rows:
+        prev = stored.get(row["timestamp"])
+        if prev == (row["price"], row["volume"], row["session"]):
+            continue
+        changed.append(row)
+    return changed
+
+
 async def fetch_and_store_intraday(
     db: AsyncSession,
     refs: list[AssetRef],
 ) -> int:
     """Fetch 1m intraday bars and upsert into the database. Returns row count.
 
-    Before upserting, deletes bars older than the oldest bar in the fresh
-    fetch so the DB only contains the current "1-day" window per asset.
-    This prevents stale data from previous sessions mixing with today's data.
+    Only bars that are new or whose values moved are written; see
+    :func:`_changed_rows`. Bars older than the oldest bar in the fresh fetch
+    are deleted so the DB only holds the current "1-day" window per asset.
 
     The Yahoo fetch + currency normalisation happens in
     :meth:`YahooClient.intraday`; this function adds session classification
@@ -86,21 +144,33 @@ async def fetch_and_store_intraday(
     raw = await yahoo_client.intraday(list(refs))
     by_symbol = {ref.symbol: ref for ref in refs}
 
-    total = 0
+    fetched: list[tuple[int, AssetRef, list]] = []
     for sym, raw_bars in raw.items():
         ref = by_symbol.get(sym)
         if ref is None or ref.id is None or not raw_bars:
             continue
-        asset_id = ref.id
+        fetched.append((ref.id, ref, raw_bars))
 
-        # Remove bars from previous sessions that Yahoo no longer returns
+    if not fetched:
+        return 0
+
+    stored = await _load_stored_window(db, [asset_id for asset_id, _, _ in fetched])
+
+    total = 0
+    for asset_id, ref, raw_bars in fetched:
+        stored_bars = stored.get(asset_id, {})
+
+        # Remove bars from previous sessions that Yahoo no longer returns.
+        # Skipped unless something is actually older, which is every poll but
+        # the first after a session rollover.
         oldest_ts = min(bar.timestamp for bar in raw_bars)
-        await db.execute(
-            delete(IntradayPrice).where(
-                IntradayPrice.asset_id == asset_id,
-                IntradayPrice.timestamp < oldest_ts,
+        if any(ts < oldest_ts for ts in stored_bars):
+            await db.execute(
+                delete(IntradayPrice).where(
+                    IntradayPrice.asset_id == asset_id,
+                    IntradayPrice.timestamp < oldest_ts,
+                )
             )
-        )
 
         rows = [
             {
@@ -112,17 +182,22 @@ async def fetch_and_store_intraday(
             }
             for bar in raw_bars
         ]
+        rows = _changed_rows(rows, stored_bars)
+        if not rows:
+            continue
 
-        stmt = pg_insert(IntradayPrice).values(rows)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["asset_id", "timestamp"],
-            set_={
-                "price": stmt.excluded.price,
-                "volume": stmt.excluded.volume,
-                "session": stmt.excluded.session,
-            },
-        )
-        await db.execute(stmt)
+        for start in range(0, len(rows), INTRADAY_UPSERT_CHUNK_ROWS):
+            chunk = rows[start:start + INTRADAY_UPSERT_CHUNK_ROWS]
+            stmt = pg_insert(IntradayPrice).values(chunk)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["asset_id", "timestamp"],
+                set_={
+                    "price": stmt.excluded.price,
+                    "volume": stmt.excluded.volume,
+                    "session": stmt.excluded.session,
+                },
+            )
+            await db.execute(stmt)
         total += len(rows)
 
     await db.commit()

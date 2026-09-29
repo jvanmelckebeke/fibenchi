@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { RAMP_COLORS, pctSpan, sigmaUnit } from "./color-scale"
+import { RAMP_COLORS, boardScale } from "./color-scale"
 import type { ColorMode } from "./color-scale"
 import { packSections } from "./paging"
 import { BoardTile, PhaseIcon } from "./tile"
@@ -70,13 +70,10 @@ export function Board({
    * which makes the filter something other than a hide. */
   scaleTiles: Tile[]
 }) {
-  // Day-adaptive scale: computed over the whole board — every page and
-  // section shares one ramp (per-page scales would make colours incomparable).
-  const span = useMemo(() => {
-    if (mode === "sigma")
-      return 3 * sigmaUnit(scaleTiles.map((t) => t.sigma).filter((v): v is number => v != null))
-    return pctSpan(scaleTiles.map((t) => t.todayPct).filter((v): v is number => v != null))
-  }, [scaleTiles, mode])
+  const { span, unread, pending, tightened } = useMemo(
+    () => boardScale(scaleTiles, mode),
+    [scaleTiles, mode],
+  )
 
   const { ref, footerRef, pages, availPx } = usePagedSections(sections)
   const [page, setPage] = useState(0)
@@ -125,7 +122,7 @@ export function Board({
           ))}
         </div>
         <div ref={footerRef} className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <Legend mode={mode} span={span} />
+          <Legend mode={mode} span={span} unread={unread} pending={pending} tightened={tightened} />
           {pages.length > 1 && (
             <Pager
               page={current}
@@ -185,7 +182,19 @@ function Pager({
   )
 }
 
-function Legend({ mode, span }: { mode: ColorMode; span: number }) {
+function Legend({
+  mode,
+  span,
+  unread,
+  pending,
+  tightened,
+}: {
+  mode: ColorMode
+  span: number
+  unread: number
+  pending: number
+  tightened: boolean
+}) {
   const unit = mode === "sigma" ? "σ" : "%"
   const fmt = () => (Number.isInteger(span) ? `${span}` : span.toFixed(1))
   return (
@@ -197,6 +206,22 @@ function Legend({ mode, span }: { mode: ColorMode; span: number }) {
           style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(", ")})` }}
         />
         <span className="tabular-nums">+{fmt()}{unit}</span>
+        {/* While the first snapshot batch is in flight every tile is unread,
+            which is not a coverage collapse — say so rather than printing the
+            whole board as missing. */}
+        {pending > 0 ? (
+          <span>scoring…</span>
+        ) : (
+          !tightened &&
+          unread > 0 && (
+            <span
+              className="cursor-help border-b border-dotted border-current"
+              title="The scale keeps its full width rather than tightening onto the tiles that resolved, which would paint them louder than they are."
+            >
+              full scale · {unread} without a reading
+            </span>
+          )
+        )}
       </span>
       <span className="flex items-center gap-1.5">
         <span className="board-tile-unread h-3 w-5 rounded-[2px]" />

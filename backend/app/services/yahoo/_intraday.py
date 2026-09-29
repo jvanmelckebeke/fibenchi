@@ -84,6 +84,12 @@ class _IntradayMixin(_YahooBase):
                     info = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
                     info = info if isinstance(info, dict) else {}
                     _, divisor = resolve_currency(info, sym)
+                    if divisor is None:
+                        logger.warning(
+                            "intraday: no currency for %s and its venue quotes in "
+                            "subunits; skipping rather than guessing a basis", sym,
+                        )
+                        continue
                     tz_name = info.get("exchangeTimezoneName")
 
                     if not tz_name and len(df) > 0:
@@ -119,6 +125,63 @@ class _IntradayMixin(_YahooBase):
                 except (KeyError, TypeError) as exc:
                     logger.warning("Failed to parse intraday data for %s: %s", sym, exc)
                     continue
+            return out
+
+        return await asyncio.to_thread(self._call, _fetch, lambda: {})
+
+    async def intraday_history(
+        self, symbols: list[str], *, days: int = 60, interval: str = "5m",
+    ) -> dict[str, pd.DataFrame]:
+        """Fetch several sessions of intraday bars, for fitting volume curves.
+
+        Regular hours only (no ``includePrePost``): the curve describes the
+        continuous session between the opening and closing auctions, and
+        pre/post prints would be credited to buckets they never traded in.
+
+        Returns ``{symbol: DataFrame}`` indexed by tz-aware timestamp with a
+        ``volume`` column. Volume needs no currency divisor, so unlike
+        :meth:`intraday` this skips the price normalisation entirely — the
+        frames are never used for prices.
+
+        Yahoo serves 5m bars for 60 days and 1m for 7; asking for more of
+        either silently returns less, so the caller's ``days`` is a ceiling
+        rather than a promise.
+        """
+        if not symbols:
+            return {}
+
+        def _fetch() -> dict[str, pd.DataFrame]:
+            ticker = self._ticker(symbols)
+            params = {"range": f"{days}d", "interval": interval}
+            data = ticker._get_data("chart", params)
+            if isinstance(data, dict):
+                check_crumb(data)
+
+            hist = padded_history_frame(ticker, data, params, symbols)
+            if hist.empty:
+                return {}
+
+            available = (
+                set(hist.index.get_level_values(0).unique())
+                if isinstance(hist.index, pd.MultiIndex)
+                else None
+            )
+
+            out: dict[str, pd.DataFrame] = {}
+            for sym in symbols:
+                try:
+                    if available is not None:
+                        if sym not in available:
+                            continue
+                        df = hist.loc[sym].copy()
+                    else:
+                        df = hist.copy()
+                except (KeyError, TypeError) as exc:
+                    logger.warning("Failed to parse intraday history for %s: %s", sym, exc)
+                    continue
+                if df.empty or "volume" not in df.columns:
+                    continue
+                out[sym] = df
             return out
 
         return await asyncio.to_thread(self._call, _fetch, lambda: {})

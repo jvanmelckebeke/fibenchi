@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "CalendarWindow": {
+      "description": "The date range the calendar body covers, inclusive on both ends.",
+      "properties": {
+        "from": {
+          "description": "First date covered (inclusive)",
+          "format": "date",
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last date covered (inclusive)",
+          "format": "date",
+          "title": "To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "title": "CalendarWindow",
+      "type": "object"
+    },
+    "HalfDay": {
+      "description": "A session that closes before its usual time.",
+      "properties": {
+        "date": {
+          "description": "Session date",
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "close": {
+          "description": "Closing time in the venue's local timezone",
+          "format": "time",
+          "title": "Close",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "close"
+      ],
+      "title": "HalfDay",
+      "type": "object"
+    },
+    "VenueCalendar": {
+      "description": "One venue's trading week, holidays, and half-days over the window.\n\nTogether the first three fields describe the window exactly: a date in it\nis a session iff it appears in ``extraSessions``, or its weekday is in\n``tradingDays`` and it is not in ``closures``.",
+      "properties": {
+        "timezone": {
+          "description": "IANA timezone of the venue's local clock",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "tradingDays": {
+          "description": "Weekdays the venue currently trades, ISO numbering (1 = Monday .. 7 = Sunday). Read from the venue's recent sessions, so do not assume Mon-Fri: some venues trade a different week, and a venue can change its week mid-window (see extraSessions)",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Tradingdays",
+          "type": "array"
+        },
+        "closures": {
+          "description": "Dates in the window that fall on a tradingDays weekday but had no session",
+          "items": {
+            "format": "date",
+            "type": "string"
+          },
+          "title": "Closures",
+          "type": "array"
+        },
+        "extraSessions": {
+          "description": "Sessions in the window on a weekday outside tradingDays \u2014 normally empty, non-empty when the venue changed its trading week during the window",
+          "items": {
+            "format": "date",
+            "type": "string"
+          },
+          "title": "Extrasessions",
+          "type": "array"
+        },
+        "halfDays": {
+          "description": "Sessions in the window that close early",
+          "items": {
+            "$ref": "#/$defs/HalfDay"
+          },
+          "title": "Halfdays",
+          "type": "array"
+        }
+      },
+      "required": [
+        "timezone",
+        "tradingDays",
+        "closures",
+        "extraSessions",
+        "halfDays"
+      ],
+      "title": "VenueCalendar",
+      "type": "object"
+    }
+  },
+  "description": "The venue-calendar bundle the companion app pulls and caches.",
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Calendar contract version the app gates on (separate from config's)",
+      "title": "Version",
+      "type": "integer"
+    },
+    "generatedAt": {
+      "description": "When this bundle was produced (UTC)",
+      "format": "date-time",
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "window": {
+      "$ref": "#/$defs/CalendarWindow",
+      "description": "Date range the closures and half-days cover"
+    },
+    "venues": {
+      "additionalProperties": {
+        "$ref": "#/$defs/VenueCalendar"
+      },
+      "description": "exchange_calendars name -> calendar. A venue whose calendar can't be built is absent rather than guessed at",
+      "title": "Venues",
+      "type": "object"
+    },
+    "symbols": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "description": "symbol -> exchange_calendars name, null when the ticker maps to no modelled venue. Always the full tracked book, even when the venues map is filtered, since this is the only place the mapping is published. A name here may be absent from venues (filtered out, or its calendar failed to build) \u2014 fall back to the calendar-less approximation for those symbols",
+      "title": "Symbols",
+      "type": "object"
+    }
+  },
+  "required": [
+    "version",
+    "generatedAt",
+    "window",
+    "venues",
+    "symbols"
+  ],
+  "title": "CompanionCalendar",
+  "type": "object"
+}

@@ -2,8 +2,8 @@
 
 The per-asset free-text "thesis" and the pseudo-ETF "thesis" were both just
 free-text notes. They are renamed to "note", freeing the word "thesis" for a
-new global thesis container (groups of tickers under one hypothesis — see
-issues #523/#524). These are pure table renames; column shapes are unchanged.
+new global thesis container (groups of tickers under one hypothesis). These
+are pure table renames; column shapes are unchanged.
 
 Idempotent / self-healing: a table is only renamed if the old name exists and
 the new name does not, so re-running — or running against a partially migrated

@@ -84,6 +84,16 @@ def make_yahoo_df(n_days: int = 60, base_price: float = 100.0) -> pd.DataFrame:
     }, index=dates)
 
 
+def daily_date_index(n: int, start: date = date(2026, 1, 1)) -> pd.Index:
+    """``n`` consecutive calendar dates as a frame index named ``date``.
+
+    Built from ``date`` objects rather than ``pd.date_range(...).date``: the
+    latter is what a provider frame carries, but pandas-stubs doesn't declare
+    ``DatetimeIndex.date``, so every caller drew a Pyright error.
+    """
+    return pd.Index([start + timedelta(days=i) for i in range(n)], name="date")
+
+
 def make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:
     """Generate synthetic price data for testing (seeded for reproducibility)."""
     np.random.seed(42)

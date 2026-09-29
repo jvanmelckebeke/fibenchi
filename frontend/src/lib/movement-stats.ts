@@ -88,7 +88,7 @@ export function computeMovementStats(prices: Price[]): MovementStats | null {
     // "Daily" metrics assume adjacent bars are adjacent sessions. When the
     // previous stored bar is more than one business day back (missing session
     // or holiday), the step is a multi-session return — excluding it keeps a
-    // composite move from being filed as a single-day extreme (issue #559).
+    // composite move from being filed as a single-day extreme.
     const singleSession = weekdaysBetween(prices[i - 1].date, date) <= 1
 
     if (singleSession && prev > 0) {
