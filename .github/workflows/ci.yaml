@@ -61,7 +61,7 @@ jobs:
           if [ -n "$DRIFT" ]; then
             echo "$DRIFT"
             git diff -- :/backend/companion.schema.json :/backend/companion.calendar.schema.json :/backend/indicator.contract.json :/backend/indicator.fixtures.json :/frontend/src/lib/generated/
-            echo "::error::Contract artifacts are stale. Run the three export scripts in backend/ and commit the result (then copy the companion/indicator ones into fibenchi-app/)."
+            echo "::error::Contract artifacts are stale. Run the three export scripts in backend/ and commit the result."
             exit 1
           fi
 
@@ -92,6 +92,43 @@ jobs:
       - run: pnpm run build
       - run: pnpm run test
       - run: pnpm audit --prod || true
+
+  # Publishes contract/ to npm for fibenchi-app. Needs test-backend so it only
+  # ever packages artifacts the drift check has matched to the Python sources.
+  # npm trusted publishing checks this file's name, so renaming it means
+  # updating the package's Trusted Publisher settings on npmjs.com too.
+  contract:
+    needs: [test-backend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: contract
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contract/package-lock.json
+
+      # Trusted publishing needs npm >= 11.5.1; Node 22 ships npm 10.
+      - run: npm install -g npm@^11.5.1
+      - run: npm ci
+      - run: npm run build
+
+      - name: Version is bumped when the contract changes
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-version.mjs origin/${{ github.base_ref }}
+
+      - name: Publish
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+        run: node scripts/release.mjs ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev' }}
 
   build-image:
     needs: [test-backend, test-frontend]
