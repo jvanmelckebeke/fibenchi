@@ -14,6 +14,9 @@ The backend exporters in `backend/scripts/` write the four JSON artifacts, and
 `npm run build` generates everything else from them. Zod is a peer dependency, so
 the schemas run on the consumer's own `zod` 3 instance.
 
+The package is ESM-only. Jest (including `jest-expo`) does not transform ESM under
+`node_modules`, so a Jest consumer has to exempt it in `transformIgnorePatterns`.
+
 ## Versions
 
 CI publishes from `.github/workflows/ci.yaml`:
