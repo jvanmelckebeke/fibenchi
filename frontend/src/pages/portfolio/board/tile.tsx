@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { changeColor, formatChangePct } from "@/lib/format"
 import { rampColor, type ColorMode } from "./color-scale"
 import { TileTooltip } from "./tile-tooltip"
+import { WindowBars } from "./window-bars"
 import type { Tile as TileData } from "./use-board-data"
 
 // Venue-phase icons: sun up = open, moon = closed, and the extended sessions
@@ -100,6 +101,7 @@ export const BoardTile = memo(function BoardTile({
           >
             {valueEl}
           </span>
+          <WindowBars windowPct={tile.windowPct} />
         </Link>
       </TooltipTrigger>
       {/* The default TooltipContent surface is bg-foreground/text-background —
