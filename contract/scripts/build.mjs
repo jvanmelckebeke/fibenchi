@@ -18,6 +18,7 @@ const DIST = join(ROOT, 'dist');
 const ARTIFACTS = [
   'companion.schema.json',
   'companion.calendar.schema.json',
+  'companion.portfolio-index.schema.json',
   'indicator.contract.json',
   'indicator.contract.schema.json',
   'indicator.fixtures.json',
@@ -81,6 +82,10 @@ writeFileSync(
 writeFileSync(
   join(GENERATED, 'calendar.schema.ts'),
   zodModule('companion.calendar.schema.json', 'companionCalendarSchema'),
+);
+writeFileSync(
+  join(GENERATED, 'portfolio-index.schema.ts'),
+  zodModule('companion.portfolio-index.schema.json', 'companionPortfolioIndexSchema'),
 );
 writeFileSync(
   join(GENERATED, 'indicator.schema.ts'),

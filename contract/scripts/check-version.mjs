@@ -22,6 +22,7 @@ const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8'
 const SHIPPED = [
   ':/backend/companion.schema.json',
   ':/backend/companion.calendar.schema.json',
+  ':/backend/companion.portfolio-index.schema.json',
   ':/backend/indicator.contract.json',
   ':/backend/indicator.contract.schema.json',
   ':/backend/indicator.fixtures.json',
@@ -45,7 +46,7 @@ if (version === baseVersion) {
   console.error(
     `::error::The contract changed but contract/package.json is still ${version}.\n` +
       `Changed:\n${changed}\n` +
-      'Bump it: major when a bundle version (CONFIG_VERSION, CALENDAR_VERSION) changes, ' +
+      'Bump it: major when a bundle version (CONFIG_VERSION, CALENDAR_VERSION, PORTFOLIO_INDEX_VERSION) changes, ' +
       'minor for an additive change such as a new indicator or field, patch otherwise.',
   );
   process.exit(1);

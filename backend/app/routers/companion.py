@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import PeriodType
 from app.database import get_db
-from app.schemas.companion import CompanionCalendar, CompanionConfig
+from app.schemas.companion import CompanionCalendar, CompanionConfig, CompanionPortfolioIndex
 from app.services import companion_calendar_service, companion_service
 
 router = APIRouter(prefix="/api/companion", tags=["companion"])
@@ -47,3 +48,13 @@ async def get_companion_calendar(
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
     return JSONResponse(body, headers={"ETag": etag})
+
+
+@router.get(
+    "/portfolio-index", response_model=CompanionPortfolioIndex, summary="Companion app portfolio index"
+)
+async def get_companion_portfolio_index(
+    period: PeriodType = Query("1y"), db: AsyncSession = Depends(get_db)
+):
+    """The same equal-weight composite index as ``/api/portfolio/index``, as a versioned bundle."""
+    return await companion_service.build_portfolio_index(db, period)

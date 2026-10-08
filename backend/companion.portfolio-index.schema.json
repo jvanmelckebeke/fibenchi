@@ -1,0 +1,95 @@
+{
+  "description": "The equal-weight composite index of every grouped asset, as /api/portfolio/index computes it.",
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Portfolio-index contract version the app gates on",
+      "title": "Version",
+      "type": "integer"
+    },
+    "generatedAt": {
+      "description": "When this bundle was produced (UTC)",
+      "format": "date-time",
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "period": {
+      "description": "Lookback period the series covers",
+      "enum": [
+        "1mo",
+        "3mo",
+        "6mo",
+        "1y",
+        "2y",
+        "5y"
+      ],
+      "title": "Period",
+      "type": "string"
+    },
+    "dates": {
+      "description": "Session dates, ascending",
+      "items": {
+        "format": "date",
+        "type": "string"
+      },
+      "title": "Dates",
+      "type": "array"
+    },
+    "values": {
+      "description": "Index value per date, starting at 1000",
+      "items": {
+        "type": "number"
+      },
+      "title": "Values",
+      "type": "array"
+    },
+    "current": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Last index value, null when the index is empty",
+      "title": "Current"
+    },
+    "change": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "current minus the first value, null when the index is empty",
+      "title": "Change"
+    },
+    "changePct": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "change as a percent of the first value, null when the index is empty",
+      "title": "Changepct"
+    }
+  },
+  "required": [
+    "version",
+    "generatedAt",
+    "period",
+    "dates",
+    "values",
+    "current",
+    "change",
+    "changePct"
+  ],
+  "title": "CompanionPortfolioIndex",
+  "type": "object"
+}
