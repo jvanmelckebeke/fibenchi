@@ -57,6 +57,42 @@
       "title": "ConfigGroup",
       "type": "object"
     },
+    "ConfigThesis": {
+      "description": "A thesis as ordered symbol references.",
+      "properties": {
+        "name": {
+          "description": "Thesis name",
+          "title": "Name",
+          "type": "string"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hex colour for the thesis badge",
+          "title": "Color"
+        },
+        "symbols": {
+          "description": "Ticker symbols in this thesis, sorted",
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ConfigThesis",
+      "type": "object"
+    },
     "ConfigTicker": {
       "description": "Metadata for a single tracked symbol (defined once across all groups).",
       "properties": {
@@ -129,6 +165,14 @@
       "description": "tag name -> hex colour",
       "title": "Tags",
       "type": "object"
+    },
+    "theses": {
+      "description": "Theses in the web board's order (by name). Optional, since servers that predate it omit it. Every symbol here also has an entry in tickers, including ones in no group",
+      "items": {
+        "$ref": "#/$defs/ConfigThesis"
+      },
+      "title": "Theses",
+      "type": "array"
     }
   },
   "required": [

@@ -19,6 +19,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from app.constants import PeriodType
 from app.models.asset import AssetType
 
 #: Current contract version. Bump on any breaking shape change; the app gates on it.
@@ -48,6 +49,14 @@ class ConfigGroup(_CamelModel):
     symbols: list[str] = Field(default_factory=list, description="Ticker symbols in this group, in order")
 
 
+class ConfigThesis(_CamelModel):
+    """A thesis as ordered symbol references."""
+
+    name: str = Field(description="Thesis name")
+    color: str | None = Field(default=None, description="Hex colour for the thesis badge")
+    symbols: list[str] = Field(default_factory=list, description="Ticker symbols in this thesis, sorted")
+
+
 class CompanionConfig(_CamelModel):
     """The full config bundle the companion app pulls and caches."""
 
@@ -56,6 +65,11 @@ class CompanionConfig(_CamelModel):
     groups: list[ConfigGroup] = Field(default_factory=list, description="User groups, ordered")
     tickers: dict[str, ConfigTicker] = Field(default_factory=dict, description="symbol -> metadata")
     tags: dict[str, str] = Field(default_factory=dict, description="tag name -> hex colour")
+    theses: list[ConfigThesis] = Field(
+        default_factory=list,
+        description="Theses in the web board's order (by name). Optional, since servers that predate "
+        "it omit it. Every symbol here also has an entry in tickers, including ones in no group",
+    )
 
 
 #: Current calendar-contract version. Deliberately independent of
@@ -119,3 +133,20 @@ class CompanionCalendar(_CamelModel):
         "place the mapping is published. A name here may be absent from venues (filtered out, or its "
         "calendar failed to build) — fall back to the calendar-less approximation for those symbols"
     )
+
+
+#: Portfolio-index contract version, independent of the other two bundles.
+PORTFOLIO_INDEX_VERSION = 1
+
+
+class CompanionPortfolioIndex(_CamelModel):
+    """The equal-weight composite index of every grouped asset, as /api/portfolio/index computes it."""
+
+    version: Literal[1] = Field(description="Portfolio-index contract version the app gates on")
+    generated_at: datetime.datetime = Field(description="When this bundle was produced (UTC)")
+    period: PeriodType = Field(description="Lookback period the series covers")
+    dates: list[datetime.date] = Field(description="Session dates, ascending")
+    values: list[float] = Field(description="Index value per date, starting at 1000")
+    current: float | None = Field(description="Last index value, null when the index is empty")
+    change: float | None = Field(description="current minus the first value, null when the index is empty")
+    change_pct: float | None = Field(description="change as a percent of the first value, null when the index is empty")

@@ -8,17 +8,19 @@ the companion app validates with. Regenerate after any change to
     python -m scripts.export_companion_schema
     # -> backend/companion.schema.json
     # -> backend/companion.calendar.schema.json
+    # -> backend/companion.portfolio-index.schema.json
 """
 
 import json
 import pathlib
 
-from app.schemas.companion import CompanionCalendar, CompanionConfig
+from app.schemas.companion import CompanionCalendar, CompanionConfig, CompanionPortfolioIndex
 
 #: Model -> artifact filename, relative to the backend root.
 ARTIFACTS = {
     "companion.schema.json": CompanionConfig,
     "companion.calendar.schema.json": CompanionCalendar,
+    "companion.portfolio-index.schema.json": CompanionPortfolioIndex,
 }
 
 
