@@ -232,6 +232,17 @@ def test_next_phase_change_always_open_venue_has_none():
     assert venue.next_phase_change(_utc(2024, 4, 6, 12, 0)) is None
 
 
+def test_last_close_us_regular_day():
+    """Wednesday 2024-04-03, regular 13:30–20:00 UTC."""
+    venue = AssetRef("AAPL").venue
+    # Mid-session → the previous day's close.
+    assert venue.last_close(_utc(2024, 4, 3, 15, 0)) == _utc(2024, 4, 2, 20, 0)
+    # At the bell itself → the close that just happened.
+    assert venue.last_close(_utc(2024, 4, 3, 20, 0)) == _utc(2024, 4, 3, 20, 0)
+    # Overnight → still today's close.
+    assert venue.last_close(_utc(2024, 4, 4, 3, 0)) == _utc(2024, 4, 3, 20, 0)
+
+
 def test_any_venue_open_fails_open_on_unknown_venue():
     """An unresolvable symbol must never let the gate block real work."""
     assert any_venue_open(["FOO.XX"], _utc(2024, 4, 6, 12, 0)) is True

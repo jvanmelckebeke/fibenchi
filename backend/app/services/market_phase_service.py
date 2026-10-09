@@ -34,6 +34,7 @@ async def collect_market_phases(db: AsyncSession) -> dict[str, CalendarPhase]:
         out[name] = CalendarPhase(
             phase=phase,
             next_change_at=venue.next_phase_change(),
+            last_close_at=venue.last_close(),
             symbols=sorted(r.symbol for r in cal_refs),
         )
     return out

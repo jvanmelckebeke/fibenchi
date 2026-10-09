@@ -56,6 +56,7 @@ export function FilterBar({
           options={[
             { value: "all", label: "All" },
             { value: "open", label: "Open" },
+            { value: "relevant", label: "Relevant" },
           ]}
           value={phaseFilter}
           onChange={onPhaseFilter}

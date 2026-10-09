@@ -21,6 +21,11 @@ class CalendarPhase(BaseModel):
         description="When the scheduled phase next changes (UTC); the venue's next bell "
         "or extended-hours edge. None when the calendar can't answer."
     )
+    last_close_at: datetime | None = Field(
+        description="When the venue's most recent regular session closed (UTC). Lets a "
+        "client tell a session that closed overnight from one that closed yesterday. "
+        "None when the calendar can't answer."
+    )
     symbols: list[str] = Field(
         description="Grouped symbols trading on this calendar — the symbol→venue mapping "
         "lives backend-side (AssetRef), so clients get it here instead of re-deriving it "

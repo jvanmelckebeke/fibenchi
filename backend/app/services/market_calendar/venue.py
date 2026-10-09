@@ -238,6 +238,11 @@ class Venue:
     def previous_close(self, at: datetime | None = None) -> datetime | None:
         return self._schedule_point("previous_close", at)
 
+    def last_close(self, at: datetime | None = None) -> datetime | None:
+        """The most recent regular close at or before ``at``. Same one-minute
+        nudge as phase(), so a close at ``at`` counts as the one that just happened."""
+        return self._schedule_point("previous_close", _as_utc(at) + pd.Timedelta(minutes=1))
+
     def _schedule_point(self, method: str, at: datetime | None) -> datetime | None:
         try:
             return getattr(self._cal, method)(_as_utc(at)).to_pydatetime()

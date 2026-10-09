@@ -50,13 +50,15 @@ export function PortfolioPage() {
             ))}
           </div>
         ) : sections.length === 0 ? (
-          // An empty board under the Open filter is a normal state — a
+          // An empty board under Open or Relevant is a normal state — a
           // weekend, or the hours after the US close — not an empty account.
           // Saying "no assets" there would read as a broken board.
           <p className="py-16 text-center text-sm text-muted-foreground">
-            {phaseFilter === "open" && allTiles.length > 0 ? (
+            {phaseFilter !== "all" && allTiles.length > 0 ? (
               <>
-                No markets open right now.{" "}
+                {phaseFilter === "open"
+                  ? "No markets open right now."
+                  : "Nothing has traded since 04:00."}{" "}
                 <button
                   onClick={() => setPhaseFilter("all")}
                   className="underline underline-offset-2 hover:text-foreground"
