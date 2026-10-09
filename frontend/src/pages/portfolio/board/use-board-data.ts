@@ -73,6 +73,8 @@ export interface Tile {
   /** Venue calendar name + next scheduled phase change (tooltip). */
   calendar: string | null
   nextBell: string | null
+  /** When the venue's most recent regular session closed (UTC ISO). */
+  lastClose: string | null
   /** Whether the phase came from a live quote (vs the schedule fallback). */
   liveState: boolean
 }
@@ -90,8 +92,26 @@ export type GroupBy = "group" | "thesis"
 /** Which venue phases earn a tile. "open" is the trading session proper —
  * pre-market and after-hours are excluded on purpose: they're thin, the tile
  * carries no volume to show how thin, and the coverage badge already counts
- * "open" this way. One predicate, so the badge and the grid can't disagree. */
-export type PhaseFilter = "all" | "open"
+ * "open" this way. One predicate, so the badge and the grid can't disagree.
+ *
+ * "relevant" adds the venues whose last session closed since the viewer's
+ * night: open now, or closed after the most recent 04:00 local. */
+export type PhaseFilter = "all" | "open" | "relevant"
+
+/** 04:00 sits after US after-hours end (02:00 CET) and every Asian open in
+ * the book (Tokyo/Seoul 01:00–02:00, Hong Kong 02:30–03:30 CET/CEST), and
+ * before any Asian close (07:30 at the earliest). So an Asian session that
+ * closed overnight stays relevant until it reopens, and yesterday's US
+ * close drops out before morning. */
+const RELEVANCE_CUTOFF_HOUR = 4
+
+/** The most recent 04:00 in the viewer's local time, at or before `now`. */
+export function relevanceCutoff(now: Date): Date {
+  const cutoff = new Date(now)
+  cutoff.setHours(RELEVANCE_CUTOFF_HOUR, 0, 0, 0)
+  if (cutoff > now) cutoff.setDate(cutoff.getDate() - 1)
+  return cutoff
+}
 
 /** Narrow the tile map to what the filter admits. A `null` phase is an
  * unresolved calendar, not an open one, so it is hidden too — the filter
@@ -99,9 +119,17 @@ export type PhaseFilter = "all" | "open"
 export function applyPhaseFilter(
   tiles: Map<string, Tile>,
   filter: PhaseFilter,
+  now: Date = new Date(),
 ): Map<string, Tile> {
   if (filter === "all") return tiles
-  return new Map([...tiles].filter(([, t]) => t.phase === "open"))
+  if (filter === "open") return new Map([...tiles].filter(([, t]) => t.phase === "open"))
+  const cutoff = relevanceCutoff(now).getTime()
+  return new Map(
+    [...tiles].filter(
+      ([, t]) =>
+        t.phase === "open" || (t.lastClose != null && new Date(t.lastClose).getTime() > cutoff),
+    ),
+  )
 }
 
 /** Per-symbol % change series over the covering month, shared by the tiles'
@@ -204,10 +232,18 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   }, [groupBy, groups, theses])
 
   const symbolPhase = useMemo(() => {
-    const out: Record<string, { calendar: string; phase: Phase; nextBell: string | null }> = {}
+    const out: Record<
+      string,
+      { calendar: string; phase: Phase; nextBell: string | null; lastClose: string | null }
+    > = {}
     for (const [cal, entry] of Object.entries(phases ?? {}))
       for (const sym of entry.symbols)
-        out[sym] = { calendar: cal, phase: entry.phase, nextBell: entry.next_change_at }
+        out[sym] = {
+          calendar: cal,
+          phase: entry.phase,
+          nextBell: entry.next_change_at,
+          lastClose: entry.last_close_at,
+        }
     return out
   }, [phases])
 
@@ -252,6 +288,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
         phase,
         calendar: scheduled?.calendar ?? null,
         nextBell: scheduled?.nextBell ?? null,
+        lastClose: scheduled?.lastClose ?? null,
         liveState,
       })
     }

@@ -30,6 +30,7 @@ async def test_market_phases_lists_in_use_calendars(client, db):
     assert data[ams]["symbols"] == ["IWDA.AS"]
     for entry in data.values():
         assert entry["phase"] in PHASES
+        assert datetime.fromisoformat(entry["last_close_at"]).tzinfo is not None
         if entry["next_change_at"] is not None:
             # ISO datetime, parseable and tz-aware
             assert datetime.fromisoformat(entry["next_change_at"]).tzinfo is not None

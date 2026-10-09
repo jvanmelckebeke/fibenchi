@@ -311,6 +311,8 @@ export interface CalendarPhase {
   phase: "premarket" | "open" | "aftermarket" | "closed"
   /** UTC instant of the next phase transition; null when unanswerable (e.g. 24/7 venues). */
   next_change_at: string | null
+  /** UTC instant the most recent regular session closed; null when unanswerable. */
+  last_close_at: string | null
   /** Grouped symbols trading on this calendar — the symbol→venue mapping, served backend-side. */
   symbols: string[]
 }
