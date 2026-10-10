@@ -220,6 +220,24 @@ def daily_total_returns(
     return (closes + cash) / closes.shift(1) - 1
 
 
+def vnr_usable_returns(
+    closes: pd.Series,
+    gaps: pd.Series | None = None,
+    dividends: pd.Series | None = None,
+) -> pd.Series:
+    """The returns the σ-Move volatility forecast is built from.
+
+    Total returns with the gap-spanning ones dropped. The non-null count
+    through a bar is what the ``VNR_WARMUP_SESSIONS`` gate counts, so a
+    consumer that reports warmup progress reads it from here rather than
+    re-deriving the rule.
+    """
+    returns = daily_total_returns(closes, dividends)
+    if gaps is not None:
+        returns = returns.where(~(gaps > 1))
+    return returns
+
+
 def _ewma_daily_vol(
     closes: pd.Series,
     lam: float,
@@ -264,9 +282,7 @@ def _ewma_daily_vol(
     denominator. Below ``VNR_SIGMA_FLOOR_MIN_OBS`` observations the estimate is
     NaN and no floor applies.
     """
-    returns = daily_total_returns(closes, dividends)
-    if gaps is not None:
-        returns = returns.where(~(gaps > 1))
+    returns = vnr_usable_returns(closes, gaps, dividends)
     # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
     ewma_var = (returns**2).ewm(
         alpha=1 - lam, adjust=False, ignore_na=False, min_periods=warmup,
