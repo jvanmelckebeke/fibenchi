@@ -1,5 +1,82 @@
 {
   "$defs": {
+    "MoveScale": {
+      "description": "A symbol's own distribution of absolute moves over one board window.\n\nThe client places the live window move on it: the percentile is the\nposition of |move| on the piecewise-linear curve through\n(quantiles[i], i * 5%), clamped to [0, 1], taking the upper index where\nadjacent quantiles are equal.",
+      "properties": {
+        "quantiles": {
+          "description": "Absolute window returns in percent at p = 0, 5, ..., 100, ascending. Each sample is the change from the last close on or before the date one window earlier, measured on every stored session in the lookback",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 21,
+          "minItems": 21,
+          "title": "Quantiles",
+          "type": "array"
+        },
+        "samples": {
+          "description": "Window returns the quantiles were taken over",
+          "title": "Samples",
+          "type": "integer"
+        },
+        "lookbackDays": {
+          "description": "Calendar days from the earliest sampled session to the latest bar",
+          "title": "Lookbackdays",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "quantiles",
+        "samples",
+        "lookbackDays"
+      ],
+      "title": "MoveScale",
+      "type": "object"
+    },
+    "MoveScales": {
+      "description": "The move scale for each board window, null where the stored history is too short.\n\nThe full lookback is 364 days for 1wk and 2wk and 730 for 1mo. A shorter\nhistory still gets a scale when its samples span at least 182 days (1wk,\n2wk) or 364 days (1mo).",
+      "properties": {
+        "1wk": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoveScale"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "7 calendar days"
+        },
+        "2wk": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoveScale"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "14 calendar days"
+        },
+        "1mo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoveScale"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "30 calendar days"
+        }
+      },
+      "required": [
+        "1wk",
+        "2wk",
+        "1mo"
+      ],
+      "title": "MoveScales",
+      "type": "object"
+    },
     "PulseClose": {
       "description": "One stored daily close.",
       "properties": {
@@ -107,6 +184,18 @@
           },
           "title": "Tail",
           "type": "array"
+        },
+        "moveScale": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoveScales"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How unusual a window move is for this symbol, from its own stored history. Absent from servers older than contract 1.4.0"
         }
       },
       "required": [

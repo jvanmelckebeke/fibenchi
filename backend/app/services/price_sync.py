@@ -12,6 +12,7 @@ from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
 from app.services.companion_pulse_service import invalidate_pulse_cache
 from app.services.compute.group import invalidate_indicator_cache
+from app.services.move_scale_service import invalidate_move_scale_cache
 from app.services.price_providers import PriceProvider, get_price_provider
 
 logger = logging.getLogger(__name__)
@@ -281,6 +282,7 @@ async def _drop_and_persist(
         if removed:
             invalidate_indicator_cache([ref])
             invalidate_pulse_cache([ref])
+            invalidate_move_scale_cache([ref])
         if removed and not dropped:
             logger.info(
                 "%s: purged %d orphaned row(s) after %s — the provider no longer "
@@ -408,11 +410,13 @@ async def _upsert_prices(db: AsyncSession, ref: AssetRef, df: pd.DataFrame) -> i
     """Upsert price rows from a DataFrame. Returns row count.
 
     Every write path funnels through here, so this is where the batch
-    indicator and pulse caches learn that a symbol's series changed. Their keys
-    can't notice a corrected value or a backfilled interior session on their own.
+    indicator, pulse and move-scale caches learn that a symbol's series
+    changed. Their keys can't notice a corrected value or a backfilled
+    interior session on their own.
     """
     count = await PriceRepository(db).upsert_prices(ref, df)
     if count:
         invalidate_indicator_cache([ref])
         invalidate_pulse_cache([ref])
+        invalidate_move_scale_cache([ref])
     return count

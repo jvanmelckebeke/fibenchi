@@ -10,9 +10,11 @@ from app.domain import AssetRef
 from app.main import app
 from app.models import Asset, AssetType, PriceHistory
 from app.repositories.group_repo import GroupRepository
-from app.services import companion_pulse_service
+from app.services import companion_pulse_service, move_scale_service
 from app.services.companion_pulse_service import CLOSES_WINDOW_DAYS, invalidate_pulse_cache
 from app.services.compute.group import compute_ref_indicators, indicator_history_start
+from app.services.compute.move_scale import MOVE_WINDOWS, move_scale
+from app.services.price_sync import _upsert_prices
 from app.services.quote_service import _reset_asset_list_cache
 from tests.conftest import TestSession
 from tests.helpers import seed_asset_with_prices
@@ -23,8 +25,10 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 @pytest.fixture(autouse=True)
 def _clear_pulse_cache():
     companion_pulse_service._pulse_cache.clear()
+    move_scale_service._move_scale_cache.clear()
     yield
     companion_pulse_service._pulse_cache.clear()
+    move_scale_service._move_scale_cache.clear()
 
 
 async def _seed(
@@ -75,7 +79,7 @@ async def test_pulse_shape(client, db):
     assert body["missing"] == []
     assert set(body["symbols"]) == {"AAPL"}
     pulse = body["symbols"]["AAPL"]
-    assert set(pulse) == {"closes", "tail"}
+    assert set(pulse) == {"closes", "tail", "moveScale"}
     assert set(pulse["closes"][0]) == {"date", "close"}
     assert set(pulse["tail"][0]) == {"date", "close", "vnr", "vnrSigma", "gapSessions", "returns"}
 
@@ -324,3 +328,56 @@ async def test_sse_stream_is_neither_compressed_nor_buffered():
     assert headers["content-type"].startswith("text/event-stream")
     assert "content-encoding" not in headers
     assert seen_at_sleep and b"event: quotes" in seen_at_sleep[0]
+
+
+async def test_move_scale_rides_on_each_symbol(client, db):
+    dates = _weekdays(600)
+    closes = _walk(600)
+    await _seed(db, "MSFT", closes, dates)
+    await _seed(db, "NEWCO", _walk(150, seed=9), _weekdays(150))
+
+    body = (await client.get("/api/companion/pulse")).json()
+    scale = body["symbols"]["MSFT"]["moveScale"]
+    assert set(scale) == {"1wk", "2wk", "1mo"}
+    assert set(scale["1mo"]) == {"quantiles", "samples", "lookbackDays"}
+
+    series = pd.Series(closes, index=dates)
+    for key, w in MOVE_WINDOWS.items():
+        assert scale[key] == move_scale(series, w).model_dump(by_alias=True)
+
+    # About 30 weeks of history: enough for the weekly windows, not for 1mo.
+    short = body["symbols"]["NEWCO"]["moveScale"]
+    assert short["1wk"] is not None and short["2wk"] is not None
+    assert short["1wk"]["lookbackDays"] < 364
+    assert short["1mo"] is None
+
+    # The web board reads the same scales.
+    web = (await client.get("/api/move-scales")).json()
+    assert web["MSFT"] == scale
+    assert web["NEWCO"] == short
+
+
+async def test_move_scales_follow_a_price_write(client, db):
+    dates = _weekdays(400)
+    asset = await _seed(db, "MSFT", _walk(400), dates)
+    before = (await client.get("/api/move-scales")).json()["MSFT"]["1wk"]
+
+    # A corrected interior close does not move the latest bar date, so only the
+    # write's invalidation can refresh the cached scale.
+    frame = pd.DataFrame(
+        {"open": [500.0], "high": [500.0], "low": [500.0], "close": [500.0], "volume": [1]},
+        index=[dates[-20]],
+    )
+    with patch(
+        "app.services.price_sync.PriceRepository.upsert_prices", new=AsyncMock(return_value=1),
+    ):
+        await db.execute(
+            PriceHistory.__table__.update()
+            .where(PriceHistory.asset_id == asset.id, PriceHistory.date == dates[-20])
+            .values(close=500.0)
+        )
+        await db.commit()
+        await _upsert_prices(db, AssetRef("MSFT", asset.id), frame)
+
+    after = (await client.get("/api/move-scales")).json()["MSFT"]["1wk"]
+    assert after["quantiles"][-1] > before["quantiles"][-1]

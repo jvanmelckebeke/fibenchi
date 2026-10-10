@@ -102,6 +102,22 @@ class PriceRepository:
         )
         return list(result.scalars().all())
 
+    async def list_closes_by_assets_since(
+        self, asset_ids: list[int], start: date
+    ) -> list[tuple[int, date, float]]:
+        """(asset_id, date, close) rows, ordered by asset then date."""
+        if not asset_ids:
+            return []
+        result = await self.db.execute(
+            select(PriceHistory.asset_id, PriceHistory.date, PriceHistory.close)
+            .where(
+                PriceHistory.asset_id.in_(asset_ids),
+                PriceHistory.date >= start,
+            )
+            .order_by(PriceHistory.asset_id, PriceHistory.date)
+        )
+        return [tuple(row) for row in result.all()]
+
     async def get_latest_date(self, asset_ids: list[int]) -> date | None:
         if not asset_ids:
             return None

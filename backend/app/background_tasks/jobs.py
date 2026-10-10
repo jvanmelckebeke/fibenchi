@@ -59,7 +59,8 @@ async def warm_all_group_caches() -> int:
 async def warm_pulse_cache() -> None:
     """Build the companion pulse so the app's next open is served from cache.
 
-    Price writes invalidate it, so after a refresh this computes afresh.
+    The pulse carries the move scales, so this warms the board's copy too.
+    Price writes invalidate both, so after a refresh this computes afresh.
     """
     async with async_session() as db:
         try:
