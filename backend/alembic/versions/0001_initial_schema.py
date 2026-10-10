@@ -33,7 +33,10 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("symbol", sa.String(20), nullable=False),
         sa.Column("name", sa.String(200), nullable=False),
-        sa.Column("type", sa.Enum("stock", "etf", name="assettype"), nullable=False),
+        # Member names, which is what Enum(AssetType) writes. Databases that
+        # predate Alembic already had these from create_all and skip this
+        # revision above.
+        sa.Column("type", sa.Enum("STOCK", "ETF", name="assettype"), nullable=False),
         sa.Column("watchlisted", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("currency", sa.String(10), nullable=False, server_default="EUR"),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
