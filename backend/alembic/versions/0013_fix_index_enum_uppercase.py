@@ -29,7 +29,11 @@ depends_on = None
 def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
-        op.execute("ALTER TYPE assettype ADD VALUE IF NOT EXISTS 'INDEX'")
+        # Committed on its own: Postgres refuses to use a new enum value in the
+        # transaction that added it, and 0020 writes 'INDEX' in the same
+        # upgrade run on a fresh database.
+        with op.get_context().autocommit_block():
+            op.execute("ALTER TYPE assettype ADD VALUE IF NOT EXISTS 'INDEX'")
 
 
 def downgrade() -> None:

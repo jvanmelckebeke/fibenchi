@@ -20,6 +20,25 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # An empty Postgres for tests/integration/test_fresh_migrations.py, which
+    # builds a database from the migrations alone. Prod's database predates
+    # Alembic, so nothing else ever runs the early revisions.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fibenchi
+          POSTGRES_PASSWORD: fibenchi
+          POSTGRES_DB: fibenchi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fibenchi"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MIGRATIONS_DATABASE_URL: postgresql+asyncpg://fibenchi:fibenchi@localhost:5432/fibenchi
     steps:
       - uses: actions/checkout@v4
 
