@@ -21,10 +21,10 @@ export const RAMP_COLORS = [
 export type ColorMode = "sigma" | "pct"
 export type PctWindow = "1wk" | "2wk" | "1mo"
 
-export const PCT_WINDOWS: { value: PctWindow; label: string; days: number; maxAbs: number }[] = [
-  { value: "1wk", label: "1 week", days: 7, maxAbs: 7 },
-  { value: "2wk", label: "2 weeks", days: 14, maxAbs: 10 },
-  { value: "1mo", label: "1 month", days: 30, maxAbs: 14 },
+export const PCT_WINDOWS: { value: PctWindow; label: string; days: number }[] = [
+  { value: "1wk", label: "1 week", days: 7 },
+  { value: "2wk", label: "2 weeks", days: 14 },
+  { value: "1mo", label: "1 month", days: 30 },
 ]
 
 export function pctWindowDef(w: PctWindow) {

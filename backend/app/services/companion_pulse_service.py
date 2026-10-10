@@ -19,9 +19,17 @@ from app.domain import AssetRef
 from app.models import PriceHistory
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.price_repo import PriceRepository
-from app.schemas.companion import PULSE_VERSION, CompanionPulse, PulseClose, PulsePoint, PulseSymbol
+from app.schemas.companion import (
+    PULSE_VERSION,
+    CompanionPulse,
+    MoveScales,
+    PulseClose,
+    PulsePoint,
+    PulseSymbol,
+)
 from app.services.compute.group import compute_ref_indicators, load_indicator_history
 from app.services.compute.indicators import INDICATOR_REGISTRY, safe_round, vnr_usable_returns
+from app.services.move_scale_service import book_move_scales
 from app.utils import TTLCache
 
 #: Calendar days of closes before each symbol's latest bar.
@@ -50,7 +58,7 @@ def _round(value, column: str) -> float | None:
     return safe_round(value, _VNR.field_decimals.get(column, _VNR.decimals))
 
 
-def _pulse_symbol(ref: AssetRef, prices: list[PriceHistory]) -> PulseSymbol:
+def _pulse_symbol(ref: AssetRef, prices: list[PriceHistory], move_scale: MoveScales | None) -> PulseSymbol:
     indicators = compute_ref_indicators(ref, prices)
     # vnr_gap_sessions and vnr_ex_div equal the gap series and the dividends
     # everywhere the count can see them (gaps > 1, payouts > 0), so this is
@@ -79,10 +87,14 @@ def _pulse_symbol(ref: AssetRef, prices: list[PriceHistory]) -> PulseSymbol:
                 returns=int(returns.loc[d]),
             )
         )
-    return PulseSymbol(closes=closes, tail=tail)
+    return PulseSymbol(closes=closes, tail=tail, move_scale=move_scale)
 
 
-def _assemble(refs: list[AssetRef], history: dict[AssetRef, list[PriceHistory]]) -> CompanionPulse:
+def _assemble(
+    refs: list[AssetRef],
+    history: dict[AssetRef, list[PriceHistory]],
+    scales: dict[str, MoveScales],
+) -> CompanionPulse:
     symbols: dict[str, PulseSymbol] = {}
     missing: list[str] = []
     for ref in sorted(refs, key=str):
@@ -90,7 +102,7 @@ def _assemble(refs: list[AssetRef], history: dict[AssetRef, list[PriceHistory]])
         if not prices:
             missing.append(ref.symbol)
             continue
-        symbols[ref.symbol] = _pulse_symbol(ref, prices)
+        symbols[ref.symbol] = _pulse_symbol(ref, prices, scales.get(ref.symbol))
     return CompanionPulse(
         version=PULSE_VERSION,
         generated_at=datetime.datetime.now(datetime.UTC),
@@ -110,8 +122,9 @@ async def build_pulse(db: AsyncSession) -> CompanionPulse:
         return cached
 
     history = await load_indicator_history(db, refs)
+    scales = await book_move_scales(db)
     # The indicator pass over the whole book is seconds of pandas work, so it
     # runs off the event loop to keep the SSE stream and other requests moving.
-    pulse = await asyncio.to_thread(_assemble, refs, history)
+    pulse = await asyncio.to_thread(_assemble, refs, history, scales)
     _pulse_cache.set_value(cache_key, pulse)
     return pulse

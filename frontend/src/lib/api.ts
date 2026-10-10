@@ -25,6 +25,7 @@ import type {
   PseudoETF,
   PseudoETFCreate,
   PseudoETFUpdate,
+  MoveScales,
   SparklinePoint,
   SymbolSearchResult,
   SymbolSource,
@@ -174,6 +175,10 @@ export const api = {
       if (period) params.append("period", period)
       return request<Record<string, SparklinePoint[]>>(`/sparklines?${params.toString()}`)
     },
+  },
+  moveScales: {
+    /** Each tracked symbol's move scale per board window, keyed by symbol. */
+    list: () => request<Record<string, MoveScales>>(`/move-scales`),
   },
   market: {
     /** Scheduled phase + next bell per in-use venue calendar (with its symbols). */

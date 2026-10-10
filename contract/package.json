@@ -1,6 +1,6 @@
 {
   "name": "@jvanmelckebeke/fibenchi-contract",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "The contract between the fibenchi backend and its companion app: config, calendar, portfolio-index and pulse Zod schemas, the indicator contract and its golden fixtures.",
   "license": "Apache-2.0",
   "repository": {

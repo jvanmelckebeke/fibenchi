@@ -101,7 +101,7 @@ export const BoardTile = memo(function BoardTile({
           >
             {valueEl}
           </span>
-          <WindowBars windowPct={tile.windowPct} />
+          <WindowBars windowPct={tile.windowPct} windowPercentile={tile.windowPercentile} />
         </Link>
       </TooltipTrigger>
       {/* The default TooltipContent surface is bg-foreground/text-background —

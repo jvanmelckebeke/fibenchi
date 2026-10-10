@@ -21,6 +21,7 @@ from app.routers import (
     holdings,
     indicators,
     market,
+    move_scales,
     note,
     portfolio,
     prices,
@@ -207,6 +208,7 @@ app.include_router(prices.router)
 app.include_router(holdings.router)
 app.include_router(indicators.router)
 app.include_router(market.router)
+app.include_router(move_scales.router)
 app.include_router(note.router)
 app.include_router(thesis.router)
 app.include_router(annotations.router)

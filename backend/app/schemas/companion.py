@@ -182,6 +182,39 @@ class PulsePoint(_CamelModel):
     )
 
 
+class MoveScale(_CamelModel):
+    """A symbol's own distribution of absolute moves over one board window.
+
+    The client places the live window move on it: the percentile is the
+    position of |move| on the piecewise-linear curve through
+    (quantiles[i], i * 5%), clamped to [0, 1], taking the upper index where
+    adjacent quantiles are equal.
+    """
+
+    quantiles: list[float] = Field(
+        min_length=21,
+        max_length=21,
+        description="Absolute window returns in percent at p = 0, 5, ..., 100, ascending. Each sample is the "
+        "change from the last close on or before the date one window earlier, measured on every stored "
+        "session in the lookback",
+    )
+    samples: int = Field(description="Window returns the quantiles were taken over")
+    lookback_days: int = Field(description="Calendar days from the earliest sampled session to the latest bar")
+
+
+class MoveScales(_CamelModel):
+    """The move scale for each board window, null where the stored history is too short.
+
+    The full lookback is 364 days for 1wk and 2wk and 730 for 1mo. A shorter
+    history still gets a scale when its samples span at least 182 days (1wk,
+    2wk) or 364 days (1mo).
+    """
+
+    one_week: MoveScale | None = Field(alias="1wk", description="7 calendar days")
+    two_weeks: MoveScale | None = Field(alias="2wk", description="14 calendar days")
+    one_month: MoveScale | None = Field(alias="1mo", description="30 calendar days")
+
+
 class PulseSymbol(_CamelModel):
     """Recent closes and the latest σ-Move readings for one symbol."""
 
@@ -189,6 +222,11 @@ class PulseSymbol(_CamelModel):
         description="Every stored close from 40 calendar days before the latest bar through it, ascending"
     )
     tail: list[PulsePoint] = Field(description="The last two stored bars (one if only one exists), ascending")
+    move_scale: MoveScales | None = Field(
+        default=None,
+        description="How unusual a window move is for this symbol, from its own stored history. Absent from "
+        "servers older than contract 1.4.0",
+    )
 
 
 class CompanionPulse(_CamelModel):
