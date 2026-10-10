@@ -13,6 +13,7 @@ import {
   useGroups,
   useIndicators,
   useMarketPhases,
+  useMoveScales,
   useSparklines,
   useTheses,
 } from "@/lib/queries"
@@ -21,6 +22,7 @@ import { resolveSigma, sigmaExDiv, type WithheldReason } from "@/lib/sigma"
 import { marketState } from "@/lib/market-state"
 import { type PctWindow, PCT_WINDOWS } from "./color-scale"
 import { windowCutoffs, windowPct } from "./window-returns"
+import { movePercentile } from "./move-percentile"
 
 export type Phase = "premarket" | "open" | "aftermarket" | "closed"
 
@@ -65,6 +67,9 @@ export interface Tile {
   price: number | null
   /** % change over each board window (from the shared 1mo series). */
   windowPct: Record<PctWindow, number | null>
+  /** Where each window's move sits in the symbol's own history of moves over
+   * that window, 0..1. Null without a move or without enough history. */
+  windowPercentile: Record<PctWindow, number | null>
   /** The 1mo close series the windows were derived from (tooltip sparkline). */
   spark: SparklinePoint[]
   /** Sections this symbol belongs to under the active grouping (tooltip). */
@@ -216,6 +221,22 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   } = useIndicators(fetchSymbols)
   const snapshotsPending = snapshotsFetching || snapshotsStale
   const { windows: windowReturns, series } = useWindowReturns(fetchSymbols)
+  const { data: moveScales } = useMoveScales()
+
+  const windowPercentiles = useMemo(() => {
+    const out: Record<string, Record<PctWindow, number | null>> = {}
+    for (const [sym, per] of Object.entries(windowReturns)) {
+      const scales = moveScales?.[sym]
+      const ranks = {} as Record<PctWindow, number | null>
+      for (const w of PCT_WINDOWS) {
+        const v = per[w.value]
+        const scale = scales?.[w.value]
+        ranks[w.value] = v != null && scale ? movePercentile(v, scale.quantiles) : null
+      }
+      out[sym] = ranks
+    }
+    return out
+  }, [windowReturns, moveScales])
 
   // Which sections each symbol sits in, under the active grouping — the one
   // question the tooltip can answer that the grid can't, since a tile only
@@ -283,6 +304,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
         todayPct: quote?.change_percent ?? snap?.change_pct ?? null,
         price: quote?.price ?? snap?.close ?? null,
         windowPct: windowReturns[symbol] ?? EMPTY_WINDOWS,
+        windowPercentile: windowPercentiles[symbol] ?? EMPTY_WINDOWS,
         spark: series?.[symbol] ?? [],
         sections: sectionsBySymbol[symbol] ?? [],
         phase,
@@ -293,7 +315,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       })
     }
     return out
-  }, [roster, quotes, snapshots, snapshotsPending, windowReturns, series, sectionsBySymbol, symbolPhase, health])
+  }, [roster, quotes, snapshots, snapshotsPending, windowReturns, windowPercentiles, series, sectionsBySymbol, symbolPhase, health])
 
   // Filtering happens on the tile map, before sections are assembled: the
   // lookups below then drop the hidden symbols by themselves, the

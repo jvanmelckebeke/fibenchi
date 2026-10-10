@@ -293,6 +293,21 @@ export interface SparklinePoint {
   close: number
 }
 
+/** A symbol's own distribution of absolute moves over one board window:
+ * |return| in percent at p = 0, 5, ..., 100. */
+export interface MoveScale {
+  quantiles: number[]
+  samples: number
+  lookbackDays: number
+}
+
+/** Null where the stored history is too short to say what is unusual. */
+export interface MoveScales {
+  "1wk": MoveScale | null
+  "2wk": MoveScale | null
+  "1mo": MoveScale | null
+}
+
 export interface IndicatorSummary {
   close: number | null
   /** Exchange-local date of the last bar behind this snapshot. Pair with a
