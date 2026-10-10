@@ -3,9 +3,10 @@
 The contract between the fibenchi backend and the companion app
 ([fibenchi-app](https://github.com/jvanmelckebeke/fibenchi-app)). It holds:
 
-- `companionConfigSchema`, `companionCalendarSchema` and
-  `companionPortfolioIndexSchema`, Zod schemas for `GET /api/companion/config`,
-  `GET /api/companion/calendar` and `GET /api/companion/portfolio-index`
+- `companionConfigSchema`, `companionCalendarSchema`,
+  `companionPortfolioIndexSchema` and `companionPulseSchema`, Zod schemas for
+  `GET /api/companion/config`, `GET /api/companion/calendar`,
+  `GET /api/companion/portfolio-index` and `GET /api/companion/pulse`
 - `indicatorContractSchema` and `INDICATOR_CONTRACT`, the indicator registry metadata
   and its Zod schema
 - the raw artifacts as JSON subpaths, including
@@ -33,8 +34,8 @@ the `dev` prerelease that matches it, not `latest`.
 Bump `version` in `package.json` in the PR that changes a contract. CI fails a
 PR that changes the artifacts without a bump. Use major when a bundle version
 (`CONFIG_VERSION`, `CALENDAR_VERSION`,
-`PORTFOLIO_INDEX_VERSION`) changes, minor for an additive change
-(a new indicator or field), and patch otherwise. The three bundles version
+`PORTFOLIO_INDEX_VERSION`, `PULSE_VERSION`) changes, minor for an additive change
+(a new indicator or field), and patch otherwise. The four bundles version
 independently at runtime, but the package has only one major.
 
 The first version was published by hand, because npm can only configure trusted

@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from datetime import date, timedelta
 
+import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import PERIOD_DAYS, WARMUP_DAYS
@@ -105,6 +106,40 @@ async def _sparklines_for_refs(
     return out
 
 
+def indicator_history_start() -> date:
+    """First date the DB-backed indicator paths load: the 3mo view plus warmup.
+
+    Shared so every consumer of :func:`compute_ref_indicators` starts its EWMAs
+    on the same bar, and so reports the same σ-Move for the same stored bar.
+    """
+    return date.today() - timedelta(days=PERIOD_DAYS["3mo"] + WARMUP_DAYS)
+
+
+async def load_indicator_history(
+    db: AsyncSession, refs: list[AssetRef],
+) -> dict[AssetRef, list[PriceHistory]]:
+    """Stored bars since :func:`indicator_history_start` per ref, in one query.
+
+    Refs without an id or without bars in that window are omitted.
+    """
+    by_id = {ref.id: ref for ref in refs if ref.id is not None}
+    if not by_id:
+        return {}
+    prices = await PriceRepository(db).list_by_assets_since(list(by_id), indicator_history_start())
+    out: dict[AssetRef, list[PriceHistory]] = {}
+    for p in prices:
+        out.setdefault(by_id[p.asset_id], []).append(p)
+    return out
+
+
+def compute_ref_indicators(ref: AssetRef, prices: list[PriceHistory]) -> pd.DataFrame:
+    """The full indicator frame for one asset's stored bars, venue-calendar exact."""
+    df = prices_to_df(prices)
+    venue = ref.venue
+    sessions = venue.session_dates_for_index(df.index) if venue else None
+    return compute_indicators(df, session_dates=sessions)
+
+
 async def _compute_snapshots_for_refs(
     db: AsyncSession, refs: list[AssetRef],
 ) -> dict[str, IndicatorSnapshotBase]:
@@ -118,10 +153,8 @@ async def _compute_snapshots_for_refs(
     if not by_id:
         return {}
 
-    price_repo = PriceRepository(db)
-
     # Build cache key: symbols + latest price date (scope-independent by design)
-    latest_date = await price_repo.get_latest_date(list(by_id))
+    latest_date = await PriceRepository(db).get_latest_date(list(by_id))
     cache_key = (frozenset(ref.symbol for ref in by_id.values()), latest_date)
 
     cached = _indicator_cache.get_value(cache_key)
@@ -129,28 +162,15 @@ async def _compute_snapshots_for_refs(
         return cached
 
     # Fetch enough history for indicator warmup (SMA50 needs ~50 trading days)
-    warmup_start = date.today() - timedelta(days=PERIOD_DAYS["3mo"] + WARMUP_DAYS)
-
-    all_prices = await price_repo.list_by_assets_since(list(by_id), warmup_start)
-
-    # Group prices by asset
-    grouped: dict[int, list[PriceHistory]] = {}
-    for p in all_prices:
-        grouped.setdefault(p.asset_id, []).append(p)
+    history = await load_indicator_history(db, list(by_id.values()))
 
     out: dict[str, IndicatorSnapshotBase] = {}
-    for asset_id, ref in by_id.items():
-        prices = grouped.get(asset_id, [])
+    for ref in by_id.values():
+        prices = history.get(ref, [])
         if len(prices) < 26:  # Need at least MACD slow period
             out[ref.symbol] = IndicatorSnapshotBase(bars=len(prices))
             continue
-
-        df = prices_to_df(prices)
-
-        venue = ref.venue
-        sessions = venue.session_dates_for_index(df.index) if venue else None
-        snapshot = build_indicator_snapshot(compute_indicators(df, session_dates=sessions))
-        out[ref.symbol] = snapshot
+        out[ref.symbol] = build_indicator_snapshot(compute_ref_indicators(ref, prices))
 
     # Merge cached fundamental metrics; background-fetch any misses
     merge_fundamentals_from_cache([ref.symbol for ref in by_id.values()], out)

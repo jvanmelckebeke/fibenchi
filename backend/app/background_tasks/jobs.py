@@ -16,6 +16,7 @@ from app.background_tasks.registry import background_task
 from app.background_tasks.split_heal import heal_split_discontinuities
 from app.config import settings as app_settings
 from app.database import async_session
+from app.services.companion_pulse_service import build_pulse
 from app.services.compute.group import compute_and_cache_indicators
 from app.services.intraday import cleanup_old_intraday, fetch_and_store_intraday
 from app.services.market_calendar import any_venue_open
@@ -55,6 +56,19 @@ async def warm_all_group_caches() -> int:
     return warmed
 
 
+async def warm_pulse_cache() -> None:
+    """Build the companion pulse so the app's next open is served from cache.
+
+    Price writes invalidate it, so after a refresh this computes afresh.
+    """
+    async with async_session() as db:
+        try:
+            pulse = await build_pulse(db)
+            logger.info(f"Companion pulse cached for {len(pulse.symbols)} symbols")
+        except Exception:
+            logger.exception("Companion pulse warm failed (non-fatal)")
+
+
 async def startup_warmup() -> None:
     """Pre-compute indicator caches at startup.
 
@@ -71,6 +85,7 @@ async def startup_warmup() -> None:
     except Exception:
         logger.exception("Startup indicator warmup failed (non-fatal)")
 
+    await warm_pulse_cache()
     await bootstrap_volume_curves()
 
 
@@ -129,7 +144,7 @@ def _refresh_trigger() -> CronTrigger | None:
 @background_task("price_refresh", trigger=_refresh_trigger)
 @background_task("price_refresh_supplemental", trigger=CronTrigger(minute="0", hour="8,16"))
 async def scheduled_refresh():
-    """Refresh all asset prices, then warm the indicator cache."""
+    """Refresh all asset prices, then warm the indicator and pulse caches."""
     logger.info("Running scheduled price refresh...")
     async with async_session() as db:
         try:
@@ -146,6 +161,8 @@ async def scheduled_refresh():
             logger.info(f"Pre-computed indicator caches for {warmed} groups")
     except Exception:
         logger.exception("Indicator pre-computation failed (non-fatal)")
+
+    await warm_pulse_cache()
 
     # Clean up old intraday data (keep only last 2 days)
     async with async_session() as db:

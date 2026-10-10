@@ -5,6 +5,7 @@ from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
@@ -181,7 +182,7 @@ app = FastAPI(
         },
         {
             "name": "companion",
-            "description": "Versioned config bundle (groups + tickers + tags) for the mobile companion app — tells it what to track; live data is fetched on-device.",
+            "description": "Versioned bundles for the mobile companion app: the config (groups + tickers + tags) that tells it what to track, the venue calendar, the portfolio index, and the pulse of recent closes and σ-Move state.",
         },
         {
             "name": "system",
@@ -189,6 +190,11 @@ app = FastAPI(
         },
     ],
 )
+
+# Nothing in front of the app compresses (Traefik on wstation has no compress
+# middleware). Starlette leaves text/event-stream uncompressed by default, so
+# the SSE quote stream still flushes each event as it is sent.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.include_router(assets.router)
 app.include_router(data.router)

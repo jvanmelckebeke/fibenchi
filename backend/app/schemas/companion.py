@@ -150,3 +150,55 @@ class CompanionPortfolioIndex(_CamelModel):
     current: float | None = Field(description="Last index value, null when the index is empty")
     change: float | None = Field(description="current minus the first value, null when the index is empty")
     change_pct: float | None = Field(description="change as a percent of the first value, null when the index is empty")
+
+
+#: Pulse contract version, independent of the other bundles.
+PULSE_VERSION = 1
+
+
+class PulseClose(_CamelModel):
+    """One stored daily close."""
+
+    date: datetime.date = Field(description="Session date")
+    close: float = Field(description="Close in the major currency unit the config's ticker currency names")
+
+
+class PulsePoint(_CamelModel):
+    """One stored bar with its σ-Move readings, as the web's indicator series has them."""
+
+    date: datetime.date = Field(description="Session date")
+    close: float = Field(description="Close in the major currency unit the config's ticker currency names")
+    vnr: float | None = Field(description="σ-Move of this bar's return (indicator key vnr), null when not scored")
+    vnr_sigma: float | None = Field(
+        description="vnr_sigma at this bar: the volatility forecast for the next session, null before warmup"
+    )
+    gap_sessions: int | None = Field(
+        description="vnr_gap_sessions at this bar: sessions spanned when the previous stored bar is more than "
+        "one session back, else null"
+    )
+    returns: int = Field(
+        description="Usable returns observed through this bar (gap-spanning ones excluded), the count the "
+        "vnr warmup gate compares against"
+    )
+
+
+class PulseSymbol(_CamelModel):
+    """Recent closes and the latest σ-Move readings for one symbol."""
+
+    closes: list[PulseClose] = Field(
+        description="Every stored close from 40 calendar days before the latest bar through it, ascending"
+    )
+    tail: list[PulsePoint] = Field(description="The last two stored bars (one if only one exists), ascending")
+
+
+class CompanionPulse(_CamelModel):
+    """Precomputed recent closes and σ-Move state for every tracked symbol."""
+
+    version: Literal[1] = Field(description="Pulse contract version the app gates on")
+    generated_at: datetime.datetime = Field(description="When this bundle was produced (UTC)")
+    symbols: dict[str, PulseSymbol] = Field(
+        description="symbol -> pulse, for every tracked symbol with stored bars (the config's tickers set)"
+    )
+    missing: list[str] = Field(
+        description="Tracked symbols with no stored bars in the indicator history window (about 18 months), sorted"
+    )

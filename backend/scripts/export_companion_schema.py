@@ -9,18 +9,20 @@ the companion app validates with. Regenerate after any change to
     # -> backend/companion.schema.json
     # -> backend/companion.calendar.schema.json
     # -> backend/companion.portfolio-index.schema.json
+    # -> backend/companion.pulse.schema.json
 """
 
 import json
 import pathlib
 
-from app.schemas.companion import CompanionCalendar, CompanionConfig, CompanionPortfolioIndex
+from app.schemas.companion import CompanionCalendar, CompanionConfig, CompanionPortfolioIndex, CompanionPulse
 
 #: Model -> artifact filename, relative to the backend root.
 ARTIFACTS = {
     "companion.schema.json": CompanionConfig,
     "companion.calendar.schema.json": CompanionCalendar,
     "companion.portfolio-index.schema.json": CompanionPortfolioIndex,
+    "companion.pulse.schema.json": CompanionPulse,
 }
 
 
