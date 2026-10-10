@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import PeriodType
 from app.database import get_db
-from app.schemas.companion import CompanionCalendar, CompanionConfig, CompanionPortfolioIndex
-from app.services import companion_calendar_service, companion_service
+from app.schemas.companion import CompanionCalendar, CompanionConfig, CompanionPortfolioIndex, CompanionPulse
+from app.services import companion_calendar_service, companion_pulse_service, companion_service
 
 router = APIRouter(prefix="/api/companion", tags=["companion"])
 
@@ -58,3 +58,10 @@ async def get_companion_portfolio_index(
 ):
     """The same equal-weight composite index as ``/api/portfolio/index``, as a versioned bundle."""
     return await companion_service.build_portfolio_index(db, period)
+
+
+@router.get("/pulse", response_model=CompanionPulse, summary="Companion app recent closes and σ-Move state")
+async def get_companion_pulse(db: AsyncSession = Depends(get_db)):
+    """Recent closes and the last two bars' σ-Move readings for every tracked symbol, so the app
+    can draw its board without fetching months of daily bars per symbol. Cached until a price write."""
+    return await companion_pulse_service.build_pulse(db)

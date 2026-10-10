@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain import AssetRef
 from app.models import Asset
 from app.models.group import group_assets
+from app.models.thesis import thesis_assets
 
 
 class AssetRepository:
@@ -38,6 +39,19 @@ class AssetRepository:
         result = await self.db.execute(
             select(Asset.id, Asset.symbol)
             .where(exists().where(group_assets.c.asset_id == Asset.id))
+        )
+        return [AssetRef(sym, aid) for aid, sym in result.all()]
+
+    async def list_in_any_group_or_thesis_refs(self) -> list[AssetRef]:
+        """Return an :class:`AssetRef` per asset in at least one group or thesis.
+
+        The set the companion config lists in ``tickers``.
+        """
+        result = await self.db.execute(
+            select(Asset.id, Asset.symbol).where(
+                exists().where(group_assets.c.asset_id == Asset.id)
+                | exists().where(thesis_assets.c.asset_id == Asset.id)
+            )
         )
         return [AssetRef(sym, aid) for aid, sym in result.all()]
 

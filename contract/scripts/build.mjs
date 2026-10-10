@@ -19,6 +19,7 @@ const ARTIFACTS = [
   'companion.schema.json',
   'companion.calendar.schema.json',
   'companion.portfolio-index.schema.json',
+  'companion.pulse.schema.json',
   'indicator.contract.json',
   'indicator.contract.schema.json',
   'indicator.fixtures.json',
@@ -86,6 +87,10 @@ writeFileSync(
 writeFileSync(
   join(GENERATED, 'portfolio-index.schema.ts'),
   zodModule('companion.portfolio-index.schema.json', 'companionPortfolioIndexSchema'),
+);
+writeFileSync(
+  join(GENERATED, 'pulse.schema.ts'),
+  zodModule('companion.pulse.schema.json', 'companionPulseSchema'),
 );
 writeFileSync(
   join(GENERATED, 'indicator.schema.ts'),

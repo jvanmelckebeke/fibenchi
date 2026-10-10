@@ -1,0 +1,159 @@
+{
+  "$defs": {
+    "PulseClose": {
+      "description": "One stored daily close.",
+      "properties": {
+        "date": {
+          "description": "Session date",
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "close": {
+          "description": "Close in the major currency unit the config's ticker currency names",
+          "title": "Close",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "close"
+      ],
+      "title": "PulseClose",
+      "type": "object"
+    },
+    "PulsePoint": {
+      "description": "One stored bar with its \u03c3-Move readings, as the web's indicator series has them.",
+      "properties": {
+        "date": {
+          "description": "Session date",
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "close": {
+          "description": "Close in the major currency unit the config's ticker currency names",
+          "title": "Close",
+          "type": "number"
+        },
+        "vnr": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "\u03c3-Move of this bar's return (indicator key vnr), null when not scored",
+          "title": "Vnr"
+        },
+        "vnrSigma": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "vnr_sigma at this bar: the volatility forecast for the next session, null before warmup",
+          "title": "Vnrsigma"
+        },
+        "gapSessions": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "vnr_gap_sessions at this bar: sessions spanned when the previous stored bar is more than one session back, else null",
+          "title": "Gapsessions"
+        },
+        "returns": {
+          "description": "Usable returns observed through this bar (gap-spanning ones excluded), the count the vnr warmup gate compares against",
+          "title": "Returns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "date",
+        "close",
+        "vnr",
+        "vnrSigma",
+        "gapSessions",
+        "returns"
+      ],
+      "title": "PulsePoint",
+      "type": "object"
+    },
+    "PulseSymbol": {
+      "description": "Recent closes and the latest \u03c3-Move readings for one symbol.",
+      "properties": {
+        "closes": {
+          "description": "Every stored close from 40 calendar days before the latest bar through it, ascending",
+          "items": {
+            "$ref": "#/$defs/PulseClose"
+          },
+          "title": "Closes",
+          "type": "array"
+        },
+        "tail": {
+          "description": "The last two stored bars (one if only one exists), ascending",
+          "items": {
+            "$ref": "#/$defs/PulsePoint"
+          },
+          "title": "Tail",
+          "type": "array"
+        }
+      },
+      "required": [
+        "closes",
+        "tail"
+      ],
+      "title": "PulseSymbol",
+      "type": "object"
+    }
+  },
+  "description": "Precomputed recent closes and \u03c3-Move state for every tracked symbol.",
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Pulse contract version the app gates on",
+      "title": "Version",
+      "type": "integer"
+    },
+    "generatedAt": {
+      "description": "When this bundle was produced (UTC)",
+      "format": "date-time",
+      "title": "Generatedat",
+      "type": "string"
+    },
+    "symbols": {
+      "additionalProperties": {
+        "$ref": "#/$defs/PulseSymbol"
+      },
+      "description": "symbol -> pulse, for every tracked symbol with stored bars (the config's tickers set)",
+      "title": "Symbols",
+      "type": "object"
+    },
+    "missing": {
+      "description": "Tracked symbols with no stored bars in the indicator history window (about 18 months), sorted",
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "generatedAt",
+    "symbols",
+    "missing"
+  ],
+  "title": "CompanionPulse",
+  "type": "object"
+}
