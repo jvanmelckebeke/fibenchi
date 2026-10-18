@@ -40,15 +40,20 @@ The Vite dev server proxies `/api/*` to the backend container.
 ```bash
 pytest                            # Run all tests
 pytest tests/test_assets.py -k test_name  # Single test
+ruff check . && ruff format --check .     # Lint + format check (CI runs both)
+ruff format .                     # Fix formatting
 ```
 
 **Frontend** (run inside container: `docker compose exec frontend <cmd>`):
 ```bash
-pnpm run lint                     # ESLint
+pnpm run lint                     # ESLint, then prettier --check
+pnpm run format                   # Fix formatting (prettier --write)
 pnpm run build                    # TypeScript check + Vite build
 ```
 
-**CI** (`.github/workflows/ci.yaml`): runs `pytest` (backend), `pnpm lint` + `pnpm build` (frontend), then builds/pushes a Docker image to GHCR. Push to `main` tags `latest`, push to `dev` tags `dev`.
+Both formatters are enforced: unformatted code fails `pnpm run lint` and the backend's `ruff format --check`, so run `pnpm run format` / `ruff format .` before committing. `.git-blame-ignore-revs` lists the mass-reformat commits; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone so `git blame` skips them.
+
+**CI** (`.github/workflows/ci.yaml`): runs `ruff check`, `ruff format --check` and `pytest` (backend), `pnpm lint` (eslint + prettier) + `pnpm build` + `pnpm test` (frontend), then builds/pushes a Docker image to GHCR. Push to `main` tags `latest`, push to `dev` tags `dev`.
 
 ## Branching Strategy
 
