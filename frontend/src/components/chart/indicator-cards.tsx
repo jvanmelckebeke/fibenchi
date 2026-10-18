@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import type { LegendValues } from "./chart-legends"
 import type { IChartApi } from "lightweight-charts"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { type IndicatorDescriptor } from "@/lib/indicator-registry"
 import { buildIndicatorTimeMap } from "@/lib/chart-utils"
 import { IndicatorValue } from "@/components/indicators/indicator-value"
@@ -87,12 +82,8 @@ function ModalChart({
 
   return (
     <div className="flex flex-col gap-1">
-      <SubChartLegend
-        descriptorId={descriptor.id}
-        values={hoverValues}
-        latest={latestValues}
-      />
-      <div ref={containerRef} className="w-full rounded-md overflow-hidden" />
+      <SubChartLegend descriptorId={descriptor.id} values={hoverValues} latest={latestValues} />
+      <div ref={containerRef} className="w-full overflow-hidden rounded-md" />
     </div>
   )
 }
@@ -136,15 +127,23 @@ export function IndicatorCards({ descriptors, currency, compact }: IndicatorCard
             key={desc.id}
             type="button"
             onClick={() => setOpenDescriptor(desc)}
-            className={cardClass}
-          >
+            className={cardClass}>
             <div className="flex flex-col gap-0.5">
-              <span className={`font-medium ${compact ? "text-xs" : "text-sm"}`}>{desc.shortLabel}</span>
+              <span className={`font-medium ${compact ? "text-xs" : "text-sm"}`}>
+                {desc.shortLabel}
+              </span>
               {!compact && desc.description && (
-                <span className="text-[11px] leading-tight text-muted-foreground">{desc.description}</span>
+                <span className="text-[11px] leading-tight text-muted-foreground">
+                  {desc.description}
+                </span>
               )}
             </div>
-            <IndicatorValue descriptor={desc} values={values} currency={currency} compact={compact} />
+            <IndicatorValue
+              descriptor={desc}
+              values={values}
+              currency={currency}
+              compact={compact}
+            />
           </button>
         ))}
       </div>
@@ -157,9 +156,7 @@ export function IndicatorCards({ descriptors, currency, compact }: IndicatorCard
               <p className="text-sm text-muted-foreground">{openDescriptor.description}</p>
             )}
           </DialogHeader>
-          {openDescriptor && (
-            <ModalChart descriptor={openDescriptor} latestValues={latestValues} />
-          )}
+          {openDescriptor && <ModalChart descriptor={openDescriptor} latestValues={latestValues} />}
         </DialogContent>
       </Dialog>
     </>

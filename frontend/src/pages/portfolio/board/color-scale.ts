@@ -99,7 +99,7 @@ export interface ScaleTile {
  * counted rather than dropped, since they decide whether it may tighten. */
 export function boardScale(
   tiles: ScaleTile[],
-  mode: ColorMode,
+  mode: ColorMode
 ): { span: number; unread: number; pending: number; tightened: boolean } {
   const readings = tiles
     .map((t) => (mode === "sigma" ? t.sigma : t.todayPct))
@@ -107,9 +107,7 @@ export function boardScale(
   const pending = tiles.filter((t) => t.reason?.kind === "pending").length
   return {
     span:
-      mode === "sigma"
-        ? 3 * sigmaUnit(readings, tiles.length)
-        : pctSpan(readings, tiles.length),
+      mode === "sigma" ? 3 * sigmaUnit(readings, tiles.length) : pctSpan(readings, tiles.length),
     unread: tiles.length - readings.length - pending,
     pending,
     tightened: hasTighteningCoverage(readings.length, tiles.length),

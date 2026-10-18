@@ -62,7 +62,7 @@ export function FilterBar({
           onChange={onPhaseFilter}
         />
       </span>
-      <span className="ml-auto rounded-full border border-border px-2.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">
+      <span className="ml-auto rounded-full border border-border px-2.5 py-0.5 text-[11px] text-muted-foreground tabular-nums">
         {coverage.open} open ·{" "}
         {coverage.pending > 0
           ? `scoring ${coverage.total}…`

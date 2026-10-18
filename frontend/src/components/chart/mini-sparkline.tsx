@@ -40,8 +40,20 @@ export function MiniSparkline({
   const color = geom.last > 0 ? "#22c55e" : geom.last < 0 ? "#ef4444" : "currentColor"
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className={className} aria-hidden>
-      <line x1={0} x2={width} y1={geom.baselineY} y2={geom.baselineY} stroke="currentColor" strokeOpacity={0.15} />
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className={className}
+      aria-hidden>
+      <line
+        x1={0}
+        x2={width}
+        y1={geom.baselineY}
+        y2={geom.baselineY}
+        stroke="currentColor"
+        strokeOpacity={0.15}
+      />
       <path
         d={geom.d}
         fill="none"

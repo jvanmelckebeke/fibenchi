@@ -28,8 +28,18 @@ interface ThesisGroupedTableProps {
 }
 
 export function ThesisGroupedTable({
-  groupId, assets, theses, allGroups, quotes, indicators,
-  onDelete, compactMode, onHover, sortBy, sortDir, onSort,
+  groupId,
+  assets,
+  theses,
+  allGroups,
+  quotes,
+  indicators,
+  onDelete,
+  compactMode,
+  onHover,
+  sortBy,
+  sortDir,
+  onSort,
 }: ThesisGroupedTableProps) {
   const [newThesisOpen, setNewThesisOpen] = useState(false)
   const [editThesis, setEditThesis] = useState<Thesis | null>(null)
@@ -70,13 +80,15 @@ export function ThesisGroupedTable({
   // under each. "Ungrouped" collects this group's thesis-less assets.
   const { sections, ungrouped } = useMemo(() => {
     const memberOfAnyThesis = new Set<number>()
-    const sections = theses.map((thesis) => {
-      const memberIds = new Set(thesis.assets.map((m) => m.id))
-      thesis.assets.forEach((m) => memberOfAnyThesis.add(m.id))
-      const inGroup = assets.filter((a) => memberIds.has(a.id))
-      const elsewhere = thesis.assets.filter((m) => !currentGroupIds.has(m.id))
-      return { thesis, inGroup, elsewhere }
-    }).filter((s) => s.inGroup.length > 0)
+    const sections = theses
+      .map((thesis) => {
+        const memberIds = new Set(thesis.assets.map((m) => m.id))
+        thesis.assets.forEach((m) => memberOfAnyThesis.add(m.id))
+        const inGroup = assets.filter((a) => memberIds.has(a.id))
+        const elsewhere = thesis.assets.filter((m) => !currentGroupIds.has(m.id))
+        return { thesis, inGroup, elsewhere }
+      })
+      .filter((s) => s.inGroup.length > 0)
 
     const ungrouped = assets.filter((a) => !memberOfAnyThesis.has(a.id))
     return { sections, ungrouped }
@@ -103,7 +115,7 @@ export function ThesisGroupedTable({
   // symbols carry identical values, so precedence is irrelevant.
   const mergedIndicators = useMemo(
     () => ({ ...(elsewhereIndicators ?? {}), ...(indicators ?? {}) }),
-    [elsewhereIndicators, indicators],
+    [elsewhereIndicators, indicators]
   )
 
   // These sections live inside the current group, so rows keep the group-scoped
@@ -120,7 +132,14 @@ export function ThesisGroupedTable({
   )
 
   const passthrough = {
-    quotes, indicators: mergedIndicators, compactMode, onHover, sortBy, sortDir, onSort, renderContextMenu,
+    quotes,
+    indicators: mergedIndicators,
+    compactMode,
+    onHover,
+    sortBy,
+    sortDir,
+    onSort,
+    renderContextMenu,
   }
 
   return (
@@ -130,8 +149,7 @@ export function ThesisGroupedTable({
           variant="outline"
           size="sm"
           className="h-7 gap-1.5 text-xs"
-          onClick={() => setNewThesisOpen(true)}
-        >
+          onClick={() => setNewThesisOpen(true)}>
           <Plus className="h-3.5 w-3.5" />
           New thesis
         </Button>
@@ -158,10 +176,9 @@ export function ThesisGroupedTable({
                 <button
                   type="button"
                   onClick={() => setEditThesis(thesis)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-muted-foreground transition-colors hover:text-foreground"
                   title="Edit thesis"
-                  aria-label={`Edit ${thesis.name}`}
-                >
+                  aria-label={`Edit ${thesis.name}`}>
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
               }

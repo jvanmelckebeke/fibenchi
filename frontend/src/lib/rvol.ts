@@ -40,14 +40,15 @@ export const MIN_VOLUME_PACE = 0.02
 /** Resolve what the RVOL column should show for one asset. */
 export function resolveRvol(
   quote: Quote | undefined,
-  snapshot: IndicatorSummary | undefined,
+  snapshot: IndicatorSummary | undefined
 ): LiveResolution {
   if (!snapshot) return { status: "withheld", reason: { kind: "no_data" } }
 
   const stored = getNumericValue(snapshot.values, "rvol")
-  const settled: LiveResolution = stored != null
-    ? { status: "ok", value: stored, source: "settled" }
-    : { status: "withheld", reason: { kind: "no_data" } }
+  const settled: LiveResolution =
+    stored != null
+      ? { status: "ok", value: stored, source: "settled" }
+      : { status: "withheld", reason: { kind: "no_data" } }
 
   const pace = quote?.volume_pace
   const volume = quote?.volume
@@ -56,7 +57,13 @@ export function resolveRvol(
   // Any of these missing is the ordinary case, not a fault: the venue is
   // closed, has no fitted curve, or the snapshot is too young for a 20-day
   // average. The settled value is still true about the session it names.
-  if (pace == null || pace < MIN_VOLUME_PACE || volume == null || baseline == null || baseline <= 0) {
+  if (
+    pace == null ||
+    pace < MIN_VOLUME_PACE ||
+    volume == null ||
+    baseline == null ||
+    baseline <= 0
+  ) {
     return settled
   }
 

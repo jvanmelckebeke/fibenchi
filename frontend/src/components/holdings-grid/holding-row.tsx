@@ -33,9 +33,8 @@ export function HoldingRow({
   return (
     <>
       <tr
-        className="border-b border-border hover:bg-muted/30 cursor-pointer group/row transition-colors"
-        onClick={onToggle}
-      >
+        className="group/row cursor-pointer border-b border-border transition-colors hover:bg-muted/30"
+        onClick={onToggle}>
         <td className="py-1 pl-2">
           {expanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -43,48 +42,59 @@ export function HoldingRow({
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           )}
         </td>
-        <td className="py-1 px-2">
+        <td className="px-2 py-1">
           <Link
             to={`/asset/${row.symbol}`}
             {...(linkTarget === "_blank" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             className="font-mono text-xs text-primary hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
+            onClick={(e) => e.stopPropagation()}>
             {row.symbol}
           </Link>
         </td>
-        <td className="py-1 px-2 text-muted-foreground truncate text-xs max-w-[200px]">
+        <td className="max-w-[200px] truncate px-2 py-1 text-xs text-muted-foreground">
           {row.name}
         </td>
-        <td className="py-1 px-2 text-right text-xs">
+        <td className="px-2 py-1 text-right text-xs">
           {row.percent != null ? `${row.percent.toFixed(1)}%` : "\u2014"}
         </td>
         {indicatorsLoading ? (
           <td
             colSpan={2 + SUMMARY_DESCRIPTORS.length}
-            className="py-1 px-2 text-right text-xs text-muted-foreground animate-pulse"
-          >
+            className="animate-pulse px-2 py-1 text-right text-xs text-muted-foreground">
             Loading...
           </td>
         ) : (
           <>
             <td
-              className="py-1 px-2 text-right text-xs"
-              title={settings.compact_numbers && indicator?.close != null ? formatPrice(indicator.close, indicator.currency, 0, settings.thousands_separator) : undefined}
-            >
+              className="px-2 py-1 text-right text-xs"
+              title={
+                settings.compact_numbers && indicator?.close != null
+                  ? formatPrice(
+                      indicator.close,
+                      indicator.currency,
+                      0,
+                      settings.thousands_separator
+                    )
+                  : undefined
+              }>
               {indicator?.close != null
                 ? settings.compact_numbers
                   ? formatCompactPrice(indicator.close, indicator.currency)
-                  : formatPrice(indicator.close, indicator.currency, 0, settings.thousands_separator)
+                  : formatPrice(
+                      indicator.close,
+                      indicator.currency,
+                      0,
+                      settings.thousands_separator
+                    )
                 : "\u2014"}
             </td>
-            <td className="py-1 px-2 text-right text-xs">
+            <td className="px-2 py-1 text-right text-xs">
               <ChangePct value={indicator?.change_pct ?? null} />
             </td>
             {SUMMARY_DESCRIPTORS.map((desc) => {
               const hs = desc.holdingSummary
               return (
-                <td key={desc.id} className="py-1 px-2 text-right">
+                <td key={desc.id} className="px-2 py-1 text-right">
                   <HoldingSummaryCell
                     format={hs.format}
                     field={hs.field}
@@ -104,13 +114,12 @@ export function HoldingRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5 opacity-0 group-hover/row:opacity-100 transition-opacity"
+              className="h-5 w-5 opacity-0 transition-opacity group-hover/row:opacity-100"
               aria-label={`Remove ${row.symbol}`}
               onClick={(e) => {
                 e.stopPropagation()
                 onRemove()
-              }}
-            >
+              }}>
               <X className="h-3 w-3" />
             </Button>
           </td>
@@ -118,7 +127,7 @@ export function HoldingRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
+          <td colSpan={totalColSpan} className="border-b border-border bg-muted/20 p-4">
             <ExpandedAssetChart symbol={row.symbol} currency={indicator?.currency} />
           </td>
         </tr>

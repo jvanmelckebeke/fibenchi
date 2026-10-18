@@ -88,8 +88,7 @@ function renderItems(actions: ContextAction[]): ReactNode {
             checked={a.checked}
             disabled={a.disabled}
             onSelect={(e) => e.preventDefault()}
-            onCheckedChange={a.onToggle}
-          >
+            onCheckedChange={a.onToggle}>
             {lead}
             {a.label}
           </ContextMenuCheckboxItem>
@@ -103,8 +102,7 @@ function renderItems(actions: ContextAction[]): ReactNode {
         <ContextMenuItem
           variant={a.destructive ? "destructive" : undefined}
           disabled={a.disabled}
-          onClick={a.action}
-        >
+          onClick={a.action}>
           {lead}
           {a.label}
           {a.hint && <span className="ml-auto text-xs text-muted-foreground">{a.hint}</span>}

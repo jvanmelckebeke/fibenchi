@@ -42,7 +42,7 @@ export function useAdoptOrphanToGroup() {
   return useInvalidatingMutation(
     ({ groupId, assetId }: { groupId: number; assetId: number }) =>
       api.groups.addAssets(groupId, [assetId]),
-    ORPHAN_KEYS,
+    ORPHAN_KEYS
   )
 }
 
@@ -51,6 +51,6 @@ export function useAdoptOrphanToThesis() {
   return useInvalidatingMutation(
     ({ thesisId, assetId }: { thesisId: number; assetId: number }) =>
       api.theses.addAssets(thesisId, [assetId]),
-    ORPHAN_KEYS,
+    ORPHAN_KEYS
   )
 }

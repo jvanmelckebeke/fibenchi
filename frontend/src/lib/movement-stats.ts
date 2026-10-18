@@ -100,8 +100,10 @@ export function computeMovementStats(prices: Price[]): MovementStats | null {
       // gain under "Max daily loss" (or vice versa): a gain is only a gain, a
       // loss only a loss. A window with no down day leaves maxDailyLoss null,
       // which the UI renders as "—".
-      if (dayPct > 0 && (maxDailyGain === null || dayPct > maxDailyGain.pct)) maxDailyGain = { pct: dayPct, date }
-      if (dayPct < 0 && (maxDailyLoss === null || dayPct < maxDailyLoss.pct)) maxDailyLoss = { pct: dayPct, date }
+      if (dayPct > 0 && (maxDailyGain === null || dayPct > maxDailyGain.pct))
+        maxDailyGain = { pct: dayPct, date }
+      if (dayPct < 0 && (maxDailyLoss === null || dayPct < maxDailyLoss.pct))
+        maxDailyLoss = { pct: dayPct, date }
     }
 
     if (cur > peak) {

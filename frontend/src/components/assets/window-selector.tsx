@@ -3,7 +3,13 @@ import { CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { STANDARD_PERIODS, relativeStart, ytdStart, todayISO, type AssetWindow } from "@/lib/asset-window"
+import {
+  STANDARD_PERIODS,
+  relativeStart,
+  ytdStart,
+  todayISO,
+  type AssetWindow,
+} from "@/lib/asset-window"
 import { formatDateShort } from "@/lib/format"
 
 const RELATIVE_PRESETS: { label: string; days: number }[] = [
@@ -36,21 +42,20 @@ export function WindowSelector({ value, onChange }: WindowSelectorProps) {
           variant={value.kind === "period" && value.period === p ? "default" : "ghost"}
           size="sm"
           onClick={() => onChange({ kind: "period", period: p })}
-          className="text-xs"
-        >
+          className="text-xs">
           {p}
         </Button>
       ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant={isCustom ? "default" : "ghost"} size="sm" className="text-xs gap-1.5">
+          <Button variant={isCustom ? "default" : "ghost"} size="sm" className="gap-1.5 text-xs">
             <CalendarDays className="h-3.5 w-3.5" />
             {isCustom ? formatDateShort(value.start) : "Custom"}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-56 space-y-3">
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">Recent</p>
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Recent</p>
             <div className="flex flex-wrap gap-1">
               {RELATIVE_PRESETS.map((r) => (
                 <Button
@@ -58,18 +63,21 @@ export function WindowSelector({ value, onChange }: WindowSelectorProps) {
                   variant="outline"
                   size="sm"
                   className="text-xs"
-                  onClick={() => applySince(relativeStart(r.days))}
-                >
+                  onClick={() => applySince(relativeStart(r.days))}>
                   {r.label}
                 </Button>
               ))}
-              <Button variant="outline" size="sm" className="text-xs" onClick={() => applySince(ytdStart())}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => applySince(ytdStart())}>
                 YTD
               </Button>
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">Since a date</p>
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Since a date</p>
             <div className="flex gap-1.5">
               <Input
                 type="date"
@@ -78,7 +86,11 @@ export function WindowSelector({ value, onChange }: WindowSelectorProps) {
                 onChange={(e) => setDraft(e.target.value)}
                 className="h-8 text-xs"
               />
-              <Button size="sm" className="text-xs" disabled={!draft} onClick={() => applySince(draft)}>
+              <Button
+                size="sm"
+                className="text-xs"
+                disabled={!draft}
+                onClick={() => applySince(draft)}>
                 Apply
               </Button>
             </div>

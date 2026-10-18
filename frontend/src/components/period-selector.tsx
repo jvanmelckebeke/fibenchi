@@ -20,8 +20,7 @@ export function PeriodSelector({
           variant={value === p ? "default" : "ghost"}
           size="sm"
           onClick={() => onChange(p)}
-          className="text-xs"
-        >
+          className="text-xs">
           {p}
         </Button>
       ))}

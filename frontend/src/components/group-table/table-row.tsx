@@ -58,7 +58,7 @@ function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: str
           observer.disconnect()
         }
       },
-      { rootMargin: "200px" },
+      { rootMargin: "200px" }
     )
     observer.observe(el)
     return () => observer.disconnect()
@@ -69,7 +69,7 @@ function LazyExpandedChart({ symbol, currency }: { symbol: string; currency: str
       {visible ? (
         <ExpandedAssetChart symbol={symbol} currency={currency} compact />
       ) : (
-        <Skeleton className="h-[200px] lg:h-[300px] w-full rounded-md" />
+        <Skeleton className="h-[200px] w-full rounded-md lg:h-[300px]" />
       )}
     </div>
   )
@@ -132,12 +132,13 @@ export const TableRow = memo(function TableRow({
   const [priceRef, pctRef] = usePriceFlash(displayPrice)
   const py = compactMode ? "py-1.5" : "py-2.5"
   const staleClass = showStale ? "stale-price" : ""
-  const priceFmt = displayPrice != null && isColumnVisible(columnSettings, "price")
-    ? formatAssetPriceWithSettings(displayPrice, asset, {
-        compact: settings.compact_numbers,
-        group: settings.thousands_separator,
-      })
-    : null
+  const priceFmt =
+    displayPrice != null && isColumnVisible(columnSettings, "price")
+      ? formatAssetPriceWithSettings(displayPrice, asset, {
+          compact: settings.compact_numbers,
+          group: settings.thousands_separator,
+        })
+      : null
 
   const handleToggle = useCallback(() => onToggle(asset.symbol), [onToggle, asset.symbol])
   const handleHover = useCallback(() => onHover(asset.symbol), [onHover, asset.symbol])
@@ -152,196 +153,200 @@ export const TableRow = memo(function TableRow({
   })
 
   const row = (
-        <tr
-          className="border-b border-border hover:bg-muted/30 data-[state=open]:bg-muted/30 cursor-pointer group transition-colors"
-          onClick={handleToggle}
-          onMouseEnter={handleHover}
-        >
-          <td
-            className={`${py} relative pl-2`}
-            title={accent ? accentTitle : undefined}
-          >
-            {accent && (
-              <span
-                aria-hidden
-                className="absolute inset-y-0 left-0 z-10 flex w-[3px] items-center justify-center overflow-hidden transition-[width] duration-200 ease-out group-hover:w-6"
-                style={{ backgroundColor: accent }}
-              >
-                {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
-                <AccentIcon
-                  className="h-3.5 w-3.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-                  style={{ color: readableTextColor(accent) }}
-                />
+    <tr
+      className="group cursor-pointer border-b border-border transition-colors hover:bg-muted/30 data-[state=open]:bg-muted/30"
+      onClick={handleToggle}
+      onMouseEnter={handleHover}>
+      <td className={`${py} relative pl-2`} title={accent ? accentTitle : undefined}>
+        {accent && (
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-0 z-10 flex w-[3px] items-center justify-center overflow-hidden transition-[width] duration-200 ease-out group-hover:w-6"
+            style={{ backgroundColor: accent }}>
+            {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
+            <AccentIcon
+              className="h-3.5 w-3.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+              style={{ color: readableTextColor(accent) }}
+            />
+          </span>
+        )}
+        <span
+          className={`inline-flex transition-transform duration-200 ease-out ${accent ? "group-hover:translate-x-[18px]" : ""}`}>
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+        </span>
+      </td>
+      <td className={`${py} px-3`}>
+        <div className="flex items-center gap-2">
+          <MarketStatusDot marketState={quote?.market_state} />
+          <Link
+            to={`/asset/${asset.symbol}`}
+            className="font-semibold hover:underline"
+            onClick={(e) => e.stopPropagation()}>
+            {asset.symbol}
+          </Link>
+          {settings.show_asset_type_badge && (
+            <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+              {asset.type}
+            </Badge>
+          )}
+        </div>
+      </td>
+      {isColumnVisible(columnSettings, "name") && (
+        <td className={`${py} px-3 text-sm text-muted-foreground`}>
+          <div className="flex items-center gap-2 truncate">
+            <span className="truncate">{asset.name}</span>
+            {asset.tags.length > 0 && (
+              <span className="flex shrink-0 gap-1">
+                {asset.tags.map((tag) => (
+                  <TagBadge key={tag.id} name={tag.name} color={tag.color} />
+                ))}
               </span>
             )}
+          </div>
+        </td>
+      )}
+      {isColumnVisible(columnSettings, "price") && (
+        <td className={`${py} px-3 text-right tabular-nums`}>
+          {priceFmt ? (
             <span
-              className={`inline-flex transition-transform duration-200 ease-out ${accent ? "group-hover:translate-x-[18px]" : ""}`}
-            >
-              {expanded ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
+              ref={priceRef}
+              className={`-mx-1 rounded px-1 font-medium ${staleClass}`}
+              title={priceFmt.title}>
+              {priceFmt.text}
             </span>
-          </td>
-          <td className={`${py} px-3`}>
-            <div className="flex items-center gap-2">
-              <MarketStatusDot marketState={quote?.market_state} />
-              <Link
-                to={`/asset/${asset.symbol}`}
-                className="font-semibold hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {asset.symbol}
-              </Link>
-              {settings.show_asset_type_badge && (
-                <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                  {asset.type}
-                </Badge>
-              )}
-            </div>
-          </td>
-          {isColumnVisible(columnSettings, "name") && (
-            <td className={`${py} px-3 text-sm text-muted-foreground`}>
-              <div className="flex items-center gap-2 truncate">
-                <span className="truncate">{asset.name}</span>
-                {asset.tags.length > 0 && (
-                  <span className="flex gap-1 shrink-0">
-                    {asset.tags.map((tag) => (
-                      <TagBadge key={tag.id} name={tag.name} color={tag.color} />
-                    ))}
-                  </span>
-                )}
-              </div>
-            </td>
+          ) : (
+            <Skeleton className="ml-auto h-4 w-14 rounded" />
           )}
-          {isColumnVisible(columnSettings, "price") && (
-            <td className={`${py} px-3 text-right tabular-nums`}>
-              {priceFmt ? (
-                <span
-                  ref={priceRef}
-                  className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
-                  title={priceFmt.title}
-                >
-                  {priceFmt.text}
-                </span>
-              ) : (
-                <Skeleton className="h-4 w-14 ml-auto rounded" />
-              )}
-            </td>
+        </td>
+      )}
+      {isColumnVisible(columnSettings, "change_pct") && (
+        <td className={`${py} px-3 text-right tabular-nums`}>
+          {displayPct != null ? (
+            <ChangePct
+              ref={pctRef}
+              value={displayPct}
+              className={`-mx-1 rounded px-1 font-medium ${staleClass}`}
+            />
+          ) : (
+            <Skeleton className="ml-auto h-4 w-12 rounded" />
           )}
-          {isColumnVisible(columnSettings, "change_pct") && (
-            <td className={`${py} px-3 text-right tabular-nums`}>
-              {displayPct != null ? (
-                <ChangePct
-                  ref={pctRef}
-                  value={displayPct}
-                  className={`font-medium rounded px-1 -mx-1 ${staleClass}`}
-                />
-              ) : (
-                <Skeleton className="h-4 w-12 ml-auto rounded" />
-              )}
+        </td>
+      )}
+      {visibleIndicatorFields.map((field) => {
+        // Override stale DB volume with live SSE quote values
+        if ((field === "volume" || field === "avg_volume") && quote?.[field] != null) {
+          const val = quote[field]!
+          const desc = getDescriptorByField(field)
+          const formatted = desc?.compactFormat ? formatCompactNumber(val) : val.toLocaleString()
+          return (
+            <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+              <span title={val.toLocaleString()}>{formatted}</span>
             </td>
-          )}
-          {visibleIndicatorFields.map((field) => {
-            // Override stale DB volume with live SSE quote values
-            if ((field === "volume" || field === "avg_volume") && quote?.[field] != null) {
-              const val = quote[field]!
-              const desc = getDescriptorByField(field)
-              const formatted = desc?.compactFormat ? formatCompactNumber(val) : val.toLocaleString()
-              return (
-                <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
-                  <span title={val.toLocaleString()}>{formatted}</span>
-                </td>
-              )
-            }
-            if (field === "macd") {
-              const macdVals = extractMacdValues(indicator?.values)
-              const m = macdVals?.macd
-              const s = macdVals?.macd_signal
-              const h = macdVals?.macd_hist
-              const hasValues = m != null || s != null || h != null
-              const histColor = h != null ? (h >= 0 ? "text-emerald-400" : "text-red-400") : ""
-              const fmt = (v: number | null | undefined) =>
-                v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
-              const histDelta = settings.show_indicator_deltas
-                ? formatDeltaAnnotation("macd_hist", indicator?.values)
-                : null
-              return (
-                <td key={field} className={`${py} px-3 text-right text-sm tabular-nums overflow-hidden`}>
-                  {hasValues ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="text-muted-foreground">M</span>
-                      <span>{fmt(m)}</span>
-                      <span className="text-muted-foreground">S</span>
-                      <span>{fmt(s)}</span>
-                      <span className="text-muted-foreground">H</span>
-                      <span className={histColor}>{fmt(h)}</span>
-                      {histDelta && (
-                        <span className="text-xs">
-                          <span className="text-muted-foreground">{histDelta.delta}</span>
-                          {histDelta.sigma && <span className="text-amber-500 ml-0.5">⚠ {histDelta.sigma}</span>}
-                        </span>
+          )
+        }
+        if (field === "macd") {
+          const macdVals = extractMacdValues(indicator?.values)
+          const m = macdVals?.macd
+          const s = macdVals?.macd_signal
+          const h = macdVals?.macd_hist
+          const hasValues = m != null || s != null || h != null
+          const histColor = h != null ? (h >= 0 ? "text-emerald-400" : "text-red-400") : ""
+          const fmt = (v: number | null | undefined) =>
+            v != null ? v.toFixed(Math.abs(v) >= 100 ? 0 : 2) : "--"
+          const histDelta = settings.show_indicator_deltas
+            ? formatDeltaAnnotation("macd_hist", indicator?.values)
+            : null
+          return (
+            <td
+              key={field}
+              className={`${py} overflow-hidden px-3 text-right text-sm tabular-nums`}>
+              {hasValues ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-muted-foreground">M</span>
+                  <span>{fmt(m)}</span>
+                  <span className="text-muted-foreground">S</span>
+                  <span>{fmt(s)}</span>
+                  <span className="text-muted-foreground">H</span>
+                  <span className={histColor}>{fmt(h)}</span>
+                  {histDelta && (
+                    <span className="text-xs">
+                      <span className="text-muted-foreground">{histDelta.delta}</span>
+                      {histDelta.sigma && (
+                        <span className="ml-0.5 text-amber-500">⚠ {histDelta.sigma}</span>
                       )}
                     </span>
-                  ) : (
-                    <span className="text-muted-foreground">&mdash;</span>
                   )}
-                </td>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">&mdash;</span>
+              )}
+            </td>
+          )
+        }
+        // Every indicator cell needs session identity, not just a number:
+        // a snapshot describes the last *settled* bar, so during market
+        // hours its values are yesterday's next to a live price. The shared
+        // resolver decides what this field is entitled to show and how far
+        // behind it is — same call the sort key makes, so the two can't
+        // disagree about which number the row is ordered by.
+        const resolved = resolveIndicatorValue(field, quote, indicator)
+        const withheld = resolved.status === "withheld" ? resolved.reason : null
+        const val = resolved.status === "ok" ? resolved.value : null
+        const desc = getDescriptorByField(field)
+        // On an ex-date the σ and the change % beside it disagree by the
+        // dividend, because only one of them counts the cash.
+        const exDiv = field === "vnr" ? sigmaExDiv(resolved, indicator) : null
+        // Route through the shared registry formatter so the table matches the
+        // card/detail rendering (decimals, threshold colours, currency prefix).
+        const formatted =
+          val != null && desc
+            ? formatIndicatorField(
+                field,
+                desc,
+                { ...indicator?.values, [field]: val },
+                asset.currency
               )
-            }
-            // Every indicator cell needs session identity, not just a number:
-            // a snapshot describes the last *settled* bar, so during market
-            // hours its values are yesterday's next to a live price. The shared
-            // resolver decides what this field is entitled to show and how far
-            // behind it is — same call the sort key makes, so the two can't
-            // disagree about which number the row is ordered by.
-            const resolved = resolveIndicatorValue(field, quote, indicator)
-            const withheld = resolved.status === "withheld" ? resolved.reason : null
-            const val = resolved.status === "ok" ? resolved.value : null
-            const desc = getDescriptorByField(field)
-            // On an ex-date the σ and the change % beside it disagree by the
-            // dividend, because only one of them counts the cash.
-            const exDiv = field === "vnr" ? sigmaExDiv(resolved, indicator) : null
-            // Route through the shared registry formatter so the table matches the
-            // card/detail rendering (decimals, threshold colours, currency prefix).
-            const formatted = val != null && desc
-              ? formatIndicatorField(field, desc, { ...indicator?.values, [field]: val }, asset.currency)
-              : null
-            const behindTitle = desc
-              ? settledSessionTitle(desc.shortLabel, resolved, indicator)
-              : null
-            return (
-              <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
-                {formatted ? (
-                  <span
-                    className={`${formatted.colorClass} ${
-                      isAbnormallyBehind(resolved)
-                        ? "opacity-60 underline decoration-dotted underline-offset-4"
-                        : ""
-                    }`}
-                    title={[
-                      desc?.compactFormat && val != null ? val.toLocaleString() : null,
-                      behindTitle,
-                      exDiv != null
-                        ? `Ex-dividend ${formatPrice(exDiv, asset.currency)} per share. σ-Move scores the total return, so the payout's price drop is not counted as a move; the change % beside it still is a price move.`
-                        : null,
-                    ].filter(Boolean).join(" — ") || undefined}
-                  >
-                    {formatted.text}
-                  </span>
-                ) : (
-                  <span
-                    className="text-muted-foreground"
-                    title={withheld ? indicatorWithheldTitle(field, withheld) ?? undefined : undefined}
-                  >
-                    &mdash;
-                  </span>
-                )}
-              </td>
-            )
-          })}
-        </tr>
+            : null
+        const behindTitle = desc ? settledSessionTitle(desc.shortLabel, resolved, indicator) : null
+        return (
+          <td key={field} className={`${py} px-3 text-right text-sm tabular-nums`}>
+            {formatted ? (
+              <span
+                className={`${formatted.colorClass} ${
+                  isAbnormallyBehind(resolved)
+                    ? "underline decoration-dotted underline-offset-4 opacity-60"
+                    : ""
+                }`}
+                title={
+                  [
+                    desc?.compactFormat && val != null ? val.toLocaleString() : null,
+                    behindTitle,
+                    exDiv != null
+                      ? `Ex-dividend ${formatPrice(exDiv, asset.currency)} per share. σ-Move scores the total return, so the payout's price drop is not counted as a move; the change % beside it still is a price move.`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" — ") || undefined
+                }>
+                {formatted.text}
+              </span>
+            ) : (
+              <span
+                className="text-muted-foreground"
+                title={
+                  withheld ? (indicatorWithheldTitle(field, withheld) ?? undefined) : undefined
+                }>
+                &mdash;
+              </span>
+            )}
+          </td>
+        )
+      })}
+    </tr>
   )
 
   return (
@@ -357,7 +362,7 @@ export const TableRow = memo(function TableRow({
       <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
       {expanded && (
         <tr>
-          <td colSpan={totalColSpan} className="bg-muted/20 p-4 border-b border-border">
+          <td colSpan={totalColSpan} className="border-b border-border bg-muted/20 p-4">
             <div className="max-w-[calc(100vw-4rem)]">
               <LazyExpandedChart symbol={asset.symbol} currency={asset.currency} />
             </div>

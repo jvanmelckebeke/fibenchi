@@ -1,5 +1,18 @@
 import { useCallback, useState, useMemo, useTransition } from "react"
-import { Activity, ArrowDownAZ, ArrowUpAZ, Layers, LayoutGrid, List, Magnet, Pencil, ScanLine, Star, Table, TrendingUp } from "lucide-react"
+import {
+  Activity,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Layers,
+  LayoutGrid,
+  List,
+  Magnet,
+  Pencil,
+  ScanLine,
+  Star,
+  Table,
+  TrendingUp,
+} from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,17 +23,44 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { SegmentedControl } from "@/components/ui/segmented-control"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AddSymbolDialog } from "@/components/assets/add-symbol-dialog"
 import { RemoveAssetDialog } from "@/components/assets/remove-asset-dialog"
 import { AssetCard } from "@/components/assets/asset-card"
 import { TagFilterPopover } from "@/components/tags/tag-filter-popover"
-import { useGroup, useGroups, useGroupSparklines, useGroupIndicators, useUpdateGroup, useTags, useTheses, usePrefetchAssetDetail, usePrefetchOtherGroups } from "@/lib/queries"
+import {
+  useGroup,
+  useGroups,
+  useGroupSparklines,
+  useGroupIndicators,
+  useUpdateGroup,
+  useTags,
+  useTheses,
+  usePrefetchAssetDetail,
+  usePrefetchOtherGroups,
+} from "@/lib/queries"
 import { useQuotes } from "@/lib/quote-stream"
 import { buildSortOptions, getScannableDescriptors } from "@/lib/indicator-registry"
-import { useSettings, type AssetTypeFilter, type GroupSortBy, type GroupViewMode, type SortDir } from "@/lib/settings"
-import { useFilteredSortedAssets, getSortValue, compareSortValues, type SortValue } from "@/lib/use-group-filter"
+import {
+  useSettings,
+  type AssetTypeFilter,
+  type GroupSortBy,
+  type GroupViewMode,
+  type SortDir,
+} from "@/lib/settings"
+import {
+  useFilteredSortedAssets,
+  getSortValue,
+  compareSortValues,
+  type SortValue,
+} from "@/lib/use-group-filter"
 import type { Asset, Thesis } from "@/lib/api"
 import { GroupTable } from "@/components/group-table"
 import { AssetContextMenuContent } from "@/components/assets/asset-context-menu"
@@ -60,7 +100,11 @@ export function GroupPage({ groupId }: { groupId: number }) {
   const [scannerIndicator, setScannerIndicator] = useState("macd")
   const [scannerPeriod, setScannerPeriod] = useState(settings.chart_default_period)
   // Sparklines only render on cards, so only fetch them in card view.
-  const { data: batchSparklines } = useGroupSparklines(groupId, sparklinePeriod, viewMode === "card")
+  const { data: batchSparklines } = useGroupSparklines(
+    groupId,
+    sparklinePeriod,
+    viewMode === "card"
+  )
   const { data: batchIndicators } = useGroupIndicators(groupId)
   const prefetch = usePrefetchAssetDetail(settings.chart_default_period)
   usePrefetchOtherGroups(groupId, sparklinePeriod)
@@ -90,7 +134,12 @@ export function GroupPage({ groupId }: { groupId: number }) {
   // ungrouped assets (each a size-1 unit). Off → plain sort, just colour-edged.
   const { listAssets, accentColors, accentTitles, accentIcons } = useMemo(() => {
     if (thesisGrouping !== "list" || !theses || theses.length === 0 || !assets) {
-      return { listAssets: assets, accentColors: undefined, accentTitles: undefined, accentIcons: undefined }
+      return {
+        listAssets: assets,
+        accentColors: undefined,
+        accentTitles: undefined,
+        accentIcons: undefined,
+      }
     }
     // asset id -> theses containing it, in the API's order (alphabetical by name)
     const thesesByAssetId = new Map<number, Thesis[]>()
@@ -164,8 +213,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
     return { listAssets: ordered, accentColors: colors, accentTitles: titles, accentIcons: icons }
   }, [thesisGrouping, thesisCluster, theses, assets, sortBy, sortDir, quotes, batchIndicators])
 
-  const setTypeFilter = (v: AssetTypeFilter) =>
-    updateSettings({ group_type_filter: v })
+  const setTypeFilter = (v: AssetTypeFilter) => updateSettings({ group_type_filter: v })
 
   const handleSort = (key: GroupSortBy) => {
     if (sortBy === key) {
@@ -176,20 +224,21 @@ export function GroupPage({ groupId }: { groupId: number }) {
     }
   }
 
-  const handleRemove = useCallback((symbol: string) => {
-    const asset = allAssets?.find((a) => a.symbol === symbol)
-    if (asset) setRemoveTarget(asset)
-  }, [allAssets])
+  const handleRemove = useCallback(
+    (symbol: string) => {
+      const asset = allAssets?.find((a) => a.symbol === symbol)
+      if (asset) setRemoveTarget(asset)
+    },
+    [allAssets]
+  )
 
   const toggleTag = (id: number) =>
-    setSelectedTags((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
-    )
+    setSelectedTags((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
+    <div className="space-y-4 p-4 lg:space-y-6 lg:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <GroupHeader groupId={groupId} group={group} isDefaultGroup={isDefaultGroup} />
           {/* Type filter */}
           <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AssetTypeFilter)}>
@@ -250,8 +299,12 @@ export function GroupPage({ groupId }: { groupId: number }) {
               <div className="flex items-center gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
-                      {sortDir === "asc" ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />}
+                    <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+                      {sortDir === "asc" ? (
+                        <ArrowUpAZ className="h-3.5 w-3.5" />
+                      ) : (
+                        <ArrowDownAZ className="h-3.5 w-3.5" />
+                      )}
                       {SORT_LABELS[sortBy]}
                     </Button>
                   </DropdownMenuTrigger>
@@ -260,7 +313,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
                       <DropdownMenuItem key={key} onClick={() => handleSort(key)}>
                         {label}
                         {sortBy === key && (
-                          <span className="ml-auto text-muted-foreground text-xs">
+                          <span className="ml-auto text-xs text-muted-foreground">
                             {sortDir === "asc" ? "\u2191" : "\u2193"}
                           </span>
                         )}
@@ -272,23 +325,53 @@ export function GroupPage({ groupId }: { groupId: number }) {
             </>
           )}
           {/* View mode */}
-          <Select value={settings.group_view_mode} onValueChange={(v) => setViewMode(v as GroupViewMode)}>
+          <Select
+            value={settings.group_view_mode}
+            onValueChange={(v) => setViewMode(v as GroupViewMode)}>
             <SelectTrigger className="h-7! py-0 text-xs" aria-label="View mode">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="table"><span className="flex items-center gap-2"><Table className="h-3.5 w-3.5" />Table</span></SelectItem>
-              <SelectItem value="card"><span className="flex items-center gap-2"><LayoutGrid className="h-3.5 w-3.5" />Cards</span></SelectItem>
-              <SelectItem value="live"><span className="flex items-center gap-2"><Activity className="h-3.5 w-3.5" />Live</span></SelectItem>
-              <SelectItem value="scanner"><span className="flex items-center gap-2"><ScanLine className="h-3.5 w-3.5" />Indicators</span></SelectItem>
+              <SelectItem value="table">
+                <span className="flex items-center gap-2">
+                  <Table className="h-3.5 w-3.5" />
+                  Table
+                </span>
+              </SelectItem>
+              <SelectItem value="card">
+                <span className="flex items-center gap-2">
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  Cards
+                </span>
+              </SelectItem>
+              <SelectItem value="live">
+                <span className="flex items-center gap-2">
+                  <Activity className="h-3.5 w-3.5" />
+                  Live
+                </span>
+              </SelectItem>
+              <SelectItem value="scanner">
+                <span className="flex items-center gap-2">
+                  <ScanLine className="h-3.5 w-3.5" />
+                  Indicators
+                </span>
+              </SelectItem>
             </SelectContent>
           </Select>
           {viewMode === "table" && (
             <div className="flex items-center gap-1.5">
               <SegmentedControl
                 options={[
-                  { value: "list", label: <List className="h-3.5 w-3.5" />, title: "List — colour-edged by thesis" },
-                  { value: "sections", label: <Layers className="h-3.5 w-3.5" />, title: "Group by thesis — sections" },
+                  {
+                    value: "list",
+                    label: <List className="h-3.5 w-3.5" />,
+                    title: "List — colour-edged by thesis",
+                  },
+                  {
+                    value: "sections",
+                    label: <Layers className="h-3.5 w-3.5" />,
+                    title: "Group by thesis — sections",
+                  },
                 ]}
                 value={thesisGrouping}
                 onChange={(v) => updateSettings({ thesis_grouping: v })}
@@ -299,8 +382,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
                   size="sm"
                   className="h-7 gap-1.5 text-xs"
                   onClick={() => updateSettings({ thesis_cluster: !thesisCluster })}
-                  title="Sort each thesis's members together as one block"
-                >
+                  title="Sort each thesis's members together as one block">
                   <Magnet className="h-3.5 w-3.5" />
                   Sort together
                 </Button>
@@ -323,7 +405,7 @@ export function GroupPage({ groupId }: { groupId: number }) {
 
       {assets && assets.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-          <TrendingUp className="h-12 w-12 mb-4" />
+          <TrendingUp className="mb-4 h-12 w-12" />
           <p>
             {allAssets && allAssets.length > 0
               ? "No assets match the current filters."
@@ -333,77 +415,78 @@ export function GroupPage({ groupId }: { groupId: number }) {
       )}
 
       <div className={isPending ? "opacity-70 transition-opacity" : "transition-opacity"}>
-      {viewMode === "live" && assets && assets.length > 0 ? (
-        <LiveDayView assets={assets} quotes={quotes} indicators={batchIndicators} />
-      ) : viewMode === "scanner" && assets && assets.length > 0 ? (
-        <CrosshairTimeSyncProvider enabled={true}>
-          <ScannerView assets={assets} descriptorId={scannerIndicator} period={scannerPeriod} />
-        </CrosshairTimeSyncProvider>
-      ) : viewMode === "table" && assets && assets.length > 0 ? (
-        <CrosshairTimeSyncProvider enabled={true}>
-          {thesisGrouping === "sections" ? (
-            <ThesisGroupedTable
-              groupId={groupId}
-              assets={assets}
-              theses={theses ?? []}
-              allGroups={allGroups ?? []}
-              quotes={quotes}
-              indicators={batchIndicators}
-              onDelete={handleRemove}
-              compactMode={settings.compact_mode}
-              onHover={prefetch}
-              sortBy={sortBy}
-              sortDir={sortDir}
-              onSort={handleSort}
-            />
-          ) : (
-            <GroupTable
-              assets={listAssets ?? assets}
-              quotes={quotes}
-              indicators={batchIndicators}
-              compactMode={settings.compact_mode}
-              onHover={prefetch}
-              sortBy={sortBy}
-              sortDir={sortDir}
-              onSort={handleSort}
-              accentColors={accentColors}
-              accentTitles={accentTitles}
-              accentIcons={accentIcons}
-              renderContextMenu={({ asset, openEdit, openNewThesis }) => (
-                <AssetContextMenuContent
-                  groupId={groupId}
-                  assetId={asset.id}
-                  symbol={asset.symbol}
-                  onEdit={openEdit}
-                  onNewThesis={openNewThesis}
-                  onRemove={() => handleRemove(asset.symbol)}
-                />
-              )}
-            />
-          )}
-        </CrosshairTimeSyncProvider>
-      ) : (
-        <div className={`grid gap-4 ${
-          settings.compact_mode
-            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"
-            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-        }`}>
-          {assets?.map((asset) => (
-            <AssetCard
-              key={asset.id}
-              groupId={groupId}
-              asset={asset}
-              quote={quotes[asset.symbol]}
-              sparklineData={batchSparklines?.[asset.symbol]}
-              indicatorData={batchIndicators?.[asset.symbol]}
-              onDelete={handleRemove}
-              onHover={prefetch}
-              showSparkline={settings.group_show_sparkline}
-              indicatorVisibility={settings.indicator_visibility}
-            />
-          ))}
-        </div>
-      )}
+        {viewMode === "live" && assets && assets.length > 0 ? (
+          <LiveDayView assets={assets} quotes={quotes} indicators={batchIndicators} />
+        ) : viewMode === "scanner" && assets && assets.length > 0 ? (
+          <CrosshairTimeSyncProvider enabled={true}>
+            <ScannerView assets={assets} descriptorId={scannerIndicator} period={scannerPeriod} />
+          </CrosshairTimeSyncProvider>
+        ) : viewMode === "table" && assets && assets.length > 0 ? (
+          <CrosshairTimeSyncProvider enabled={true}>
+            {thesisGrouping === "sections" ? (
+              <ThesisGroupedTable
+                groupId={groupId}
+                assets={assets}
+                theses={theses ?? []}
+                allGroups={allGroups ?? []}
+                quotes={quotes}
+                indicators={batchIndicators}
+                onDelete={handleRemove}
+                compactMode={settings.compact_mode}
+                onHover={prefetch}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+            ) : (
+              <GroupTable
+                assets={listAssets ?? assets}
+                quotes={quotes}
+                indicators={batchIndicators}
+                compactMode={settings.compact_mode}
+                onHover={prefetch}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={handleSort}
+                accentColors={accentColors}
+                accentTitles={accentTitles}
+                accentIcons={accentIcons}
+                renderContextMenu={({ asset, openEdit, openNewThesis }) => (
+                  <AssetContextMenuContent
+                    groupId={groupId}
+                    assetId={asset.id}
+                    symbol={asset.symbol}
+                    onEdit={openEdit}
+                    onNewThesis={openNewThesis}
+                    onRemove={() => handleRemove(asset.symbol)}
+                  />
+                )}
+              />
+            )}
+          </CrosshairTimeSyncProvider>
+        ) : (
+          <div
+            className={`grid gap-4 ${
+              settings.compact_mode
+                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"
+                : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            }`}>
+            {assets?.map((asset) => (
+              <AssetCard
+                key={asset.id}
+                groupId={groupId}
+                asset={asset}
+                quote={quotes[asset.symbol]}
+                sparklineData={batchSparklines?.[asset.symbol]}
+                indicatorData={batchIndicators?.[asset.symbol]}
+                onDelete={handleRemove}
+                onHover={prefetch}
+                showSparkline={settings.group_show_sparkline}
+                indicatorVisibility={settings.indicator_visibility}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <RemoveAssetDialog
@@ -419,9 +502,18 @@ export function GroupPage({ groupId }: { groupId: number }) {
   )
 }
 
-function GroupHeader({ groupId, group, isDefaultGroup }: {
+function GroupHeader({
+  groupId,
+  group,
+  isDefaultGroup,
+}: {
   groupId: number
-  group?: { name: string; description: string | null; icon: string | null; assets: { id: number }[] }
+  group?: {
+    name: string
+    description: string | null
+    icon: string | null
+    assets: { id: number }[]
+  }
   isDefaultGroup: boolean
 }) {
   const updateGroup = useUpdateGroup()
@@ -429,8 +521,8 @@ function GroupHeader({ groupId, group, isDefaultGroup }: {
   const [editName, setEditName] = useState("")
 
   const HeaderIcon = useMemo(
-    () => isDefaultGroup ? Star : resolveIcon(group?.icon),
-    [isDefaultGroup, group?.icon],
+    () => (isDefaultGroup ? Star : resolveIcon(group?.icon)),
+    [isDefaultGroup, group?.icon]
   )
 
   const startEditing = () => {
@@ -445,10 +537,7 @@ function GroupHeader({ groupId, group, isDefaultGroup }: {
       setEditing(false)
       return
     }
-    updateGroup.mutate(
-      { id: groupId, data: { name } },
-      { onSuccess: () => setEditing(false) },
-    )
+    updateGroup.mutate({ id: groupId, data: { name } }, { onSuccess: () => setEditing(false) })
   }
 
   if (!group) {
@@ -479,9 +568,8 @@ function GroupHeader({ groupId, group, isDefaultGroup }: {
       {!isDefaultGroup && (
         <button
           onClick={startEditing}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-          title="Rename group"
-        >
+          className="text-muted-foreground transition-colors hover:text-foreground"
+          title="Rename group">
           <Pencil className="h-3.5 w-3.5" />
         </button>
       )}

@@ -18,7 +18,12 @@ export type LiveResolverId = "sigma" | "rvol"
 
 export type IndicatorCategory = "technical" | "volatility" | "fundamentals" | "market_data"
 
-export const CATEGORY_ORDER: IndicatorCategory[] = ["fundamentals", "market_data", "technical", "volatility"]
+export const CATEGORY_ORDER: IndicatorCategory[] = [
+  "fundamentals",
+  "market_data",
+  "technical",
+  "volatility",
+]
 export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
   fundamentals: "Fundamentals",
   market_data: "Market Data",
@@ -28,11 +33,7 @@ export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
 
 /** Where an indicator can appear across the UI. */
 export type Placement =
-  | "group_table"
-  | "group_card"
-  | "detail_chart"
-  | "detail_card"
-  | "detail_stats"
+  "group_table" | "group_card" | "detail_chart" | "detail_card" | "detail_stats"
 
 /** Declarative conditional-color rule (pure data, no callbacks). */
 export interface ThresholdColor {
@@ -146,7 +147,7 @@ export { INDICATOR_REGISTRY }
 export function isVisibleAt(
   visibilityMap: Record<string, Placement[]> | undefined,
   indicatorId: string,
-  placement: Placement,
+  placement: Placement
 ): boolean {
   const descriptor = getDescriptorById(indicatorId)
   if (!descriptor) return false
@@ -160,17 +161,25 @@ export function isVisibleAt(
 /** Resolve the first matching threshold color class for a value. */
 export function resolveThresholdColor(
   thresholds: ThresholdColor[] | undefined,
-  value: number | string | null | undefined,
+  value: number | string | null | undefined
 ): string {
   if (!thresholds || value == null) return ""
   const n = typeof value === "number" ? value : parseFloat(String(value))
   if (isNaN(n)) return ""
   for (const t of thresholds) {
     switch (t.condition) {
-      case "lt":  if (n < t.value) return t.className; break
-      case "gt":  if (n > t.value) return t.className; break
-      case "lte": if (n <= t.value) return t.className; break
-      case "gte": if (n >= t.value) return t.className; break
+      case "lt":
+        if (n < t.value) return t.className
+        break
+      case "gt":
+        if (n > t.value) return t.className
+        break
+      case "lte":
+        if (n <= t.value) return t.className
+        break
+      case "gte":
+        if (n >= t.value) return t.className
+        break
     }
   }
   return ""
@@ -179,7 +188,7 @@ export function resolveThresholdColor(
 /** Safely extract a numeric value from the values dict. */
 export function getNumericValue(
   values: Record<string, number | string | null | undefined> | undefined,
-  field: string,
+  field: string
 ): number | null {
   const v = values?.[field]
   return typeof v === "number" ? v : null
@@ -188,7 +197,7 @@ export function getNumericValue(
 /** Safely extract a string value from the values dict. */
 export function getStringValue(
   values: Record<string, number | string | null | undefined> | undefined,
-  field: string,
+  field: string
 ): string | null {
   const v = values?.[field]
   return typeof v === "string" ? v : null
@@ -203,8 +212,8 @@ export function getSubChartDescriptors(): IndicatorDescriptor[] {
 }
 
 export function getCardDescriptors(excludeSubcharts = false): IndicatorDescriptor[] {
-  return INDICATOR_REGISTRY.filter((d) =>
-    d.placement === "card" || (!excludeSubcharts && d.cardEligible),
+  return INDICATOR_REGISTRY.filter(
+    (d) => d.placement === "card" || (!excludeSubcharts && d.cardEligible)
   )
 }
 
@@ -226,7 +235,7 @@ export function getScannableDescriptors(): IndicatorDescriptor[] {
 
 export function getHoldingSummaryDescriptors(): IndicatorDescriptorWithSummary[] {
   return INDICATOR_REGISTRY.filter(
-    (d): d is IndicatorDescriptorWithSummary => d.holdingSummary != null,
+    (d): d is IndicatorDescriptorWithSummary => d.holdingSummary != null
   )
 }
 
@@ -248,11 +257,13 @@ export function buildSortOptions(): [string, string][] {
 
 /** Extract the three MACD values from an indicator values dict. */
 export function extractMacdValues(values?: Record<string, number | string | null>) {
-  return values ? {
-    macd: getNumericValue(values, "macd"),
-    macd_signal: getNumericValue(values, "macd_signal"),
-    macd_hist: getNumericValue(values, "macd_hist"),
-  } : undefined
+  return values
+    ? {
+        macd: getNumericValue(values, "macd"),
+        macd_signal: getNumericValue(values, "macd_signal"),
+        macd_hist: getNumericValue(values, "macd_hist"),
+      }
+    : undefined
 }
 
 /** Fields that carry daily deltas, mapped to the number of decimal places. */
@@ -272,7 +283,7 @@ const DELTA_DECIMALS: Record<string, number> = {
  */
 export function formatDeltaAnnotation(
   field: string,
-  values: Record<string, number | string | null | undefined> | undefined,
+  values: Record<string, number | string | null | undefined> | undefined
 ): { delta: string; sigma: string | null } | null {
   const decimals = DELTA_DECIMALS[field]
   if (decimals == null) return null
@@ -310,7 +321,7 @@ export function formatIndicatorField(
   field: string,
   descriptor: IndicatorDescriptor,
   values: Record<string, number | string | null | undefined>,
-  currency?: string,
+  currency?: string
 ): { text: string; colorClass: string } {
   const val = getNumericValue(values, field)
   if (val == null) return { text: "--", colorClass: "text-muted-foreground" }
@@ -343,7 +354,7 @@ export function formatIndicatorField(
  */
 export function resolveAdxColor(
   adx: number,
-  values: Record<string, number | string | null | undefined>,
+  values: Record<string, number | string | null | undefined>
 ): string {
   if (adx < 20) return "text-zinc-400"
   if (adx < 25) return "text-yellow-500"

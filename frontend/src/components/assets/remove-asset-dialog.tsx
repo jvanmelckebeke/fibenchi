@@ -28,7 +28,8 @@ function attachmentLines(a: AssetAttachments): { label: string; value: string }[
   if (a.pseudo_etfs.length) lines.push({ label: "Pseudo-ETFs", value: a.pseudo_etfs.join(", ") })
   if (a.tags.length) lines.push({ label: "Tags", value: a.tags.join(", ") })
   if (a.has_note) lines.push({ label: "Note", value: "yes" })
-  if (a.annotation_count > 0) lines.push({ label: "Annotations", value: String(a.annotation_count) })
+  if (a.annotation_count > 0)
+    lines.push({ label: "Annotations", value: String(a.annotation_count) })
   return lines
 }
 
@@ -38,7 +39,13 @@ function attachmentLines(a: AssetAttachments): { label: string; value: string }[
  * (theses / pseudo-ETFs / tags / note / annotations), and offers a hard delete —
  * so the lifecycle decision is made with the attachments in view.
  */
-export function RemoveAssetDialog({ asset, groupId, groupName, open, onOpenChange }: RemoveAssetDialogProps) {
+export function RemoveAssetDialog({
+  asset,
+  groupId,
+  groupName,
+  open,
+  onOpenChange,
+}: RemoveAssetDialogProps) {
   const symbol = asset?.symbol ?? ""
   const { data: attachments, isLoading } = useAssetAttachments(symbol, open && asset != null)
   const [alsoDelete, setAlsoDelete] = useState(false)
@@ -97,7 +104,9 @@ export function RemoveAssetDialog({ asset, groupId, groupName, open, onOpenChang
                 </ul>
               </div>
             )}
-            <label htmlFor="also-delete-entirely" className="flex cursor-pointer items-start gap-2 text-sm">
+            <label
+              htmlFor="also-delete-entirely"
+              className="flex cursor-pointer items-start gap-2 text-sm">
               <Checkbox
                 id="also-delete-entirely"
                 checked={alsoDelete}
@@ -120,8 +129,7 @@ export function RemoveAssetDialog({ asset, groupId, groupName, open, onOpenChang
           <Button
             variant={alsoDelete ? "destructive" : "default"}
             onClick={confirm}
-            disabled={pending || isLoading}
-          >
+            disabled={pending || isLoading}>
             {alsoDelete ? "Delete entirely" : "Remove"}
           </Button>
         </DialogFooter>

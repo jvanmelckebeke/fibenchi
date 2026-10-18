@@ -6,7 +6,7 @@ export const STALE_24H = 24 * 60 * 60_000
 
 export function useInvalidatingMutation<TData, TVariables>(
   mutationFn: (vars: TVariables) => Promise<TData>,
-  invalidateKeys: readonly (readonly unknown[])[],
+  invalidateKeys: readonly (readonly unknown[])[]
 ) {
   const qc = useQueryClient()
   return useMutation({
@@ -36,7 +36,8 @@ export const keys = {
   groupSparklines: (id: number, period?: string) => ["group-sparklines", id, period] as const,
   groupIndicators: (id: number) => ["group-indicators", id] as const,
   // Sorted+joined so the key is order-independent (same symbol set → one cache entry).
-  indicators: (symbols: readonly string[]) => ["indicators", [...symbols].sort().join(",")] as const,
+  indicators: (symbols: readonly string[]) =>
+    ["indicators", [...symbols].sort().join(",")] as const,
   sparklines: (symbols: readonly string[], period?: string) =>
     ["sparklines", [...symbols].sort().join(","), period] as const,
   note: (symbol: string) => ["note", symbol] as const,
@@ -47,7 +48,8 @@ export const keys = {
   pseudoEtfs: ["pseudo-etfs"] as const,
   pseudoEtf: (id: number) => ["pseudo-etfs", id] as const,
   pseudoEtfPerformance: (id: number) => ["pseudo-etfs", id, "performance"] as const,
-  pseudoEtfConstituentsIndicators: (id: number) => ["pseudo-etfs", id, "constituents-indicators"] as const,
+  pseudoEtfConstituentsIndicators: (id: number) =>
+    ["pseudo-etfs", id, "constituents-indicators"] as const,
   pseudoEtfNote: (id: number) => ["pseudo-etfs", id, "note"] as const,
   pseudoEtfAnnotations: (id: number) => ["pseudo-etfs", id, "annotations"] as const,
   symbolSearchLocal: (q: string) => ["symbol-search-local", q] as const,

@@ -23,7 +23,6 @@ import { MovementStats } from "./movement-stats"
 import { EarningsCountdown } from "@/components/assets/earnings-countdown"
 import { HoldingsSection } from "./holdings-section"
 
-
 export function AssetDetailPage() {
   const { symbol } = useParams<{ symbol: string }>()
   const { settings } = useSettings()
@@ -44,8 +43,16 @@ export function AssetDetailPage() {
   if (!symbol) return null
 
   return (
-    <div className="p-6 space-y-6">
-      <Header symbol={symbol} asset={asset} assetWindow={assetWindow} setAssetWindow={setAssetWindow} isTracked={isTracked} mode={mode} setMode={setMode} />
+    <div className="space-y-6 p-6">
+      <Header
+        symbol={symbol}
+        asset={asset}
+        assetWindow={assetWindow}
+        setAssetWindow={setAssetWindow}
+        isTracked={isTracked}
+        mode={mode}
+        setMode={setMode}
+      />
       <ChartSection
         symbol={symbol}
         assetWindow={assetWindow}
@@ -56,12 +63,7 @@ export function AssetDetailPage() {
         mode={mode}
       />
       {mode === "historical" && prices && prices.length > 1 && (
-        <MovementStats
-          prices={prices}
-          label={windowLabel}
-          symbol={symbol}
-          asset={asset}
-        />
+        <MovementStats prices={prices} label={windowLabel} symbol={symbol} asset={asset} />
       )}
       {mode === "historical" && indicators && indicators.length > 0 && (
         <StatsPanel

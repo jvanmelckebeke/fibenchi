@@ -27,13 +27,13 @@ export function SortableHeader({
 
   return (
     <th
-      className={`relative ${align === "right" ? "text-right" : "text-left"} text-xs font-medium px-3 py-2 ${
+      className={`relative ${align === "right" ? "text-right" : "text-left"} px-3 py-2 text-xs font-medium ${
         onSort ? "cursor-pointer select-none hover:text-foreground" : ""
       } ${active ? "text-foreground" : "text-muted-foreground"}`}
       onClick={() => onSort?.(sortKey)}
-      style={style}
-    >
-      <span className={`inline-flex items-center gap-0.5 ${align === "right" ? "justify-end" : ""}`}>
+      style={style}>
+      <span
+        className={`inline-flex items-center gap-0.5 ${align === "right" ? "justify-end" : ""}`}>
         {label}
         {active && <Icon className="h-3 w-3" />}
       </span>
@@ -42,7 +42,7 @@ export function SortableHeader({
           type="button"
           aria-label={`Resize ${label} column`}
           tabIndex={-1}
-          className="absolute right-0 top-1 bottom-1 w-0.5 cursor-col-resize bg-border/50 hover:bg-primary/40 transition-colors border-0 p-0"
+          className="absolute top-1 right-0 bottom-1 w-0.5 cursor-col-resize border-0 bg-border/50 p-0 transition-colors hover:bg-primary/40"
           onPointerDown={onResizeStart}
           onDoubleClick={onResizeReset}
           onClick={(e) => e.stopPropagation()}

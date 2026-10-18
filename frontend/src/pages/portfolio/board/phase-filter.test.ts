@@ -27,12 +27,18 @@ describe("applyPhaseFilter", () => {
   })
 
   it("hides tiles whose venue calendar never resolved", () => {
-    const tiles = board([["KNOWN", "open"], ["MYSTERY", null]])
+    const tiles = board([
+      ["KNOWN", "open"],
+      ["MYSTERY", null],
+    ])
     expect([...applyPhaseFilter(tiles, "open").keys()]).toEqual(["KNOWN"])
   })
 
   it("yields an empty map overnight rather than falling back to everything", () => {
-    const tiles = board([["A", "closed"], ["B", "aftermarket"]])
+    const tiles = board([
+      ["A", "closed"],
+      ["B", "aftermarket"],
+    ])
     expect(applyPhaseFilter(tiles, "open").size).toBe(0)
   })
 })

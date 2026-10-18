@@ -2,11 +2,7 @@ import { Outlet } from "react-router-dom"
 import { CommandSearch } from "@/components/search/command-search"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 
 export function Layout() {
   return (

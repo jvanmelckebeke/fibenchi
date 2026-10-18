@@ -66,7 +66,10 @@ function near(a: number | null | undefined, b: number | null | undefined): boole
  * staleness — reading it as such blanks every symbol at once whenever the
  * provider hiccups.
  */
-export function sessionsBehind(snapshot: IndicatorSummary, quote: Quote | undefined): number | null {
+export function sessionsBehind(
+  snapshot: IndicatorSummary,
+  quote: Quote | undefined
+): number | null {
   if (!quote) return null
   const asOf = snapshot.as_of
   const session = quote.session_date
@@ -130,7 +133,7 @@ function planFor(behind: number | null, gapFlagged: boolean): Plan {
  */
 export function resolveSigma(
   quote: Quote | undefined,
-  snapshot: IndicatorSummary | undefined,
+  snapshot: IndicatorSummary | undefined
 ): SigmaResolution {
   if (!snapshot) return { status: "withheld", reason: { kind: "no_data" } }
 
@@ -181,7 +184,7 @@ export function resolveSigma(
  */
 export function sigmaExDiv(
   resolution: { status: "ok"; source: ValueSource } | { status: "withheld" },
-  snapshot: IndicatorSummary | undefined,
+  snapshot: IndicatorSummary | undefined
 ): number | null {
   if (resolution.status !== "ok" || resolution.source !== "settled") return null
   return getNumericValue(snapshot?.values, "vnr_ex_div")

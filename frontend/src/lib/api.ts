@@ -50,7 +50,7 @@ const BASE = "/api"
 
 function qs(params: Record<string, string | undefined>): string {
   const entries = Object.entries(params).filter(
-    (entry): entry is [string, string] => entry[1] !== undefined,
+    (entry): entry is [string, string] => entry[1] !== undefined
   )
   return entries.length ? `?${new URLSearchParams(entries)}` : ""
 }
@@ -74,8 +74,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // Portfolio & Assets
 export const api = {
   portfolio: {
-    index: (period?: string) =>
-      request<PortfolioIndex>(`/portfolio/index${qs({ period })}`),
+    index: (period?: string) => request<PortfolioIndex>(`/portfolio/index${qs({ period })}`),
     performers: (period?: string) =>
       request<AssetPerformance[]>(`/portfolio/performers${qs({ period })}`),
   },
@@ -103,12 +102,10 @@ export const api = {
       request<AssetDetail>(`/assets/${symbol}/detail${qs({ period })}`),
     refresh: (symbol: string, period?: string) =>
       request<SyncResult>(`/assets/${symbol}/refresh${qs({ period })}`, { method: "POST" }),
-    holdings: (symbol: string) =>
-      request<EtfHoldings>(`/assets/${symbol}/holdings`),
+    holdings: (symbol: string) => request<EtfHoldings>(`/assets/${symbol}/holdings`),
     holdingsIndicators: (symbol: string) =>
       request<HoldingIndicator[]>(`/assets/${symbol}/holdings/indicators`),
-    earnings: (symbol: string) =>
-      request<EarningsInfo>(`/assets/${symbol}/earnings`),
+    earnings: (symbol: string) => request<EarningsInfo>(`/assets/${symbol}/earnings`),
   },
   tags: {
     list: () => request<Tag[]>("/tags"),
@@ -127,10 +124,12 @@ export const api = {
       request<Thesis>("/theses", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: ThesisUpdate) =>
       request<Thesis>(`/theses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    delete: (id: number) =>
-      request<void>(`/theses/${id}`, { method: "DELETE" }),
+    delete: (id: number) => request<void>(`/theses/${id}`, { method: "DELETE" }),
     addAssets: (id: number, assetIds: number[]) =>
-      request<Thesis>(`/theses/${id}/assets`, { method: "POST", body: JSON.stringify({ asset_ids: assetIds }) }),
+      request<Thesis>(`/theses/${id}/assets`, {
+        method: "POST",
+        body: JSON.stringify({ asset_ids: assetIds }),
+      }),
     removeAsset: (id: number, assetId: number) =>
       request<Thesis>(`/theses/${id}/assets/${assetId}`, { method: "DELETE" }),
   },
@@ -141,10 +140,12 @@ export const api = {
       request<Group>("/groups", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: GroupUpdate) =>
       request<Group>(`/groups/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    delete: (id: number) =>
-      request<void>(`/groups/${id}`, { method: "DELETE" }),
+    delete: (id: number) => request<void>(`/groups/${id}`, { method: "DELETE" }),
     reorder: (groupIds: number[]) =>
-      request<Group[]>("/groups/reorder", { method: "PUT", body: JSON.stringify({ group_ids: groupIds }) }),
+      request<Group[]>("/groups/reorder", {
+        method: "PUT",
+        body: JSON.stringify({ group_ids: groupIds }),
+      }),
     addAssets: (id: number, assetIds: number[]) =>
       request<Group>(`/groups/${id}/assets`, {
         method: "POST",
@@ -202,8 +203,10 @@ export const api = {
     delete: (symbol: string, id: number) =>
       request<void>(`/assets/${symbol}/annotations/${id}`, { method: "DELETE" }),
   },
-  searchLocal: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=local`),
-  searchYahoo: (q: string) => request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=yahoo`),
+  searchLocal: (q: string) =>
+    request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=local`),
+  searchYahoo: (q: string) =>
+    request<SymbolSearchResult[]>(`/search?q=${encodeURIComponent(q)}&source=yahoo`),
   settings: {
     get: () => request<{ data: Record<string, unknown> }>("/settings"),
     update: (data: Record<string, unknown>) =>
@@ -218,13 +221,16 @@ export const api = {
     create: (data: SymbolSourceCreate) =>
       request<SymbolSource>("/symbol-sources", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: SymbolSourceUpdate) =>
-      request<SymbolSource>(`/symbol-sources/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+      request<SymbolSource>(`/symbol-sources/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     sync: (id: number) =>
       request<{ source_id: number; symbols_synced: number; message: string }>(
-        `/symbol-sources/${id}/sync`, { method: "POST" },
+        `/symbol-sources/${id}/sync`,
+        { method: "POST" }
       ),
-    delete: (id: number) =>
-      request<void>(`/symbol-sources/${id}`, { method: "DELETE" }),
+    delete: (id: number) => request<void>(`/symbol-sources/${id}`, { method: "DELETE" }),
   },
   pseudoEtfs: {
     list: () => request<PseudoETF[]>("/pseudo-etfs"),
@@ -233,8 +239,7 @@ export const api = {
     get: (id: number) => request<PseudoETF>(`/pseudo-etfs/${id}`),
     update: (id: number, data: PseudoETFUpdate) =>
       request<PseudoETF>(`/pseudo-etfs/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    delete: (id: number) =>
-      request<void>(`/pseudo-etfs/${id}`, { method: "DELETE" }),
+    delete: (id: number) => request<void>(`/pseudo-etfs/${id}`, { method: "DELETE" }),
     addConstituents: (id: number, assetIds: number[]) =>
       request<PseudoETF>(`/pseudo-etfs/${id}/constituents`, {
         method: "POST",
@@ -242,8 +247,10 @@ export const api = {
       }),
     removeConstituent: (etfId: number, assetId: number) =>
       request<PseudoETF>(`/pseudo-etfs/${etfId}/constituents/${assetId}`, { method: "DELETE" }),
-    performance: (id: number) => request<PerformanceBreakdownPoint[]>(`/pseudo-etfs/${id}/performance`),
-    constituentsIndicators: (id: number) => request<ConstituentIndicator[]>(`/pseudo-etfs/${id}/constituents/indicators`),
+    performance: (id: number) =>
+      request<PerformanceBreakdownPoint[]>(`/pseudo-etfs/${id}/performance`),
+    constituentsIndicators: (id: number) =>
+      request<ConstituentIndicator[]>(`/pseudo-etfs/${id}/constituents/indicators`),
     note: {
       get: (id: number) => request<Note>(`/pseudo-etfs/${id}/note`),
       update: (id: number, content: string) =>

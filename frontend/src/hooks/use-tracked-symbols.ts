@@ -6,8 +6,5 @@ import { useAssets } from "@/lib/queries"
  */
 export function useTrackedSymbols(): Set<string> {
   const { data: assets } = useAssets()
-  return useMemo(
-    () => new Set(assets?.map((a) => a.symbol)),
-    [assets],
-  )
+  return useMemo(() => new Set(assets?.map((a) => a.symbol)), [assets])
 }

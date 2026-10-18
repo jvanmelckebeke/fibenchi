@@ -67,13 +67,17 @@ export function ThesisFormFields({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-status`}>Status</Label>
-          <Select value={values.status} onValueChange={(v) => onChange("status", v as ThesisStatus)}>
+          <Select
+            value={values.status}
+            onValueChange={(v) => onChange("status", v as ThesisStatus)}>
             <SelectTrigger id={`${idPrefix}-status`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

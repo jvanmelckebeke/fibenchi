@@ -44,7 +44,7 @@ export function CommandSearch() {
       setOpen(false)
       navigate(`/asset/${symbol}`)
     },
-    [navigate],
+    [navigate]
   )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -75,20 +75,19 @@ export function CommandSearch() {
     <>
       <button
         onClick={() => handleOpenChange(true)}
-        className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
-      >
+        className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted">
         <Search className="h-3.5 w-3.5" />
         <span>Search symbols…</span>
-        <kbd className="ml-2 hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono sm:inline-block">
+        <kbd className="ml-2 hidden rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] sm:inline-block">
           {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}K
         </kbd>
       </button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
           <DialogTitle className="sr-only">Search symbols</DialogTitle>
           <div className="flex items-center border-b px-3">
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               ref={inputRef}
               value={query}

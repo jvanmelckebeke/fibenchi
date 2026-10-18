@@ -8,10 +8,7 @@ export function useGroups() {
 }
 
 export function useCreateGroup() {
-  return useInvalidatingMutation(
-    (data: GroupCreate) => api.groups.create(data),
-    [keys.groups],
-  )
+  return useInvalidatingMutation((data: GroupCreate) => api.groups.create(data), [keys.groups])
 }
 
 export function useUpdateGroup() {
@@ -39,7 +36,7 @@ export function useDeleteGroup() {
 export function useReorderGroups() {
   return useInvalidatingMutation(
     (groupIds: number[]) => api.groups.reorder(groupIds),
-    [keys.groups],
+    [keys.groups]
   )
 }
 
@@ -47,7 +44,7 @@ export function useAddAssetsToGroup() {
   return useInvalidatingMutation(
     ({ groupId, assetIds }: { groupId: number; assetIds: number[] }) =>
       api.groups.addAssets(groupId, assetIds),
-    [keys.groups, keys.assets],
+    [keys.groups, keys.assets]
   )
 }
 
@@ -60,7 +57,7 @@ export function useRemoveAssetFromGroup() {
       await qc.cancelQueries({ queryKey: keys.group(groupId) })
       const previous = qc.getQueryData<Group>(keys.group(groupId))
       qc.setQueryData<Group>(keys.group(groupId), (old) =>
-        old ? { ...old, assets: old.assets.filter((a) => a.id !== assetId) } : old,
+        old ? { ...old, assets: old.assets.filter((a) => a.id !== assetId) } : old
       )
       return { previous, groupId }
     },

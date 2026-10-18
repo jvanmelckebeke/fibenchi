@@ -65,7 +65,12 @@ export function AssetSuggestionBanner({
               Suggestion:{" "}
               <span className="font-medium text-foreground">{summarise(suggestion, open)}</span>
             </p>
-            <Button type="button" variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={onApply}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[11px]"
+              onClick={onApply}>
               Use this
             </Button>
           </div>
@@ -79,8 +84,7 @@ export function AssetSuggestionBanner({
             type="button"
             onClick={onReset}
             disabled={resetPending}
-            className="underline underline-offset-2 hover:text-foreground disabled:opacity-50"
-          >
+            className="underline underline-offset-2 hover:text-foreground disabled:opacity-50">
             reset to auto-detect
           </button>
         </p>

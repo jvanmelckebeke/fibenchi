@@ -31,7 +31,10 @@ interface IndicatorVisibilityEditorProps {
   onChange: (visibility: Record<string, Placement[]>) => void
 }
 
-export function IndicatorVisibilityEditor({ visibility, onChange }: IndicatorVisibilityEditorProps) {
+export function IndicatorVisibilityEditor({
+  visibility,
+  onChange,
+}: IndicatorVisibilityEditorProps) {
   const [open, setOpen] = useState(false)
 
   const grouped = new Map<IndicatorCategory, IndicatorDescriptor[]>()
@@ -70,17 +73,21 @@ export function IndicatorVisibilityEditor({ visibility, onChange }: IndicatorVis
           Configure Indicator Visibility
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Indicator Visibility</DialogTitle>
         </DialogHeader>
 
         {/* Column headers */}
         <div className="space-y-4">
-          <div className="grid items-center gap-x-2" style={{ gridTemplateColumns: `1fr repeat(${PLACEMENT_COLS.length}, 56px)` }}>
+          <div
+            className="grid items-center gap-x-2"
+            style={{ gridTemplateColumns: `1fr repeat(${PLACEMENT_COLS.length}, 56px)` }}>
             <div />
             {PLACEMENT_COLS.map((col) => (
-              <span key={col.placement} className="text-[11px] text-muted-foreground text-center font-medium">
+              <span
+                key={col.placement}
+                className="text-center text-[11px] font-medium text-muted-foreground">
                 {col.label}
               </span>
             ))}
@@ -88,7 +95,7 @@ export function IndicatorVisibilityEditor({ visibility, onChange }: IndicatorVis
 
           {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
             <div key={cat}>
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              <h4 className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                 {CATEGORY_LABELS[cat]}
               </h4>
               <div className="space-y-0.5">
@@ -97,10 +104,9 @@ export function IndicatorVisibilityEditor({ visibility, onChange }: IndicatorVis
                   return (
                     <div
                       key={desc.id}
-                      className="grid items-center gap-x-2 py-1.5 rounded hover:bg-muted/50"
-                      style={{ gridTemplateColumns: `1fr repeat(${PLACEMENT_COLS.length}, 56px)` }}
-                    >
-                      <span className="text-sm font-medium pl-1">{desc.label}</span>
+                      className="grid items-center gap-x-2 rounded py-1.5 hover:bg-muted/50"
+                      style={{ gridTemplateColumns: `1fr repeat(${PLACEMENT_COLS.length}, 56px)` }}>
+                      <span className="pl-1 text-sm font-medium">{desc.label}</span>
                       {PLACEMENT_COLS.map((col) => {
                         const capable = desc.capabilities.includes(col.placement)
                         const checked = capable && active.includes(col.placement)

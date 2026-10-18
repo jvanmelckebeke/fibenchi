@@ -7,7 +7,7 @@ export function useColumnResize() {
   const { settings, updateSettings } = useSettings()
   const widths = useMemo(
     () => settings.group_table_column_widths ?? {},
-    [settings.group_table_column_widths],
+    [settings.group_table_column_widths]
   )
   const draggingRef = useRef(false)
 
@@ -16,7 +16,7 @@ export function useColumnResize() {
       const w = widths[key]
       return w != null ? { width: w, minWidth: MIN_WIDTH } : { minWidth: MIN_WIDTH }
     },
-    [widths],
+    [widths]
   )
 
   const startResize = useCallback(
@@ -55,7 +55,7 @@ export function useColumnResize() {
       document.addEventListener("pointermove", onMove)
       document.addEventListener("pointerup", onUp)
     },
-    [widths, updateSettings],
+    [widths, updateSettings]
   )
 
   const resetWidth = useCallback(
@@ -70,7 +70,7 @@ export function useColumnResize() {
       const th = (e.target as HTMLElement).closest("th")
       if (th) th.style.width = ""
     },
-    [widths, updateSettings],
+    [widths, updateSettings]
   )
 
   return { getColumnStyle, startResize, resetWidth }

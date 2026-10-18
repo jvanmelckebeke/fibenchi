@@ -30,9 +30,7 @@ function getChartTheme() {
 }
 
 export function useChartTheme() {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains("dark")
-  )
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"))
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -93,7 +91,9 @@ export function baseChartOptions(container: HTMLElement, height: number) {
 }
 
 /** Build a Map from date string to numeric indicator values, filtering out nulls/non-numbers. */
-export function buildIndicatorTimeMap(indicators: Indicator[]): Map<string, Record<string, number>> {
+export function buildIndicatorTimeMap(
+  indicators: Indicator[]
+): Map<string, Record<string, number>> {
   const map = new Map<string, Record<string, number>>()
   for (const i of indicators) {
     const vals: Record<string, number> = {}

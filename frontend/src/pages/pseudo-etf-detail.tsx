@@ -8,10 +8,7 @@ import { AnnotationsList } from "@/components/notes/annotations-list"
 import { HoldingsGrid, type HoldingsGridRow } from "@/components/holdings-grid"
 import { AddConstituentPicker } from "@/components/pseudo-etf/add-constituent-picker"
 import { CrosshairTimeSyncProvider } from "@/components/chart/crosshair-time-sync"
-import {
-  PerformanceOverlayChart,
-  DailyContributionChart,
-} from "@/components/pseudo-etf"
+import { PerformanceOverlayChart, DailyContributionChart } from "@/components/pseudo-etf"
 import { STACK_COLORS } from "@/lib/chart-utils"
 import { formatChangePct } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
@@ -47,9 +44,7 @@ function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
         avgMap.set(sym, (avgMap.get(sym) ?? 0) + val)
       }
     }
-    return [...avgMap.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([sym]) => sym)
+    return [...avgMap.entries()].sort((a, b) => b[1] - a[1]).map(([sym]) => sym)
   }, [performance])
 
   const symbolColorMap = useMemo(() => {
@@ -63,7 +58,7 @@ function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
   if (!etf) return null
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center gap-3">
         <Link to="/pseudo-etfs">
           <Button variant="ghost" size="icon">
@@ -81,7 +76,7 @@ function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
       </div>
 
       {isLoading && (
-        <div className="h-[440px] flex flex-col items-center justify-center gap-2 text-muted-foreground">
+        <div className="flex h-[440px] flex-col items-center justify-center gap-2 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span className="text-sm">Calculating performance...</span>
         </div>
@@ -89,10 +84,19 @@ function PseudoEtfDetailContent({ etfId }: { etfId: number }) {
 
       {performance && performance.length > 0 && (
         <>
-          <PerformanceOverlayChart data={performance} baseValue={etf.base_value} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
+          <PerformanceOverlayChart
+            data={performance}
+            baseValue={etf.base_value}
+            sortedSymbols={sortedSymbols}
+            symbolColorMap={symbolColorMap}
+          />
           <PerformanceStats data={performance} baseValue={etf.base_value} />
           {performance.length > 1 && (
-            <DailyContributionChart data={performance} sortedSymbols={sortedSymbols} symbolColorMap={symbolColorMap} />
+            <DailyContributionChart
+              data={performance}
+              sortedSymbols={sortedSymbols}
+              symbolColorMap={symbolColorMap}
+            />
           )}
         </>
       )}
@@ -130,7 +134,13 @@ function EtfNote({ etfId }: { etfId: number }) {
   return <NoteEditor note={note} onSave={update.mutate} isSaving={update.isPending} />
 }
 
-function PerformanceStats({ data, baseValue }: { data: PerformanceBreakdownPoint[]; baseValue: number }) {
+function PerformanceStats({
+  data,
+  baseValue,
+}: {
+  data: PerformanceBreakdownPoint[]
+  baseValue: number
+}) {
   if (!data.length) return null
 
   const last = data[data.length - 1]
@@ -145,13 +155,13 @@ function PerformanceStats({ data, baseValue }: { data: PerformanceBreakdownPoint
       </div>
       <div>
         <span className="text-muted-foreground">Total return: </span>
-        <span className={`font-medium ${returnFmt.className}`}>
-          {returnFmt.text}
-        </span>
+        <span className={`font-medium ${returnFmt.className}`}>{returnFmt.text}</span>
       </div>
       <div>
         <span className="text-muted-foreground">Period: </span>
-        <span className="font-medium">{data[0].date} to {last.date}</span>
+        <span className="font-medium">
+          {data[0].date} to {last.date}
+        </span>
       </div>
     </div>
   )
@@ -161,7 +171,7 @@ function HoldingsTable({ etfId }: { etfId: number }) {
   const { data: etf } = usePseudoEtf(etfId)
   const { data: indicators, isLoading: indicatorsLoading } = usePseudoEtfConstituentsIndicators(
     etfId,
-    (etf?.constituents.length ?? 0) > 0,
+    (etf?.constituents.length ?? 0) > 0
   )
   const removeConstituent = useRemovePseudoEtfConstituent()
   const [addingAsset, setAddingAsset] = useState(false)
@@ -187,7 +197,7 @@ function HoldingsTable({ etfId }: { etfId: number }) {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-base">Holdings ({etf.constituents.length})</CardTitle>
         <Button size="sm" variant="ghost" onClick={() => setAddingAsset(!addingAsset)}>
-          <UserPlus className="h-3.5 w-3.5 mr-1" />
+          <UserPlus className="mr-1 h-3.5 w-3.5" />
           Add
         </Button>
       </CardHeader>
@@ -201,7 +211,9 @@ function HoldingsTable({ etfId }: { etfId: number }) {
         )}
 
         {etf.constituents.length === 0 && !addingAsset && (
-          <p className="text-sm text-muted-foreground italic">No constituents. Add stocks to this basket.</p>
+          <p className="text-sm text-muted-foreground italic">
+            No constituents. Add stocks to this basket.
+          </p>
         )}
 
         {etf.constituents.length > 0 && (
@@ -218,4 +230,3 @@ function HoldingsTable({ etfId }: { etfId: number }) {
     </Card>
   )
 }
-

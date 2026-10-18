@@ -4,7 +4,12 @@ import { ChartSyncProvider } from "./chart-sync-provider"
 import { CandlestickChart } from "./candlestick-chart"
 import { SubChart } from "./sub-chart"
 import { IndicatorCards } from "./indicator-cards"
-import { getSubChartDescriptors, getCardDescriptors, isVisibleAt, type Placement } from "@/lib/indicator-registry"
+import {
+  getSubChartDescriptors,
+  getCardDescriptors,
+  isVisibleAt,
+  type Placement,
+} from "@/lib/indicator-registry"
 
 const SUB_CHART_DESCRIPTORS = getSubChartDescriptors()
 const CARD_DESCRIPTORS = getCardDescriptors(true)
@@ -46,17 +51,17 @@ export function PriceChart({
       if (effectiveExcludes.includes(id)) return false
       return isVisibleAt(indicatorVisibility, id, "detail_chart")
     },
-    [indicatorVisibility, effectiveExcludes],
+    [indicatorVisibility, effectiveExcludes]
   )
 
   const enabledSubCharts = useMemo(
     () => SUB_CHART_DESCRIPTORS.filter((d) => isVisible(d.id)),
-    [isVisible],
+    [isVisible]
   )
 
   const enabledCards = useMemo(
     () => CARD_DESCRIPTORS.filter((d) => isVisibleAt(indicatorVisibility, d.id, "detail_card")),
-    [indicatorVisibility],
+    [indicatorVisibility]
   )
 
   const hasSubCharts = enabledSubCharts.length > 0

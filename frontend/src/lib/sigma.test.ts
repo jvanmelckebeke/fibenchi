@@ -9,21 +9,40 @@ import type { IndicatorSummary, Quote } from "@/lib/types"
 // change -1.06%). σ-Move showed +1.56 next to a red day.
 
 const q = (over: Partial<Quote> = {}): Quote => ({
-  symbol: "X", price: null, previous_close: null, change: null, change_percent: null,
-  volume: null, avg_volume: null, currency: "USD", market_state: null,
-  session_date: null, recent_sessions: null, volume_pace: null, ...over,
+  symbol: "X",
+  price: null,
+  previous_close: null,
+  change: null,
+  change_percent: null,
+  volume: null,
+  avg_volume: null,
+  currency: "USD",
+  market_state: null,
+  session_date: null,
+  recent_sessions: null,
+  volume_pace: null,
+  ...over,
 })
 
 const snap = (over: Partial<IndicatorSummary> = {}): IndicatorSummary => ({
-  close: null, as_of: null, change_pct: null, bars: 300, values: {}, ...over,
+  close: null,
+  as_of: null,
+  change_pct: null,
+  bars: 300,
+  values: {},
+  ...over,
 })
 
 /** Six real sessions, newest first — Tue 11th back through Tue 4th of August
  * 2026, skipping the weekend. Index in this list IS the distance a stored bar
  * sits behind the live session. */
 const SESSIONS = [
-  "2026-08-11", "2026-08-10", "2026-08-07",
-  "2026-08-06", "2026-08-05", "2026-08-04",
+  "2026-08-11",
+  "2026-08-10",
+  "2026-08-07",
+  "2026-08-06",
+  "2026-08-05",
+  "2026-08-04",
 ]
 
 /** A quote dated Tuesday, carrying the venue's recent session window. */
@@ -34,7 +53,7 @@ describe("resolveSigma — session identity decides, not price similarity", () =
   it("recomputes live when the stored bar is the quote's prior session", () => {
     const r = resolveSigma(
       dated({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 28300, as_of: "2026-08-10", values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      snap({ close: 28300, as_of: "2026-08-10", values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(-0.184, 3), source: "live" })
   })
@@ -44,7 +63,7 @@ describe("resolveSigma — session identity decides, not price similarity", () =
     // tolerance rejects exactly these, i.e. every symbol worth looking at.
     const r = resolveSigma(
       dated({ change_percent: 12.0, previous_close: 100, price: 112 }),
-      snap({ close: 100, as_of: "2026-08-10", values: { vnr: 0.2, vnr_sigma: 0.02 } }),
+      snap({ close: 100, as_of: "2026-08-10", values: { vnr: 0.2, vnr_sigma: 0.02 } })
     )
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(6, 6), source: "live" })
   })
@@ -54,7 +73,7 @@ describe("resolveSigma — session identity decides, not price similarity", () =
     // absorbed that bar's own move, so dividing by it understates.
     const r = resolveSigma(
       dated({ change_percent: 0.3, previous_close: 100, price: 100.3 }),
-      snap({ close: 100.3, as_of: "2026-08-11", values: { vnr: 0.305, vnr_sigma: 0.01 } }),
+      snap({ close: 100.3, as_of: "2026-08-11", values: { vnr: 0.305, vnr_sigma: 0.01 } })
     )
     expect(r).toEqual({ status: "ok", sigma: 0.305, source: "settled" })
   })
@@ -65,7 +84,7 @@ describe("resolveSigma — session identity decides, not price similarity", () =
     // the bar is close enough to score, the answer comes from the quote.
     const r = resolveSigma(
       dated({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 30250, as_of: "2026-08-07", values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      snap({ close: 30250, as_of: "2026-08-07", values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(-0.184, 3), source: "live" })
   })
@@ -74,9 +93,14 @@ describe("resolveSigma — session identity decides, not price similarity", () =
     // Easter Monday: the prior session is the Thursday. "Minus one business
     // day" would name Good Friday and reject a perfectly good stored bar.
     const r = resolveSigma(
-      q({ session_date: "2025-04-21", recent_sessions: ["2025-04-21", "2025-04-17", "2025-04-16"],
-          change_percent: 2.0, previous_close: 100, price: 102 }),
-      snap({ close: 100, as_of: "2025-04-17", values: { vnr: 0.1, vnr_sigma: 0.02 } }),
+      q({
+        session_date: "2025-04-21",
+        recent_sessions: ["2025-04-21", "2025-04-17", "2025-04-16"],
+        change_percent: 2.0,
+        previous_close: 100,
+        price: 102,
+      }),
+      snap({ close: 100, as_of: "2025-04-17", values: { vnr: 0.1, vnr_sigma: 0.02 } })
     )
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(1, 6), source: "live" })
   })
@@ -88,31 +112,39 @@ describe("resolveSigma — gap-flagged snapshots", () => {
   // previous_close 207.45 IS that close — so change_percent is a verified
   // single-session return.
   const gapSnap = snap({
-    close: 209.9, as_of: "2026-08-13",
+    close: 209.9,
+    as_of: "2026-08-13",
     values: { vnr: null, vnr_sigma: 0.016578, vnr_gap_sessions: 2 },
   })
   const gapQuote = q({
-    session_date: "2026-08-13", recent_sessions: ["2026-08-13", "2026-08-12", "2026-08-11"],
-    change_percent: 1.18, previous_close: 207.45, price: 209.9,
+    session_date: "2026-08-13",
+    recent_sessions: ["2026-08-13", "2026-08-12", "2026-08-11"],
+    change_percent: 1.18,
+    previous_close: 207.45,
+    price: 209.9,
   })
 
   it("recovers the reading from the quote instead of blanking a mover", () => {
-    expect(resolveSigma(gapQuote, gapSnap)).toEqual(
-      { status: "ok", sigma: expect.closeTo(0.712, 3), source: "live" },
-    )
+    expect(resolveSigma(gapQuote, gapSnap)).toEqual({
+      status: "ok",
+      sigma: expect.closeTo(0.712, 3),
+      source: "live",
+    })
   })
 
   it("explains the blank when there is no quote to recover from", () => {
-    expect(resolveSigma(undefined, gapSnap)).toEqual(
-      { status: "withheld", reason: { kind: "gap", sessions: 2 } },
-    )
+    expect(resolveSigma(undefined, gapSnap)).toEqual({
+      status: "withheld",
+      reason: { kind: "gap", sessions: 2 },
+    })
   })
 
   it("explains the blank when the forecast is unusable", () => {
     const noForecast = snap({ ...gapSnap, values: { vnr_gap_sessions: 2, vnr_sigma: 0 } })
-    expect(resolveSigma(gapQuote, noForecast)).toEqual(
-      { status: "withheld", reason: { kind: "gap", sessions: 2 } },
-    )
+    expect(resolveSigma(gapQuote, noForecast)).toEqual({
+      status: "withheld",
+      reason: { kind: "gap", sessions: 2 },
+    })
   })
 })
 
@@ -122,7 +154,8 @@ describe("resolveSigma — a bar several sessions behind", () => {
   // unaffected — the quote's change % is measured against 08-18's real close —
   // so only the forecast is stale, by one EWMA update.
   const pry = snap({
-    close: 131.05, as_of: "2026-08-07",
+    close: 131.05,
+    as_of: "2026-08-07",
     values: { vnr: 0.9, vnr_sigma: 0.02449 },
   })
 
@@ -135,7 +168,7 @@ describe("resolveSigma — a bar several sessions behind", () => {
     const atLimit = SESSIONS[VNR_MAX_SESSIONS_BEHIND]
     const r = resolveSigma(
       dated({ change_percent: -0.4, previous_close: 124.65 }),
-      snap({ ...pry, as_of: atLimit }),
+      snap({ ...pry, as_of: atLimit })
     )
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(-0.163, 3), source: "live" })
   })
@@ -144,7 +177,7 @@ describe("resolveSigma — a bar several sessions behind", () => {
     const pastLimit = SESSIONS[VNR_MAX_SESSIONS_BEHIND + 1]
     const r = resolveSigma(
       dated({ change_percent: -0.4, previous_close: 124.65 }),
-      snap({ ...pry, as_of: pastLimit }),
+      snap({ ...pry, as_of: pastLimit })
     )
     expect(r).toEqual({
       status: "withheld",
@@ -155,7 +188,7 @@ describe("resolveSigma — a bar several sessions behind", () => {
   it("withholds without a distance when the bar predates the whole window", () => {
     const r = resolveSigma(
       dated({ change_percent: -0.4, previous_close: 124.65 }),
-      snap({ ...pry, as_of: "2026-05-04" }),
+      snap({ ...pry, as_of: "2026-05-04" })
     )
     expect(r).toEqual({ status: "withheld", reason: { kind: "feed_behind", sessions: null } })
   })
@@ -171,7 +204,7 @@ describe("resolveSigma — a bar several sessions behind", () => {
     // The stored 0.9 describes 08-07. There is no honest way to show it.
     const r = resolveSigma(
       dated({ change_percent: -0.4, previous_close: 124.65 }),
-      snap({ ...pry, values: { vnr: 0.9 } }),
+      snap({ ...pry, values: { vnr: 0.9 } })
     )
     expect(r).toEqual({ status: "withheld", reason: { kind: "cannot_score" } })
   })
@@ -188,7 +221,7 @@ describe("resolveSigma — degraded inputs", () => {
   it("still treats a real quote matching neither price as behind", () => {
     const r = resolveSigma(
       q({ price: 28000, previous_close: 28300 }),
-      snap({ close: 30250, values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      snap({ close: 30250, values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(r).toEqual({ status: "withheld", reason: { kind: "feed_behind", sessions: null } })
   })
@@ -203,16 +236,21 @@ describe("resolveSigma — degraded inputs", () => {
   it("falls back to price corroboration for a snapshot with no as_of", () => {
     const r = resolveSigma(
       q({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 28300, values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      snap({ close: 28300, values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(-0.184, 3), source: "live" })
   })
 
   it("corroborates on price when the venue has no calendar", () => {
     const r = resolveSigma(
-      q({ session_date: "2026-08-11", recent_sessions: null,
-          change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 28300, as_of: "2026-08-10", values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      q({
+        session_date: "2026-08-11",
+        recent_sessions: null,
+        change_percent: -1.06,
+        previous_close: 28300,
+        price: 28000,
+      }),
+      snap({ close: 28300, as_of: "2026-08-10", values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(r).toEqual({ status: "ok", sigma: expect.closeTo(-0.184, 3), source: "live" })
   })
@@ -222,7 +260,7 @@ describe("resolveSigma — degraded inputs", () => {
     // change % is the sign contradiction this whole module exists to prevent.
     const r = resolveSigma(
       dated({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 28300, as_of: "2026-08-10", values: { vnr: 1.56 } }),
+      snap({ close: 28300, as_of: "2026-08-10", values: { vnr: 1.56 } })
     )
     expect(r).toEqual({ status: "withheld", reason: { kind: "cannot_score" } })
   })
@@ -236,9 +274,10 @@ describe("resolveSigma — degraded inputs", () => {
   })
 
   it("reports no_data without a snapshot", () => {
-    expect(resolveSigma(dated(), undefined)).toEqual(
-      { status: "withheld", reason: { kind: "no_data" } },
-    )
+    expect(resolveSigma(dated(), undefined)).toEqual({
+      status: "withheld",
+      reason: { kind: "no_data" },
+    })
   })
 })
 
@@ -251,7 +290,7 @@ describe("sigmaSortKey", () => {
   it("is null for a withheld reading, so blanked rows never sort by a hidden number", () => {
     const withheld = resolveSigma(
       dated({ price: 1, previous_close: 2 }),
-      snap({ close: 30250, as_of: "2026-08-01", values: { vnr: 1.56 } }),
+      snap({ close: 30250, as_of: "2026-08-01", values: { vnr: 1.56 } })
     )
     expect(sigmaSortKey(withheld)).toBeNull()
   })
@@ -260,7 +299,9 @@ describe("sigmaSortKey", () => {
 describe("sigmaExDiv", () => {
   it("reports the payout behind a settled σ that disagrees with the change %", () => {
     const settled = snap({
-      close: 95, as_of: SESSIONS[0], change_pct: -4.8,
+      close: 95,
+      as_of: SESSIONS[0],
+      change_pct: -4.8,
       values: { vnr: 0.1, vnr_ex_div: 5.0 },
     })
     const r = resolveSigma(undefined, settled)
@@ -277,7 +318,8 @@ describe("sigmaExDiv", () => {
     // The live number divides the quote's own change %, and that carries the
     // ex-date drop uncorrected — the stored bar's dividend does not describe it.
     const s = snap({
-      close: 28300, as_of: "2026-08-10",
+      close: 28300,
+      as_of: "2026-08-10",
       values: { vnr: 1.56, vnr_sigma: 0.0576, vnr_ex_div: 0.42 },
     })
     const r = resolveSigma(dated({ change_percent: -1.06, price: 28000 }), s)

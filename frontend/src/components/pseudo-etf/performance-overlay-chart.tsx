@@ -1,9 +1,5 @@
 import { useEffect, useRef, useMemo } from "react"
-import {
-  createChart,
-  type IChartApi,
-  LineSeries,
-} from "lightweight-charts"
+import { createChart, type IChartApi, LineSeries } from "lightweight-charts"
 import { baseChartOptions, STACK_COLORS } from "@/lib/chart-utils"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import { useCrosshairHover } from "@/hooks/use-crosshair-hover"
@@ -126,7 +122,16 @@ export function PerformanceOverlayChart({
       totalSeriesRef.current = null
       baseLineRef.current = null
     }
-  }, [data, baseValue, sortedSymbols, symbolColorMap, startLifecycle, theme.dark, hoverRef, subscribe])
+  }, [
+    data,
+    baseValue,
+    sortedSymbols,
+    symbolColorMap,
+    startLifecycle,
+    theme.dark,
+    hoverRef,
+    subscribe,
+  ])
 
   // Apply baseLine + totalLine theme colors on theme change
   useEffect(() => {
@@ -140,12 +145,20 @@ export function PerformanceOverlayChart({
 
   return (
     <div className="space-y-2">
-      <div ref={ref} className="w-full rounded-md overflow-hidden" />
+      <div ref={ref} className="w-full overflow-hidden rounded-md" />
       <SymbolLegend
         sortedSymbols={sortedSymbols}
         symbolColorMap={symbolColorMap}
-        values={displayData ? sortedSymbols.map((sym) => displayData.rebased[sym]?.toFixed(2)) : undefined}
-        suffix={displayData ? <span className="text-xs font-medium ml-auto">Index: {displayData.total.toFixed(2)}</span> : undefined}
+        values={
+          displayData ? sortedSymbols.map((sym) => displayData.rebased[sym]?.toFixed(2)) : undefined
+        }
+        suffix={
+          displayData ? (
+            <span className="ml-auto text-xs font-medium">
+              Index: {displayData.total.toFixed(2)}
+            </span>
+          ) : undefined
+        }
       />
     </div>
   )

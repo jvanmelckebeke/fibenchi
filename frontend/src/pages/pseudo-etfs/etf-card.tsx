@@ -38,7 +38,7 @@ export function EtfCard({ etf }: { etf: PseudoETF }) {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between pb-2">
         {editing ? (
-          <div className="flex-1 space-y-2 mr-2">
+          <div className="mr-2 flex-1 space-y-2">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
             <Textarea
               value={description}
@@ -46,29 +46,42 @@ export function EtfCard({ etf }: { etf: PseudoETF }) {
               className="min-h-[40px]"
             />
             <div className="flex gap-1">
-              <Button size="sm" onClick={handleSave}>Save</Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleSave}>
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
             </div>
           </div>
         ) : (
-          <Link to={`/pseudo-etf/${etf.id}`} className="hover:underline flex-1">
+          <Link to={`/pseudo-etf/${etf.id}`} className="flex-1 hover:underline">
             <CardTitle className="text-base">{etf.name}</CardTitle>
             {etf.description && (
-              <p className="text-xs text-muted-foreground mt-1">{etf.description}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{etf.description}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="mt-1 text-xs text-muted-foreground">
               Base: {etf.base_date} = {etf.base_value} · {etf.constituents.length} constituents
             </p>
           </Link>
         )}
         {!editing && (
           <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Edit pseudo-ETF" onClick={() => setEditing(true)}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              aria-label="Edit pseudo-ETF"
+              onClick={() => setEditing(true)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Delete pseudo-ETF">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  aria-label="Delete pseudo-ETF">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </AlertDialogTrigger>
@@ -76,7 +89,8 @@ export function EtfCard({ etf }: { etf: PseudoETF }) {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete pseudo-ETF</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete &ldquo;{etf.name}&rdquo;? This action cannot be undone.
+                    Are you sure you want to delete &ldquo;{etf.name}&rdquo;? This action cannot be
+                    undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -94,7 +108,9 @@ export function EtfCard({ etf }: { etf: PseudoETF }) {
         <div className="flex flex-wrap gap-1.5">
           {etf.constituents.map((asset) => (
             <Link key={asset.id} to={`/asset/${asset.symbol}`}>
-              <Badge variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+              <Badge
+                variant="secondary"
+                className="cursor-pointer transition-colors hover:bg-primary hover:text-primary-foreground">
                 {asset.symbol}
               </Badge>
             </Link>

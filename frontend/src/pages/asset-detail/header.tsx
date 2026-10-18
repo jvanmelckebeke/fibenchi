@@ -12,7 +12,11 @@ import { WindowSelector } from "@/components/assets/window-selector"
 import { resolveWindow, type AssetWindow } from "@/lib/asset-window"
 import { MarketStatusDot } from "@/components/market-status-dot"
 import { resolveIcon } from "@/lib/icon-utils"
-import { buildYahooFinanceUrl, buildYahooQuoteUrl, formatAssetPriceWithSettings } from "@/lib/format"
+import {
+  buildYahooFinanceUrl,
+  buildYahooQuoteUrl,
+  formatAssetPriceWithSettings,
+} from "@/lib/format"
 import { ChangePct } from "@/components/change-pct"
 import type { Asset } from "@/lib/api"
 import { useQuote } from "@/lib/quote-stream"
@@ -51,12 +55,13 @@ export function Header({
   const price = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
   const [priceRef, pctRef] = usePriceFlash(price)
-  const priceFmt = price != null
-    ? formatAssetPriceWithSettings(price, asset ?? { type: "stock", symbol, currency: "USD" }, {
-        compact: settings.compact_numbers,
-        group: settings.thousands_separator,
-      })
-    : null
+  const priceFmt =
+    price != null
+      ? formatAssetPriceWithSettings(price, asset ?? { type: "stock", symbol, currency: "USD" }, {
+          compact: settings.compact_numbers,
+          group: settings.thousands_separator,
+        })
+      : null
 
   return (
     <div className="flex items-center justify-between">
@@ -76,25 +81,23 @@ export function Header({
         {priceFmt && (
           <span
             ref={priceRef}
-            className="text-xl font-semibold tabular-nums rounded px-1"
-            title={priceFmt.title}
-          >
+            className="rounded px-1 text-xl font-semibold tabular-nums"
+            title={priceFmt.title}>
             {priceFmt.text}
           </span>
         )}
         {changePct != null && (
-          <ChangePct
-            ref={pctRef}
-            value={changePct}
-            className="text-sm font-medium rounded px-1"
-          />
+          <ChangePct ref={pctRef} value={changePct} className="rounded px-1 text-sm font-medium" />
         )}
         <a
-          href={settings.yahoo_link_mode === "quote" ? buildYahooQuoteUrl(symbol) : buildYahooFinanceUrl(symbol)}
+          href={
+            settings.yahoo_link_mode === "quote"
+              ? buildYahooQuoteUrl(symbol)
+              : buildYahooFinanceUrl(symbol)
+          }
           target="_blank"
           rel="noopener noreferrer"
-          title="View on Yahoo Finance"
-        >
+          title="View on Yahoo Finance">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <ExternalLink className="h-4 w-4 text-muted-foreground" />
           </Button>
@@ -104,42 +107,43 @@ export function Header({
             variant="outline"
             size="sm"
             onClick={() => createAsset.mutate({ symbol: symbol.toUpperCase() })}
-            disabled={createAsset.isPending}
-          >
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            disabled={createAsset.isPending}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
             {createAsset.isPending ? "Adding..." : "Track"}
           </Button>
         )}
-        {isTracked && assetId != null && groups && (() => {
-          const availableGroups = groups.filter(
-            (g) => !g.is_default && !g.assets.some((a) => a.id === assetId),
-          )
-          if (availableGroups.length === 0) return null
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <FolderPlus className="h-3.5 w-3.5 mr-1.5" />
-                  Add to Group
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {availableGroups.map((g) => {
-                  const Icon = resolveIcon(g.icon)
-                  return (
-                    <DropdownMenuItem
-                      key={g.id}
-                      onClick={() => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] })}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {g.name}
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        })()}
+        {isTracked &&
+          assetId != null &&
+          groups &&
+          (() => {
+            const availableGroups = groups.filter(
+              (g) => !g.is_default && !g.assets.some((a) => a.id === assetId)
+            )
+            if (availableGroups.length === 0) return null
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
+                    Add to Group
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {availableGroups.map((g) => {
+                    const Icon = resolveIcon(g.icon)
+                    return (
+                      <DropdownMenuItem
+                        key={g.id}
+                        onClick={() => addToGroup.mutate({ groupId: g.id, assetIds: [assetId] })}>
+                        <Icon className="h-4 w-4" />
+                        {g.name}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )
+          })()}
       </div>
       <div className="flex items-center gap-2">
         <Tabs value={mode} onValueChange={(v) => setMode(v as ChartMode)}>
@@ -156,9 +160,10 @@ export function Header({
                 variant="outline"
                 size="sm"
                 onClick={() => refresh.mutate(resolveWindow(assetWindow).fetchPeriod)}
-                disabled={refresh.isPending}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refresh.isPending ? "animate-spin" : ""}`} />
+                disabled={refresh.isPending}>
+                <RefreshCw
+                  className={`mr-1.5 h-3.5 w-3.5 ${refresh.isPending ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
             )}

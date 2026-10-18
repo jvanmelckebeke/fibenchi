@@ -4,8 +4,7 @@ import { windowPct, type WindowBounds } from "./window-returns"
 // A window opening 2026-07-27, with the grace running to 2026-08-01.
 const BOUNDS: WindowBounds = { start: "2026-07-27", latestBaseline: "2026-08-01" }
 
-const series = (...entries: [string, number][]) =>
-  entries.map(([date, close]) => ({ date, close }))
+const series = (...entries: [string, number][]) => entries.map(([date, close]) => ({ date, close }))
 
 describe("windowPct", () => {
   it("measures from the last close at or before the window start", () => {

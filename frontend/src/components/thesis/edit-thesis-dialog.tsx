@@ -33,8 +33,10 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
     description: thesis.description ?? "",
   })
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const update: <K extends keyof ThesisFormValues>(key: K, value: ThesisFormValues[K]) => void =
-    (key, value) => setValues((v) => ({ ...v, [key]: value }))
+  const update: <K extends keyof ThesisFormValues>(key: K, value: ThesisFormValues[K]) => void = (
+    key,
+    value
+  ) => setValues((v) => ({ ...v, [key]: value }))
 
   const handleSave = () => {
     const trimmed = values.name.trim()
@@ -48,7 +50,7 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
         opened_at: values.openedAt,
         description: values.description.trim() || null,
       },
-      { onSuccess: onClose },
+      { onSuccess: onClose }
     )
   }
 
@@ -71,13 +73,14 @@ function EditThesisForm({ thesis, onClose }: { thesis: Thesis; onClose: () => vo
           variant="ghost"
           className="gap-1.5 text-destructive hover:text-destructive"
           onClick={handleDelete}
-          disabled={deleteThesis.isPending}
-        >
+          disabled={deleteThesis.isPending}>
           <Trash2 className="h-4 w-4" />
           {confirmDelete ? "Confirm delete" : "Delete"}
         </Button>
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={handleSave} disabled={!values.name.trim() || updateThesis.isPending}>
             Save
           </Button>

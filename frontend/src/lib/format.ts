@@ -63,7 +63,12 @@ export function currencySymbol(currency: string): string {
   return CURRENCY_SYMBOLS[currency.toUpperCase()] ?? `${currency}\u00a0`
 }
 
-export function formatPrice(value: number, currency: string, decimals?: number, groupDigits = false): string {
+export function formatPrice(
+  value: number,
+  currency: string,
+  decimals?: number,
+  groupDigits = false
+): string {
   const d = decimals ?? currencyDecimals(currency)
   const fixed = value.toFixed(d)
   if (!groupDigits) return `${currencySymbol(currency)}${fixed}`
@@ -76,7 +81,7 @@ export function formatAssetPrice(
   value: number,
   asset: AssetFormatHints,
   decimals?: number,
-  groupDigits = false,
+  groupDigits = false
 ): string {
   const unit = unitOf(asset)
   if (unit === "currency") return formatPrice(value, asset.currency, decimals, groupDigits)
@@ -146,7 +151,7 @@ export function formatAssetCompactPrice(value: number, asset: AssetFormatHints):
 export function formatAssetPriceWithSettings(
   value: number,
   asset: AssetFormatHints,
-  opts: { compact?: boolean; group?: boolean },
+  opts: { compact?: boolean; group?: boolean }
 ): { text: string; title?: string } {
   const full = formatAssetPrice(value, asset, undefined, opts.group)
   if (!opts.compact) return { text: full }
@@ -231,58 +236,105 @@ export function buildYahooFinanceUrl(symbol: string): string {
         "\u200cBollinger Bands\u200c (20,2,ma,y)": {
           type: "Bollinger Bands",
           inputs: {
-            Period: 20, Field: "field", "Standard Deviations": 2,
-            "Moving Average Type": "ma", "Channel Fill": true,
+            Period: 20,
+            Field: "field",
+            "Standard Deviations": 2,
+            "Moving Average Type": "ma",
+            "Channel Fill": true,
             id: "\u200cBollinger Bands\u200c (20,2,ma,y)",
             display: "\u200cBollinger Bands\u200c (20,2,ma,y)",
           },
-          outputs: { "Bollinger Bands Top": "auto", "Bollinger Bands Median": "auto", "Bollinger Bands Bottom": "auto" },
+          outputs: {
+            "Bollinger Bands Top": "auto",
+            "Bollinger Bands Median": "auto",
+            "Bollinger Bands Bottom": "auto",
+          },
           panel: "chart",
           parameters: { chartName: "chart", editMode: true, panelName: "chart" },
           disabled: false,
         },
         "\u200crsi\u200c (14)": {
           type: "rsi",
-          inputs: { Period: "14", Field: "field", id: "\u200crsi\u200c (14)", display: "\u200crsi\u200c (14)" },
+          inputs: {
+            Period: "14",
+            Field: "field",
+            id: "\u200crsi\u200c (14)",
+            display: "\u200crsi\u200c (14)",
+          },
           outputs: { RSI: "auto" },
           panel: "\u200crsi\u200c (14)",
           parameters: {
-            studyOverZonesEnabled: true, studyOverBoughtValue: 80, studyOverBoughtColor: "auto",
-            studyOverSoldValue: 20, studyOverSoldColor: "auto",
-            chartName: "chart", editMode: true, panelName: "\u200crsi\u200c (14)",
+            studyOverZonesEnabled: true,
+            studyOverBoughtValue: 80,
+            studyOverBoughtColor: "auto",
+            studyOverSoldValue: 20,
+            studyOverSoldColor: "auto",
+            chartName: "chart",
+            editMode: true,
+            panelName: "\u200crsi\u200c (14)",
           },
           disabled: false,
         },
         "\u200cmacd\u200c (12,26,9)": {
           type: "macd",
           inputs: {
-            "Fast MA Period": 12, "Slow MA Period": 26, "Signal Period": 9,
-            id: "\u200cmacd\u200c (12,26,9)", display: "\u200cmacd\u200c (12,26,9)",
+            "Fast MA Period": 12,
+            "Slow MA Period": 26,
+            "Signal Period": 9,
+            id: "\u200cmacd\u200c (12,26,9)",
+            display: "\u200cmacd\u200c (12,26,9)",
           },
-          outputs: { MACD: "auto", Signal: "#FF0000", "Increasing Bar": "#00DD00", "Decreasing Bar": "#FF0000" },
+          outputs: {
+            MACD: "auto",
+            Signal: "#FF0000",
+            "Increasing Bar": "#00DD00",
+            "Decreasing Bar": "#FF0000",
+          },
           panel: "\u200cmacd\u200c (12,26,9)",
-          parameters: { chartName: "chart", editMode: true, panelName: "\u200cmacd\u200c (12,26,9)" },
+          parameters: {
+            chartName: "chart",
+            editMode: true,
+            panelName: "\u200cmacd\u200c (12,26,9)",
+          },
           disabled: false,
         },
       },
       panels: {
         chart: {
-          percent: 0.64, display: symbol, chartName: "chart", index: 0,
+          percent: 0.64,
+          display: symbol,
+          chartName: "chart",
+          index: 0,
           yAxis: { name: "chart", position: null },
-          yaxisLHS: [], yaxisRHS: ["chart", "\u200cvol undr\u200c"],
+          yaxisLHS: [],
+          yaxisRHS: ["chart", "\u200cvol undr\u200c"],
         },
         "\u200crsi\u200c (14)": {
-          percent: 0.16, display: "\u200crsi\u200c (14)", chartName: "chart", index: 1,
+          percent: 0.16,
+          display: "\u200crsi\u200c (14)",
+          chartName: "chart",
+          index: 1,
           yAxis: { name: "\u200crsi\u200c (14)", position: null },
-          yaxisLHS: [], yaxisRHS: ["\u200crsi\u200c (14)"],
+          yaxisLHS: [],
+          yaxisRHS: ["\u200crsi\u200c (14)"],
         },
         "\u200cmacd\u200c (12,26,9)": {
-          percent: 0.2, display: "\u200cmacd\u200c (12,26,9)", chartName: "chart", index: 2,
+          percent: 0.2,
+          display: "\u200cmacd\u200c (12,26,9)",
+          chartName: "chart",
+          index: 2,
           yAxis: { name: "\u200cmacd\u200c (12,26,9)", position: null },
-          yaxisLHS: [], yaxisRHS: ["\u200cmacd\u200c (12,26,9)"],
+          yaxisLHS: [],
+          yaxisRHS: ["\u200cmacd\u200c (12,26,9)"],
         },
       },
-      setSpan: { multiplier: 1, base: "year", periodicity: { period: 1, timeUnit: "day" }, showEventsQuote: true, forceLoad: true },
+      setSpan: {
+        multiplier: 1,
+        base: "year",
+        periodicity: { period: 1, timeUnit: "day" },
+        showEventsQuote: true,
+        forceLoad: true,
+      },
       outliers: false,
       animation: true,
       headsUp: { static: true, dynamic: false, floating: false },
@@ -292,12 +344,22 @@ export function buildYahooFinanceUrl(symbol: string): string {
       color: "#0081f2",
       crosshairSticky: false,
       dontSaveRangeToLayout: true,
-      symbols: [{
-        symbol,
-        symbolObject: { symbol, quoteType: "EQUITY", exchangeTimeZone: "America/New_York" },
-        periodicity: 1, interval: "day", timeUnit: null,
-        setSpan: { multiplier: 1, base: "year", periodicity: { period: 1, timeUnit: "day" }, showEventsQuote: true, forceLoad: true },
-      }],
+      symbols: [
+        {
+          symbol,
+          symbolObject: { symbol, quoteType: "EQUITY", exchangeTimeZone: "America/New_York" },
+          periodicity: 1,
+          interval: "day",
+          timeUnit: null,
+          setSpan: {
+            multiplier: 1,
+            base: "year",
+            periodicity: { period: 1, timeUnit: "day" },
+            showEventsQuote: true,
+            forceLoad: true,
+          },
+        },
+      ],
       renderers: [],
     },
     events: { divs: true, splits: true, tradingHorizon: "none", sigDevEvents: [] },

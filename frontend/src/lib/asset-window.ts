@@ -25,9 +25,7 @@ export const STANDARD_PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
 const LARGEST_PERIOD = STANDARD_PERIODS[STANDARD_PERIODS.length - 1]
 
-export type AssetWindow =
-  | { kind: "period"; period: string }
-  | { kind: "since"; start: string } // ISO yyyy-mm-dd
+export type AssetWindow = { kind: "period"; period: string } | { kind: "since"; start: string } // ISO yyyy-mm-dd
 
 export interface ResolvedWindow {
   /** Backend period to actually fetch (guaranteed to cover the window). */

@@ -34,14 +34,14 @@ export function useHardDeleteAsset() {
 export function useCreateAsset() {
   return useInvalidatingMutation(
     (data: AssetCreate) => api.assets.create(data),
-    [keys.assets, keys.groups],
+    [keys.assets, keys.groups]
   )
 }
 
 export function useUpdateAsset() {
   return useInvalidatingMutation(
     ({ id, data }: { id: number; data: AssetUpdate }) => api.assets.update(id, data),
-    [keys.assets, keys.groups],
+    [keys.assets, keys.groups]
   )
 }
 
@@ -50,7 +50,7 @@ export function useUpdateAsset() {
 export function useResetAssetDetection() {
   return useInvalidatingMutation(
     ({ id, fields }: { id: number; fields?: string[] }) => api.assets.resetDetection(id, fields),
-    [keys.assets, keys.groups],
+    [keys.assets, keys.groups]
   )
 }
 

@@ -1,9 +1,5 @@
 import { useState } from "react"
-import {
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EntityDialog } from "@/components/entity-dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -87,7 +83,7 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
           setUnitKind(updated.unit_kind)
           setCurrency(updated.currency)
         },
-      },
+      }
     )
   }
 
@@ -106,7 +102,7 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
               : undefined,
         },
       },
-      { onSuccess: onClose },
+      { onSuccess: onClose }
     )
   }
 
@@ -124,11 +120,7 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
         />
         <div className="space-y-2">
           <Label htmlFor="asset-name">Name</Label>
-          <Input
-            id="asset-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <Input id="asset-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="asset-type">Type</Label>
@@ -155,7 +147,9 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
               {UNIT_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
-                  <span className="ml-2 font-mono text-[11px] text-muted-foreground">{opt.hint}</span>
+                  <span className="ml-2 font-mono text-[11px] text-muted-foreground">
+                    {opt.hint}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -183,8 +177,9 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
         </Button>
         <Button
           onClick={handleSave}
-          disabled={!dirty || !name.trim() || (currencyApplies && !currency.trim()) || updateAsset.isPending}
-        >
+          disabled={
+            !dirty || !name.trim() || (currencyApplies && !currency.trim()) || updateAsset.isPending
+          }>
           Save
         </Button>
       </DialogFooter>
@@ -194,7 +189,11 @@ function EditAssetForm({ asset, onClose }: { asset: EditableAsset; onClose: () =
 
 export function EditAssetDialog({ asset, open, onOpenChange }: EditAssetDialogProps) {
   return (
-    <EntityDialog entity={asset} open={open} onOpenChange={onOpenChange} contentClassName="sm:max-w-[400px]">
+    <EntityDialog
+      entity={asset}
+      open={open}
+      onOpenChange={onOpenChange}
+      contentClassName="sm:max-w-[400px]">
       {(asset, close) => <EditAssetForm asset={asset} onClose={close} />}
     </EntityDialog>
   )

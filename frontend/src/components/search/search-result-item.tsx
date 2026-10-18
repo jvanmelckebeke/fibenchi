@@ -16,17 +16,19 @@ interface SearchResultItemProps {
 export function SearchResultItem({ result, isTracked, symbolClassName }: SearchResultItemProps) {
   return (
     <>
-      <span className={`font-mono font-medium text-primary shrink-0 ${symbolClassName ?? ""}`}>
+      <span className={`shrink-0 font-mono font-medium text-primary ${symbolClassName ?? ""}`}>
         {result.symbol}
       </span>
-      <span className="text-muted-foreground truncate">{result.name}</span>
+      <span className="truncate text-muted-foreground">{result.name}</span>
       {isTracked ? (
-        <Badge variant="outline" className="ml-auto text-xs shrink-0 gap-1 text-emerald-500 border-emerald-500/30">
+        <Badge
+          variant="outline"
+          className="ml-auto shrink-0 gap-1 border-emerald-500/30 text-xs text-emerald-500">
           <Check className="h-3 w-3" />
           Tracked
         </Badge>
       ) : (
-        <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+        <Badge variant="secondary" className="ml-auto shrink-0 text-xs">
           {result.exchange}
         </Badge>
       )}

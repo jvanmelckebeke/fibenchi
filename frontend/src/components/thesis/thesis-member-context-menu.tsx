@@ -1,6 +1,12 @@
 import { FolderPlus, Pencil, Trash2 } from "lucide-react"
-import { ContextActionsContent, type ContextAction } from "@/components/context-menu/context-actionable"
-import { useThesisMembershipAction, groupTargetActions } from "@/components/context-menu/menu-actions"
+import {
+  ContextActionsContent,
+  type ContextAction,
+} from "@/components/context-menu/context-actionable"
+import {
+  useThesisMembershipAction,
+  groupTargetActions,
+} from "@/components/context-menu/menu-actions"
 import { useGroups, useAddAssetsToGroup, useRemoveAssetFromThesis } from "@/lib/queries"
 
 interface ThesisMemberContextMenuContentProps {
@@ -34,7 +40,7 @@ export function ThesisMemberContextMenuContent({
       label: "Add to group",
       icon: FolderPlus,
       items: groupTargetActions(groupList, assetId, symbol, (gid) =>
-        addToGroup.mutate({ groupId: gid, assetIds: [assetId] }),
+        addToGroup.mutate({ groupId: gid, assetIds: [assetId] })
       ),
     },
     thesisAction,

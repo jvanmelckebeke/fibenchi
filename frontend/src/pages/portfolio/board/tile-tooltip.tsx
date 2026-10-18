@@ -37,13 +37,17 @@ function Sparkline({ points, monthPct }: { points: SparklinePoint[]; monthPct: n
   const lo = Math.min(...closes)
   const hi = Math.max(...closes)
   const range = hi - lo || 1
-  const stroke = monthPct != null && monthPct < 0 ? "var(--color-red-500)" : "var(--color-emerald-500)"
+  const stroke =
+    monthPct != null && monthPct < 0 ? "var(--color-red-500)" : "var(--color-emerald-500)"
 
   // Drawn in a 0..1 unit box and stretched by the viewBox, so the geometry
   // stays independent of the rendered size; non-scaling-stroke keeps the line
   // 1.4px through that stretch.
   const d = closes
-    .map((c, i) => `${i === 0 ? "M" : "L"}${(i / (closes.length - 1)).toFixed(4)},${((hi - c) / range).toFixed(4)}`)
+    .map(
+      (c, i) =>
+        `${i === 0 ? "M" : "L"}${(i / (closes.length - 1)).toFixed(4)},${((hi - c) / range).toFixed(4)}`
+    )
     .join(" ")
 
   return (
@@ -51,8 +55,7 @@ function Sparkline({ points, monthPct }: { points: SparklinePoint[]; monthPct: n
       viewBox="0 0 1 1"
       preserveAspectRatio="none"
       className="h-[42px] w-[130px] shrink-0 overflow-visible"
-      aria-hidden
-    >
+      aria-hidden>
       <path d={`${d} L1,1 L0,1 Z`} fill={stroke} fillOpacity={0.1} />
       <path
         d={d}
@@ -79,7 +82,7 @@ function WarmupBar({ bars, needed }: { bars: number; needed: number }) {
           style={{ width: `${Math.min(100, (bars / needed) * 100)}%` }}
         />
       </div>
-      <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground">
+      <span className="shrink-0 font-mono text-[10.5px] text-muted-foreground tabular-nums">
         {bars}/{needed} sessions
       </span>
     </div>
@@ -121,18 +124,24 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
             </span>
           )}
         </div>
-        {tile.asset.name && <div className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">{tile.asset.name}</div>}
+        {tile.asset.name && (
+          <div className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
+            {tile.asset.name}
+          </div>
+        )}
       </div>
 
       <div className="border-t border-border px-3 py-2">
         <div className="flex items-baseline gap-2">
-          <span className={`text-[17px] font-semibold tabular-nums ${changeColor(lead)}`}>{leadText}</span>
+          <span className={`text-[17px] font-semibold tabular-nums ${changeColor(lead)}`}>
+            {leadText}
+          </span>
           {/* formatAssetPrice, not formatPrice: an index isn't
               currency-denominated, and a yield index (^TYX, ^TNX, …) is quoted
               in percent — a "$" in front of a 30-year Treasury yield is a
               category error, not a cosmetic one. */}
           {tile.price != null && (
-            <span className="text-[13px] font-medium tabular-nums text-muted-foreground">
+            <span className="text-[13px] font-medium text-muted-foreground tabular-nums">
               {formatAssetPrice(tile.price, tile.asset)}
             </span>
           )}
@@ -142,8 +151,7 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
           {stop ? (
             <span
               className="ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
-              style={{ backgroundColor: stop.color, color: stop.ink }}
-            >
+              style={{ backgroundColor: stop.color, color: stop.ink }}>
               {mode === "sigma" ? fmtSigma(encoded!) : formatChangePct(encoded!).text}
             </span>
           ) : (
@@ -157,7 +165,8 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
             explained reading and a broken-looking one. */}
         {tile.exDiv != null && (
           <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-            Ex-dividend {formatAssetPrice(tile.exDiv, tile.asset)} — σ counts it, the % change doesn't.
+            Ex-dividend {formatAssetPrice(tile.exDiv, tile.asset)} — σ counts it, the % change
+            doesn't.
           </div>
         )}
       </div>
@@ -195,7 +204,9 @@ export function TileTooltip({ tile, mode, span }: { tile: Tile; mode: ColorMode;
         {tile.sections.length > 1 && (
           <div className="flex flex-wrap gap-1">
             {tile.sections.map((s) => (
-              <span key={s} className="rounded bg-muted px-1.5 py-0.5 text-[10.5px] text-foreground">
+              <span
+                key={s}
+                className="rounded bg-muted px-1.5 py-0.5 text-[10.5px] text-foreground">
                 {s}
               </span>
             ))}

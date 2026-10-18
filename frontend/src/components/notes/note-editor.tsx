@@ -28,11 +28,11 @@ class MarkdownErrorBoundary extends Component<
 function RawFallback({ content }: { content: string }) {
   return (
     <>
-      <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-600 dark:text-amber-400 mb-3">
+      <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
         <span>Markdown rendering failed. Showing raw text.</span>
       </div>
-      <pre className="whitespace-pre-wrap text-sm">{content}</pre>
+      <pre className="text-sm whitespace-pre-wrap">{content}</pre>
     </>
   )
 }
@@ -80,12 +80,12 @@ export function NoteEditor({ note, onSave, isSaving }: NoteEditorProps) {
           />
         ) : note?.content ? (
           <MarkdownErrorBoundary fallback={<RawFallback content={note.content} />}>
-            <div className="prose prose-sm dark:prose-invert max-w-none min-h-[100px]">
+            <div className="prose prose-sm min-h-[100px] max-w-none dark:prose-invert">
               <Markdown>{note.content}</Markdown>
             </div>
           </MarkdownErrorBoundary>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none min-h-[100px]">
+          <div className="prose prose-sm min-h-[100px] max-w-none dark:prose-invert">
             <p className="text-muted-foreground italic">No notes yet. Click Edit to write some.</p>
           </div>
         )}

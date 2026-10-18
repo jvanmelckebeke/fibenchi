@@ -1,13 +1,6 @@
 import { useState, useMemo, forwardRef } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import {
-  Star,
-  Plus,
-  X,
-  Trash2,
-  Pencil,
-  GripVertical,
-} from "lucide-react"
+import { Star, Plus, X, Trash2, Pencil, GripVertical } from "lucide-react"
 import {
   DndContext,
   closestCenter,
@@ -53,19 +46,16 @@ import { EditGroupDialog } from "@/components/layout/edit-group-dialog"
 import type { Group } from "@/lib/api"
 
 /** Drag handle rendered inside the sidebar menu button. */
-const DragHandle = forwardRef<HTMLButtonElement, React.ComponentProps<"button">>(
-  (props, ref) => (
-    <button
-      ref={ref}
-      type="button"
-      className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground -ml-1 shrink-0"
-      tabIndex={-1}
-      {...props}
-    >
-      <GripVertical className="h-3.5 w-3.5" />
-    </button>
-  ),
-)
+const DragHandle = forwardRef<HTMLButtonElement, React.ComponentProps<"button">>((props, ref) => (
+  <button
+    ref={ref}
+    type="button"
+    className="-ml-1 shrink-0 cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground"
+    tabIndex={-1}
+    {...props}>
+    <GripVertical className="h-3.5 w-3.5" />
+  </button>
+))
 DragHandle.displayName = "DragHandle"
 
 function SortableGroupItem({
@@ -81,14 +71,9 @@ function SortableGroupItem({
   onEdit: () => void
   onDelete: () => void
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: group.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: group.id,
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -103,25 +88,24 @@ function SortableGroupItem({
       <ContextActionable
         actions={[
           { label: "Edit group", action: onEdit, icon: Pencil },
-          { label: "Delete group", action: onDelete, icon: Trash2, destructive: true, separatorBefore: true },
-        ]}
-      >
-        <div className="flex items-center w-full rounded-md data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+          {
+            label: "Delete group",
+            action: onDelete,
+            icon: Trash2,
+            destructive: true,
+            separatorBefore: true,
+          },
+        ]}>
+        <div className="flex w-full items-center rounded-md data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
           {showDragHandle && <DragHandle {...attributes} {...listeners} />}
-          <SidebarMenuButton
-            asChild
-            isActive={isActive}
-            tooltip={group.name}
-          >
+          <SidebarMenuButton asChild isActive={isActive} tooltip={group.name}>
             <Link to={`/groups/${group.id}`}>
               {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
               <GroupIcon />
               <span>{group.name}</span>
             </Link>
           </SidebarMenuButton>
-          {group.assets.length > 0 && (
-            <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>
-          )}
+          {group.assets.length > 0 && <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>}
         </div>
       </ContextActionable>
     </SidebarMenuItem>
@@ -144,7 +128,7 @@ export function GroupsSection() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
   const handleCreate = () => {
@@ -158,7 +142,7 @@ export function GroupsSection() {
           setCreating(false)
           navigate(`/groups/${group.id}`)
         },
-      },
+      }
     )
   }
 
@@ -201,8 +185,7 @@ export function GroupsSection() {
       {!isCollapsed && customGroups.length > 0 && (
         <SidebarGroupAction
           onClick={() => setEditing(!editing)}
-          title={editing ? "Done" : "Edit groups"}
-        >
+          title={editing ? "Done" : "Edit groups"}>
           {editing ? <X /> : <Pencil />}
         </SidebarGroupAction>
       )}
@@ -216,8 +199,7 @@ export function GroupsSection() {
                   location.pathname === `/groups/${defaultGroup.id}` ||
                   location.pathname === "/watchlist"
                 }
-                tooltip={defaultGroup.name}
-              >
+                tooltip={defaultGroup.name}>
                 <Link to={`/groups/${defaultGroup.id}`}>
                   <Star />
                   <span>{defaultGroup.name}</span>
@@ -231,12 +213,10 @@ export function GroupsSection() {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
+            onDragEnd={handleDragEnd}>
             <SortableContext
               items={customGroups.map((g) => g.id)}
-              strategy={verticalListSortingStrategy}
-            >
+              strategy={verticalListSortingStrategy}>
               {customGroups.map((group) => (
                 <SortableGroupItem
                   key={group.id}
@@ -277,8 +257,7 @@ export function GroupsSection() {
               ) : (
                 <SidebarMenuButton
                   className="text-muted-foreground"
-                  onClick={() => setCreating(true)}
-                >
+                  onClick={() => setCreating(true)}>
                   <Plus className="h-4 w-4" />
                   <span>New group</span>
                 </SidebarMenuButton>
@@ -299,7 +278,8 @@ export function GroupsSection() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete group</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &ldquo;{deleteTarget?.name}&rdquo;? Assets in this group will not be deleted.
+              Are you sure you want to delete &ldquo;{deleteTarget?.name}&rdquo;? Assets in this
+              group will not be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,9 +1,5 @@
 import { useState } from "react"
-import {
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EntityDialog } from "@/components/entity-dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,8 +24,11 @@ function EditGroupForm({ group, onClose }: { group: Group; onClose: () => void }
   const handleSave = () => {
     if (!name.trim()) return
     updateGroup.mutate(
-      { id: group.id, data: { name: name.trim(), description: description.trim() || undefined, icon } },
-      { onSuccess: onClose },
+      {
+        id: group.id,
+        data: { name: name.trim(), description: description.trim() || undefined, icon },
+      },
+      { onSuccess: onClose }
     )
   }
 
@@ -65,7 +64,9 @@ function EditGroupForm({ group, onClose }: { group: Group; onClose: () => void }
         </div>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
         <Button onClick={handleSave} disabled={!name.trim() || updateGroup.isPending}>
           Save
         </Button>
@@ -76,7 +77,11 @@ function EditGroupForm({ group, onClose }: { group: Group; onClose: () => void }
 
 export function EditGroupDialog({ group, open, onOpenChange }: EditGroupDialogProps) {
   return (
-    <EntityDialog entity={group} open={open} onOpenChange={onOpenChange} contentClassName="sm:max-w-[400px]">
+    <EntityDialog
+      entity={group}
+      open={open}
+      onOpenChange={onOpenChange}
+      contentClassName="sm:max-w-[400px]">
       {(group, close) => <EditGroupForm group={group} onClose={close} />}
     </EntityDialog>
   )

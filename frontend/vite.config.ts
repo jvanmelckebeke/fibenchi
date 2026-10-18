@@ -17,11 +17,7 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes("lightweight-charts")) return "lightweight-charts"
           if (id.includes("@radix-ui")) return "radix-ui"
-          if (
-            id.includes("react-dom") ||
-            id.includes("react-router") ||
-            id.includes("scheduler")
-          )
+          if (id.includes("react-dom") || id.includes("react-router") || id.includes("scheduler"))
             return "react-vendor"
           if (id.includes("@tanstack")) return "tanstack"
         },

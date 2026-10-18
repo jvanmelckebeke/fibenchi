@@ -8,14 +8,46 @@ import { toKebab, resolveIcon } from "@/lib/icon-utils"
 
 /** Curated icons shown by default before searching. */
 const CURATED_ICONS = [
-  "Folder", "FolderOpen", "Briefcase", "Globe", "TrendingUp",
-  "BarChart3", "LineChart", "PieChart", "Wallet", "Landmark",
-  "Building2", "Factory", "Cpu", "Zap", "Leaf",
-  "Heart", "Shield", "Lock", "Gem", "Crown",
-  "Rocket", "Target", "Flag", "Bookmark", "Star",
-  "Sun", "Moon", "Cloud", "Flame", "Droplets",
-  "Car", "Plane", "Ship", "Home", "Store",
-  "Smartphone", "Monitor", "Gamepad2", "Music", "Film",
+  "Folder",
+  "FolderOpen",
+  "Briefcase",
+  "Globe",
+  "TrendingUp",
+  "BarChart3",
+  "LineChart",
+  "PieChart",
+  "Wallet",
+  "Landmark",
+  "Building2",
+  "Factory",
+  "Cpu",
+  "Zap",
+  "Leaf",
+  "Heart",
+  "Shield",
+  "Lock",
+  "Gem",
+  "Crown",
+  "Rocket",
+  "Target",
+  "Flag",
+  "Bookmark",
+  "Star",
+  "Sun",
+  "Moon",
+  "Cloud",
+  "Flame",
+  "Droplets",
+  "Car",
+  "Plane",
+  "Ship",
+  "Home",
+  "Store",
+  "Smartphone",
+  "Monitor",
+  "Gamepad2",
+  "Music",
+  "Film",
 ] as const
 
 interface IconPickerProps {
@@ -72,8 +104,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                     onChange(kebab)
                     setOpen(false)
                     setSearch("")
-                  }}
-                >
+                  }}>
                   <Icon className="h-4 w-4" />
                 </button>
               )

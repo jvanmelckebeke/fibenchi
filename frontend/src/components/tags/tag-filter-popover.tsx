@@ -1,10 +1,6 @@
 import { Filter, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { TagBadge } from "@/components/tags/tag-badge"
 import type { Tag } from "@/lib/api"
 
@@ -26,24 +22,23 @@ export function TagFilterPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
           <Filter className="h-3.5 w-3.5" />
           Tags
           {activeCount > 0 && (
-            <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0 text-[10px] font-semibold leading-4 min-w-[18px] text-center">
+            <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0 text-center text-[10px] leading-4 font-semibold text-primary-foreground">
               {activeCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto max-w-80">
-        <div className="flex items-center justify-between gap-4 mb-2">
+        <div className="mb-2 flex items-center justify-between gap-4">
           <span className="text-xs font-medium text-muted-foreground">Filter by tag</span>
           {activeCount > 0 && (
             <button
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              onClick={onClear}
-            >
+              onClick={onClear}>
               <X className="h-3 w-3" />
               Clear
             </button>

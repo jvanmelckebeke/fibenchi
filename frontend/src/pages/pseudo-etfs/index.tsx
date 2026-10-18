@@ -10,11 +10,11 @@ export function PseudoEtfsPage() {
   const [creating, setCreating] = useState(false)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Pseudo-ETFs</h1>
         <Button onClick={() => setCreating(true)} disabled={creating}>
-          <Plus className="h-4 w-4 mr-1.5" />
+          <Plus className="mr-1.5 h-4 w-4" />
           New Pseudo-ETF
         </Button>
       </div>
@@ -29,7 +29,7 @@ export function PseudoEtfsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {etfs?.map((etf) => (
           <EtfCard key={etf.id} etf={etf} />
         ))}

@@ -68,9 +68,7 @@ export function CrosshairTimeSyncProvider({ enabled, children }: CrosshairTimeSy
   if (!enabled) return <>{children}</>
 
   return (
-    <CrosshairTimeSyncContext.Provider value={value}>
-      {children}
-    </CrosshairTimeSyncContext.Provider>
+    <CrosshairTimeSyncContext.Provider value={value}>{children}</CrosshairTimeSyncContext.Provider>
   )
 }
 

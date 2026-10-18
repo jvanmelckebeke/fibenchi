@@ -16,7 +16,7 @@ export function getSortValue(
   asset: Asset,
   sortBy: GroupSortBy,
   quotes: Record<string, Quote>,
-  indicators?: Record<string, IndicatorSummary>,
+  indicators?: Record<string, IndicatorSummary>
 ): SortValue {
   switch (sortBy) {
     case "name":
@@ -30,7 +30,7 @@ export function getSortValue(
       // cell sorts as "no value" and can never order by a number the user
       // isn't being shown, and a live-scored column sorts on the live number.
       return indicatorSortKey(
-        resolveIndicatorValue(sortBy, quotes[asset.symbol], indicators?.[asset.symbol]),
+        resolveIndicatorValue(sortBy, quotes[asset.symbol], indicators?.[asset.symbol])
       )
     }
   }
@@ -56,7 +56,7 @@ export function useFilteredSortedAssets(
     sortDir: SortDir
     quotes: Record<string, Quote>
     indicators?: Record<string, IndicatorSummary>
-  },
+  }
 ): Asset[] | undefined {
   const { typeFilter, selectedTags, sortBy, sortDir, quotes, indicators } = opts
 
@@ -68,15 +68,13 @@ export function useFilteredSortedAssets(
       filtered = filtered.filter((a) => a.type === typeFilter)
     }
     if (selectedTags.length > 0) {
-      filtered = filtered.filter((a) =>
-        a.tags.some((t) => selectedTags.includes(t.id))
-      )
+      filtered = filtered.filter((a) => a.tags.some((t) => selectedTags.includes(t.id)))
     }
 
     const sorted = [...filtered].sort((a, b) => {
       const cmp = compareSortValues(
         getSortValue(a, sortBy, quotes, indicators),
-        getSortValue(b, sortBy, quotes, indicators),
+        getSortValue(b, sortBy, quotes, indicators)
       )
       return sortDir === "asc" ? cmp : -cmp
     })

@@ -27,7 +27,12 @@ interface NewThesisDialogProps {
   onCreated?: (thesis: Thesis) => void
 }
 
-export function NewThesisDialog({ open, onOpenChange, initialName, onCreated }: NewThesisDialogProps) {
+export function NewThesisDialog({
+  open,
+  onOpenChange,
+  initialName,
+  onCreated,
+}: NewThesisDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -62,8 +67,10 @@ function NewThesisForm({
     openedAt: todayISO(),
     description: "",
   })
-  const update: <K extends keyof ThesisFormValues>(key: K, value: ThesisFormValues[K]) => void =
-    (key, value) => setValues((v) => ({ ...v, [key]: value }))
+  const update: <K extends keyof ThesisFormValues>(key: K, value: ThesisFormValues[K]) => void = (
+    key,
+    value
+  ) => setValues((v) => ({ ...v, [key]: value }))
 
   const handleCreate = () => {
     const trimmed = values.name.trim()
@@ -82,7 +89,7 @@ function NewThesisForm({
           onCreated?.(thesis)
           onClose()
         },
-      },
+      }
     )
   }
 
@@ -91,9 +98,16 @@ function NewThesisForm({
       <DialogHeader>
         <DialogTitle>New thesis</DialogTitle>
       </DialogHeader>
-      <ThesisFormFields values={values} onChange={update} idPrefix="thesis" namePlaceholder="e.g. El Niño" />
+      <ThesisFormFields
+        values={values}
+        onChange={update}
+        idPrefix="thesis"
+        namePlaceholder="e.g. El Niño"
+      />
       <DialogFooter>
-        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
         <Button onClick={handleCreate} disabled={!values.name.trim() || createThesis.isPending}>
           Create
         </Button>

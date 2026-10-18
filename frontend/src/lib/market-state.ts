@@ -39,7 +39,11 @@ const MARKET_STATES = {
  */
 export type MarketState = keyof typeof MARKET_STATES
 
-const DEFAULT_STATE: MarketStateDisplay = { dotColor: "bg-red-500", label: "Closed", phase: "closed" }
+const DEFAULT_STATE: MarketStateDisplay = {
+  dotColor: "bg-red-500",
+  label: "Closed",
+  phase: "closed",
+}
 
 /** Resolve a market-state code to its dot colour + label (falls back to Closed). */
 export function marketState(state: MarketState | null | undefined): MarketStateDisplay {

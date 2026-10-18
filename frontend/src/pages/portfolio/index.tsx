@@ -46,7 +46,10 @@ export function PortfolioPage() {
           // reflows under the cursor.
           <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-[3px] 2xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] 2xl:gap-1">
             {Array.from({ length: 24 }, (_, i) => (
-              <div key={i} className="h-[62px] animate-pulse 2xl:h-[80px] rounded-[3px] bg-muted/40" />
+              <div
+                key={i}
+                className="h-[62px] animate-pulse rounded-[3px] bg-muted/40 2xl:h-[80px]"
+              />
             ))}
           </div>
         ) : sections.length === 0 ? (
@@ -61,8 +64,7 @@ export function PortfolioPage() {
                   : "Nothing has traded since 04:00."}{" "}
                 <button
                   onClick={() => setPhaseFilter("all")}
-                  className="underline underline-offset-2 hover:text-foreground"
-                >
+                  className="underline underline-offset-2 hover:text-foreground">
                   Show all {allTiles.length}
                 </button>
               </>
