@@ -26,7 +26,7 @@ export function LiveDayView({ assets, quotes, indicators }: LiveDayViewProps) {
   const intraday = useIntraday()
 
   return (
-    <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {assets.map((asset) => (
         <LiveCard
           key={asset.id}
@@ -70,58 +70,56 @@ const LiveCard = memo(function LiveCard({
   const marketLabel = marketState(quote?.market_state).label
 
   return (
-    <Link to={`/asset/${symbol}`} className="block border rounded-lg bg-card overflow-hidden hover:border-primary/50 transition-colors">
+    <Link
+      to={`/asset/${symbol}`}
+      className="block overflow-hidden rounded-lg border bg-card transition-colors hover:border-primary/50">
       {/* Header — ticker, price, change%, market state */}
-      <div className="px-3 pt-3 pb-1 space-y-0.5">
-        <div className="flex items-baseline justify-between gap-2 min-w-0">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <span className="font-semibold text-sm truncate">{symbol}</span>
-            <span className="text-xs text-muted-foreground truncate">{name}</span>
+      <div className="space-y-0.5 px-3 pt-3 pb-1">
+        <div className="flex min-w-0 items-baseline justify-between gap-2">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate text-sm font-semibold">{symbol}</span>
+            <span className="truncate text-xs text-muted-foreground">{name}</span>
           </div>
-          <div className="flex items-baseline gap-1.5 shrink-0">
+          <div className="flex shrink-0 items-baseline gap-1.5">
             <span
               ref={priceRef}
-              className="text-sm font-medium tabular-nums rounded px-0.5 -mx-0.5"
-            >
-              {price != null ? formatPrice(price, currency, undefined, settings.thousands_separator) : "--"}
+              className="-mx-0.5 rounded px-0.5 text-sm font-medium tabular-nums">
+              {price != null
+                ? formatPrice(price, currency, undefined, settings.thousands_separator)
+                : "--"}
             </span>
             {changePct != null && (
               <ChangePct
                 ref={pctRef}
                 value={changePct}
-                className="text-xs rounded px-0.5 -mx-0.5"
+                className="-mx-0.5 rounded px-0.5 text-xs"
               />
             )}
           </div>
         </div>
-        <div className="text-xs text-muted-foreground">
-          {marketLabel}
-        </div>
+        <div className="text-xs text-muted-foreground">{marketLabel}</div>
       </div>
 
       {/* Chart */}
-      <div className="h-[200px] mx-3 mb-1 rounded border border-border/50 overflow-hidden">
+      <div className="mx-3 mb-1 h-[200px] overflow-hidden rounded border border-border/50">
         {points && points.length > 0 ? (
-          <IntradayChart
-            points={points}
-            previousClose={previousClose ?? null}
-          />
+          <IntradayChart points={points} previousClose={previousClose ?? null} />
         ) : quoteStatus === "disconnected" ? (
-          <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
             <div className="h-2 w-2 rounded-full bg-destructive/70" />
             <span className="text-xs">Disconnected</span>
           </div>
         ) : quoteStatus !== "connected" ? (
           <div className="h-full w-full animate-pulse bg-muted/40" />
         ) : (
-          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
             No intraday data
           </div>
         )}
       </div>
 
       {/* Below chart — indicator deltas + volume */}
-      <div className="flex items-baseline justify-between px-3 pb-3 pt-1 text-xs text-muted-foreground">
+      <div className="flex items-baseline justify-between px-3 pt-1 pb-3 text-xs text-muted-foreground">
         {settings.show_indicator_deltas && indicatorData?.values ? (
           <div className="flex flex-wrap gap-x-2 gap-y-0.5">
             {DELTA_FIELDS.map((field) => {
@@ -129,16 +127,23 @@ const LiveCard = memo(function LiveCard({
               if (!ann) return null
               return (
                 <span key={field} className="tabular-nums">
-                  <span className="uppercase">{field === "macd_hist" ? "MACD H" : field}</span>
-                  {" "}
-                  <span className={changeColor(parseFloat(ann.delta.replace(/[()]/g, "")))}>{ann.delta}</span>
-                  {ann.sigma && <span className="text-muted-foreground/60 ml-0.5">{ann.sigma}</span>}
+                  <span className="uppercase">{field === "macd_hist" ? "MACD H" : field}</span>{" "}
+                  <span className={changeColor(parseFloat(ann.delta.replace(/[()]/g, "")))}>
+                    {ann.delta}
+                  </span>
+                  {ann.sigma && (
+                    <span className="ml-0.5 text-muted-foreground/60">{ann.sigma}</span>
+                  )}
                 </span>
               )
             })}
           </div>
-        ) : <div />}
-        {volume != null && <span className="shrink-0 tabular-nums">Vol: {formatCompactNumber(volume)}</span>}
+        ) : (
+          <div />
+        )}
+        {volume != null && (
+          <span className="shrink-0 tabular-nums">Vol: {formatCompactNumber(volume)}</span>
+        )}
       </div>
     </Link>
   )

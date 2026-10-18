@@ -72,9 +72,9 @@ export function OrphansCard() {
       </CardHeader>
       <CardContent className="space-y-2">
         <p className="text-xs text-muted-foreground">
-          Removed from every group and referenced by no thesis or pseudo-ETF. Their price
-          history sticks around until you re-adopt or delete them. A flagged row still has
-          notes or annotations you wrote — deleting it throws those away for good.
+          Removed from every group and referenced by no thesis or pseudo-ETF. Their price history
+          sticks around until you re-adopt or delete them. A flagged row still has notes or
+          annotations you wrote — deleting it throws those away for good.
         </p>
         <div className="max-h-64 overflow-y-auto">
           <table className="w-full text-sm">
@@ -92,15 +92,16 @@ export function OrphansCard() {
                 <tr key={o.id} className="border-t border-border/50">
                   <td className="py-1.5 font-medium">
                     <span className="flex items-center gap-1">
-                      <Link to={`/asset/${o.symbol}`} className="hover:text-primary hover:underline">
+                      <Link
+                        to={`/asset/${o.symbol}`}
+                        className="hover:text-primary hover:underline">
                         {o.symbol}
                       </Link>
                       {handwrittenLoss(o) && (
                         <span
                           title={`Has ${handwrittenLoss(o)} — deleting loses them`}
                           aria-label={`Has ${handwrittenLoss(o)}`}
-                          className="flex shrink-0"
-                        >
+                          className="flex shrink-0">
                           <PencilLine className="h-3.5 w-3.5 text-amber-500" />
                         </span>
                       )}
@@ -108,14 +109,18 @@ export function OrphansCard() {
                   </td>
                   <td className="max-w-48 truncate py-1.5 text-muted-foreground">{o.name}</td>
                   <td className="py-1.5 text-right tabular-nums">{o.price_bars}</td>
-                  <td className="py-1.5 text-right tabular-nums text-muted-foreground">
+                  <td className="py-1.5 text-right text-muted-foreground tabular-nums">
                     {o.latest_bar ?? "—"}
                   </td>
                   <td className="py-1.5">
                     <div className="flex justify-end gap-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 cursor-pointer" title="Add to group or thesis">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 cursor-pointer"
+                            title="Add to group or thesis">
                             <FolderPlus className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -124,8 +129,7 @@ export function OrphansCard() {
                           {(groups ?? []).map((g) => (
                             <DropdownMenuItem
                               key={g.id}
-                              onClick={() => adoptToGroup.mutate({ groupId: g.id, assetId: o.id })}
-                            >
+                              onClick={() => adoptToGroup.mutate({ groupId: g.id, assetId: o.id })}>
                               {g.name}
                             </DropdownMenuItem>
                           ))}
@@ -136,8 +140,9 @@ export function OrphansCard() {
                               {(theses ?? []).map((t) => (
                                 <DropdownMenuItem
                                   key={t.id}
-                                  onClick={() => adoptToThesis.mutate({ thesisId: t.id, assetId: o.id })}
-                                >
+                                  onClick={() =>
+                                    adoptToThesis.mutate({ thesisId: t.id, assetId: o.id })
+                                  }>
                                   {t.name}
                                 </DropdownMenuItem>
                               ))}
@@ -150,8 +155,7 @@ export function OrphansCard() {
                         size="icon"
                         className="h-7 w-7 cursor-pointer text-red-500 hover:text-red-600"
                         title="Delete asset and its price history"
-                        onClick={() => setPendingDelete(o)}
-                      >
+                        onClick={() => setPendingDelete(o)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -163,7 +167,9 @@ export function OrphansCard() {
         </div>
       </CardContent>
 
-      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {pendingDelete?.symbol}?</AlertDialogTitle>
@@ -172,10 +178,10 @@ export function OrphansCard() {
               price bars. If you re-add the ticker later, the history is re-fetched from Yahoo.
             </AlertDialogDescription>
             {pendingDelete && handwrittenLoss(pendingDelete) && (
-              <AlertDialogDescription className="text-destructive font-medium">
-                It also deletes {handwrittenLoss(pendingDelete)} you wrote for {pendingDelete.symbol}.
-                That can't be re-fetched — adopt it into a group or thesis instead if you want to
-                keep it.
+              <AlertDialogDescription className="font-medium text-destructive">
+                It also deletes {handwrittenLoss(pendingDelete)} you wrote for{" "}
+                {pendingDelete.symbol}. That can't be re-fetched — adopt it into a group or thesis
+                instead if you want to keep it.
               </AlertDialogDescription>
             )}
           </AlertDialogHeader>
@@ -186,8 +192,7 @@ export function OrphansCard() {
               onClick={() => {
                 if (pendingDelete) deleteOrphan.mutate(pendingDelete.id)
                 setPendingDelete(null)
-              }}
-            >
+              }}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

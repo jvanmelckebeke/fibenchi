@@ -127,10 +127,12 @@ class TestClientIntraday:
         ]
         hist = _make_hist_df("NKT.CO", ts_list, [100.0, 101.0, 102.0])
 
-        price_data = {"NKT.CO": {
-            "currency": "DKK",
-            "exchangeTimezoneName": None,  # Yahoo returns None for Copenhagen
-        }}
+        price_data = {
+            "NKT.CO": {
+                "currency": "DKK",
+                "exchangeTimezoneName": None,  # Yahoo returns None for Copenhagen
+            }
+        }
 
         mock_ticker = MagicMock()
         mock_ticker.price = price_data
@@ -174,8 +176,7 @@ class TestClientIntraday:
         hist = _make_hist_df("AAPL", ts_list, [100.0])
 
         mock_ticker = MagicMock()
-        mock_ticker.price = {"AAPL": {"currency": "USD",
-                                      "exchangeTimezoneName": "America/New_York"}}
+        mock_ticker.price = {"AAPL": {"currency": "USD", "exchangeTimezoneName": "America/New_York"}}
         # Raw chart response contains AAPL but omits 2914.T entirely.
         mock_ticker._get_data.return_value = {"AAPL": {"timestamp": [1]}}
         mock_ticker._historical_data_to_dataframe.return_value = hist
@@ -193,10 +194,12 @@ class TestClientIntraday:
         ts_list = [datetime(2026, 2, 25, 10, 0, tzinfo=ZoneInfo("Europe/London"))]
         hist = _make_hist_df("VOD.L", ts_list, [8500.0])
 
-        price_data = {"VOD.L": {
-            "currency": "GBp",
-            "exchangeTimezoneName": "Europe/London",
-        }}
+        price_data = {
+            "VOD.L": {
+                "currency": "GBp",
+                "exchangeTimezoneName": "Europe/London",
+            }
+        }
 
         mock_ticker = MagicMock()
         mock_ticker.price = price_data
@@ -227,16 +230,18 @@ class TestClientIntraday:
     async def test_filters_synthetic_non_minute_boundary_bars(self):
         """Yahoo echo bars at non-minute-boundary timestamps are dropped."""
         ts_list = [
-            datetime(2026, 2, 25, 10, 0, 0, tzinfo=CPH),    # real: on minute
-            datetime(2026, 2, 25, 10, 3, 43, tzinfo=CPH),   # synthetic: 43s offset
-            datetime(2026, 2, 25, 10, 5, 0, tzinfo=CPH),    # real: on minute
+            datetime(2026, 2, 25, 10, 0, 0, tzinfo=CPH),  # real: on minute
+            datetime(2026, 2, 25, 10, 3, 43, tzinfo=CPH),  # synthetic: 43s offset
+            datetime(2026, 2, 25, 10, 5, 0, tzinfo=CPH),  # real: on minute
         ]
         hist = _make_hist_df("P911.DE", ts_list, [41.0, 41.75, 42.0])
 
-        price_data = {"P911.DE": {
-            "currency": "EUR",
-            "exchangeTimezoneName": "Europe/Berlin",
-        }}
+        price_data = {
+            "P911.DE": {
+                "currency": "EUR",
+                "exchangeTimezoneName": "Europe/Berlin",
+            }
+        }
 
         mock_ticker = MagicMock()
         mock_ticker.price = price_data
@@ -339,8 +344,10 @@ class TestFetchAndStoreIntraday:
         mock_db = AsyncMock()
         stored = {1: {stale_ts: (1.0, 1, "regular")}}
 
-        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
-             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored):
+        with (
+            patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
+            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored),
+        ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == 2
@@ -355,8 +362,10 @@ class TestFetchAndStoreIntraday:
         fresh_bars = [_bar(0, 30.0, 100)]
         mock_db = AsyncMock()
 
-        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
-             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}):
+        with (
+            patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
+            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}),
+        ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == 1
@@ -371,8 +380,10 @@ class TestFetchAndStoreIntraday:
 
         mock_db = AsyncMock()
 
-        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
-             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored):
+        with (
+            patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
+            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored),
+        ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == 0
@@ -387,8 +398,10 @@ class TestFetchAndStoreIntraday:
 
         mock_db = AsyncMock()
 
-        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
-             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored):
+        with (
+            patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
+            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored),
+        ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == 1
@@ -407,8 +420,10 @@ class TestFetchAndStoreIntraday:
 
         mock_db = AsyncMock()
 
-        with patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}), \
-             patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}):
+        with (
+            patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
+            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}),
+        ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
         assert count == len(fresh_bars)

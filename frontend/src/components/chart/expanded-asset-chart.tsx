@@ -50,8 +50,8 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
   const isWide = useIsWide()
 
   const cardDescs = compact ? CARD_DESCRIPTORS_ALL : CARD_DESCRIPTORS_EXCLUSIVE
-  const enabledCards = cardDescs.filter(
-    (d) => isVisibleAt(settings.indicator_visibility, d.id, "detail_card"),
+  const enabledCards = cardDescs.filter((d) =>
+    isVisibleAt(settings.indicator_visibility, d.id, "detail_card")
   )
 
   const compactChartHeight = isWide ? 300 : 200
@@ -59,15 +59,15 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
   if (isLoading || !prices?.length) {
     if (compact) {
       return (
-        <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row">
           <div className="min-w-0 lg:flex-[4]">
-            <div className="h-[200px] lg:h-[300px] flex items-center justify-center">
+            <div className="flex h-[200px] items-center justify-center lg:h-[300px]">
               <Skeleton className="h-full w-full rounded-md" />
             </div>
           </div>
-          <div className="flex flex-row flex-wrap lg:flex-col gap-1.5 lg:min-w-[140px] lg:max-w-[200px]">
+          <div className="flex flex-row flex-wrap gap-1.5 lg:max-w-[200px] lg:min-w-[140px] lg:flex-col">
             {enabledCards.map((d) => (
-              <Skeleton key={d.id} className="h-12 w-24 lg:w-full rounded-md" />
+              <Skeleton key={d.id} className="h-12 w-24 rounded-md lg:w-full" />
             ))}
           </div>
         </div>
@@ -86,7 +86,7 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
   if (compact) {
     return (
       <ChartSyncProvider prices={prices} indicators={indicators ?? []}>
-        <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row">
           <div className="min-w-0 lg:flex-[4]">
             <CandlestickChart
               annotations={annotations ?? []}
@@ -97,7 +97,7 @@ export function ExpandedAssetChart({ symbol, currency, compact = false }: Expand
               roundedClass="rounded-md"
             />
           </div>
-          <div className="flex flex-row flex-wrap lg:flex-col gap-1.5 lg:min-w-[140px] lg:max-w-[200px] lg:mt-8">
+          <div className="flex flex-row flex-wrap gap-1.5 lg:mt-8 lg:max-w-[200px] lg:min-w-[140px] lg:flex-col">
             <IndicatorCards descriptors={enabledCards} currency={currency} compact />
           </div>
         </div>

@@ -16,7 +16,8 @@ const STATUS_STYLES: Record<ThesisStatus, { label: string; className: string }> 
 export function StatusBadge({ status }: { status: ThesisStatus }) {
   const s = STATUS_STYLES[status] ?? STATUS_STYLES.watching
   return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${s.className}`}>
+    <span
+      className={`rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase ${s.className}`}>
       {s.label}
     </span>
   )
@@ -63,8 +64,7 @@ export function ThesisSectionHeader({
       <span
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
         style={{ backgroundColor: thesis.color }}
-        aria-hidden
-      >
+        aria-hidden>
         {/* eslint-disable-next-line react-hooks/static-components -- resolveIcon returns stable refs from lucide's icon map */}
         <ThesisIcon className="h-4 w-4" style={{ color: readableTextColor(thesis.color) }} />
       </span>
@@ -75,7 +75,9 @@ export function ThesisSectionHeader({
           {memberCount} {memberCount === 1 ? "ticker" : "tickers"}
         </span>
       )}
-      <span className="text-xs text-muted-foreground">opened {formatDateLong(thesis.opened_at)}</span>
+      <span className="text-xs text-muted-foreground">
+        opened {formatDateLong(thesis.opened_at)}
+      </span>
       {thesis.aggregate_pct != null && (
         <ChangePct
           value={thesis.aggregate_pct}
@@ -96,8 +98,7 @@ export function ThesisSectionHeader({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-left"
-        >
+          className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-left">
           {content}
         </button>
       ) : (

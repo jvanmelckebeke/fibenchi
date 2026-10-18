@@ -19,7 +19,12 @@ async def list_annotations(symbol: str, db: AsyncSession = Depends(get_db)):
 async def create_annotation(symbol: str, data: AnnotationCreate, db: AsyncSession = Depends(get_db)):
     asset = await get_asset(symbol, db)
     return await annotation_service.create_annotation(
-        db, asset.id, date=data.date, title=data.title, body=data.body, color=data.color,
+        db,
+        asset.id,
+        date=data.date,
+        title=data.title,
+        body=data.body,
+        color=data.color,
     )
 
 

@@ -20,7 +20,9 @@ export function HoldingSummaryCell({
 }) {
   if (format === "numeric") {
     const val = getNumericValue(values, field)
-    return <IndicatorCell value={val != null ? `${val.toFixed(decimals ?? 0)}${suffix ?? ""}` : null} />
+    return (
+      <IndicatorCell value={val != null ? `${val.toFixed(decimals ?? 0)}${suffix ?? ""}` : null} />
+    )
   }
 
   if (format === "compare_close") {

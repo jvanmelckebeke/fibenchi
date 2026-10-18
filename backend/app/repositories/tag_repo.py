@@ -11,9 +11,7 @@ class TagRepository:
 
     async def list_all(self) -> list[Tag]:
         result = await self.db.execute(
-            select(Tag)
-            .options(selectinload(Tag.assets).selectinload(Asset.tags))
-            .order_by(Tag.name)
+            select(Tag).options(selectinload(Tag.assets).selectinload(Asset.tags)).order_by(Tag.name)
         )
         return list(result.scalars().all())
 

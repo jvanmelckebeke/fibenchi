@@ -12,6 +12,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 # --- GET /prices ---
 
+
 async def test_get_prices_returns_data(client, db):
     asset = await seed_asset_with_prices(db)
     resp = await client.get(f"/api/assets/{asset.symbol}/prices?period=3mo")
@@ -41,6 +42,7 @@ async def test_get_prices_respects_period_boundary(client, db):
 async def test_get_prices_ephemeral_symbol(client):
     """Untracked symbol fetches from provider without persisting."""
     from unittest.mock import MagicMock
+
     mock_df = make_yahoo_df()
     mock_prov = MagicMock()
     mock_prov.fetch_history = AsyncMock(return_value=mock_df)
@@ -53,6 +55,7 @@ async def test_get_prices_ephemeral_symbol(client):
 async def test_get_prices_unknown_404(client):
     """Symbol that fails provider fetch returns 404."""
     from unittest.mock import MagicMock
+
     mock_prov = MagicMock()
     mock_prov.fetch_history = AsyncMock(side_effect=ValueError("No data"))
     with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
@@ -61,6 +64,7 @@ async def test_get_prices_unknown_404(client):
 
 
 # --- GET /indicators ---
+
 
 async def test_get_indicators_fields(client, db):
     """Indicators endpoint returns all expected technical indicator fields."""
@@ -73,6 +77,7 @@ async def test_get_indicators_fields(client, db):
     assert set(data[0].keys()) == {"date", "close", "values"}
     # All registry output fields should be under 'values'
     from app.services.compute.indicators import get_all_output_fields
+
     expected_fields = set(get_all_output_fields())
     assert set(data[0]["values"].keys()) == expected_fields
 
@@ -80,6 +85,7 @@ async def test_get_indicators_fields(client, db):
 async def test_get_indicators_ephemeral(client):
     """Indicators for non-DB symbol uses ephemeral fetch with warmup."""
     from unittest.mock import MagicMock
+
     mock_df = make_yahoo_df(n_days=120)
     mock_prov = MagicMock()
     mock_prov.fetch_history = AsyncMock(return_value=mock_df)
@@ -90,6 +96,7 @@ async def test_get_indicators_ephemeral(client):
 
 
 # --- POST /refresh ---
+
 
 async def test_refresh_prices(client, db):
     """Refresh triggers sync and returns count."""

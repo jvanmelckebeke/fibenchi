@@ -42,18 +42,19 @@ async def test_data_health_reports_holes(client, db):
     stored = {p.date for p in await PriceRepository(db).list_by_asset(asset.id)}
     sessions = sorted(AssetRef("AAPL").venue.session_dates(min(stored), max(stored)))
     hole = sessions[len(sessions) // 2]
-    await db.execute(delete(PriceHistory).where(
-        PriceHistory.asset_id == asset.id, PriceHistory.date == hole,
-    ))
+    await db.execute(
+        delete(PriceHistory).where(
+            PriceHistory.asset_id == asset.id,
+            PriceHistory.date == hole,
+        )
+    )
     await db.commit()
 
     resp = await client.get("/api/system/data-health")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_missing_sessions"] == 1
-    assert data["hole_symbols"] == [
-        {"symbol": "AAPL", "missing_sessions": [hole.isoformat()]}
-    ]
+    assert data["hole_symbols"] == [{"symbol": "AAPL", "missing_sessions": [hole.isoformat()]}]
 
 
 async def test_data_health_next_scan_reflects_throttle(client, db):
@@ -71,10 +72,12 @@ async def test_data_health_expected_bars_give_completeness(client, db):
     asset = await seed_asset_with_prices(db, "AAPL", n_days=60)
     stored = {p.date for p in await PriceRepository(db).list_by_asset(asset.id)}
     sessions = sorted(AssetRef("AAPL").venue.session_dates(min(stored), max(stored)))
-    await db.execute(delete(PriceHistory).where(
-        PriceHistory.asset_id == asset.id,
-        PriceHistory.date == sessions[len(sessions) // 2],
-    ))
+    await db.execute(
+        delete(PriceHistory).where(
+            PriceHistory.asset_id == asset.id,
+            PriceHistory.date == sessions[len(sessions) // 2],
+        )
+    )
     await db.commit()
 
     data = (await client.get("/api/system/data-health")).json()
@@ -103,9 +106,9 @@ async def test_stats_counts_collection(client, db):
 async def test_stats_asset_mix_classifies_by_ticker_shape(client, db):
     """The asset mix combines ticker-shape kinds (crypto/futures) with the
     stored Yahoo type (stock vs ETF)."""
-    await seed_asset_with_prices(db, "AAPL", n_days=40)      # stock
-    await seed_asset_with_prices(db, "BTC-USD", n_days=40)   # crypto by shape
-    await seed_asset_with_prices(db, "ES=F", n_days=40)      # future by shape
+    await seed_asset_with_prices(db, "AAPL", n_days=40)  # stock
+    await seed_asset_with_prices(db, "BTC-USD", n_days=40)  # crypto by shape
+    await seed_asset_with_prices(db, "ES=F", n_days=40)  # future by shape
 
     data = (await client.get("/api/system/stats")).json()
     assert data["stocks"] == 1
@@ -156,9 +159,7 @@ async def test_orphans_listed_and_hard_deletable(client, db):
     resp = await client.delete(f"/api/system/orphans/{orph.id}")
     assert resp.status_code == 204
     assert (await client.get("/api/system/orphans")).json() == []
-    bars = (await db.execute(
-        select(PriceHistory).where(PriceHistory.asset_id == orph.id)
-    )).scalars().all()
+    bars = (await db.execute(select(PriceHistory).where(PriceHistory.asset_id == orph.id))).scalars().all()
     assert bars == []
 
 
@@ -171,10 +172,12 @@ async def test_orphans_report_handwritten_content_that_delete_would_destroy(clie
     plain = await seed_asset_with_prices(db, "PLAIN", n_days=10, add_to_group=False)
     written = await seed_asset_with_prices(db, "WRITTEN", n_days=10, add_to_group=False)
     db.add(Note(asset_id=written.id, content="why I bought it"))
-    db.add_all([
-        Annotation(asset_id=written.id, date=date(2026, 1, 5), title="entry"),
-        Annotation(asset_id=written.id, date=date(2026, 2, 5), title="added"),
-    ])
+    db.add_all(
+        [
+            Annotation(asset_id=written.id, date=date(2026, 1, 5), title="entry"),
+            Annotation(asset_id=written.id, date=date(2026, 2, 5), title="added"),
+        ]
+    )
     await db.commit()
 
     orphans = {o["symbol"]: o for o in (await client.get("/api/system/orphans")).json()}
@@ -188,12 +191,8 @@ async def test_orphans_report_handwritten_content_that_delete_would_destroy(clie
 
     # And the delete really does take them, which is what the warning claims.
     assert (await client.delete(f"/api/system/orphans/{written.id}")).status_code == 204
-    assert (await db.execute(
-        select(Annotation).where(Annotation.asset_id == written.id)
-    )).scalars().all() == []
-    assert (await db.execute(
-        select(Note).where(Note.asset_id == written.id)
-    )).scalars().all() == []
+    assert (await db.execute(select(Annotation).where(Annotation.asset_id == written.id))).scalars().all() == []
+    assert (await db.execute(select(Note).where(Note.asset_id == written.id))).scalars().all() == []
     assert plain.id is not None  # untouched
 
 

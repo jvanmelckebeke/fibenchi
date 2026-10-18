@@ -34,7 +34,7 @@ export function StatsPanel({ indicators, indicatorVisibility, currency, quote }:
 
   const grouped = useMemo(() => {
     const visible = INDICATOR_REGISTRY.filter((d) =>
-      isVisibleAt(indicatorVisibility, d.id, "detail_stats"),
+      isVisibleAt(indicatorVisibility, d.id, "detail_stats")
     )
     const groups = new Map<IndicatorCategory, IndicatorDescriptor[]>()
     for (const desc of visible) {
@@ -51,10 +51,10 @@ export function StatsPanel({ indicators, indicatorVisibility, currency, quote }:
   if (!latestValues || grouped.size === 0) return null
 
   return (
-    <div className="rounded-lg border bg-card text-card-foreground divide-y">
+    <div className="divide-y rounded-lg border bg-card text-card-foreground">
       {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
         <div key={cat} className="px-4 py-3">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <h3 className="mb-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
             {CATEGORY_LABELS[cat]}
           </h3>
           <div className="space-y-2">
@@ -74,16 +74,19 @@ export function StatsPanel({ indicators, indicatorVisibility, currency, quote }:
   )
 }
 
-function DeltaBadge({ field, values }: {
+function DeltaBadge({
+  field,
+  values,
+}: {
   field: string
   values: Record<string, number | string | null | undefined>
 }) {
   const ann = formatDeltaAnnotation(field, values)
   if (!ann) return null
   return (
-    <span className="text-xs tabular-nums ml-1">
+    <span className="ml-1 text-xs tabular-nums">
       <span className="text-muted-foreground">{ann.delta}</span>
-      {ann.sigma && <span className="text-amber-500 ml-0.5">⚠ {ann.sigma}</span>}
+      {ann.sigma && <span className="ml-0.5 text-amber-500">⚠ {ann.sigma}</span>}
     </span>
   )
 }
@@ -103,7 +106,7 @@ function StatRow({
   const main = formatIndicatorField(mainField, descriptor, values, currency)
   // Exclude delta/sigma fields from secondary display — they're shown via DeltaBadge
   const secondaryFields = descriptor.fields.filter(
-    (f) => f !== mainField && !f.endsWith("_delta") && !f.endsWith("_delta_sigma"),
+    (f) => f !== mainField && !f.endsWith("_delta") && !f.endsWith("_delta_sigma")
   )
 
   // Multi-field indicators: show labeled values
@@ -114,14 +117,16 @@ function StatRow({
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-sm font-medium">{descriptor.label}</span>
           <span className="flex items-baseline">
-            <span className={`text-sm font-semibold tabular-nums ${main.colorClass}`}>{main.text}</span>
+            <span className={`text-sm font-semibold tabular-nums ${main.colorClass}`}>
+              {main.text}
+            </span>
             {showDeltas && <DeltaBadge field={mainField} values={values} />}
           </span>
         </div>
         {/* Row 2: description + secondary values */}
         <div className="flex items-baseline justify-between gap-4">
           <p className="text-xs text-muted-foreground">{descriptor.description}</p>
-          <div className="flex items-baseline gap-3 tabular-nums shrink-0">
+          <div className="flex shrink-0 items-baseline gap-3 tabular-nums">
             {secondaryFields.map((f) => {
               const series = getSeriesByField(f)
               const label = series?.label ?? f.replace(/_/g, " ")
@@ -145,7 +150,9 @@ function StatRow({
       <div className="flex items-baseline justify-between gap-4">
         <span className="text-sm font-medium">{descriptor.label}</span>
         <span className="flex items-baseline">
-          <span className={`text-sm font-semibold tabular-nums ${main.colorClass}`}>{main.text}</span>
+          <span className={`text-sm font-semibold tabular-nums ${main.colorClass}`}>
+            {main.text}
+          </span>
           {showDeltas && <DeltaBadge field={mainField} values={values} />}
         </span>
       </div>

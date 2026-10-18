@@ -15,7 +15,8 @@ _MIN_ENTRY_PRICE = 10.0
 
 
 async def compute_portfolio_index(
-    db: AsyncSession, period: str = "1y",
+    db: AsyncSession,
+    period: str = "1y",
 ) -> dict:
     """Compute equal-weight composite index of all grouped assets.
 
@@ -32,8 +33,12 @@ async def compute_portfolio_index(
         return empty
 
     points = await calculate_performance(
-        db, asset_ids, start_date, base_value=1000.0,
-        dynamic_entry=True, min_entry_price=_MIN_ENTRY_PRICE,
+        db,
+        asset_ids,
+        start_date,
+        base_value=1000.0,
+        dynamic_entry=True,
+        min_entry_price=_MIN_ENTRY_PRICE,
     )
 
     if not points:
@@ -56,7 +61,8 @@ async def compute_portfolio_index(
 
 
 async def compute_performers(
-    db: AsyncSession, period: str = "1y",
+    db: AsyncSession,
+    period: str = "1y",
 ) -> list[dict]:
     """Return grouped assets ranked by period return (best first).
 
@@ -102,12 +108,14 @@ async def compute_performers(
         last_close = price_map.get((aid, last_d))
         if first_close and last_close and first_close > 0:
             pct = ((last_close - first_close) / first_close) * 100
-            performers.append({
-                "symbol": asset.symbol,
-                "name": asset.name,
-                "type": asset.type.value,
-                "change_pct": round(pct, 2),
-            })
+            performers.append(
+                {
+                    "symbol": asset.symbol,
+                    "name": asset.name,
+                    "type": asset.type.value,
+                    "change_pct": round(pct, 2),
+                }
+            )
 
     performers.sort(key=lambda p: p["change_pct"], reverse=True)
     return performers

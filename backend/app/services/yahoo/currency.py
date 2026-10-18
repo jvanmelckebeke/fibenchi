@@ -42,10 +42,7 @@ def _normalize_ohlcv_df(df: pd.DataFrame, divisor: int) -> pd.DataFrame:
     """
     if divisor == 1:
         return df
-    price_cols = [
-        c for c in ("open", "high", "low", "close", "adjclose", "dividends")
-        if c in df.columns
-    ]
+    price_cols = [c for c in ("open", "high", "low", "close", "adjclose", "dividends") if c in df.columns]
     df = df.copy()
     df[price_cols] = df[price_cols] / divisor
     return df

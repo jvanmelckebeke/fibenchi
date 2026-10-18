@@ -50,7 +50,7 @@ export function createMainChart(
   container: HTMLElement,
   chartType: "candle" | "line",
   height: number,
-  hideTimeAxis: boolean,
+  hideTimeAxis: boolean
 ): { chart: IChartApi; series: Series } {
   const opts = baseChartOptions(container, height)
   const chart = createChart(container, {
@@ -113,7 +113,7 @@ export function createOverlays(chart: IChartApi): OverlayState {
 export function createSubChart(
   container: HTMLElement,
   descriptor: IndicatorDescriptor,
-  height = 120,
+  height = 120
 ): SubChartState {
   const hasFixedRange = !!descriptor.chartConfig?.range
   const opts = baseChartOptions(container, height)
@@ -168,7 +168,7 @@ export function createSubChart(
 function createSeriesFromDescriptor(
   chart: IChartApi,
   s: SeriesDescriptor,
-  autoscaleProvider?: () => { priceRange: { minValue: number; maxValue: number } },
+  autoscaleProvider?: () => { priceRange: { minValue: number; maxValue: number } }
 ): Series {
   if (s.type === "histogram") {
     return chart.addSeries(HistogramSeries, {
@@ -217,7 +217,7 @@ export function setVolumeData(series: Series, prices: Price[], enabled: boolean)
       time: p.date,
       value: p.volume,
       color: p.close >= p.open ? "rgba(34, 197, 94, 0.35)" : "rgba(239, 68, 68, 0.35)",
-    })),
+    }))
   )
 }
 
@@ -227,7 +227,7 @@ export function setVolumeData(series: Series, prices: Price[], enabled: boolean)
 export function setMainSeriesData(
   series: Series,
   prices: Price[],
-  chartType: "candle" | "line",
+  chartType: "candle" | "line"
 ): void {
   if (chartType === "line") {
     series.setData(prices.map((p) => ({ time: p.date, value: p.close })))
@@ -239,7 +239,7 @@ export function setMainSeriesData(
         high: p.high,
         low: p.low,
         close: p.close,
-      })),
+      }))
     )
   }
 }
@@ -248,7 +248,7 @@ export function setMainSeriesData(
 export function setAllOverlayData(
   state: OverlayState,
   indicators: Indicator[],
-  enabledIds: Set<string>,
+  enabledIds: Set<string>
 ): void {
   for (const desc of getOverlayDescriptors()) {
     const enabled = enabledIds.has(desc.id)
@@ -261,7 +261,7 @@ export function setAllOverlayData(
           ? indicators
               .filter((i) => i.values[s.field] !== null)
               .map((i) => ({ time: i.date, value: i.values[s.field]! }))
-          : [],
+          : []
       )
     }
 
@@ -272,7 +272,7 @@ export function setAllOverlayData(
         if (enabled) {
           const { upperField, lowerField } = desc.bandFill
           const data = indicators.filter(
-            (i) => i.values[upperField] !== null && i.values[lowerField] !== null,
+            (i) => i.values[upperField] !== null && i.values[lowerField] !== null
           )
           bandEntry.fill.data = data.map((i) => ({
             time: i.date,
@@ -306,8 +306,9 @@ export function setSubChartData(state: SubChartState, indicators: Indicator[]): 
         filtered.map((i) => ({
           time: i.date,
           value: i.values[s.field]!,
-          color: i.values[s.field]! >= 0 ? s.histogramColors!.positive : s.histogramColors!.negative,
-        })),
+          color:
+            i.values[s.field]! >= 0 ? s.histogramColors!.positive : s.histogramColors!.negative,
+        }))
       )
     } else {
       handle.setData(filtered.map((i) => ({ time: i.date, value: i.values[s.field]! })))
@@ -330,7 +331,10 @@ export function setSubChartData(state: SubChartState, indicators: Indicator[]): 
 }
 
 /** Create annotation markers on the series. Returns handle for lifecycle management. */
-export function addAnnotationMarkers(series: Series, annotations: Annotation[]): MarkersHandle | null {
+export function addAnnotationMarkers(
+  series: Series,
+  annotations: Annotation[]
+): MarkersHandle | null {
   if (!annotations.length) return null
   const markers = annotations
     .map((a) => ({

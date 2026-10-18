@@ -1,7 +1,9 @@
-# Ruff config for the backend. Intentionally lenient to start: catch the real
-# footguns (unused imports, undefined names, import order) with near-zero style
-# noise. Broaden `select` over time; a type checker (pyright/mypy) is a separate
-# follow-up for the None-access / return-type class of issues ruff can't see.
+# Ruff config for the backend. `ruff format` runs with its default style on the
+# line length and excludes below. The lint rules are intentionally lenient to
+# start: catch the real footguns (unused imports, undefined names, import order)
+# with near-zero style noise. Broaden `select` over time; a type checker
+# (pyright/mypy) is a separate follow-up for the None-access / return-type class
+# of issues ruff can't see.
 [tool.ruff]
 target-version = "py312"
 line-length = 120

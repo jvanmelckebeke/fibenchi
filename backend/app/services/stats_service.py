@@ -91,9 +91,7 @@ async def collect_stats(db: AsyncSession) -> StatsResponse:
     # thesis-kept rows are reported separately, not mixed in.
     tracked_rows = (
         await db.execute(
-            select(Asset.symbol, Asset.type)
-            .join(group_assets, group_assets.c.asset_id == Asset.id)
-            .distinct()
+            select(Asset.symbol, Asset.type).join(group_assets, group_assets.c.asset_id == Asset.id).distinct()
         )
     ).all()
     mix = Counter(_mix_bucket(sym, typ) for sym, typ in tracked_rows)
@@ -103,27 +101,17 @@ async def collect_stats(db: AsyncSession) -> StatsResponse:
     # thesis or pseudo-ETF (the soft delete keeps these on purpose) vs
     # orphaned (referenced by nothing).
     in_group = select(group_assets.c.asset_id).where(group_assets.c.asset_id == Asset.id)
-    referenced = (
-        select(thesis_assets.c.asset_id).where(thesis_assets.c.asset_id == Asset.id)
-    ).exists() | (
-        select(pseudo_etf_constituents.c.asset_id).where(
-            pseudo_etf_constituents.c.asset_id == Asset.id
-        )
+    referenced = (select(thesis_assets.c.asset_id).where(thesis_assets.c.asset_id == Asset.id)).exists() | (
+        select(pseudo_etf_constituents.c.asset_id).where(pseudo_etf_constituents.c.asset_id == Asset.id)
     ).exists()
     ungrouped_referenced = (
-        await db.execute(
-            select(func.count()).select_from(Asset).where(~in_group.exists(), referenced)
-        )
+        await db.execute(select(func.count()).select_from(Asset).where(~in_group.exists(), referenced))
     ).scalar_one()
     ungrouped_orphaned = (
-        await db.execute(
-            select(func.count()).select_from(Asset).where(~in_group.exists(), ~referenced)
-        )
+        await db.execute(select(func.count()).select_from(Asset).where(~in_group.exists(), ~referenced))
     ).scalar_one()
 
-    earliest, latest = (
-        await db.execute(select(func.min(PriceHistory.date), func.max(PriceHistory.date)))
-    ).one()
+    earliest, latest = (await db.execute(select(func.min(PriceHistory.date), func.max(PriceHistory.date)))).one()
 
     stats = StatsResponse(
         assets_total=await _count(db, Asset),
@@ -166,10 +154,7 @@ async def collect_data_health(db: AsyncSession) -> DataHealthResponse:
     with_holes = [(ref, holes) for ref, _, holes in coverage if holes]
     with_holes.sort(key=lambda c: max(c[1]), reverse=True)
     health = DataHealthResponse(
-        hole_symbols=[
-            HoleSymbol(symbol=ref, missing_sessions=sorted(holes))
-            for ref, holes in with_holes
-        ],
+        hole_symbols=[HoleSymbol(symbol=ref, missing_sessions=sorted(holes)) for ref, holes in with_holes],
         total_missing_sessions=sum(len(holes) for _, holes in with_holes),
         expected_session_bars=sum(n for _, n, _ in coverage),
         covered_symbols=len(coverage),
@@ -183,15 +168,11 @@ async def collect_data_health(db: AsyncSession) -> DataHealthResponse:
 
 def _is_orphan_conditions():
     """SQL conditions for "this Asset row is referenced by nothing"."""
-    in_group = select(group_assets.c.asset_id).where(
-        group_assets.c.asset_id == Asset.id
-    ).exists()
-    in_thesis = select(thesis_assets.c.asset_id).where(
-        thesis_assets.c.asset_id == Asset.id
-    ).exists()
-    in_pseudo_etf = select(pseudo_etf_constituents.c.asset_id).where(
-        pseudo_etf_constituents.c.asset_id == Asset.id
-    ).exists()
+    in_group = select(group_assets.c.asset_id).where(group_assets.c.asset_id == Asset.id).exists()
+    in_thesis = select(thesis_assets.c.asset_id).where(thesis_assets.c.asset_id == Asset.id).exists()
+    in_pseudo_etf = (
+        select(pseudo_etf_constituents.c.asset_id).where(pseudo_etf_constituents.c.asset_id == Asset.id).exists()
+    )
     return ~in_group, ~in_thesis, ~in_pseudo_etf
 
 
@@ -204,18 +185,19 @@ async def list_orphans(db: AsyncSession) -> list[OrphanAsset]:
     scalars rather than more joins, which would fan out and multiply the bar
     count by the annotation count.
     """
-    annotation_count = (
-        select(func.count(Annotation.id))
-        .where(Annotation.asset_id == Asset.id)
-        .scalar_subquery()
-    )
+    annotation_count = select(func.count(Annotation.id)).where(Annotation.asset_id == Asset.id).scalar_subquery()
     note_exists = select(Note.id).where(Note.asset_id == Asset.id).exists()
     rows = (
         await db.execute(
             select(
-                Asset.id, Asset.symbol, Asset.name, Asset.type,
-                func.count(PriceHistory.id), func.max(PriceHistory.date),
-                annotation_count, note_exists,
+                Asset.id,
+                Asset.symbol,
+                Asset.name,
+                Asset.type,
+                func.count(PriceHistory.id),
+                func.max(PriceHistory.date),
+                annotation_count,
+                note_exists,
             )
             .outerjoin(PriceHistory, PriceHistory.asset_id == Asset.id)
             .where(*_is_orphan_conditions())
@@ -225,9 +207,14 @@ async def list_orphans(db: AsyncSession) -> list[OrphanAsset]:
     ).all()
     return [
         OrphanAsset(
-            id=aid, symbol=sym, name=name, type=typ,
-            price_bars=bars, latest_bar=latest,
-            annotations=notes, has_note=has_note,
+            id=aid,
+            symbol=sym,
+            name=name,
+            type=typ,
+            price_bars=bars,
+            latest_bar=latest,
+            annotations=notes,
+            has_note=has_note,
         )
         for aid, sym, name, typ, bars, latest, notes, has_note in rows
     ]
@@ -245,14 +232,10 @@ async def delete_orphan(db: AsyncSession, asset_id: int) -> None:
     if asset is None:
         raise HTTPException(404, "Asset not found")
     still_orphan = (
-        await db.execute(
-            select(Asset.id).where(Asset.id == asset_id, *_is_orphan_conditions())
-        )
+        await db.execute(select(Asset.id).where(Asset.id == asset_id, *_is_orphan_conditions()))
     ).scalar_one_or_none()
     if still_orphan is None:
-        raise HTTPException(
-            409, "Asset is referenced by a group, thesis, or pseudo-ETF — not an orphan"
-        )
+        raise HTTPException(409, "Asset is referenced by a group, thesis, or pseudo-ETF — not an orphan")
     await db.delete(asset)
     await db.commit()
     # The card that triggered this sits next to the cached collection counts;

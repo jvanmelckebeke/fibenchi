@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState, memo } from "react"
-import { createChart, type IChartApi, ColorType, BaselineSeries, CrosshairMode } from "lightweight-charts"
+import {
+  createChart,
+  type IChartApi,
+  ColorType,
+  BaselineSeries,
+  CrosshairMode,
+} from "lightweight-charts"
 import type { IntradayPoint } from "@/lib/types"
 import { useChartTheme } from "@/lib/chart-utils"
 import { attachResizeAndCleanup } from "@/hooks/use-chart-lifecycle"
 
 /** 6-color session × direction palette */
 const SESSION_COLORS = {
-  pre:     { up: "#7dd3fc", down: "#075985" },  // sky-300 / sky-800
-  regular: { up: "#10b981", down: "#ef4444" },  // emerald-500 / red-500
-  post:    { up: "#c4b5fd", down: "#5b21b6" },  // violet-300 / violet-800
+  pre: { up: "#7dd3fc", down: "#075985" }, // sky-300 / sky-800
+  regular: { up: "#10b981", down: "#ef4444" }, // emerald-500 / red-500
+  post: { up: "#c4b5fd", down: "#5b21b6" }, // violet-300 / violet-800
 } as const
 
 type SessionKey = keyof typeof SESSION_COLORS
@@ -24,11 +30,11 @@ function getSessionPalette(session: string) {
   const colors = SESSION_COLORS[session as SessionKey] ?? SESSION_COLORS.regular
   return {
     topLineColor: colors.up,
-    topFillColor1: hexToRgba(colors.up, 0.20),
+    topFillColor1: hexToRgba(colors.up, 0.2),
     topFillColor2: hexToRgba(colors.up, 0.02),
     bottomLineColor: colors.down,
     bottomFillColor1: hexToRgba(colors.down, 0.02),
-    bottomFillColor2: hexToRgba(colors.down, 0.20),
+    bottomFillColor2: hexToRgba(colors.down, 0.2),
   }
 }
 
@@ -75,7 +81,7 @@ function formatIntradayTime(time: number): string {
 export interface IntradayChartProps {
   points: IntradayPoint[]
   previousClose: number | null
-  interactive?: boolean  // enables zoom/scroll/crosshair (default false)
+  interactive?: boolean // enables zoom/scroll/crosshair (default false)
 }
 
 export const IntradayChart = memo(function IntradayChart({
@@ -175,8 +181,7 @@ export const IntradayChart = memo(function IntradayChart({
     // After SSE reconnect the points array is fully replaced — detect via first
     // timestamp or length shrinking so we don't feed stale indices to update().
     const dataReplaced =
-      points[0]?.time !== firstTimeRef.current ||
-      points.length < lastLenRef.current
+      points[0]?.time !== firstTimeRef.current || points.length < lastLenRef.current
     const needsRecreate =
       seriesListRef.current.length === 0 ||
       prevCloseRef.current !== baseline ||
@@ -201,7 +206,9 @@ export const IntradayChart = memo(function IntradayChart({
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: interactive,
-          autoscaleInfoProvider: (original: () => { priceRange: { minValue: number; maxValue: number } | null }) => {
+          autoscaleInfoProvider: (
+            original: () => { priceRange: { minValue: number; maxValue: number } | null }
+          ) => {
             const res = original()
             if (!res?.priceRange) return res
             const { minValue, maxValue } = res.priceRange
@@ -288,5 +295,5 @@ export const IntradayChart = memo(function IntradayChart({
     }
   }, [points, previousClose, theme, interactive, chartVersion])
 
-  return <div ref={containerRef} className="w-full h-full" />
+  return <div ref={containerRef} className="h-full w-full" />
 })

@@ -82,12 +82,14 @@ def _parse_yahoo_results(quotes: list[dict]) -> list[dict]:
         qt = item.get("quoteType", "")
         if qt not in ("EQUITY", "ETF"):
             continue
-        results.append({
-            "symbol": item.get("symbol", ""),
-            "name": item.get("shortname") or item.get("longname") or "",
-            "exchange": item.get("exchDisp") or item.get("exchange") or "",
-            "type": "stock" if qt == "EQUITY" else "etf",
-        })
+        results.append(
+            {
+                "symbol": item.get("symbol", ""),
+                "name": item.get("shortname") or item.get("longname") or "",
+                "exchange": item.get("exchDisp") or item.get("exchange") or "",
+                "type": "stock" if qt == "EQUITY" else "etf",
+            }
+        )
         if len(results) >= 8:
             break
     return results

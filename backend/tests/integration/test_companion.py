@@ -106,9 +106,7 @@ async def test_companion_portfolio_index_shape(client, db):
 
 async def test_companion_portfolio_index_reuses_service(client):
     index = {"dates": ["2026-01-02"], "values": [1000.0], "current": 1000.0, "change": 0.0, "change_pct": 0.0}
-    with patch(
-        "app.services.companion_service.compute_portfolio_index", AsyncMock(return_value=index)
-    ) as compute:
+    with patch("app.services.companion_service.compute_portfolio_index", AsyncMock(return_value=index)) as compute:
         body = (await client.get("/api/companion/portfolio-index?period=3mo")).json()
     assert compute.await_args.args[1] == "3mo"
     assert body["period"] == "3mo"

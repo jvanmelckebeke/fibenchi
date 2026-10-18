@@ -73,12 +73,8 @@ class TestBatchFetchFundamentalsSync:
     @patch("app.services.yahoo.client.Ticker")
     async def test_returns_all_fields(self, mock_ticker_cls):
         ticker = MagicMock()
-        ticker.key_stats = {
-            "AAPL": {"forwardPE": 28.5, "pegRatio": 2.1, "enterpriseToEbitda": 22.3}
-        }
-        ticker.financial_data = {
-            "AAPL": {"returnOnEquity": 0.157, "revenueGrowth": 0.089}
-        }
+        ticker.key_stats = {"AAPL": {"forwardPE": 28.5, "pegRatio": 2.1, "enterpriseToEbitda": 22.3}}
+        ticker.financial_data = {"AAPL": {"returnOnEquity": 0.157, "revenueGrowth": 0.089}}
         mock_ticker_cls.return_value = ticker
 
         result = await yahoo_client.fundamentals(["AAPL"])

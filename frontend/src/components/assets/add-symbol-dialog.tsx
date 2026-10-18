@@ -9,7 +9,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { SearchResultsList } from "@/components/search/search-results-list"
 import { useCreateAsset, useAddAssetsToGroup, useGroups } from "@/lib/queries"
 import { useTwoPhaseSearch } from "@/hooks/use-two-phase-search"
@@ -60,18 +66,28 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
           if (gid) {
             addAssetsToGroup.mutate(
               { groupId: gid, assetIds: [asset.id] },
-              { onSuccess: closeDialog },
+              { onSuccess: closeDialog }
             )
           } else {
             closeDialog()
           }
         },
-      },
+      }
     )
   }
 
   return (
-    <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setSymbol(""); setShowSuggestions(false); setTargetGroupId(resolveTargetGroup(groupId)); createAsset.reset() } }}>
+    <Dialog
+      open={dialogOpen}
+      onOpenChange={(open) => {
+        setDialogOpen(open)
+        if (!open) {
+          setSymbol("")
+          setShowSuggestions(false)
+          setTargetGroupId(resolveTargetGroup(groupId))
+          createAsset.reset()
+        }
+      }}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="h-4 w-4" />
@@ -87,16 +103,23 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
             <Input
               placeholder="Search by name or symbol (e.g. AAPL, Porsche)"
               value={symbol}
-              onChange={(e) => { setSymbol(e.target.value); setShowSuggestions(true) }}
-              onKeyDown={(e) => { if (e.key === "Enter") { setShowSuggestions(false); handleAdd() } }}
+              onChange={(e) => {
+                setSymbol(e.target.value)
+                setShowSuggestions(true)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setShowSuggestions(false)
+                  handleAdd()
+                }
+              }}
               onFocus={() => setShowSuggestions(true)}
               autoFocus
             />
             {showDropdown && (
               <div
                 ref={suggestionsRef}
-                className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-72 overflow-auto"
-              >
+                className="absolute top-full right-0 left-0 z-50 mt-1 max-h-72 overflow-auto rounded-md border border-border bg-popover shadow-md">
                 <SearchResultsList
                   localResults={localResults}
                   yahooLoading={yahooLoading}
@@ -110,19 +133,18 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
               </div>
             )}
             {showSuggestions && !hasResults && !yahooLoading && trimmedQuery && (
-              <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md">
+              <div className="absolute top-full right-0 left-0 z-50 mt-1 rounded-md border border-border bg-popover shadow-md">
                 <div className="px-3 py-2 text-sm text-muted-foreground">No results found</div>
               </div>
             )}
           </div>
           {selectableGroups && selectableGroups.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground shrink-0">Add to</span>
+              <span className="shrink-0 text-sm text-muted-foreground">Add to</span>
               <Select
                 value={resolveTargetGroup(targetGroupId)?.toString() ?? ""}
-                onValueChange={(v) => setTargetGroupId(Number(v))}
-              >
-                <SelectTrigger className="text-xs h-7">
+                onValueChange={(v) => setTargetGroupId(Number(v))}>
+                <SelectTrigger className="h-7 text-xs">
                   <SelectValue placeholder="Select group" />
                 </SelectTrigger>
                 <SelectContent>
@@ -139,7 +161,12 @@ export function AddSymbolDialog({ groupId }: { groupId?: number }) {
             <p className="text-sm text-destructive">{createAsset.error.message}</p>
           )}
           <div className="flex justify-end">
-            <Button onClick={() => { setShowSuggestions(false); handleAdd() }} disabled={createAsset.isPending || addAssetsToGroup.isPending || !symbol.trim()}>
+            <Button
+              onClick={() => {
+                setShowSuggestions(false)
+                handleAdd()
+              }}
+              disabled={createAsset.isPending || addAssetsToGroup.isPending || !symbol.trim()}>
               {createAsset.isPending || addAssetsToGroup.isPending ? "Adding\u2026" : "Add"}
             </Button>
           </div>

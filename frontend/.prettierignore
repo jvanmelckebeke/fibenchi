@@ -1,0 +1,4 @@
+dist
+pnpm-lock.yaml
+# Written by backend/scripts/export_shared_constants.py; CI fails if it differs from the exporter's output.
+src/lib/generated/

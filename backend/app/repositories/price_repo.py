@@ -44,8 +44,7 @@ def _ohlc_fault(row) -> str | None:
     Value-level plausibility for closes needs a different mechanism — see the
     follow-up on clamping or flagging rather than rejecting.
     """
-    o, h, low, c = (float(row["open"]), float(row["high"]),
-                    float(row["low"]), float(row["close"]))
+    o, h, low, c = (float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"]))
     if h < low:
         return f"high {h} < low {low}"
     if min(o, h, low, c) <= 0:
@@ -64,7 +63,7 @@ UPSERT_CHUNK_ROWS = 2000
 
 def _chunked(rows: list[dict], size: int) -> Iterator[list[dict]]:
     for start in range(0, len(rows), size):
-        yield rows[start:start + size]
+        yield rows[start : start + size]
 
 
 class PriceRepository:
@@ -73,9 +72,7 @@ class PriceRepository:
 
     async def list_by_asset(self, asset_id: int) -> list[PriceHistory]:
         result = await self.db.execute(
-            select(PriceHistory)
-            .where(PriceHistory.asset_id == asset_id)
-            .order_by(PriceHistory.date)
+            select(PriceHistory).where(PriceHistory.asset_id == asset_id).order_by(PriceHistory.date)
         )
         return list(result.scalars().all())
 
@@ -87,9 +84,7 @@ class PriceRepository:
         )
         return list(result.scalars().all())
 
-    async def list_by_assets_since(
-        self, asset_ids: list[int], start: date
-    ) -> list[PriceHistory]:
+    async def list_by_assets_since(self, asset_ids: list[int], start: date) -> list[PriceHistory]:
         if not asset_ids:
             return []
         result = await self.db.execute(
@@ -102,9 +97,7 @@ class PriceRepository:
         )
         return list(result.scalars().all())
 
-    async def list_closes_by_assets_since(
-        self, asset_ids: list[int], start: date
-    ) -> list[tuple[int, date, float]]:
+    async def list_closes_by_assets_since(self, asset_ids: list[int], start: date) -> list[tuple[int, date, float]]:
         """(asset_id, date, close) rows, ordered by asset then date."""
         if not asset_ids:
             return []
@@ -121,16 +114,10 @@ class PriceRepository:
     async def get_latest_date(self, asset_ids: list[int]) -> date | None:
         if not asset_ids:
             return None
-        result = await self.db.execute(
-            select(func.max(PriceHistory.date)).where(
-                PriceHistory.asset_id.in_(asset_ids)
-            )
-        )
+        result = await self.db.execute(select(func.max(PriceHistory.date)).where(PriceHistory.asset_id.in_(asset_ids)))
         return result.scalar()
 
-    async def get_first_dates(
-        self, asset_ids: list[int], since: date
-    ) -> dict[int, date]:
+    async def get_first_dates(self, asset_ids: list[int], since: date) -> dict[int, date]:
         if not asset_ids:
             return {}
         result = await self.db.execute(
@@ -157,9 +144,7 @@ class PriceRepository:
         )
         return {row.asset_id: row.last_date for row in result}
 
-    async def get_latest_closes(
-        self, asset_ids: list[int]
-    ) -> dict[int, tuple[date, float]]:
+    async def get_latest_closes(self, asset_ids: list[int]) -> dict[int, tuple[date, float]]:
         """Latest stored (date, close) per asset."""
         if not asset_ids:
             return {}
@@ -175,28 +160,21 @@ class PriceRepository:
         result = await self.db.execute(
             select(PriceHistory.asset_id, PriceHistory.date, PriceHistory.close).join(
                 last_dates,
-                (PriceHistory.asset_id == last_dates.c.asset_id)
-                & (PriceHistory.date == last_dates.c.last_date),
+                (PriceHistory.asset_id == last_dates.c.asset_id) & (PriceHistory.date == last_dates.c.last_date),
             )
         )
         return {row.asset_id: (row.date, row.close) for row in result}
 
-    async def get_prices_at_dates(
-        self, asset_ids: list[int], dates: set[date]
-    ) -> dict[tuple[int, date], float]:
+    async def get_prices_at_dates(self, asset_ids: list[int], dates: set[date]) -> dict[tuple[int, date], float]:
         if not asset_ids or not dates:
             return {}
         result = await self.db.execute(
-            select(PriceHistory)
-            .where(
+            select(PriceHistory).where(
                 PriceHistory.asset_id.in_(asset_ids),
                 PriceHistory.date.in_(list(dates)),
             )
         )
-        return {
-            (p.asset_id, p.date): p.close
-            for p in result.scalars().all()
-        }
+        return {(p.asset_id, p.date): p.close for p in result.scalars().all()}
 
     async def delete_prices_after(self, asset_id: int, last_date: date) -> int:
         """Delete stored bars strictly after ``last_date`` for one asset.
@@ -216,7 +194,9 @@ class PriceRepository:
         return result.rowcount or 0
 
     async def find_price_steps(
-        self, factor: float, asset_ids: list[int] | None = None,
+        self,
+        factor: float,
+        asset_ids: list[int] | None = None,
     ) -> list[tuple[int, date, float, float]]:
         """Find adjacent stored bars whose close jumps by more than ``factor``.
 
@@ -231,11 +211,19 @@ class PriceRepository:
         reprice (0.464) all inside the same band. The caller has to ask the
         provider which one it is looking at.
         """
-        prev = func.lag(PriceHistory.close).over(
-            partition_by=PriceHistory.asset_id, order_by=PriceHistory.date,
-        ).label("prev")
+        prev = (
+            func.lag(PriceHistory.close)
+            .over(
+                partition_by=PriceHistory.asset_id,
+                order_by=PriceHistory.date,
+            )
+            .label("prev")
+        )
         stepped = select(
-            PriceHistory.asset_id, PriceHistory.date, PriceHistory.close, prev,
+            PriceHistory.asset_id,
+            PriceHistory.date,
+            PriceHistory.close,
+            prev,
         )
         if asset_ids:
             stepped = stepped.where(PriceHistory.asset_id.in_(asset_ids))
@@ -253,15 +241,11 @@ class PriceRepository:
             )
             .order_by(stepped.c.date)
         )
-        return [
-            (row[0], row[1], float(row[2]), float(row[3])) for row in result.all()
-        ]
+        return [(row[0], row[1], float(row[2]), float(row[3])) for row in result.all()]
 
     async def get_oldest_date(self, asset_id: int) -> date | None:
         """Date of the asset's earliest stored bar, or None if it has none."""
-        result = await self.db.execute(
-            select(func.min(PriceHistory.date)).where(PriceHistory.asset_id == asset_id)
-        )
+        result = await self.db.execute(select(func.min(PriceHistory.date)).where(PriceHistory.asset_id == asset_id))
         return result.scalar_one_or_none()
 
     async def get_dates(self, asset_id: int, start: date, end: date) -> set[date]:
@@ -336,15 +320,17 @@ class PriceRepository:
                 impossible.append((dt, fault))
                 continue
 
-            rows.append({
-                "asset_id": ref.id,
-                "date": dt,
-                "open": round(float(row["open"]), 4),
-                "high": round(float(row["high"]), 4),
-                "low": round(float(row["low"]), 4),
-                "close": round(float(row["close"]), 4),
-                "volume": int(row["volume"]) if pd.notna(row["volume"]) else 0,
-            })
+            rows.append(
+                {
+                    "asset_id": ref.id,
+                    "date": dt,
+                    "open": round(float(row["open"]), 4),
+                    "high": round(float(row["high"]), 4),
+                    "low": round(float(row["low"]), 4),
+                    "close": round(float(row["close"]), 4),
+                    "volume": int(row["volume"]) if pd.notna(row["volume"]) else 0,
+                }
+            )
             if has_dividends:
                 cash = row[DIVIDEND_COLUMN]
                 rows[-1]["dividend"] = round(float(cash), 6) if pd.notna(cash) else 0.0
@@ -353,7 +339,9 @@ class PriceRepository:
             logger.warning(
                 "Skipped %d price bar(s) with NaN OHLC for %s (asset_id=%d) "
                 "(dates: %s) — this leaves a gap in price_history",
-                len(skipped), ref, ref.id,
+                len(skipped),
+                ref,
+                ref.id,
                 ", ".join(d.isoformat() for d in skipped),
             )
         if impossible:
@@ -361,7 +349,9 @@ class PriceRepository:
                 "Rejected %d internally inconsistent price bar(s) for %s "
                 "(asset_id=%d): %s — this leaves a gap in price_history, which "
                 "the gap guard reports honestly and the hole heal re-fetches",
-                len(impossible), ref, ref.id,
+                len(impossible),
+                ref,
+                ref.id,
                 "; ".join(f"{d.isoformat()} {why}" for d, why in impossible),
             )
         return rows

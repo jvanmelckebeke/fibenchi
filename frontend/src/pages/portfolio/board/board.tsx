@@ -51,7 +51,12 @@ function usePagedSections(sections: BoardSection[]) {
   const pages = useMemo(() => {
     const g = metrics.full ? GEOM.full : GEOM.compact
     const cols = Math.max(1, Math.floor((metrics.width + g.gap) / (g.minTile + g.gap)))
-    return packSections(sections, { cols, rowPx: g.rowPx, headerPx: g.headerPx, availPx: metrics.availPx })
+    return packSections(sections, {
+      cols,
+      rowPx: g.rowPx,
+      headerPx: g.headerPx,
+      availPx: metrics.availPx,
+    })
   }, [sections, metrics])
 
   return { ref, footerRef, pages, availPx: metrics.availPx }
@@ -72,7 +77,7 @@ export function Board({
 }) {
   const { span, unread, pending, tightened } = useMemo(
     () => boardScale(scaleTiles, mode),
-    [scaleTiles, mode],
+    [scaleTiles, mode]
   )
 
   const { ref, footerRef, pages, availPx } = usePagedSections(sections)
@@ -105,31 +110,30 @@ export function Board({
       <div ref={ref}>
         <div className="space-y-5" style={pages.length > 1 ? { minHeight: availPx } : undefined}>
           {visible.map((s) => (
-          <section key={s.key}>
-            <h2 className="mb-1.5 flex items-center gap-2 text-xs font-medium 2xl:mb-2 2xl:text-[13px] text-muted-foreground">
-              {s.accent && (
-                <span aria-hidden className="h-4 w-[3px] rounded-full" style={{ backgroundColor: s.accent }} />
-              )}
-              {s.title}
-              <span className="opacity-60">{s.tiles.length}</span>
-            </h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-[3px] 2xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] 2xl:gap-1">
-              {s.tiles.map((t) => (
-                <BoardTile key={t.symbol} tile={t} mode={mode} span={span} />
-              ))}
-            </div>
-          </section>
+            <section key={s.key}>
+              <h2 className="mb-1.5 flex items-center gap-2 text-xs font-medium text-muted-foreground 2xl:mb-2 2xl:text-[13px]">
+                {s.accent && (
+                  <span
+                    aria-hidden
+                    className="h-4 w-[3px] rounded-full"
+                    style={{ backgroundColor: s.accent }}
+                  />
+                )}
+                {s.title}
+                <span className="opacity-60">{s.tiles.length}</span>
+              </h2>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-[3px] 2xl:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] 2xl:gap-1">
+                {s.tiles.map((t) => (
+                  <BoardTile key={t.symbol} tile={t} mode={mode} span={span} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
         <div ref={footerRef} className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <Legend mode={mode} span={span} unread={unread} pending={pending} tightened={tightened} />
           {pages.length > 1 && (
-            <Pager
-              page={current}
-              pageCount={pages.length}
-              pages={pages}
-              onPage={setPage}
-            />
+            <Pager page={current} pageCount={pages.length} pages={pages} onPage={setPage} />
           )}
         </div>
       </div>
@@ -154,8 +158,7 @@ function Pager({
         onClick={() => onPage(Math.max(0, page - 1))}
         disabled={page === 0}
         className="rounded p-1 hover:bg-muted disabled:opacity-30"
-        aria-label="Previous page"
-      >
+        aria-label="Previous page">
         <ChevronLeft className="h-4 w-4" />
       </button>
       {pages.map((p, i) => (
@@ -165,8 +168,7 @@ function Pager({
           title={p.map((s) => s.title).join(" · ")}
           className={`rounded px-2 py-0.5 tabular-nums hover:bg-muted ${
             i === page ? "bg-muted font-medium text-foreground" : ""
-          }`}
-        >
+          }`}>
           {i + 1}
         </button>
       ))}
@@ -174,8 +176,7 @@ function Pager({
         onClick={() => onPage(Math.min(pageCount - 1, page + 1))}
         disabled={page === pageCount - 1}
         className="rounded p-1 hover:bg-muted disabled:opacity-30"
-        aria-label="Next page"
-      >
+        aria-label="Next page">
         <ChevronRight className="h-4 w-4" />
       </button>
     </div>
@@ -200,12 +201,18 @@ function Legend({
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-[11px] text-muted-foreground">
       <span className="flex items-center gap-1.5">
-        <span className="tabular-nums">-{fmt()}{unit}</span>
+        <span className="tabular-nums">
+          -{fmt()}
+          {unit}
+        </span>
         <span
           className="h-3 w-36 rounded-[2px]"
           style={{ background: `linear-gradient(to right, ${RAMP_COLORS.join(", ")})` }}
         />
-        <span className="tabular-nums">+{fmt()}{unit}</span>
+        <span className="tabular-nums">
+          +{fmt()}
+          {unit}
+        </span>
         {/* While the first snapshot batch is in flight every tile is unread,
             which is not a coverage collapse — say so rather than printing the
             whole board as missing. */}
@@ -216,8 +223,7 @@ function Legend({
           unread > 0 && (
             <span
               className="cursor-help border-b border-dotted border-current"
-              title="The scale keeps its full width rather than tightening onto the tiles that resolved, which would paint them louder than they are."
-            >
+              title="The scale keeps its full width rather than tightening onto the tiles that resolved, which would paint them louder than they are.">
               full scale · {unread} without a reading
             </span>
           )

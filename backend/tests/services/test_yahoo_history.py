@@ -40,9 +40,7 @@ def _make_multi_index_df(symbols: list[str], n: int = 5, base: float = 100.0) ->
                 "close": [base + i + 0.5 for i in range(n)],
                 "volume": [1_000_000] * n,
             },
-            index=pd.MultiIndex.from_tuples(
-                [(sym, d) for d in dates], names=["symbol", "date"]
-            ),
+            index=pd.MultiIndex.from_tuples([(sym, d) for d in dates], names=["symbol", "date"]),
         )
         frames.append(df)
     return pd.concat(frames)
@@ -76,9 +74,7 @@ class TestFetchHistory:
         s, e = date(2025, 1, 1), date(2025, 3, 1)
         await yahoo_client.history("AAPL", start=s, end=e)
 
-        ticker.history.assert_called_once_with(
-            start="2025-01-01", end="2025-03-01", interval="1d"
-        )
+        ticker.history.assert_called_once_with(start="2025-01-01", end="2025-03-01", interval="1d")
 
     @patch("app.services.yahoo.client.Ticker")
     async def test_raises_on_empty_dataframe(self, mock_ticker_cls):
@@ -110,9 +106,7 @@ class TestFetchHistory:
                 "close": [100.5, 101.5, 102.5],
                 "volume": [1_000_000, 1_000_000, 1_000_000],
             },
-            index=pd.MultiIndex.from_tuples(
-                [("AAPL", d) for d in dates], names=["symbol", "date"]
-            ),
+            index=pd.MultiIndex.from_tuples([("AAPL", d) for d in dates], names=["symbol", "date"]),
         )
         ticker = MagicMock()
         ticker.history.return_value = df
@@ -133,8 +127,13 @@ class TestFetchHistory:
         intraday = dt(2026, 4, 6, 9, 0, tzinfo=pytz.timezone("Asia/Seoul"))
         index = pd.Index(daily_dates + [intraday], name="date")
         df = pd.DataFrame(
-            {"open": [100, 101, 102], "high": [101, 102, 103], "low": [99, 100, 101],
-             "close": [100.5, 101.5, 102.5], "volume": [1_000_000] * 3},
+            {
+                "open": [100, 101, 102],
+                "high": [101, 102, 103],
+                "low": [99, 100, 101],
+                "close": [100.5, 101.5, 102.5],
+                "volume": [1_000_000] * 3,
+            },
             index=index,
         )
         ticker = MagicMock()
@@ -220,9 +219,7 @@ def _batch_ticker(symbols, df, quotes=None, data=None):
     ``_historical_data_to_dataframe`` (the resulting frame).
     """
     ticker = MagicMock()
-    ticker._get_data.return_value = (
-        data if data is not None else {s: {"timestamp": [1]} for s in symbols}
-    )
+    ticker._get_data.return_value = data if data is not None else {s: {"timestamp": [1]} for s in symbols}
     ticker._historical_data_to_dataframe.return_value = df
     ticker.quotes = quotes or {}
     return ticker
@@ -243,7 +240,9 @@ class TestBatchHistory:
     async def test_error_payload_returns_empty(self, mock_ticker_cls):
         """Per-symbol error strings build into an empty frame → {}."""
         mock_ticker_cls.return_value = _batch_ticker(
-            ["AAPL"], pd.DataFrame(), data={"AAPL": "No data found"},
+            ["AAPL"],
+            pd.DataFrame(),
+            data={"AAPL": "No data found"},
         )
 
         assert await yahoo_client.batch_history(["AAPL"]) == {}
@@ -252,7 +251,8 @@ class TestBatchHistory:
     async def test_returns_dataframes_per_symbol(self, mock_ticker_cls):
         df = _make_multi_index_df(["AAPL", "MSFT"], n=5)
         mock_ticker_cls.return_value = _batch_ticker(
-            ["AAPL", "MSFT"], df,
+            ["AAPL", "MSFT"],
+            df,
             quotes={"AAPL": {"currency": "USD"}, "MSFT": {"currency": "USD"}},
         )
 
@@ -270,7 +270,9 @@ class TestBatchHistory:
             index=pd.MultiIndex.from_tuples([("AAPL", dates[0])], names=["symbol", "date"]),
         )
         mock_ticker_cls.return_value = _batch_ticker(
-            ["AAPL"], df, quotes={"AAPL": {"currency": "USD"}},
+            ["AAPL"],
+            df,
+            quotes={"AAPL": {"currency": "USD"}},
         )
 
         result = await yahoo_client.batch_history(["AAPL"])
@@ -281,14 +283,19 @@ class TestBatchHistory:
         """Gracefully skip symbols that raise KeyError on .loc."""
         dates = pd.bdate_range(end=date.today(), periods=3)
         df = pd.DataFrame(
-            {"open": [100, 101, 102], "high": [101, 102, 103], "low": [99, 100, 101],
-             "close": [100.5, 101.5, 102.5], "volume": [1_000_000] * 3},
-            index=pd.MultiIndex.from_tuples(
-                [("AAPL", d) for d in dates], names=["symbol", "date"]
-            ),
+            {
+                "open": [100, 101, 102],
+                "high": [101, 102, 103],
+                "low": [99, 100, 101],
+                "close": [100.5, 101.5, 102.5],
+                "volume": [1_000_000] * 3,
+            },
+            index=pd.MultiIndex.from_tuples([("AAPL", d) for d in dates], names=["symbol", "date"]),
         )
         mock_ticker_cls.return_value = _batch_ticker(
-            ["AAPL", "MISSING"], df, quotes={"AAPL": {"currency": "USD"}},
+            ["AAPL", "MISSING"],
+            df,
+            quotes={"AAPL": {"currency": "USD"}},
         )
 
         result = await yahoo_client.batch_history(["AAPL", "MISSING"])
@@ -300,15 +307,19 @@ class TestBatchHistory:
         """GBp prices in batch should be divided by 100."""
         dates = pd.bdate_range(end=date.today(), periods=3)
         df = pd.DataFrame(
-            {"open": [15000, 15100, 15200], "high": [15100, 15200, 15300],
-             "low": [14900, 15000, 15100], "close": [15050, 15150, 15250],
-             "volume": [500_000] * 3},
-            index=pd.MultiIndex.from_tuples(
-                [("HSBA.L", d) for d in dates], names=["symbol", "date"]
-            ),
+            {
+                "open": [15000, 15100, 15200],
+                "high": [15100, 15200, 15300],
+                "low": [14900, 15000, 15100],
+                "close": [15050, 15150, 15250],
+                "volume": [500_000] * 3,
+            },
+            index=pd.MultiIndex.from_tuples([("HSBA.L", d) for d in dates], names=["symbol", "date"]),
         )
         mock_ticker_cls.return_value = _batch_ticker(
-            ["HSBA.L"], df, quotes={"HSBA.L": {"currency": "GBp"}},
+            ["HSBA.L"],
+            df,
+            quotes={"HSBA.L": {"currency": "GBp"}},
         )
 
         result = await yahoo_client.batch_history(["HSBA.L"])
@@ -320,12 +331,14 @@ class TestBatchHistory:
         """A dropped quote for a pence-quoted listing must skip, not store 1:1."""
         dates = pd.bdate_range(end=date.today(), periods=3)
         df = pd.DataFrame(
-            {"open": [15000, 15100, 15200], "high": [15100, 15200, 15300],
-             "low": [14900, 15000, 15100], "close": [15050, 15150, 15250],
-             "volume": [500_000] * 3},
-            index=pd.MultiIndex.from_tuples(
-                [("HSBA.L", d) for d in dates], names=["symbol", "date"]
-            ),
+            {
+                "open": [15000, 15100, 15200],
+                "high": [15100, 15200, 15300],
+                "low": [14900, 15000, 15100],
+                "close": [15050, 15150, 15250],
+                "volume": [500_000] * 3,
+            },
+            index=pd.MultiIndex.from_tuples([("HSBA.L", d) for d in dates], names=["symbol", "date"]),
         )
         mock_ticker_cls.return_value = _batch_ticker(["HSBA.L"], df, quotes={})
 
@@ -344,7 +357,8 @@ class TestOmittedSymbolPadding:
         payload, so yahooquery filters it instead of KeyError-ing."""
         df = _make_multi_index_df(["AAPL"], n=5)
         ticker = _batch_ticker(
-            ["AAPL", "2914.T"], df,
+            ["AAPL", "2914.T"],
+            df,
             quotes={"AAPL": {"currency": "USD"}},
             data={"AAPL": {"timestamp": [1]}},  # 2914.T absent entirely
         )

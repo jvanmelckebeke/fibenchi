@@ -16,8 +16,8 @@ from enum import Enum
 
 
 class FieldSource(str, Enum):
-    AUTO = "auto"   # derived by Fibenchi; safe to re-derive and re-suggest
-    USER = "user"   # set deliberately by a human; suggestions stay quiet
+    AUTO = "auto"  # derived by Fibenchi; safe to re-derive and re-suggest
+    USER = "user"  # set deliberately by a human; suggestions stay quiet
 
     @property
     def is_auto(self) -> bool:

@@ -52,16 +52,22 @@ async def test_heal_refreshes_unreconciled_asset(db):
 
     # Quote two sessions ahead of the stored bar: nothing reconciles.
     provider = _provider_with_quotes([_quote("PRY.MI", close * 0.90, close * 0.95)])
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices",
-               new_callable=AsyncMock, return_value=22) as mock_sync:
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch(
+            "app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock, return_value=22
+        ) as mock_sync,
+    ):
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {"PRY.MI": 22}
     # The heal threads the already-fetched quote anchor into the sync so it
     # doesn't re-fetch the same quote (#5): (price, previous_close, state, date).
     mock_sync.assert_awaited_once_with(
-        db, AssetRef.of(asset), period="1mo", anchor=(close * 0.90, close * 0.95, "REGULAR", None),
+        db,
+        AssetRef.of(asset),
+        period="1mo",
+        anchor=(close * 0.90, close * 0.95, "REGULAR", None),
     )
 
 
@@ -76,19 +82,23 @@ async def test_heal_failure_is_non_fatal_and_rolls_back(db):
 
     # Both quotes sit two sessions ahead of the stored bar: nothing reconciles,
     # so both are due for a heal.
-    provider = _provider_with_quotes([
-        _quote("GOOD.OL", good_close * 0.90, good_close * 0.95),
-        _quote("BAD.OL", bad_close * 0.90, bad_close * 0.95),
-    ])
+    provider = _provider_with_quotes(
+        [
+            _quote("GOOD.OL", good_close * 0.90, good_close * 0.95),
+            _quote("BAD.OL", bad_close * 0.90, bad_close * 0.95),
+        ]
+    )
 
     async def fake_sync(_db, asset, **_kw):
         if asset.symbol == "BAD.OL":
             raise RuntimeError("boom")
         return 22
 
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices", side_effect=fake_sync), \
-         patch.object(db, "rollback", new_callable=AsyncMock) as mock_rollback:
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch("app.background_tasks.price_heal.sync_asset_prices", side_effect=fake_sync),
+        patch.object(db, "rollback", new_callable=AsyncMock) as mock_rollback,
+    ):
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {"GOOD.OL": 22}
@@ -103,14 +113,18 @@ async def test_heal_skips_reconciling_assets(db):
     c1 = await _latest_close(db, a1)
     c2 = await _latest_close(db, a2)
 
-    provider = _provider_with_quotes([
-        # Normal market-hours state: stored bar is the quote's prior session.
-        _quote("PREV", c1 * 0.95, c1),
-        # Current session already stored (settled close equals the price).
-        _quote("CURR", c2, c2 * 1.05),
-    ])
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
+    provider = _provider_with_quotes(
+        [
+            # Normal market-hours state: stored bar is the quote's prior session.
+            _quote("PREV", c1 * 0.95, c1),
+            # Current session already stored (settled close equals the price).
+            _quote("CURR", c2, c2 * 1.05),
+        ]
+    )
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync,
+    ):
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {}
@@ -122,8 +136,10 @@ async def test_heal_skips_assets_without_stored_bars(db):
     await seed_asset_with_prices(db, "NEWB", n_days=0)
 
     provider = _provider_with_quotes([_quote("NEWB", 100.0, 99.0)])
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync,
+    ):
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {}
@@ -135,8 +151,10 @@ async def test_heal_skips_dead_quotes(db):
     await seed_asset_with_prices(db, "DEAD", n_days=30)
 
     provider = _provider_with_quotes([_quote("DEAD", None, None)])
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync:
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync,
+    ):
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {}
@@ -150,9 +168,10 @@ async def test_heal_cooldown_prevents_hammering(db):
 
     # Still unreconcilable after the heal (Yahoo keeps serving lagged data).
     provider = _provider_with_quotes([_quote("LAG.MI", close * 0.90, close * 0.95)])
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices",
-               new_callable=AsyncMock, return_value=0) as mock_sync:
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock, return_value=0) as mock_sync,
+    ):
         await heal_unreconciled_prices(db)
         await heal_unreconciled_prices(db)
 
@@ -181,8 +200,10 @@ async def test_heal_success_does_not_burn_the_cooldown(db):
         await session.commit()
         return 1
 
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices", side_effect=repairing_sync):
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch("app.background_tasks.price_heal.sync_asset_prices", side_effect=repairing_sync),
+    ):
         await heal_unreconciled_prices(db)
 
     assert await _latest_close(db, asset) == pytest.approx(fixed_price)
@@ -196,9 +217,14 @@ async def test_heal_error_still_sets_the_cooldown(db):
     close = await _latest_close(db, asset)
     provider = _provider_with_quotes([_quote("BOOM.MI", close * 0.90, close * 0.95)])
 
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices",
-               new_callable=AsyncMock, side_effect=RuntimeError("yahoo down")):
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch(
+            "app.background_tasks.price_heal.sync_asset_prices",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("yahoo down"),
+        ),
+    ):
         healed = await heal_unreconciled_prices(db)
 
     assert healed == {}
@@ -211,12 +237,11 @@ async def test_heal_caps_per_run_and_defers_rest(db):
     assets = [await seed_asset_with_prices(db, f"S{i:02d}", n_days=10) for i in range(n)]
     closes = {a.symbol: await _latest_close(db, a) for a in assets}
 
-    provider = _provider_with_quotes(
-        [_quote(s, c * 0.90, c * 0.95) for s, c in closes.items()]
-    )
-    with patch("app.background_tasks.price_heal.get_price_provider", return_value=provider), \
-         patch("app.background_tasks.price_heal.sync_asset_prices",
-               new_callable=AsyncMock, return_value=1) as mock_sync:
+    provider = _provider_with_quotes([_quote(s, c * 0.90, c * 0.95) for s, c in closes.items()])
+    with (
+        patch("app.background_tasks.price_heal.get_price_provider", return_value=provider),
+        patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock, return_value=1) as mock_sync,
+    ):
         first = await heal_unreconciled_prices(db)
         second = await heal_unreconciled_prices(db)
 
@@ -249,10 +274,17 @@ class TestDateBasedStaleness:
         """Make ``bar_date`` the asset's latest stored bar."""
         await db.execute(delete(PriceHistory).where(PriceHistory.asset_id == asset.id))
         for day in (bar_date - timedelta(days=7), bar_date):
-            db.add(PriceHistory(
-                asset_id=asset.id, date=day, open=close, high=close,
-                low=close, close=close, volume=1000,
-            ))
+            db.add(
+                PriceHistory(
+                    asset_id=asset.id,
+                    date=day,
+                    open=close,
+                    high=close,
+                    low=close,
+                    close=close,
+                    volume=1000,
+                )
+            )
         await db.flush()
 
     async def test_heals_a_stale_bar_a_flat_market_hides(self, db):
@@ -265,10 +297,12 @@ class TestDateBasedStaleness:
         quote = _quote("PRY.MI", 124.60, 122.45)
         quote.session_date = sessions[0].isoformat()
 
-        with patch("app.background_tasks.price_heal.get_price_provider",
-                   return_value=_provider_with_quotes([quote])), \
-             patch("app.background_tasks.price_heal.sync_asset_prices",
-                   new_callable=AsyncMock, return_value=3) as mock_sync:
+        with (
+            patch("app.background_tasks.price_heal.get_price_provider", return_value=_provider_with_quotes([quote])),
+            patch(
+                "app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock, return_value=3
+            ) as mock_sync,
+        ):
             healed = await heal_unreconciled_prices(db)
 
         assert healed == {"PRY.MI": 3}
@@ -284,10 +318,10 @@ class TestDateBasedStaleness:
         quote = _quote("NEX.PA", 140.10, 136.80)
         quote.session_date = sessions[0].isoformat()
 
-        with patch("app.background_tasks.price_heal.get_price_provider",
-                   return_value=_provider_with_quotes([quote])), \
-             patch("app.background_tasks.price_heal.sync_asset_prices",
-                   new_callable=AsyncMock) as mock_sync:
+        with (
+            patch("app.background_tasks.price_heal.get_price_provider", return_value=_provider_with_quotes([quote])),
+            patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync,
+        ):
             assert await heal_unreconciled_prices(db) == {}
         mock_sync.assert_not_awaited()
 
@@ -301,10 +335,12 @@ class TestDateBasedStaleness:
         quote = _quote("PRY.MI", 124.60, 122.45)
         quote.session_date = sessions[0].isoformat()
 
-        with patch("app.background_tasks.price_heal.get_price_provider",
-                   return_value=_provider_with_quotes([quote])), \
-             patch("app.background_tasks.price_heal.sync_asset_prices",
-                   new_callable=AsyncMock, return_value=1) as mock_sync:
+        with (
+            patch("app.background_tasks.price_heal.get_price_provider", return_value=_provider_with_quotes([quote])),
+            patch(
+                "app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock, return_value=1
+            ) as mock_sync,
+        ):
             assert await heal_unreconciled_prices(db) == {"PRY.MI": 1}
         mock_sync.assert_awaited_once()
 
@@ -314,10 +350,13 @@ class TestDateBasedStaleness:
         asset = await seed_asset_with_prices(db, "PRY.MI", n_days=30)
         await self._stored_at(db, asset, sessions[3], 122.20)
 
-        with patch("app.background_tasks.price_heal.get_price_provider",
-                   return_value=_provider_with_quotes([_quote("PRY.MI", 124.60, 122.45)])), \
-             patch("app.background_tasks.price_heal.sync_asset_prices",
-                   new_callable=AsyncMock) as mock_sync:
+        with (
+            patch(
+                "app.background_tasks.price_heal.get_price_provider",
+                return_value=_provider_with_quotes([_quote("PRY.MI", 124.60, 122.45)]),
+            ),
+            patch("app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock) as mock_sync,
+        ):
             assert await heal_unreconciled_prices(db) == {}
         mock_sync.assert_not_awaited()
 
@@ -332,10 +371,12 @@ class TestDateBasedStaleness:
         quote = _quote("PRY.MI", 124.60, 122.45)
         quote.session_date = sessions[0].isoformat()
 
-        with patch("app.background_tasks.price_heal.get_price_provider",
-                   return_value=_provider_with_quotes([quote])), \
-             patch("app.background_tasks.price_heal.sync_asset_prices",
-                   new_callable=AsyncMock, return_value=0) as mock_sync:
+        with (
+            patch("app.background_tasks.price_heal.get_price_provider", return_value=_provider_with_quotes([quote])),
+            patch(
+                "app.background_tasks.price_heal.sync_asset_prices", new_callable=AsyncMock, return_value=0
+            ) as mock_sync,
+        ):
             await heal_unreconciled_prices(db)
             await heal_unreconciled_prices(db)
 
@@ -385,9 +426,12 @@ async def _seed_with_hole(db, symbol="AAPL", frac=0.5):
     stored = {p.date for p in await PriceRepository(db).list_by_asset(asset.id)}
     sessions = sorted(AssetRef(symbol).venue.session_dates(min(stored), max(stored)))
     hole = sessions[max(1, min(len(sessions) - 2, int(len(sessions) * frac)))]
-    await db.execute(delete(PriceHistory).where(
-        PriceHistory.asset_id == asset.id, PriceHistory.date == hole,
-    ))
+    await db.execute(
+        delete(PriceHistory).where(
+            PriceHistory.asset_id == asset.id,
+            PriceHistory.date == hole,
+        )
+    )
     await db.commit()
     return asset, hole
 
@@ -458,8 +502,7 @@ async def test_hole_heal_failure_does_not_abort_batch(db):
             raise ValueError("No data found for AAAA")
         return 1
 
-    with patch.object(price_heal, "sync_asset_prices_range",
-                      new=AsyncMock(side_effect=sync_side_effect)) as sync:
+    with patch.object(price_heal, "sync_asset_prices_range", new=AsyncMock(side_effect=sync_side_effect)) as sync:
         healed = await heal_interior_holes(db, force=True)
 
     assert sync.await_count == 2
@@ -519,9 +562,12 @@ async def test_hole_heal_skips_unknown_venue(db):
     """No venue calendar → holes and holidays are indistinguishable → skip."""
     asset = await seed_asset_with_prices(db, "FOO.XX", n_days=60)
     stored = sorted({p.date for p in await PriceRepository(db).list_by_asset(asset.id)})
-    await db.execute(delete(PriceHistory).where(
-        PriceHistory.asset_id == asset.id, PriceHistory.date == stored[len(stored) // 2],
-    ))
+    await db.execute(
+        delete(PriceHistory).where(
+            PriceHistory.asset_id == asset.id,
+            PriceHistory.date == stored[len(stored) // 2],
+        )
+    )
     await db.commit()
     with patch.object(price_heal, "sync_asset_prices_range", new_callable=AsyncMock) as sync:
         healed = await heal_interior_holes(db, force=True)

@@ -35,6 +35,7 @@ async def test_create_tag_duplicate_raises_400(MockRepo):
     mock_repo.get_by_name = AsyncMock(return_value=_make_tag())
 
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         await create_tag(db, name="tech", color="#3b82f6")
     assert exc_info.value.status_code == 400
@@ -47,6 +48,7 @@ async def test_update_tag_not_found_raises_404(MockRepo):
     mock_repo.get_by_id = AsyncMock(return_value=None)
 
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         await update_tag(db, tag_id=999, name="new", color=None)
     assert exc_info.value.status_code == 404
@@ -59,6 +61,7 @@ async def test_delete_tag_not_found_raises_404(MockRepo):
     mock_repo.get_by_id = AsyncMock(return_value=None)
 
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         await delete_tag(db, tag_id=999)
     assert exc_info.value.status_code == 404

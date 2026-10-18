@@ -38,7 +38,9 @@ class _QuotesMixin(_YahooBase):
             return parse_quotes(symbols, data if isinstance(data, dict) else {})
 
         result = await asyncio.to_thread(
-            self._call, _fetch, lambda: [Quote.placeholder(s) for s in symbols],
+            self._call,
+            _fetch,
+            lambda: [Quote.placeholder(s) for s in symbols],
         )
         # Don't cache a fully degraded batch — we want a real result next try.
         if any(not q.is_placeholder for q in result):
@@ -67,5 +69,7 @@ class _QuotesMixin(_YahooBase):
             return out
 
         return await asyncio.to_thread(
-            self._call, _fetch, lambda: {s: "USD" for s in symbols},
+            self._call,
+            _fetch,
+            lambda: {s: "USD" for s in symbols},
         )

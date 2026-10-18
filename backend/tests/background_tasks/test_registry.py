@@ -28,6 +28,7 @@ class TestRegistry:
 
     async def test_duplicate_id_rejected(self):
         with pytest.raises(ValueError, match="price_heal"):
+
             @background_task("price_heal", trigger=IntervalTrigger(minutes=1))
             async def _clashing():
                 pass

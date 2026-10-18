@@ -78,9 +78,7 @@ def build_venue_calendar(name: str, window: Window) -> VenueCalendar | None:
         trading_days=sorted(d + 1 for d in week.weekdays),
         closures=week.closures,
         extra_sessions=week.extra_sessions,
-        half_days=[
-            HalfDay(date=day, close=close) for day, close in (venue.early_closes(start, end) or [])
-        ],
+        half_days=[HalfDay(date=day, close=close) for day, close in (venue.early_closes(start, end) or [])],
     )
 
 

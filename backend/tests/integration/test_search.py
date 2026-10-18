@@ -51,9 +51,12 @@ class TestSearchSymbols:
 
     @patch("app.services.search_service.yahoo_client")
     async def test_yahoo_source(self, mock_yahoo, client, db):
-        mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = {"quotes": [
-            {"symbol": "TSLA", "shortname": "Tesla Inc.", "exchDisp": "NASDAQ", "quoteType": "EQUITY"},
-        ]}
+        mock_yahoo.search = AsyncMock()
+        mock_yahoo.search.return_value = {
+            "quotes": [
+                {"symbol": "TSLA", "shortname": "Tesla Inc.", "exchDisp": "NASDAQ", "quoteType": "EQUITY"},
+            ]
+        }
         resp = await client.get("/api/search", params={"q": "tesla", "source": "yahoo"})
         assert resp.status_code == 200
         data = resp.json()
@@ -72,9 +75,12 @@ class TestSearchSymbols:
     @patch("app.services.search_service.yahoo_client")
     async def test_all_source_falls_back_to_yahoo(self, mock_yahoo, client, db):
         """With fewer than 8 local results, should query Yahoo."""
-        mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = {"quotes": [
-            {"symbol": "XYZQ", "shortname": "XYZ Corp", "exchDisp": "NYSE", "quoteType": "EQUITY"},
-        ]}
+        mock_yahoo.search = AsyncMock()
+        mock_yahoo.search.return_value = {
+            "quotes": [
+                {"symbol": "XYZQ", "shortname": "XYZ Corp", "exchDisp": "NYSE", "quoteType": "EQUITY"},
+            ]
+        }
         resp = await client.get("/api/search", params={"q": "xyzq", "source": "all"})
         assert resp.status_code == 200
         data = resp.json()
@@ -82,10 +88,13 @@ class TestSearchSymbols:
 
     @patch("app.services.search_service.yahoo_client")
     async def test_yahoo_filters_non_equity_etf(self, mock_yahoo, client):
-        mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = {"quotes": [
-            {"symbol": "BTCUSD", "shortname": "Bitcoin", "exchDisp": "CCC", "quoteType": "CRYPTOCURRENCY"},
-            {"symbol": "AAPL", "shortname": "Apple", "exchDisp": "NASDAQ", "quoteType": "EQUITY"},
-        ]}
+        mock_yahoo.search = AsyncMock()
+        mock_yahoo.search.return_value = {
+            "quotes": [
+                {"symbol": "BTCUSD", "shortname": "Bitcoin", "exchDisp": "CCC", "quoteType": "CRYPTOCURRENCY"},
+                {"symbol": "AAPL", "shortname": "Apple", "exchDisp": "NASDAQ", "quoteType": "EQUITY"},
+            ]
+        }
         resp = await client.get("/api/search", params={"q": "btc", "source": "yahoo"})
         assert resp.status_code == 200
         data = resp.json()

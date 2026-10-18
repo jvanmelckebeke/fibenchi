@@ -40,22 +40,23 @@ async def test_upgrade_head_builds_a_working_database():
 
     async with engine.connect() as conn:
         labels = (
-            await conn.execute(
-                text(
-                    "SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid "
-                    "WHERE t.typname = 'assettype'"
+            (
+                await conn.execute(
+                    text(
+                        "SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid "
+                        "WHERE t.typname = 'assettype'"
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     # Enum(AssetType) writes member names, so every one of them must be a label.
     assert {t.name for t in AssetType} <= set(labels)
 
     session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with session() as db:
-        db.add_all(
-            Asset(symbol=f"T-{t.name}", name=f"fresh {t.name}", type=t, currency="USD")
-            for t in AssetType
-        )
+        db.add_all(Asset(symbol=f"T-{t.name}", name=f"fresh {t.name}", type=t, currency="USD") for t in AssetType)
         await db.commit()
         stored = (await db.execute(select(Asset).order_by(Asset.symbol))).scalars().all()
     assert {a.type for a in stored} == set(AssetType)

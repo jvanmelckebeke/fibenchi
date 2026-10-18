@@ -1,8 +1,4 @@
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { marketState, type MarketState } from "@/lib/market-state"
 
@@ -18,9 +14,7 @@ export function MarketStatusDot({
   return (
     <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>
-        <span
-          className={cn("inline-block h-2 w-2 rounded-full shrink-0", dotColor, className)}
-        />
+        <span className={cn("inline-block h-2 w-2 shrink-0 rounded-full", dotColor, className)} />
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs">
         {label}

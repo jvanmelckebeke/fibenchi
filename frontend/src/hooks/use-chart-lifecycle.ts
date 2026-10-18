@@ -13,7 +13,7 @@ import { useChartTheme, chartThemeOptions, type ChartTheme } from "@/lib/chart-u
 export function attachResizeAndCleanup(
   container: HTMLElement,
   charts: IChartApi[],
-  { refit = true }: { refit?: boolean } = {},
+  { refit = true }: { refit?: boolean } = {}
 ): () => void {
   const resizeObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
@@ -41,7 +41,7 @@ export function attachResizeAndCleanup(
  */
 export function useChartLifecycle(
   containerRef: RefObject<HTMLDivElement | null>,
-  chartRefs: MutableRefObject<IChartApi | null>[],
+  chartRefs: MutableRefObject<IChartApi | null>[]
 ): { theme: ChartTheme; startLifecycle: (charts: IChartApi[]) => () => void } {
   const theme = useChartTheme()
 
@@ -60,19 +60,22 @@ export function useChartLifecycle(
   }, [theme])
 
   // Returns a cleanup function for the caller's useEffect
-  const startLifecycle = useCallback((charts: IChartApi[]): (() => void) => {
-    const container = containerRef.current
-    if (!container) return () => {}
+  const startLifecycle = useCallback(
+    (charts: IChartApi[]): (() => void) => {
+      const container = containerRef.current
+      if (!container) return () => {}
 
-    const detach = attachResizeAndCleanup(container, charts, { refit: false })
+      const detach = attachResizeAndCleanup(container, charts, { refit: false })
 
-    return () => {
-      detach()
-      for (const ref of chartRefsRef.current) {
-        ref.current = null
+      return () => {
+        detach()
+        for (const ref of chartRefsRef.current) {
+          ref.current = null
+        }
       }
-    }
-  }, [containerRef])
+    },
+    [containerRef]
+  )
 
   return { theme, startLifecycle }
 }

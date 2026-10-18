@@ -141,13 +141,15 @@ def _parse_csv(raw_text: str, asset_type: str, enabled_markets: set[str]) -> lis
 
         yahoo_symbol = f"{raw_symbol}{suffix}"
 
-        results.append(SymbolEntry(
-            symbol=yahoo_symbol,
-            name=raw_name,
-            exchange=raw_market.strip().strip('"'),
-            currency=raw_currency,
-            type=asset_type,
-        ))
+        results.append(
+            SymbolEntry(
+                symbol=yahoo_symbol,
+                name=raw_name,
+                exchange=raw_market.strip().strip('"'),
+                currency=raw_currency,
+                type=asset_type,
+            )
+        )
 
     return results
 

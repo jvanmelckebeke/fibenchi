@@ -35,4 +35,3 @@ export const MIN_WINDOW_FILL = 0.12
 export function windowBarFill(percentile: number | null): number | null {
   return percentile == null ? null : Math.max(MIN_WINDOW_FILL, percentile)
 }
-

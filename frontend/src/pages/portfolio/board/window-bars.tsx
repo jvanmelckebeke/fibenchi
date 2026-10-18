@@ -21,7 +21,9 @@ export function WindowBars({
         const v = windowPct[w.value]
         const fill = windowBarFill(windowPercentile[w.value])
         return (
-          <span key={w.value} className="h-[3px] flex-1 overflow-hidden rounded-full bg-black/30 2xl:h-1">
+          <span
+            key={w.value}
+            className="h-[3px] flex-1 overflow-hidden rounded-full bg-black/30 2xl:h-1">
             {v != null && fill != null && (
               <span
                 className={`block h-full rounded-full ${v >= 0 ? "bg-emerald-300 shadow-[0_0_4px_rgb(110_231_183/0.8)]" : "bg-rose-300 shadow-[0_0_4px_rgb(253_164_175/0.8)]"}`}

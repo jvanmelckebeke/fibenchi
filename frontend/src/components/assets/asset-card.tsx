@@ -14,7 +14,12 @@ import { TagBadge } from "@/components/tags/tag-badge"
 import type { Asset, Quote, SparklinePoint, IndicatorSummary } from "@/lib/api"
 import { formatAssetPriceWithSettings } from "@/lib/format"
 import { ChangePct } from "@/components/change-pct"
-import { getCardDescriptors, isVisibleAt, type IndicatorDescriptor, type Placement } from "@/lib/indicator-registry"
+import {
+  getCardDescriptors,
+  isVisibleAt,
+  type IndicatorDescriptor,
+  type Placement,
+} from "@/lib/indicator-registry"
 import { IndicatorValue } from "@/components/indicators/indicator-value"
 import { usePriceFlash } from "@/lib/use-price-flash"
 import { useSettings } from "@/lib/settings"
@@ -50,9 +55,16 @@ function MiniIndicatorCard({
   className?: string
 }) {
   return (
-    <div className={`rounded bg-muted/50 px-2 py-1 ${expanded ? "text-center" : ""} ${className ?? ""}`}>
+    <div
+      className={`rounded bg-muted/50 px-2 py-1 ${expanded ? "text-center" : ""} ${className ?? ""}`}>
       <span className="text-[10px] text-muted-foreground">{descriptor.shortLabel}</span>
-      <IndicatorValue descriptor={descriptor} values={values} currency={currency} compact expanded={expanded} />
+      <IndicatorValue
+        descriptor={descriptor}
+        values={values}
+        currency={currency}
+        compact
+        expanded={expanded}
+      />
     </div>
   )
 }
@@ -72,7 +84,7 @@ export const AssetCard = memo(function AssetCard({
   const { settings } = useSettings()
   const enabledCards = useMemo(
     () => CARD_DESCRIPTORS.filter((d) => isVisibleAt(indicatorVisibility, d.id, "group_card")),
-    [indicatorVisibility],
+    [indicatorVisibility]
   )
   const lastPrice = quote?.price ?? null
   const changePct = quote?.change_percent ?? null
@@ -82,17 +94,20 @@ export const AssetCard = memo(function AssetCard({
   const [newThesisOpen, setNewThesisOpen] = useState(false)
   const addToThesis = useAddAssetToThesis()
 
-  const priceFmt = lastPrice != null
-    ? formatAssetPriceWithSettings(lastPrice, asset, {
-        compact: settings.compact_numbers,
-        group: settings.thousands_separator,
-      })
-    : null
+  const priceFmt =
+    lastPrice != null
+      ? formatAssetPriceWithSettings(lastPrice, asset, {
+          compact: settings.compact_numbers,
+          group: settings.thousands_separator,
+        })
+      : null
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <Card className="group relative hover:border-primary/50 data-[state=open]:border-primary/50 transition-colors" onMouseEnter={() => onHover(symbol)}>
+        <Card
+          className="group relative transition-colors hover:border-primary/50 data-[state=open]:border-primary/50"
+          onMouseEnter={() => onHover(symbol)}>
           <Link to={`/asset/${symbol}`}>
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
@@ -104,9 +119,8 @@ export const AssetCard = memo(function AssetCard({
                 {priceFmt ? (
                   <span
                     ref={priceRef}
-                    className="ml-auto text-base font-semibold tabular-nums rounded px-1 -mx-1"
-                    title={priceFmt.title}
-                  >
+                    className="-mx-1 ml-auto rounded px-1 text-base font-semibold tabular-nums"
+                    title={priceFmt.title}>
                     {priceFmt.text}
                   </span>
                 ) : (
@@ -114,34 +128,36 @@ export const AssetCard = memo(function AssetCard({
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground truncate">{name}</p>
+                <p className="truncate text-xs text-muted-foreground">{name}</p>
                 {changePct != null ? (
                   <ChangePct
                     ref={pctRef}
                     value={changePct}
-                    className="text-xs font-medium rounded px-1 -mx-1"
+                    className="-mx-1 rounded px-1 text-xs font-medium"
                   />
                 ) : (
                   <Skeleton className="h-3.5 w-12 rounded" />
                 )}
               </div>
               {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
+                <div className="mt-1 flex flex-wrap gap-1">
                   {tags.map((tag) => (
                     <TagBadge key={tag.id} name={tag.name} color={tag.color} />
                   ))}
                 </div>
               )}
             </CardHeader>
-            <CardContent className="pt-0 space-y-2">
+            <CardContent className="space-y-2 pt-0">
               {showSparkline && <DeferredSparkline batchData={sparklineData} />}
               {enabledCards.length > 0 && (
                 <div
-                  className="gap-1.5 mt-1 grid"
-                  style={{ gridTemplateColumns: enabledCards.length === 1 ? "1fr" : "1fr 1fr" }}
-                >
+                  className="mt-1 grid gap-1.5"
+                  style={{ gridTemplateColumns: enabledCards.length === 1 ? "1fr" : "1fr 1fr" }}>
                   {enabledCards.map((desc, i) => {
-                    const isLastOdd = enabledCards.length > 1 && enabledCards.length % 2 === 1 && i === enabledCards.length - 1
+                    const isLastOdd =
+                      enabledCards.length > 1 &&
+                      enabledCards.length % 2 === 1 &&
+                      i === enabledCards.length - 1
                     const isAlone = enabledCards.length === 1
                     return (
                       <MiniIndicatorCard
@@ -168,11 +184,7 @@ export const AssetCard = memo(function AssetCard({
         onRemove={() => onDelete(symbol)}
         onNewThesis={() => setNewThesisOpen(true)}
       />
-      <EditAssetDialog
-        asset={asset}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-      />
+      <EditAssetDialog asset={asset} open={editOpen} onOpenChange={setEditOpen} />
       <NewThesisDialog
         open={newThesisOpen}
         onOpenChange={setNewThesisOpen}

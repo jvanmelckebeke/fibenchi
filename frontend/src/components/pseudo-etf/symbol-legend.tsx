@@ -14,14 +14,16 @@ export function SymbolLegend({
   suffix?: React.ReactNode
 }) {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 items-center">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
       {sortedSymbols.map((sym, idx) => (
         <div key={sym} className="flex items-center gap-1.5 text-xs">
           <div
-            className="w-3 h-3 rounded-sm flex-shrink-0"
+            className="h-3 w-3 flex-shrink-0 rounded-sm"
             style={{ backgroundColor: symbolColorMap.get(sym) }}
           />
-          <Link to={`/asset/${sym}`} className="hover:underline text-muted-foreground hover:text-foreground">
+          <Link
+            to={`/asset/${sym}`}
+            className="text-muted-foreground hover:text-foreground hover:underline">
             {sym}
           </Link>
           {values?.[idx] !== undefined && (

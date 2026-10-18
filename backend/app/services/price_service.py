@@ -106,7 +106,10 @@ async def _ensure_prices(db: AsyncSession, asset: Asset, period: str) -> list[Pr
 
 
 async def _ensure_warmup_prices(
-    db: AsyncSession, asset: Asset, prices: list[PriceHistory], start: date,
+    db: AsyncSession,
+    asset: Asset,
+    prices: list[PriceHistory],
+    start: date,
 ) -> list[PriceHistory]:
     """Backfill warmup-period prices if the stored history doesn't reach far enough back.
 
@@ -133,14 +136,16 @@ def _df_to_price_rows(df: pd.DataFrame, start: date) -> list[PriceResponse]:
     for dt, row in df.iterrows():
         if dt < start or row[ohlc_cols].isna().any():
             continue
-        rows.append(PriceResponse(
-            date=dt,
-            open=round(float(row["open"]), 4),
-            high=round(float(row["high"]), 4),
-            low=round(float(row["low"]), 4),
-            close=round(float(row["close"]), 4),
-            volume=int(row["volume"]),
-        ))
+        rows.append(
+            PriceResponse(
+                date=dt,
+                open=round(float(row["open"]), 4),
+                high=round(float(row["high"]), 4),
+                low=round(float(row["low"]), 4),
+                close=round(float(row["close"]), 4),
+                volume=int(row["volume"]),
+            )
+        )
     return rows
 
 
@@ -154,11 +159,13 @@ def _df_to_indicator_rows(indicators: pd.DataFrame, start: date) -> list[Indicat
             for col in defn.output_fields:
                 decimals = defn.field_decimals.get(col, defn.decimals)
                 values[col] = safe_round(row[col], decimals)
-        rows.append(IndicatorResponse(
-            date=dt,
-            close=round(row["close"], 4),
-            values=values,
-        ))
+        rows.append(
+            IndicatorResponse(
+                date=dt,
+                close=round(row["close"], 4),
+                values=values,
+            )
+        )
     return rows
 
 
@@ -173,7 +180,10 @@ async def get_prices(db: AsyncSession, asset: Asset | None, symbol: str, period:
 
 
 async def _compute_or_cached_indicators(
-    db: AsyncSession, asset: Asset | None, symbol: str, period: str,
+    db: AsyncSession,
+    asset: Asset | None,
+    symbol: str,
+    period: str,
 ) -> tuple[list[IndicatorResponse], pd.DataFrame | None]:
     """Shared indicator computation with caching.
 

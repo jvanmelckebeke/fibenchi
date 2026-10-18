@@ -61,9 +61,7 @@ async def get_data(
     if not symbol_list:
         raise HTTPException(status_code=422, detail="At least one symbol is required")
     if len(symbol_list) > MAX_SYMBOLS:
-        raise HTTPException(
-            status_code=422, detail=f"Maximum {MAX_SYMBOLS} symbols per request"
-        )
+        raise HTTPException(status_code=422, detail=f"Maximum {MAX_SYMBOLS} symbols per request")
 
     # Parse and validate fields
     field_set = {f.strip().lower() for f in fields.split(",") if f.strip()}

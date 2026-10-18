@@ -62,12 +62,12 @@ function SourceCard({ source }: { source: SymbolSource }) {
   const availableMarkets = providerInfo?.markets ?? []
 
   return (
-    <div className="rounded-lg border border-border p-4 space-y-3">
+    <div className="space-y-3 rounded-lg border border-border p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Database className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium">{source.name}</span>
-          <span className="text-xs text-muted-foreground rounded-full bg-muted px-2 py-0.5">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
             {source.symbol_count.toLocaleString()} symbols
           </span>
         </div>
@@ -75,10 +75,9 @@ function SourceCard({ source }: { source: SymbolSource }) {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs gap-1.5"
+            className="h-7 gap-1.5 text-xs"
             onClick={handleSync}
-            disabled={syncSource.isPending}
-          >
+            disabled={syncSource.isPending}>
             {syncSource.isPending ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
@@ -90,8 +89,7 @@ function SourceCard({ source }: { source: SymbolSource }) {
             variant="ghost"
             size="sm"
             className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-            onClick={handleDelete}
-          >
+            onClick={handleDelete}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -126,10 +124,9 @@ function SourceCard({ source }: { source: SymbolSource }) {
                   onClick={() => handleToggleMarket(m.key)}
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                     active
-                      ? "bg-primary/10 text-primary border border-primary/20"
+                      ? "border border-primary/20 bg-primary/10 text-primary"
                       : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
+                  }`}>
                   {m.label.replace("Euronext ", "").replace("Oslo Børs", "Oslo")}
                 </button>
               )
@@ -167,7 +164,7 @@ export function SymbolSourcesSettings() {
           setAdding(false)
           setNewProviderType("")
         },
-      },
+      }
     )
   }
 
@@ -188,10 +185,12 @@ export function SymbolSourcesSettings() {
           </div>
         )}
 
-        {sources?.map((source) => <SourceCard key={source.id} source={source} />)}
+        {sources?.map((source) => (
+          <SourceCard key={source.id} source={source} />
+        ))}
 
         {sources && sources.length === 0 && !adding && (
-          <p className="text-sm text-muted-foreground py-2">
+          <p className="py-2 text-sm text-muted-foreground">
             No sources configured. Add one to enable instant symbol search.
           </p>
         )}
@@ -210,10 +209,19 @@ export function SymbolSourcesSettings() {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" onClick={handleAdd} disabled={!newProviderType || createSource.isPending}>
+            <Button
+              size="sm"
+              onClick={handleAdd}
+              disabled={!newProviderType || createSource.isPending}>
               {createSource.isPending ? "Adding..." : "Add"}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => { setAdding(false); setNewProviderType("") }}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setAdding(false)
+                setNewProviderType("")
+              }}>
               Cancel
             </Button>
           </div>

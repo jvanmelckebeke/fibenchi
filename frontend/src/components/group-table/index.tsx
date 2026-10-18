@@ -14,9 +14,13 @@ import { SortableHeader } from "./sortable-header"
 import { ColumnVisibilityMenu } from "./column-visibility-menu"
 import { TableRow, type RowMenuRenderer } from "./table-row"
 export type { RowMenuContext, RowMenuRenderer } from "./table-row"
-import { BASE_COLUMN_DEFS, isColumnVisible, useResponsiveHidden, useOrderedIndicatorFields } from "./shared"
+import {
+  BASE_COLUMN_DEFS,
+  isColumnVisible,
+  useResponsiveHidden,
+  useOrderedIndicatorFields,
+} from "./shared"
 import { useColumnResize } from "./use-column-resize"
-
 
 interface GroupTableProps {
   assets: Asset[]
@@ -52,7 +56,24 @@ interface GroupTableProps {
   accentIcons?: Record<string, string>
 }
 
-export function GroupTable({ assets, quotes, indicators, renderContextMenu, compactMode, onHover, sortBy, sortDir, onSort, moreAssets, moreLabel, moreOpen, onToggleMore, accentColors, accentTitles, accentIcons }: GroupTableProps) {
+export function GroupTable({
+  assets,
+  quotes,
+  indicators,
+  renderContextMenu,
+  compactMode,
+  onHover,
+  sortBy,
+  sortDir,
+  onSort,
+  moreAssets,
+  moreLabel,
+  moreOpen,
+  onToggleMore,
+  accentColors,
+  accentTitles,
+  accentIcons,
+}: GroupTableProps) {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(new Set())
   // Single "new thesis for asset" dialog owned by the table, targeted by the
   // active row — instead of every row mounting its own dialog + mutation.
@@ -93,13 +114,17 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
 
   const orderedIndicatorFields = useOrderedIndicatorFields()
   const visibleIndicatorFields = useMemo(
-    () => orderedIndicatorFields.filter((f) => isColumnVisible(columnSettings, f) && !responsiveHidden.has(f)),
-    [orderedIndicatorFields, columnSettings, responsiveHidden],
+    () =>
+      orderedIndicatorFields.filter(
+        (f) => isColumnVisible(columnSettings, f) && !responsiveHidden.has(f)
+      ),
+    [orderedIndicatorFields, columnSettings, responsiveHidden]
   )
 
   // Total visible columns: expand chevron (1) + symbol (1) + toggleable base + toggleable indicators
-  const visibleBaseCount =
-    BASE_COLUMN_DEFS.filter((c) => isColumnVisible(columnSettings, c.key)).length
+  const visibleBaseCount = BASE_COLUMN_DEFS.filter((c) =>
+    isColumnVisible(columnSettings, c.key)
+  ).length
   const totalColSpan = 1 + 1 + visibleBaseCount + visibleIndicatorFields.length
 
   const hasMore = !!moreAssets && moreAssets.length > 0
@@ -126,14 +151,13 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
   )
 
   return (
-    <div className="rounded-md border border-border overflow-x-auto">
+    <div className="overflow-x-auto rounded-md border border-border">
       <div className="flex items-center justify-end gap-0.5 px-1 py-0.5">
         <Button
           variant="ghost"
           size="sm"
           className="h-6 gap-1 px-1.5 text-xs text-muted-foreground"
-          onClick={toggleExpandAll}
-        >
+          onClick={toggleExpandAll}>
           {allExpanded ? (
             <ChevronsDownUp className="h-3.5 w-3.5" />
           ) : (
@@ -154,23 +178,26 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
           <tr className="border-b border-border bg-muted/50">
             <th className="w-8" />
             <SortableHeader
-              label="Symbol" sortKey="name" align="left"
-              sortBy={sortBy} sortDir={sortDir} onSort={onSort}
+              label="Symbol"
+              sortKey="name"
+              align="left"
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={onSort}
               style={getColumnStyle("symbol")}
               onResizeStart={(e) => startResize("symbol", e)}
               onResizeReset={(e) => resetWidth("symbol", e)}
             />
             {isColumnVisible(columnSettings, "name") && (
               <th
-                className="relative text-left text-xs font-medium text-muted-foreground px-3 py-2"
-                style={getColumnStyle("name")}
-              >
+                className="relative px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+                style={getColumnStyle("name")}>
                 Name
                 <button
                   type="button"
                   aria-label="Resize Name column"
                   tabIndex={-1}
-                  className="absolute right-0 top-1 bottom-1 w-0.5 cursor-col-resize bg-border/50 hover:bg-primary/40 transition-colors border-0 p-0"
+                  className="absolute top-1 right-0 bottom-1 w-0.5 cursor-col-resize border-0 bg-border/50 p-0 transition-colors hover:bg-primary/40"
                   onPointerDown={(e) => startResize("name", e)}
                   onDoubleClick={(e) => resetWidth("name", e)}
                   onClick={(e) => e.stopPropagation()}
@@ -179,8 +206,12 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
             )}
             {isColumnVisible(columnSettings, "price") && (
               <SortableHeader
-                label="Price" sortKey="price" align="right"
-                sortBy={sortBy} sortDir={sortDir} onSort={onSort}
+                label="Price"
+                sortKey="price"
+                align="right"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
                 style={getColumnStyle("price")}
                 onResizeStart={(e) => startResize("price", e)}
                 onResizeReset={(e) => resetWidth("price", e)}
@@ -188,8 +219,12 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
             )}
             {isColumnVisible(columnSettings, "change_pct") && (
               <SortableHeader
-                label="Change" sortKey="change_pct" align="right"
-                sortBy={sortBy} sortDir={sortDir} onSort={onSort}
+                label="Change"
+                sortKey="change_pct"
+                align="right"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={onSort}
                 style={getColumnStyle("change_pct")}
                 onResizeStart={(e) => startResize("change_pct", e)}
                 onResizeReset={(e) => resetWidth("change_pct", e)}
@@ -223,10 +258,13 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
                   <button
                     type="button"
                     onClick={toggleMore}
-                    className="flex w-full items-center gap-1 px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors"
-                    aria-expanded={moreOpenState}
-                  >
-                    {moreOpenState ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+                    className="flex w-full items-center gap-1 px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
+                    aria-expanded={moreOpenState}>
+                    {moreOpenState ? (
+                      <ChevronDown className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 shrink-0" />
+                    )}
                     {moreLabel}
                   </button>
                 </td>
@@ -238,7 +276,9 @@ export function GroupTable({ assets, quotes, indicators, renderContextMenu, comp
       </table>
       <NewThesisDialog
         open={newThesisFor != null}
-        onOpenChange={(o) => { if (!o) setNewThesisFor(null) }}
+        onOpenChange={(o) => {
+          if (!o) setNewThesisFor(null)
+        }}
         onCreated={(thesis) => {
           if (newThesisFor) addToThesis.mutate({ thesisId: thesis.id, assetId: newThesisFor.id })
         }}

@@ -9,27 +9,19 @@ class GroupRepository:
         self.db = db
 
     async def list_all(self) -> list[Group]:
-        result = await self.db.execute(
-            select(Group).order_by(Group.position, Group.name)
-        )
+        result = await self.db.execute(select(Group).order_by(Group.position, Group.name))
         return list(result.scalars().all())
 
     async def get_default(self) -> Group | None:
-        result = await self.db.execute(
-            select(Group).where(Group.is_default.is_(True))
-        )
+        result = await self.db.execute(select(Group).where(Group.is_default.is_(True)))
         return result.scalar_one_or_none()
 
     async def get_by_id(self, group_id: int) -> Group | None:
-        result = await self.db.execute(
-            select(Group).where(Group.id == group_id)
-        )
+        result = await self.db.execute(select(Group).where(Group.id == group_id))
         return result.scalar_one_or_none()
 
     async def get_by_name(self, name: str) -> Group | None:
-        result = await self.db.execute(
-            select(Group).where(Group.name == name)
-        )
+        result = await self.db.execute(select(Group).where(Group.name == name))
         return result.scalar_one_or_none()
 
     async def create(self, **kwargs) -> Group:

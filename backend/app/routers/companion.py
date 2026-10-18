@@ -34,28 +34,20 @@ async def get_companion_calendar(
     """Venue closures, half-days and trading week the companion can't compute
     for itself. Carries its own version, and is cached separately from
     ``/config`` (see ``CALENDAR_VERSION``)."""
-    bundle = await companion_calendar_service.build_calendar(
-        db, venues=venues.split(",") if venues else None
-    )
+    bundle = await companion_calendar_service.build_calendar(db, venues=venues.split(",") if venues else None)
     body = bundle.model_dump(by_alias=True, mode="json")
 
     # generatedAt is excluded because it moves on every request; see
     # companion_calendar_service.default_window for why the rest holds still.
-    digest = json.dumps(
-        {k: v for k, v in body.items() if k != "generatedAt"}, sort_keys=True, separators=(",", ":")
-    )
+    digest = json.dumps({k: v for k, v in body.items() if k != "generatedAt"}, sort_keys=True, separators=(",", ":"))
     etag = f'W/"{hashlib.sha256(digest.encode()).hexdigest()[:32]}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
     return JSONResponse(body, headers={"ETag": etag})
 
 
-@router.get(
-    "/portfolio-index", response_model=CompanionPortfolioIndex, summary="Companion app portfolio index"
-)
-async def get_companion_portfolio_index(
-    period: PeriodType = Query("1y"), db: AsyncSession = Depends(get_db)
-):
+@router.get("/portfolio-index", response_model=CompanionPortfolioIndex, summary="Companion app portfolio index")
+async def get_companion_portfolio_index(period: PeriodType = Query("1y"), db: AsyncSession = Depends(get_db)):
     """The same equal-weight composite index as ``/api/portfolio/index``, as a versioned bundle."""
     return await companion_service.build_portfolio_index(db, period)
 

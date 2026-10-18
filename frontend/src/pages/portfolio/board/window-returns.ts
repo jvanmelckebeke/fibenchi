@@ -50,7 +50,7 @@ export function windowCutoffs(): Record<PctWindow, WindowBounds> {
 export function windowPct(
   points: SparklinePoint[],
   last: number,
-  bounds: WindowBounds,
+  bounds: WindowBounds
 ): number | null {
   if (!points.length) return null
 

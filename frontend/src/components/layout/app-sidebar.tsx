@@ -39,7 +39,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip="fibenchi">
               <Link to="/">
-                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg text-sm font-bold">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
                   f
                 </div>
                 <span className="text-lg font-bold">fibenchi</span>
@@ -58,12 +58,9 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={
-                      to === "/"
-                        ? location.pathname === "/"
-                        : location.pathname.startsWith(to)
+                      to === "/" ? location.pathname === "/" : location.pathname.startsWith(to)
                     }
-                    tooltip={label}
-                  >
+                    tooltip={label}>
                     <Link to={to}>
                       <Icon />
                       <span>{label}</span>
@@ -81,11 +78,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={location.pathname === "/stats"}
-              tooltip="Stats"
-            >
+            <SidebarMenuButton asChild isActive={location.pathname === "/stats"} tooltip="Stats">
               <Link to="/stats">
                 <ChartPie />
                 <span>Stats</span>
@@ -96,8 +89,7 @@ export function AppSidebar() {
             <SidebarMenuButton
               asChild
               isActive={location.pathname === "/settings"}
-              tooltip="Settings"
-            >
+              tooltip="Settings">
               <Link to="/settings">
                 <Settings />
                 <span>Settings</span>
@@ -105,7 +97,10 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton size="sm" className="cursor-default hover:bg-transparent" tooltip={STATUS_CONFIG[quoteStatus].label}>
+            <SidebarMenuButton
+              size="sm"
+              className="cursor-default hover:bg-transparent"
+              tooltip={STATUS_CONFIG[quoteStatus].label}>
               <span
                 className={`h-2 w-2 shrink-0 rounded-full ${STATUS_CONFIG[quoteStatus].color}`}
               />

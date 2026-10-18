@@ -99,9 +99,7 @@ async def _load_stored_window(
     return stored
 
 
-def _changed_rows(
-    rows: list[dict], stored: dict[datetime, tuple[float, int, str]]
-) -> list[dict]:
+def _changed_rows(rows: list[dict], stored: dict[datetime, tuple[float, int, str]]) -> list[dict]:
     """Keep only the rows whose stored counterpart is absent or different.
 
     A closed 1-minute bar never changes: the price is a close, the volume is
@@ -187,7 +185,7 @@ async def fetch_and_store_intraday(
             continue
 
         for start in range(0, len(rows), INTRADAY_UPSERT_CHUNK_ROWS):
-            chunk = rows[start:start + INTRADAY_UPSERT_CHUNK_ROWS]
+            chunk = rows[start : start + INTRADAY_UPSERT_CHUNK_ROWS]
             stmt = pg_insert(IntradayPrice).values(chunk)
             stmt = stmt.on_conflict_do_update(
                 index_elements=["asset_id", "timestamp"],
@@ -236,14 +234,16 @@ async def get_intraday_bars(
         if ref is None:
             continue
         sym = ref.symbol
-        bars_by_symbol.setdefault(sym, []).append(IntradayBar(
-            time=int(row.timestamp.timestamp()),
-            price=row.price,
-            volume=row.volume,
-            # DB column is str-typed but only ever stores the 3 session values
-            # (written via _classify_session); Pydantic re-validates at runtime.
-            session=cast(Session, row.session),
-        ))
+        bars_by_symbol.setdefault(sym, []).append(
+            IntradayBar(
+                time=int(row.timestamp.timestamp()),
+                price=row.price,
+                volume=row.volume,
+                # DB column is str-typed but only ever stores the 3 session values
+                # (written via _classify_session); Pydantic re-validates at runtime.
+                session=cast(Session, row.session),
+            )
+        )
 
     return bars_by_symbol
 
@@ -252,8 +252,6 @@ async def cleanup_old_intraday(db: AsyncSession) -> int:
     """Delete intraday data older than 1 day. Returns rows deleted."""
     today = date.today()
     cutoff = datetime.combine(today - timedelta(days=1), time.min, tzinfo=ET)
-    result = await db.execute(
-        delete(IntradayPrice).where(IntradayPrice.timestamp < cutoff)
-    )
+    result = await db.execute(delete(IntradayPrice).where(IntradayPrice.timestamp < cutoff))
     await db.commit()
     return result.rowcount or 0

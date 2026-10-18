@@ -53,10 +53,7 @@ def mixed(
     response, which is the whole problem.
     """
     true = true_series(n_pre + n_post)
-    closes = [
-        (t if i in displaced else t * ratio) if i < n_pre else t
-        for i, t in enumerate(true)
-    ]
+    closes = [(t if i in displaced else t * ratio) if i < n_pre else t for i, t in enumerate(true)]
     splits = [0.0] * len(true)
     splits[n_pre] = ratio
     cash = None
@@ -114,10 +111,7 @@ class TestRequotingDisplacedBars:
         # split's pass, and the bar displaced behind both has to end up under
         # the product of the two.
         true = true_series(40)
-        closes = [
-            t * 4 if i < 20 else (t * 2 if i < 32 else t)
-            for i, t in enumerate(true)
-        ]
+        closes = [t * 4 if i < 20 else (t * 2 if i < 32 else t) for i, t in enumerate(true)]
         closes[10] = true[10] * 2  # the provider applied only the older split
         splits = [0.0] * 40
         splits[20] = splits[32] = RATIO
@@ -192,9 +186,7 @@ class TestWindowsAgree:
         narrow = normalize_frame(mixed({8}, n_pre=20).iloc[4:], "MNST")
 
         shared = wide.index.intersection(narrow.index)
-        assert wide.loc[shared, "close"].tolist() == pytest.approx(
-            narrow.loc[shared, "close"].tolist()
-        )
+        assert wide.loc[shared, "close"].tolist() == pytest.approx(narrow.loc[shared, "close"].tolist())
 
 
 class TestWindowsThatStillDisagree:
@@ -208,9 +200,7 @@ class TestWindowsThatStillDisagree:
     def test_a_window_starting_inside_a_group_stores_quarter_priced_bars(self):
         df = mixed({5, 6, 7}, n_pre=12)
 
-        assert normalize_frame(df, "MNST")["close"].tolist()[6:9] == pytest.approx(
-            [48.6, 48.7, 48.8]
-        )
+        assert normalize_frame(df, "MNST")["close"].tolist()[6:9] == pytest.approx([48.6, 48.7, 48.8])
         # Bars 6 and 7 keep the provider's already-adjusted price and are
         # halved a second time by the rebasing around them.
         inside = normalize_frame(df.iloc[6:], "MNST")

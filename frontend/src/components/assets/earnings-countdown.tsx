@@ -35,14 +35,23 @@ export function EarningsCountdown({ symbol }: { symbol: string }) {
     if (data.last_reported_date) {
       const daysSinceReport = -daysUntil(data.last_reported_date)
       if (daysSinceReport >= 0 && daysSinceReport <= POST_EARNINGS_DAYS) {
-        return { mode: "post-earnings" as const, daysSince: daysSinceReport, reportedDate: data.last_reported_date }
+        return {
+          mode: "post-earnings" as const,
+          daysSince: daysSinceReport,
+          reportedDate: data.last_reported_date,
+        }
       }
     }
 
     const days = daysUntil(data.earnings_date)
     if (days < 0) return null
 
-    return { mode: "countdown" as const, days, date: data.earnings_date, isEstimate: data.is_estimate }
+    return {
+      mode: "countdown" as const,
+      days,
+      date: data.earnings_date,
+      isEstimate: data.is_estimate,
+    }
   }, [data])
 
   if (isLoading) {
@@ -90,7 +99,7 @@ export function EarningsCountdown({ symbol }: { symbol: string }) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xs font-bold text-amber-500 animate-pulse">POST</span>
+            <span className="animate-pulse text-xs font-bold text-amber-500">POST</span>
             <span className="text-[10px] text-amber-500/70">{daysSince}d ago</span>
           </div>
         </div>
@@ -142,7 +151,11 @@ export function EarningsCountdown({ symbol }: { symbol: string }) {
       <div className="space-y-1">
         <p className="text-sm font-medium text-muted-foreground">Earnings Countdown</p>
         <p className="text-sm">{formatDateLong(date)}</p>
-        {isEstimate && <Badge variant="outline" className="text-[10px]">Estimated</Badge>}
+        {isEstimate && (
+          <Badge variant="outline" className="text-[10px]">
+            Estimated
+          </Badge>
+        )}
       </div>
     </div>
   )

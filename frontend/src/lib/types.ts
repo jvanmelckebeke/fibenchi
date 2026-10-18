@@ -389,7 +389,7 @@ export interface Quote {
 }
 
 export interface IntradayPoint {
-  time: number       // Unix timestamp
+  time: number // Unix timestamp
   price: number
   volume: number
   session: "pre" | "regular" | "post"

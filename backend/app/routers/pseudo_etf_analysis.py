@@ -11,7 +11,11 @@ from app.services.fundamentals_cache import merge_fundamentals_into_batch
 router = APIRouter(prefix="/api/pseudo-etfs", tags=["pseudo-etfs"])
 
 
-@router.get("/{etf_id}/performance", response_model=list[PerformanceBreakdownPoint], summary="Get indexed performance with per-constituent breakdown")
+@router.get(
+    "/{etf_id}/performance",
+    response_model=list[PerformanceBreakdownPoint],
+    summary="Get indexed performance with per-constituent breakdown",
+)
 async def get_performance(etf_id: int, db: AsyncSession = Depends(get_db)):
     etf = await get_pseudo_etf(etf_id, db)
 
@@ -19,12 +23,14 @@ async def get_performance(etf_id: int, db: AsyncSession = Depends(get_db)):
     if not asset_ids:
         return []
 
-    return await calculate_performance(
-        db, asset_ids, etf.base_date, etf.base_value, include_breakdown=True
-    )
+    return await calculate_performance(db, asset_ids, etf.base_date, etf.base_value, include_breakdown=True)
 
 
-@router.get("/{etf_id}/constituents/indicators", response_model=list[ConstituentIndicatorResponse], summary="Get technical indicators for each constituent")
+@router.get(
+    "/{etf_id}/constituents/indicators",
+    response_model=list[ConstituentIndicatorResponse],
+    summary="Get technical indicators for each constituent",
+)
 async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get_db)):
     """Return latest indicator snapshot for each constituent of a pseudo-ETF."""
     etf = await get_pseudo_etf(etf_id, db)
@@ -34,9 +40,7 @@ async def get_constituent_indicators(etf_id: int, db: AsyncSession = Depends(get
 
     # Get latest performance breakdown for weight calculation
     asset_ids = [a.id for a in etf.constituents]
-    perf = await calculate_performance(
-        db, asset_ids, etf.base_date, etf.base_value, include_breakdown=True
-    )
+    perf = await calculate_performance(db, asset_ids, etf.base_date, etf.base_value, include_breakdown=True)
     weight_map: dict[str, float] = {}
     if perf:
         last_point = perf[-1]

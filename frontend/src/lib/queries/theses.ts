@@ -24,37 +24,31 @@ export function useThesis(id: number) {
 }
 
 export function useCreateThesis() {
-  return useInvalidatingMutation(
-    (data: ThesisCreate) => api.theses.create(data),
-    [keys.theses],
-  )
+  return useInvalidatingMutation((data: ThesisCreate) => api.theses.create(data), [keys.theses])
 }
 
 export function useUpdateThesis(id: number) {
   return useInvalidatingMutation(
     (data: ThesisUpdate) => api.theses.update(id, data),
-    [keys.theses, keys.thesis(id)],
+    [keys.theses, keys.thesis(id)]
   )
 }
 
 export function useDeleteThesis() {
-  return useInvalidatingMutation(
-    (id: number) => api.theses.delete(id),
-    [keys.theses],
-  )
+  return useInvalidatingMutation((id: number) => api.theses.delete(id), [keys.theses])
 }
 
 export function useAddThesisAssets(id: number) {
   return useInvalidatingMutation(
     (assetIds: number[]) => api.theses.addAssets(id, assetIds),
-    [keys.theses, keys.thesis(id)],
+    [keys.theses, keys.thesis(id)]
   )
 }
 
 export function useRemoveThesisAsset(id: number) {
   return useInvalidatingMutation(
     (assetId: number) => api.theses.removeAsset(id, assetId),
-    [keys.theses, keys.thesis(id)],
+    [keys.theses, keys.thesis(id)]
   )
 }
 
@@ -64,7 +58,7 @@ export function useAddAssetToThesis() {
   return useInvalidatingMutation(
     ({ thesisId, assetId }: { thesisId: number; assetId: number }) =>
       api.theses.addAssets(thesisId, [assetId]),
-    [keys.theses],
+    [keys.theses]
   )
 }
 
@@ -72,6 +66,6 @@ export function useRemoveAssetFromThesis() {
   return useInvalidatingMutation(
     ({ thesisId, assetId }: { thesisId: number; assetId: number }) =>
       api.theses.removeAsset(thesisId, assetId),
-    [keys.theses],
+    [keys.theses]
   )
 }

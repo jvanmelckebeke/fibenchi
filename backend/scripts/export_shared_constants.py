@@ -126,18 +126,14 @@ def _render(constants: list[Constant]) -> str:
     for c in constants:
         doc = "\n".join(f" * {line}".rstrip() for line in c.doc.splitlines())
         blocks.append(
-            f"/**\n{doc}\n *\n * @see backend/{c.source}\n */\n"
-            f"export const {c.name} = {_ts_number(c.value)}\n"
+            f"/**\n{doc}\n *\n * @see backend/{c.source}\n */\nexport const {c.name} = {_ts_number(c.value)}\n"
         )
     return "\n".join(blocks)
 
 
 def main() -> None:
     # __file__-relative, so the artifact lands in the same place from any cwd.
-    out = (
-        pathlib.Path(__file__).resolve().parents[2]
-        / "frontend/src/lib/generated/backend-constants.ts"
-    )
+    out = pathlib.Path(__file__).resolve().parents[2] / "frontend/src/lib/generated/backend-constants.ts"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(_render(SHARED), encoding="utf-8")
     print(f"wrote {out} ({len(SHARED)} constants)")

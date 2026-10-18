@@ -92,7 +92,8 @@ def _split_over(df: pd.DataFrame, boundary: date) -> date | None:
     ratios = pd.to_numeric(df[SPLIT_COLUMN], errors="coerce").fillna(0.0)
     return min(
         (
-            when for when, ratio in zip(df.index, ratios, strict=False)
+            when
+            for when, ratio in zip(df.index, ratios, strict=False)
             if ratio > 0 and not math.isclose(float(ratio), 1.0) and when >= boundary
         ),
         default=None,
@@ -100,7 +101,10 @@ def _split_over(df: pd.DataFrame, boundary: date) -> date | None:
 
 
 async def _drop_unrebasable_bars(
-    db: AsyncSession, ref: AssetRef, df: pd.DataFrame, boundary: date,
+    db: AsyncSession,
+    ref: AssetRef,
+    df: pd.DataFrame,
+    boundary: date,
 ) -> int:
     """Delete the stored bar behind a step the re-fetch could not overwrite.
 
@@ -143,7 +147,9 @@ async def _drop_unrebasable_bars(
         logger.info(
             "%s: removed %d bar(s) the provider no longer prices (%s) — they were "
             "the last rows left in the pre-split basis and could not be rebased",
-            ref, removed, ", ".join(str(d) for d in trailing),
+            ref,
+            removed,
+            ", ".join(str(d) for d in trailing),
         )
     return removed
 
@@ -171,9 +177,11 @@ async def heal_split_discontinuities(db: AsyncSession) -> dict[str, int]:
         # on every earnings day; the confident wording belongs below, once the
         # provider's own history has settled it.
         logger.info(
-            "%s: stored close steps %s -> %s at %s; asking the provider whether "
-            "a split explains it",
-            ref, prev_close, close, boundary,
+            "%s: stored close steps %s -> %s at %s; asking the provider whether a split explains it",
+            ref,
+            prev_close,
+            close,
+            boundary,
         )
         candidates.append((ref, boundary))
 
@@ -197,7 +205,9 @@ async def heal_split_discontinuities(db: AsyncSession) -> dict[str, int]:
             if oldest is None:
                 continue
             df = await provider.fetch_history(
-                ref, start=oldest, end=date.today() + timedelta(days=1),
+                ref,
+                start=oldest,
+                end=date.today() + timedelta(days=1),
             )
             anchor = (await _quote_anchors(provider, [ref])).get(ref, _NO_ANCHOR)
             count = await _drop_and_persist(db, ref, df, anchor)
@@ -219,7 +229,9 @@ async def heal_split_discontinuities(db: AsyncSession) -> dict[str, int]:
         healed[str(ref)] = count
         logger.info(
             "%s: rebased onto one share basis, %d bars re-stored (%s resolved)",
-            ref, count, boundary,
+            ref,
+            count,
+            boundary,
         )
 
     return healed
@@ -245,7 +257,8 @@ def _write_off(ref: AssetRef, boundary: date, ex_date: date | None) -> None:
             "%s: the %s step survived a full re-fetch — the provider prices "
             "both bars and no split explains the jump, so it is a real "
             "session. Not retrying; a currency rebasing looks like this too",
-            ref, boundary,
+            ref,
+            boundary,
         )
         return
 
@@ -257,7 +270,11 @@ def _write_off(ref: AssetRef, boundary: date, ex_date: date | None) -> None:
             "%s: the %s step survived a full re-fetch, but the provider reports "
             "the %s split over it and quotes those bars in either basis from "
             "one response to the next. Retrying (attempt %d of %d)",
-            ref, boundary, ex_date, attempts, MAX_UNRESOLVED_ATTEMPTS,
+            ref,
+            boundary,
+            ex_date,
+            attempts,
+            MAX_UNRESOLVED_ATTEMPTS,
         )
         return
 
@@ -265,5 +282,8 @@ def _write_off(ref: AssetRef, boundary: date, ex_date: date | None) -> None:
     logger.warning(
         "%s: the %s step survived %d full re-fetches inside the %s split "
         "window. Not retrying; the stored bars there need looking at by hand",
-        ref, boundary, attempts, ex_date,
+        ref,
+        boundary,
+        attempts,
+        ex_date,
     )

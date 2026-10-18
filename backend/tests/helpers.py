@@ -10,9 +10,7 @@ from app.models import Asset, AssetType, PriceHistory
 from app.repositories.group_repo import GroupRepository
 
 
-async def create_asset_via_api(
-    client, symbol: str, name: str, attach_to_watchlist: bool = True, **kwargs
-) -> dict:
+async def create_asset_via_api(client, symbol: str, name: str, attach_to_watchlist: bool = True, **kwargs) -> dict:
     """Create an asset through the HTTP API and return the JSON response.
 
     ``POST /api/assets`` no longer attaches to any group. By default this
@@ -35,8 +33,12 @@ async def create_asset_via_api(
 
 
 async def seed_asset_with_prices(
-    db, symbol: str = "AAPL", name: str | None = None, n_days: int = 500,
-    base_price: float = 150.0, add_to_group: bool = True,
+    db,
+    symbol: str = "AAPL",
+    name: str | None = None,
+    n_days: int = 500,
+    base_price: float = 150.0,
+    add_to_group: bool = True,
 ) -> Asset:
     """Create an asset with n_days of realistic price data.
 
@@ -44,8 +46,10 @@ async def seed_asset_with_prices(
     default group so it appears in group/portfolio queries.
     """
     asset = Asset(
-        symbol=symbol, name=name or f"{symbol} Inc.",
-        type=AssetType.STOCK, currency="USD",
+        symbol=symbol,
+        name=name or f"{symbol} Inc.",
+        type=AssetType.STOCK,
+        currency="USD",
     )
     db.add(asset)
     await db.flush()
@@ -61,12 +65,17 @@ async def seed_asset_with_prices(
         if d.weekday() >= 5:
             continue
         price = base_price + i * 0.1
-        db.add(PriceHistory(
-            asset_id=asset.id, date=d,
-            open=round(price - 0.5, 4), high=round(price + 1.0, 4),
-            low=round(price - 1.0, 4), close=round(price, 4),
-            volume=1_000_000 + i * 1000,
-        ))
+        db.add(
+            PriceHistory(
+                asset_id=asset.id,
+                date=d,
+                open=round(price - 0.5, 4),
+                high=round(price + 1.0, 4),
+                low=round(price - 1.0, 4),
+                close=round(price, 4),
+                volume=1_000_000 + i * 1000,
+            )
+        )
     await db.commit()
     return asset
 
@@ -75,13 +84,16 @@ def make_yahoo_df(n_days: int = 60, base_price: float = 100.0) -> pd.DataFrame:
     """Create a DataFrame that looks like Yahoo Finance output."""
     dates = pd.bdate_range(end=date.today(), periods=n_days)
     prices = [base_price + i * 0.5 for i in range(n_days)]
-    return pd.DataFrame({
-        "open": [p - 0.5 for p in prices],
-        "high": [p + 1.0 for p in prices],
-        "low": [p - 1.0 for p in prices],
-        "close": prices,
-        "volume": [1_000_000] * n_days,
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "open": [p - 0.5 for p in prices],
+            "high": [p + 1.0 for p in prices],
+            "low": [p - 1.0 for p in prices],
+            "close": prices,
+            "volume": [1_000_000] * n_days,
+        },
+        index=dates,
+    )
 
 
 def daily_date_index(n: int, start: date = date(2026, 1, 1)) -> pd.Index:
@@ -101,13 +113,16 @@ def make_price_df(n: int = 100, start_price: float = 100.0) -> pd.DataFrame:
     returns = np.random.normal(0.001, 0.02, n)
     prices = start_price * np.cumprod(1 + returns)
 
-    return pd.DataFrame({
-        "open": prices * (1 - np.random.uniform(0, 0.01, n)),
-        "high": prices * (1 + np.random.uniform(0, 0.02, n)),
-        "low": prices * (1 - np.random.uniform(0, 0.02, n)),
-        "close": prices,
-        "volume": np.random.randint(1_000_000, 10_000_000, n),
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "open": prices * (1 - np.random.uniform(0, 0.01, n)),
+            "high": prices * (1 + np.random.uniform(0, 0.02, n)),
+            "low": prices * (1 - np.random.uniform(0, 0.02, n)),
+            "close": prices,
+            "volume": np.random.randint(1_000_000, 10_000_000, n),
+        },
+        index=dates,
+    )
 
 
 def make_series_from_returns(returns: list[float], start: float = 100.0) -> pd.Series:
@@ -121,6 +136,7 @@ def make_series_from_returns(returns: list[float], start: float = 100.0) -> pd.S
 # ---------------------------------------------------------------------------
 # Repository test helpers — real SQLAlchemy model instances (need db session)
 # ---------------------------------------------------------------------------
+
 
 async def create_test_asset(db, symbol: str = "AAPL", **kwargs) -> Asset:
     """Create and commit a real Asset row to the test database.
@@ -139,6 +155,7 @@ async def create_test_asset(db, symbol: str = "AAPL", **kwargs) -> Asset:
 # ---------------------------------------------------------------------------
 # Service test helpers — lightweight mock/model instances (no db needed)
 # ---------------------------------------------------------------------------
+
 
 def make_mock_asset(symbol: str = "AAPL", **overrides) -> Asset:
     """Create a MagicMock that quacks like an Asset.
@@ -161,8 +178,11 @@ def make_model_asset(**overrides) -> Asset:
     (e.g. asset_service tests that inspect attribute values).
     """
     defaults = dict(
-        id=1, symbol="AAPL", name="Apple Inc.",
-        type=AssetType.STOCK, currency="USD",
+        id=1,
+        symbol="AAPL",
+        name="Apple Inc.",
+        type=AssetType.STOCK,
+        currency="USD",
     )
     defaults.update(overrides)
     return Asset(**defaults)

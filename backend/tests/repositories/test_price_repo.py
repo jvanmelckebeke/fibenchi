@@ -22,9 +22,12 @@ async def _seed_prices(db, asset_id: int, n_days: int = 30, base_price: float = 
             continue
         price = base_price + i * 0.5
         p = PriceHistory(
-            asset_id=asset_id, date=d,
-            open=round(price - 0.5, 4), high=round(price + 1.0, 4),
-            low=round(price - 1.0, 4), close=round(price, 4),
+            asset_id=asset_id,
+            date=d,
+            open=round(price - 0.5, 4),
+            high=round(price + 1.0, 4),
+            low=round(price - 1.0, 4),
+            close=round(price, 4),
             volume=1_000_000,
         )
         db.add(p)
@@ -164,13 +167,16 @@ async def test_build_price_rows_logs_nan_skips(caplog):
     """A NaN-OHLC bar is skipped but never silently — the skip is logged with
     its date so a hole in price_history is diagnosable (issue #559)."""
     idx = pd.bdate_range(end=date.today(), periods=3)
-    df = pd.DataFrame({
-        "open": [100.0, float("nan"), 102.0],
-        "high": [101.0, 101.5, 103.0],
-        "low": [99.0, 99.5, 101.0],
-        "close": [100.5, 101.0, 102.5],
-        "volume": [1_000, 1_000, 1_000],
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            "open": [100.0, float("nan"), 102.0],
+            "high": [101.0, 101.5, 103.0],
+            "low": [99.0, 99.5, 101.0],
+            "close": [100.5, 101.0, 102.5],
+            "volume": [1_000, 1_000, 1_000],
+        },
+        index=idx,
+    )
 
     with caplog.at_level("WARNING", logger="app.repositories.price_repo"):
         rows = PriceRepository.build_price_rows(AssetRef("MT.AS", 1), df)
@@ -186,10 +192,16 @@ async def test_build_price_rows_logs_nan_skips(caplog):
 async def test_build_price_rows_clean_df_no_warning(caplog):
     """No NaN rows -> no warning noise."""
     idx = pd.bdate_range(end=date.today(), periods=3)
-    df = pd.DataFrame({
-        "open": [100.0] * 3, "high": [101.0] * 3, "low": [99.0] * 3,
-        "close": [100.5] * 3, "volume": [1_000] * 3,
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            "open": [100.0] * 3,
+            "high": [101.0] * 3,
+            "low": [99.0] * 3,
+            "close": [100.5] * 3,
+            "volume": [1_000] * 3,
+        },
+        index=idx,
+    )
     with caplog.at_level("WARNING", logger="app.repositories.price_repo"):
         rows = PriceRepository.build_price_rows(AssetRef("AAPL", 1), df)
     assert len(rows) == 3
@@ -198,11 +210,17 @@ async def test_build_price_rows_clean_df_no_warning(caplog):
 
 async def test_build_price_rows_carries_dividends():
     idx = pd.bdate_range(end=date.today(), periods=3)
-    df = pd.DataFrame({
-        "open": [100.0] * 3, "high": [101.0] * 3, "low": [99.0] * 3,
-        "close": [100.5] * 3, "volume": [1_000] * 3,
-        "dividends": [0.0, 0.62, 0.0],
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            "open": [100.0] * 3,
+            "high": [101.0] * 3,
+            "low": [99.0] * 3,
+            "close": [100.5] * 3,
+            "volume": [1_000] * 3,
+            "dividends": [0.0, 0.62, 0.0],
+        },
+        index=idx,
+    )
 
     rows = PriceRepository.build_price_rows(AssetRef("AAPL", 1), df)
     assert [r["dividend"] for r in rows] == [0.0, 0.62, 0.0]
@@ -216,10 +234,16 @@ async def test_build_price_rows_omits_dividend_when_the_frame_has_none():
     re-fetches a bar whose event it can no longer see.
     """
     idx = pd.bdate_range(end=date.today(), periods=2)
-    df = pd.DataFrame({
-        "open": [100.0] * 2, "high": [101.0] * 2, "low": [99.0] * 2,
-        "close": [100.5] * 2, "volume": [1_000] * 2,
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            "open": [100.0] * 2,
+            "high": [101.0] * 2,
+            "low": [99.0] * 2,
+            "close": [100.5] * 2,
+            "volume": [1_000] * 2,
+        },
+        index=idx,
+    )
 
     rows = PriceRepository.build_price_rows(AssetRef("AAPL", 1), df)
     assert all("dividend" not in r for r in rows)

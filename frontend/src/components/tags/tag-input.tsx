@@ -5,13 +5,7 @@ import { DEFAULT_THESIS_COLOR } from "@/lib/thesis-colors"
 import type { TagBrief } from "@/lib/api"
 import { useTags, useCreateTag, useAttachTag, useDetachTag } from "@/lib/queries"
 
-export function TagInput({
-  symbol,
-  currentTags,
-}: {
-  symbol: string
-  currentTags: TagBrief[]
-}) {
+export function TagInput({ symbol, currentTags }: { symbol: string; currentTags: TagBrief[] }) {
   const [search, setSearch] = useState("")
   const [newColor, setNewColor] = useState(DEFAULT_THESIS_COLOR)
 

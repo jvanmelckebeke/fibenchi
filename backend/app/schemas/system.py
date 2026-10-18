@@ -7,9 +7,7 @@ from pydantic import BaseModel, Field
 
 class HoleSymbol(BaseModel):
     symbol: str = Field(description="Ticker with missing sessions in its stored history")
-    missing_sessions: list[datetime.date] = Field(
-        description="Scheduled trading sessions with no stored bar"
-    )
+    missing_sessions: list[datetime.date] = Field(description="Scheduled trading sessions with no stored bar")
 
 
 class DataHealthResponse(BaseModel):
@@ -53,13 +51,9 @@ class OrphanAsset(BaseModel):
     price_bars: int = Field(description="Stored daily bars that would be deleted with it")
     latest_bar: datetime.date | None = Field(description="Newest stored daily bar")
     annotations: int = Field(
-        description="Hand-written chart annotations that would be deleted with it "
-        "(not re-fetchable)"
+        description="Hand-written chart annotations that would be deleted with it (not re-fetchable)"
     )
-    has_note: bool = Field(
-        description="Whether a hand-written thesis note would be deleted with it "
-        "(not re-fetchable)"
-    )
+    has_note: bool = Field(description="Whether a hand-written thesis note would be deleted with it (not re-fetchable)")
 
 
 class StatsResponse(BaseModel):
@@ -71,9 +65,7 @@ class StatsResponse(BaseModel):
         description="Ungrouped assets whose row is kept because a thesis or "
         "pseudo-ETF references it (the soft delete preserves these on purpose)"
     )
-    assets_orphaned: int = Field(
-        description="Ungrouped assets referenced by nothing — leftovers of removals"
-    )
+    assets_orphaned: int = Field(description="Ungrouped assets referenced by nothing — leftovers of removals")
     # Asset mix: one bucket per *tracked* asset (in ≥1 group) — sums to
     # assets_tracked. Ticker-shape classification (AssetRef.kind) refined by
     # the stored Yahoo type for the stock/ETF split.

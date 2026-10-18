@@ -127,9 +127,13 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
         if not _is_stale(ref, stored, price, previous_close, session_date):
             continue
         logger.info(
-            "%s: stored bar %s (close %s) is stale against the %s quote "
-            "(price %s, previous_close %s)",
-            sym, stored[0], stored[1], session_date, price, previous_close,
+            "%s: stored bar %s (close %s) is stale against the %s quote (price %s, previous_close %s)",
+            sym,
+            stored[0],
+            stored[1],
+            session_date,
+            price,
+            previous_close,
         )
         anchor: Anchor = (price, previous_close, q.market_state, session_date)
         stale.append((sym, anchor))
@@ -138,17 +142,17 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
         return {}
 
     now = time.monotonic()
-    due = [
-        (s, a) for (s, a) in stale
-        if (t := _last_attempt.get(s)) is None or now - t >= HEAL_COOLDOWN_SECONDS
-    ]
+    due = [(s, a) for (s, a) in stale if (t := _last_attempt.get(s)) is None or now - t >= HEAL_COOLDOWN_SECONDS]
     skipped_cooldown = len(stale) - len(due)
     deferred = due[MAX_HEALS_PER_RUN:]
     due = due[:MAX_HEALS_PER_RUN]
     if skipped_cooldown or deferred:
         logger.info(
             "Price heal: %d stale symbol(s); healing %d (%d on cooldown, %d deferred to next run)",
-            len(stale), len(due), skipped_cooldown, len(deferred),
+            len(stale),
+            len(due),
+            skipped_cooldown,
+            len(deferred),
         )
 
     healed: dict[str, int] = {}
@@ -174,7 +178,8 @@ async def heal_unreconciled_prices(db: AsyncSession) -> dict[str, int]:
             _last_attempt[sym] = now
             logger.info(
                 "%s: still stale after heal — backing off %d min",
-                sym, HEAL_COOLDOWN_SECONDS // 60,
+                sym,
+                HEAL_COOLDOWN_SECONDS // 60,
             )
     return healed
 
@@ -243,9 +248,7 @@ async def scan_session_coverage(db: AsyncSession) -> list[tuple[AssetRef, int, s
         return []
 
     window_start = date.today() - timedelta(days=HOLE_SCAN_WINDOW_DAYS)
-    all_prices = await PriceRepository(db).list_by_assets_since(
-        [a.id for a in assets], window_start
-    )
+    all_prices = await PriceRepository(db).list_by_assets_since([a.id for a in assets], window_start)
     stored_by_asset: dict[int, set[date]] = {}
     for p in all_prices:
         stored_by_asset.setdefault(p.asset_id, set()).add(p.date)
@@ -322,9 +325,10 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
     _hole_backlog = bool(deferred)
     if deferred:
         logger.info(
-            "Hole heal: %d symbol(s) with interior holes; healing %d, deferring %d "
-            "(next scan in %d min)",
-            len(candidates) + len(deferred), len(candidates), len(deferred),
+            "Hole heal: %d symbol(s) with interior holes; healing %d, deferring %d (next scan in %d min)",
+            len(candidates) + len(deferred),
+            len(candidates),
+            len(deferred),
             HOLE_BACKLOG_RESCAN_SECONDS // 60,
         )
 
@@ -346,15 +350,17 @@ async def heal_interior_holes(db: AsyncSession, force: bool = False) -> dict[str
             remaining = holes - {p.date for p in refreshed}
             if remaining:
                 logger.info(
-                    "%s: %d of %d interior hole(s) persist after re-fetch "
-                    "(Yahoo may backfill later): %s",
-                    symbol, len(remaining), len(holes),
+                    "%s: %d of %d interior hole(s) persist after re-fetch (Yahoo may backfill later): %s",
+                    symbol,
+                    len(remaining),
+                    len(holes),
                     ", ".join(d.isoformat() for d in sorted(remaining)),
                 )
             else:
                 logger.info(
                     "%s: healed %d interior hole(s): %s",
-                    symbol, len(holes),
+                    symbol,
+                    len(holes),
                     ", ".join(d.isoformat() for d in sorted(holes)),
                 )
         except ValueError as e:

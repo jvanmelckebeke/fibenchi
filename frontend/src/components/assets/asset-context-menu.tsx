@@ -1,7 +1,13 @@
 import { ArrowRightLeft, Copy, Pencil, Trash2 } from "lucide-react"
 import { resolveIcon } from "@/lib/icon-utils"
-import { ContextActionsContent, type ContextAction } from "@/components/context-menu/context-actionable"
-import { useThesisMembershipAction, groupTargetActions } from "@/components/context-menu/menu-actions"
+import {
+  ContextActionsContent,
+  type ContextAction,
+} from "@/components/context-menu/context-actionable"
+import {
+  useThesisMembershipAction,
+  groupTargetActions,
+} from "@/components/context-menu/menu-actions"
 import { useGroups, useAddAssetsToGroup, useRemoveAssetFromGroup } from "@/lib/queries"
 
 interface AssetContextMenuContentProps {
@@ -48,7 +54,7 @@ export function AssetContextMenuContent({
             label: "Copy to group",
             icon: Copy,
             items: groupTargetActions(otherGroups, assetId, symbol, (gid) =>
-              addToGroup.mutate({ groupId: gid, assetIds: [assetId] }),
+              addToGroup.mutate({ groupId: gid, assetIds: [assetId] })
             ),
           },
         ]

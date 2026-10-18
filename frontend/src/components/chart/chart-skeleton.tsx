@@ -1,14 +1,10 @@
 export function ChartSkeleton({ height = 520 }: { height?: number }) {
   return (
-    <div
-      className="rounded-lg border border-border bg-card overflow-hidden"
-      style={{ height }}
-    >
+    <div className="overflow-hidden rounded-lg border border-border bg-card" style={{ height }}>
       <svg
         viewBox="0 0 800 400"
         preserveAspectRatio="none"
-        className="h-full w-full text-muted-foreground/10"
-      >
+        className="h-full w-full text-muted-foreground/10">
         {/* Y-axis ticks */}
         {[80, 160, 240, 320].map((y) => (
           <line key={y} x1={60} y1={y} x2={780} y2={y} stroke="currentColor" strokeWidth={1} />

@@ -14,24 +14,28 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 _MOCK_QUOTES = [
-    Quote(**{
-        "symbol": "AAPL",
-        "price": 185.50,
-        "previous_close": 184.00,
-        "change": 1.50,
-        "change_percent": 0.82,
-        "currency": "USD",
-        "market_state": "REGULAR",
-    }),
-    Quote(**{
-        "symbol": "MSFT",
-        "price": 420.00,
-        "previous_close": 418.50,
-        "change": 1.50,
-        "change_percent": 0.36,
-        "currency": "USD",
-        "market_state": "REGULAR",
-    }),
+    Quote(
+        **{
+            "symbol": "AAPL",
+            "price": 185.50,
+            "previous_close": 184.00,
+            "change": 1.50,
+            "change_percent": 0.82,
+            "currency": "USD",
+            "market_state": "REGULAR",
+        }
+    ),
+    Quote(
+        **{
+            "symbol": "MSFT",
+            "price": 420.00,
+            "previous_close": 418.50,
+            "change": 1.50,
+            "change_percent": 0.36,
+            "currency": "USD",
+            "market_state": "REGULAR",
+        }
+    ),
 ]
 
 

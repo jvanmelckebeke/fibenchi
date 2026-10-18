@@ -4,30 +4,26 @@ import { Layout } from "@/components/layout/layout"
 import { WatchlistRedirect } from "@/pages/watchlist-redirect"
 
 const PortfolioPage = lazy(() =>
-  import("@/pages/portfolio").then((m) => ({ default: m.PortfolioPage })),
+  import("@/pages/portfolio").then((m) => ({ default: m.PortfolioPage }))
 )
 const GroupDetailPage = lazy(() =>
-  import("@/pages/group-detail").then((m) => ({ default: m.GroupDetailPage })),
+  import("@/pages/group-detail").then((m) => ({ default: m.GroupDetailPage }))
 )
 const AssetDetailPage = lazy(() =>
-  import("@/pages/asset-detail").then((m) => ({ default: m.AssetDetailPage })),
+  import("@/pages/asset-detail").then((m) => ({ default: m.AssetDetailPage }))
 )
 const PseudoEtfsPage = lazy(() =>
-  import("@/pages/pseudo-etfs").then((m) => ({ default: m.PseudoEtfsPage })),
+  import("@/pages/pseudo-etfs").then((m) => ({ default: m.PseudoEtfsPage }))
 )
 const PseudoEtfDetailPage = lazy(() =>
   import("@/pages/pseudo-etf-detail").then((m) => ({
     default: m.PseudoEtfDetailPage,
-  })),
+  }))
 )
-const ThesesPage = lazy(() =>
-  import("@/pages/theses").then((m) => ({ default: m.ThesesPage })),
-)
-const StatsPage = lazy(() =>
-  import("@/pages/stats").then((m) => ({ default: m.StatsPage })),
-)
+const ThesesPage = lazy(() => import("@/pages/theses").then((m) => ({ default: m.ThesesPage })))
+const StatsPage = lazy(() => import("@/pages/stats").then((m) => ({ default: m.StatsPage })))
 const SettingsPage = lazy(() =>
-  import("@/pages/settings").then((m) => ({ default: m.SettingsPage })),
+  import("@/pages/settings").then((m) => ({ default: m.SettingsPage }))
 )
 
 export default function App() {

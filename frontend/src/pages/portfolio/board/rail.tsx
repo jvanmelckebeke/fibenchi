@@ -6,7 +6,13 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { SparklineChart } from "@/components/chart/sparkline"
 import { SegmentedControl } from "@/components/ui/segmented-control"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { usePortfolioIndex } from "@/lib/queries"
 import { changeColor, formatChangePct } from "@/lib/format"
 import { PCT_WINDOWS, pctWindowDef, type PctWindow } from "./color-scale"
@@ -55,8 +61,7 @@ export function IndexCard() {
             ))}
           </SelectContent>
         </Select>
-      }
-    >
+      }>
       {isLoading || !data ? (
         <div className="h-[96px] animate-pulse rounded bg-muted/40" />
       ) : !data.dates.length ? (
@@ -64,9 +69,13 @@ export function IndexCard() {
       ) : (
         <div className="space-y-1.5">
           <div className="text-3xl font-light tabular-nums 2xl:text-4xl">
-            {data.current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {data.current.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </div>
-          <div className={`text-sm font-medium tabular-nums 2xl:text-[15px] ${changeColor(data.change)}`}>
+          <div
+            className={`text-sm font-medium tabular-nums 2xl:text-[15px] ${changeColor(data.change)}`}>
             {data.change >= 0 ? "+" : ""}
             {data.change.toFixed(2)} · {formatChangePct(data.change_pct).text}
           </div>
@@ -84,15 +93,16 @@ function MoverRow({ tile, pct, maxAbs }: { tile: Tile; pct: number; maxAbs: numb
   return (
     <Link
       to={`/asset/${tile.symbol}`}
-      className="relative flex items-center justify-between gap-2 rounded px-2 py-1 text-[13px] hover:bg-muted/40 2xl:py-1.5 2xl:text-sm"
-    >
+      className="relative flex items-center justify-between gap-2 rounded px-2 py-1 text-[13px] hover:bg-muted/40 2xl:py-1.5 2xl:text-sm">
       <span
         aria-hidden
         className={`absolute inset-y-0.5 left-0 rounded-sm ${pct >= 0 ? "bg-emerald-500/10" : "bg-red-500/10"}`}
         style={{ width: `${width}%` }}
       />
       <span className="relative font-mono">{tile.symbol}</span>
-      <span className={`relative tabular-nums ${changeColor(pct)}`}>{formatChangePct(pct).text}</span>
+      <span className={`relative tabular-nums ${changeColor(pct)}`}>
+        {formatChangePct(pct).text}
+      </span>
     </Link>
   )
 }
@@ -104,7 +114,10 @@ export function MoversCard({ tiles }: { tiles: Tile[] }) {
     .filter((r): r is { tile: Tile; pct: number } => r.pct != null)
     .sort((a, b) => b.pct - a.pct)
   const up = ranked.filter((r) => r.pct > 0).slice(0, 5)
-  const down = ranked.filter((r) => r.pct < 0).slice(-5).reverse()
+  const down = ranked
+    .filter((r) => r.pct < 0)
+    .slice(-5)
+    .reverse()
   const missing = tiles.length - ranked.length
   const maxAbs = maxAbsMove([...up, ...down].map((r) => r.pct))
 
@@ -113,12 +126,15 @@ export function MoversCard({ tiles }: { tiles: Tile[] }) {
       title="Movers"
       control={
         <SegmentedControl<PctWindow>
-          options={PCT_WINDOWS.map((w) => ({ value: w.value, label: w.value, title: `over ${w.label}` }))}
+          options={PCT_WINDOWS.map((w) => ({
+            value: w.value,
+            label: w.value,
+            title: `over ${w.label}`,
+          }))}
           value={window}
           onChange={setWindow}
         />
-      }
-    >
+      }>
       {ranked.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           No {pctWindowDef(window).label} readings yet.
@@ -152,7 +168,9 @@ export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
   const unscored = tiles.filter((t) => t.sigma == null).length
 
   return (
-    <RailCard title="Most unusual" control={<span className="text-xs text-muted-foreground">today</span>}>
+    <RailCard
+      title="Most unusual"
+      control={<span className="text-xs text-muted-foreground">today</span>}>
       {scored.length === 0 ? (
         <p className="text-xs text-muted-foreground">No readings.</p>
       ) : (
@@ -161,8 +179,7 @@ export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
             <Link
               key={t.symbol}
               to={`/asset/${t.symbol}`}
-              className="flex items-center justify-between gap-2 rounded px-2 py-1 text-[13px] hover:bg-muted/40 2xl:py-1.5 2xl:text-sm"
-            >
+              className="flex items-center justify-between gap-2 rounded px-2 py-1 text-[13px] hover:bg-muted/40 2xl:py-1.5 2xl:text-sm">
               <span className="font-mono">{t.symbol}</span>
               <span className={`tabular-nums ${changeColor(t.sigma)}`}>
                 {t.sigma > 0 ? "+" : ""}

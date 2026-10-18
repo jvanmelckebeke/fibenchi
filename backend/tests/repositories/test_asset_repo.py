@@ -110,7 +110,10 @@ async def test_list_all_includes_ungrouped(db):
 async def test_create_and_save(db):
     repo = AssetRepository(db)
     asset = await repo.create(
-        symbol="AAPL", name="Apple", type=AssetType.STOCK, currency="USD",
+        symbol="AAPL",
+        name="Apple",
+        type=AssetType.STOCK,
+        currency="USD",
     )
     assert asset.id is not None
     assert asset.symbol == "AAPL"

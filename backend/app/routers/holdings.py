@@ -17,7 +17,11 @@ async def get_holdings(symbol: str, db: AsyncSession = Depends(get_db)):
     return await holdings_service.get_holdings(db, symbol)
 
 
-@router.get("/indicators", response_model=list[HoldingIndicatorResponse], summary="Get technical indicators for each ETF holding")
+@router.get(
+    "/indicators",
+    response_model=list[HoldingIndicatorResponse],
+    summary="Get technical indicators for each ETF holding",
+)
 async def get_holdings_indicators(symbol: str, db: AsyncSession = Depends(get_db)):
     """Return latest indicator snapshot for each of the ETF's top holdings."""
     snapshots = await holdings_service.get_holdings_indicators(db, symbol)

@@ -96,16 +96,14 @@ class TestComputePerformers:
 
         today = date.today()
         start = today - timedelta(days=365)
-        mock_price_repo_cls.return_value.get_first_dates = AsyncMock(
-            return_value={1: start, 2: start}
-        )
-        mock_price_repo_cls.return_value.get_last_dates = AsyncMock(
-            return_value={1: today, 2: today}
-        )
+        mock_price_repo_cls.return_value.get_first_dates = AsyncMock(return_value={1: start, 2: start})
+        mock_price_repo_cls.return_value.get_last_dates = AsyncMock(return_value={1: today, 2: today})
         mock_price_repo_cls.return_value.get_prices_at_dates = AsyncMock(
             return_value={
-                (1, start): 100.0, (1, today): 150.0,
-                (2, start): 200.0, (2, today): 280.0,
+                (1, start): 100.0,
+                (1, today): 150.0,
+                (2, start): 200.0,
+                (2, today): 280.0,
             }
         )
 
@@ -149,9 +147,7 @@ class TestComputePerformers:
         start = today - timedelta(days=365)
         mock_price_repo_cls.return_value.get_first_dates = AsyncMock(return_value={1: start})
         mock_price_repo_cls.return_value.get_last_dates = AsyncMock(return_value={1: today})
-        mock_price_repo_cls.return_value.get_prices_at_dates = AsyncMock(
-            return_value={(1, start): 0, (1, today): 50.0}
-        )
+        mock_price_repo_cls.return_value.get_prices_at_dates = AsyncMock(return_value={(1, start): 0, (1, today): 50.0})
 
         result = await compute_performers(db, period="1y")
         assert result == []

@@ -63,9 +63,11 @@ def _pulse_symbol(ref: AssetRef, prices: list[PriceHistory], move_scale: MoveSca
     # vnr_gap_sessions and vnr_ex_div equal the gap series and the dividends
     # everywhere the count can see them (gaps > 1, payouts > 0), so this is
     # the same series the warmup gate counted.
-    returns = vnr_usable_returns(
-        indicators["close"], indicators["vnr_gap_sessions"], indicators["vnr_ex_div"]
-    ).notna().cumsum()
+    returns = (
+        vnr_usable_returns(indicators["close"], indicators["vnr_gap_sessions"], indicators["vnr_ex_div"])
+        .notna()
+        .cumsum()
+    )
 
     latest = indicators.index[-1]
     window_start = latest - datetime.timedelta(days=CLOSES_WINDOW_DAYS)

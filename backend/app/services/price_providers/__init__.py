@@ -19,9 +19,7 @@ def init_price_provider() -> None:
     name = settings.price_provider
     cls = _PROVIDERS.get(name)
     if cls is None:
-        raise ValueError(
-            f"Unknown price provider: {name!r}. Available: {list(_PROVIDERS)}"
-        )
+        raise ValueError(f"Unknown price provider: {name!r}. Available: {list(_PROVIDERS)}")
     _instance = cls()
 
 
@@ -31,7 +29,5 @@ def get_price_provider() -> PriceProvider:
     Raises RuntimeError if init_price_provider() hasn't been called yet.
     """
     if _instance is None:
-        raise RuntimeError(
-            "Price provider not initialized — call init_price_provider() first"
-        )
+        raise RuntimeError("Price provider not initialized — call init_price_provider() first")
     return _instance

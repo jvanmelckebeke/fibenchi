@@ -85,6 +85,7 @@ def reset_yahoo_throttle():
     """
     from app.services.yahoo import yahoo_client
     from app.services.yahoo.rate_limit import yahoo_throttle
+
     original_min_interval = yahoo_throttle._min_interval
     yahoo_throttle._min_interval = 0.0
     yahoo_throttle.reset()
@@ -137,6 +138,7 @@ def _clear_thesis_perf_cache():
     in-memory DB (whose ids reset each test); clear it so one test can't read a
     colliding cache key written by another."""
     from app.services import thesis_service
+
     thesis_service._thesis_perf_cache.clear()
     yield
 
@@ -153,6 +155,7 @@ def _isolate_fundamentals_cache(monkeypatch):
     stub the scheduler to a no-op; tests that care about the merge behaviour
     patch the merge functions at their call sites instead."""
     from app.services import fundamentals_cache
+
     fundamentals_cache._fundamentals_cache.clear()
     fundamentals_cache._pending_symbols.clear()
     monkeypatch.setattr(fundamentals_cache, "_schedule_background_fetch", lambda *_a, **_k: None)

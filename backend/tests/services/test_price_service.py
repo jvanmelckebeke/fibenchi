@@ -30,21 +30,25 @@ def _make_price_history(asset_id: int = 1, n_days: int = 100, base_price: float 
         if d.weekday() >= 5:
             continue
         price = base_price + i * 0.1
-        prices.append(PriceHistory(
-            id=i + 1, asset_id=asset_id, date=d,
-            open=round(price - 0.5, 4), high=round(price + 1.0, 4),
-            low=round(price - 1.0, 4), close=round(price, 4),
-            volume=1_000_000,
-        ))
+        prices.append(
+            PriceHistory(
+                id=i + 1,
+                asset_id=asset_id,
+                date=d,
+                open=round(price - 0.5, 4),
+                high=round(price + 1.0, 4),
+                low=round(price - 1.0, 4),
+                close=round(price, 4),
+                volume=1_000_000,
+            )
+        )
     return prices
 
 
 def _mock_provider(**overrides):
     """Create a mock PriceProvider with async method stubs."""
     provider = MagicMock()
-    provider.fetch_history = AsyncMock(
-        return_value=overrides.get("fetch_history", pd.DataFrame())
-    )
+    provider.fetch_history = AsyncMock(return_value=overrides.get("fetch_history", pd.DataFrame()))
     return provider
 
 
@@ -65,6 +69,7 @@ async def test_fetch_ephemeral_raises_404_on_empty():
     mock_prov = _mock_provider(fetch_history=empty_df)
     with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await _fetch_ephemeral("XXXX", "3mo")
         assert exc_info.value.status_code == 404
@@ -75,6 +80,7 @@ async def test_fetch_ephemeral_raises_404_on_error():
     mock_prov.fetch_history = AsyncMock(side_effect=ValueError("No data"))
     with patch("app.services.price_service.get_price_provider", return_value=mock_prov):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await _fetch_ephemeral("XXXX", "3mo")
         assert exc_info.value.status_code == 404
@@ -93,6 +99,7 @@ async def test_ensure_prices_syncs_when_empty(mock_sync, MockPriceRepo):
     mock_sync.return_value = len(prices)
 
     from app.services.price_service import _ensure_prices
+
     result = await _ensure_prices(db, asset, "3mo")
 
     mock_sync.assert_awaited_once()
@@ -192,6 +199,7 @@ async def test_ensure_prices_caches_earliest_after_noop_backfill(mock_sync_range
     mock_sync_range.return_value = 0  # sync returned nothing new
 
     from app.services.price_service import _ensure_prices
+
     await _ensure_prices(db, asset, "5y")  # 5y goes back ~1825 days
 
     # sync_asset_prices_range was called (first attempt)
@@ -216,6 +224,7 @@ async def test_ensure_prices_skips_fetch_on_second_request(mock_sync_range, Mock
     mock_sync_range.return_value = 0
 
     from app.services.price_service import _ensure_prices
+
     await _ensure_prices(db, asset, "5y")
     assert mock_sync_range.await_count == 1
 
@@ -242,6 +251,7 @@ async def test_ensure_prices_does_not_cache_when_backfill_succeeds(mock_sync_ran
     mock_sync_range.return_value = 200
 
     from app.services.price_service import _ensure_prices
+
     await _ensure_prices(db, asset, "5y")
 
     # Sync was called

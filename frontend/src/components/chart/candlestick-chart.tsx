@@ -72,7 +72,7 @@ export function CandlestickChart({
       if (excludeIndicators?.includes(id)) return false
       return isVisibleAt(indicatorVisibility, id, "detail_chart")
     },
-    [indicatorVisibility, excludeIndicators],
+    [indicatorVisibility, excludeIndicators]
   )
 
   const enabledOverlayIds = useMemo(() => {
@@ -141,9 +141,8 @@ export function CandlestickChart({
           <Legend values={hoverValues} latest={latestValues} />
           <button
             onClick={resetView}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
-            title="Reset chart view"
-          >
+            className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            title="Reset chart view">
             Reset view
           </button>
         </div>

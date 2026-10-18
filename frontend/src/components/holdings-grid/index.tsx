@@ -14,7 +14,13 @@ interface HoldingsGridProps {
   linkTarget?: "_blank"
 }
 
-export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, linkTarget }: HoldingsGridProps) {
+export function HoldingsGrid({
+  rows,
+  indicatorMap,
+  indicatorsLoading,
+  onRemove,
+  linkTarget,
+}: HoldingsGridProps) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string | number>>(new Set())
   const hasRemove = !!onRemove
 
@@ -32,13 +38,23 @@ export function HoldingsGrid({ rows, indicatorMap, indicatorsLoading, onRemove, 
           <thead>
             <tr className="border-b border-border">
               <th className="w-6" />
-              <th className="text-left text-xs font-medium text-muted-foreground px-2 py-1">Symbol</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-2 py-1">Name</th>
-              <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">%</th>
-              <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">Price</th>
-              <th className="text-right text-xs font-medium text-muted-foreground px-2 py-1">Chg%</th>
+              <th className="px-2 py-1 text-left text-xs font-medium text-muted-foreground">
+                Symbol
+              </th>
+              <th className="px-2 py-1 text-left text-xs font-medium text-muted-foreground">
+                Name
+              </th>
+              <th className="px-2 py-1 text-right text-xs font-medium text-muted-foreground">%</th>
+              <th className="px-2 py-1 text-right text-xs font-medium text-muted-foreground">
+                Price
+              </th>
+              <th className="px-2 py-1 text-right text-xs font-medium text-muted-foreground">
+                Chg%
+              </th>
               {SUMMARY_DESCRIPTORS.map((desc) => (
-                <th key={desc.id} className="text-right text-xs font-medium text-muted-foreground px-2 py-1">
+                <th
+                  key={desc.id}
+                  className="px-2 py-1 text-right text-xs font-medium text-muted-foreground">
                   {desc.holdingSummary.label}
                 </th>
               ))}

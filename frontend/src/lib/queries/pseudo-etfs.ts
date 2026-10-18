@@ -3,7 +3,11 @@ import { api, type PseudoETFCreate, type PseudoETFUpdate, type AnnotationCreate 
 import { keys, STALE_5MIN, useInvalidatingMutation } from "./shared"
 
 export function usePseudoEtfs() {
-  return useQuery({ queryKey: keys.pseudoEtfs, queryFn: api.pseudoEtfs.list, staleTime: STALE_5MIN })
+  return useQuery({
+    queryKey: keys.pseudoEtfs,
+    queryFn: api.pseudoEtfs.list,
+    staleTime: STALE_5MIN,
+  })
 }
 
 export function usePseudoEtf(id: number) {
@@ -18,22 +22,19 @@ export function usePseudoEtf(id: number) {
 export function useCreatePseudoEtf() {
   return useInvalidatingMutation(
     (data: PseudoETFCreate) => api.pseudoEtfs.create(data),
-    [keys.pseudoEtfs],
+    [keys.pseudoEtfs]
   )
 }
 
 export function useUpdatePseudoEtf() {
   return useInvalidatingMutation(
     ({ id, data }: { id: number; data: PseudoETFUpdate }) => api.pseudoEtfs.update(id, data),
-    [keys.pseudoEtfs],
+    [keys.pseudoEtfs]
   )
 }
 
 export function useDeletePseudoEtf() {
-  return useInvalidatingMutation(
-    (id: number) => api.pseudoEtfs.delete(id),
-    [keys.pseudoEtfs],
-  )
+  return useInvalidatingMutation((id: number) => api.pseudoEtfs.delete(id), [keys.pseudoEtfs])
 }
 
 export function useAddPseudoEtfConstituents() {
@@ -93,7 +94,7 @@ export function usePseudoEtfNote(id: number) {
 export function useUpdatePseudoEtfNote(id: number) {
   return useInvalidatingMutation(
     (content: string) => api.pseudoEtfs.note.update(id, content),
-    [keys.pseudoEtfNote(id)],
+    [keys.pseudoEtfNote(id)]
   )
 }
 
@@ -110,13 +111,13 @@ export function usePseudoEtfAnnotations(id: number) {
 export function useCreatePseudoEtfAnnotation(id: number) {
   return useInvalidatingMutation(
     (data: AnnotationCreate) => api.pseudoEtfs.annotations.create(id, data),
-    [keys.pseudoEtfAnnotations(id)],
+    [keys.pseudoEtfAnnotations(id)]
   )
 }
 
 export function useDeletePseudoEtfAnnotation(id: number) {
   return useInvalidatingMutation(
     (annotationId: number) => api.pseudoEtfs.annotations.delete(id, annotationId),
-    [keys.pseudoEtfAnnotations(id)],
+    [keys.pseudoEtfAnnotations(id)]
   )
 }

@@ -30,7 +30,7 @@ export function ColorSwatchPicker({
           className={cn(
             SIZES[size],
             "rounded-full border-2",
-            value === c ? "border-foreground" : "border-transparent",
+            value === c ? "border-foreground" : "border-transparent"
           )}
           style={{ backgroundColor: c }}
           onClick={() => onChange(c)}

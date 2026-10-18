@@ -12,23 +12,46 @@ import type { IndicatorSummary, Quote } from "@/lib/types"
  * 2026, skipping the weekend. Index in this list IS the distance a stored bar
  * sits behind the live session. */
 const SESSIONS = [
-  "2026-08-11", "2026-08-10", "2026-08-07",
-  "2026-08-06", "2026-08-05", "2026-08-04",
+  "2026-08-11",
+  "2026-08-10",
+  "2026-08-07",
+  "2026-08-06",
+  "2026-08-05",
+  "2026-08-04",
 ]
 
 const q = (over: Partial<Quote> = {}): Quote => ({
-  symbol: "X", price: null, previous_close: null, change: null, change_percent: null,
-  volume: null, avg_volume: null, currency: "USD", market_state: null,
-  session_date: SESSIONS[0], recent_sessions: SESSIONS, volume_pace: null, ...over,
+  symbol: "X",
+  price: null,
+  previous_close: null,
+  change: null,
+  change_percent: null,
+  volume: null,
+  avg_volume: null,
+  currency: "USD",
+  market_state: null,
+  session_date: SESSIONS[0],
+  recent_sessions: SESSIONS,
+  volume_pace: null,
+  ...over,
 })
 
 const snap = (over: Partial<IndicatorSummary> = {}): IndicatorSummary => ({
-  close: null, as_of: null, change_pct: null, bars: 300, values: {}, ...over,
+  close: null,
+  as_of: null,
+  change_pct: null,
+  bars: 300,
+  values: {},
+  ...over,
 })
 
 describe("resolveIndicatorValue — settled fields", () => {
   it("reads a plain indicator straight off the snapshot", () => {
-    const r = resolveIndicatorValue("rvol", q(), snap({ as_of: SESSIONS[1], values: { rvol: 4.55 } }))
+    const r = resolveIndicatorValue(
+      "rvol",
+      q(),
+      snap({ as_of: SESSIONS[1], values: { rvol: 4.55 } })
+    )
     expect(r).toEqual({ status: "ok", value: 4.55, source: "settled", behind: 1 })
   })
 
@@ -46,7 +69,9 @@ describe("resolveIndicatorValue — settled fields", () => {
 
   it("withholds with no distance when there is no snapshot at all", () => {
     expect(resolveIndicatorValue("rvol", q(), undefined)).toEqual({
-      status: "withheld", reason: { kind: "no_data" }, behind: null,
+      status: "withheld",
+      reason: { kind: "no_data" },
+      behind: null,
     })
   })
 
@@ -61,7 +86,7 @@ describe("resolveIndicatorValue — live fields dispatch to their resolver", () 
     const r = resolveIndicatorValue(
       "vnr",
       q({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 28300, as_of: SESSIONS[1], values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      snap({ close: 28300, as_of: SESSIONS[1], values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(r.status).toBe("ok")
     expect(r).toMatchObject({ source: "live", behind: 1 })
@@ -71,7 +96,7 @@ describe("resolveIndicatorValue — live fields dispatch to their resolver", () 
     const r = resolveIndicatorValue(
       "vnr",
       q({ change_percent: 2, previous_close: 100, price: 102 }),
-      snap({ close: 100, as_of: SESSIONS[5], values: { vnr: 1.1, vnr_sigma: 0.02 } }),
+      snap({ close: 100, as_of: SESSIONS[5], values: { vnr: 1.1, vnr_sigma: 0.02 } })
     )
     expect(r).toMatchObject({ status: "withheld", reason: { kind: "feed_behind", sessions: 5 } })
   })
@@ -81,7 +106,7 @@ describe("resolveIndicatorValue — live fields dispatch to their resolver", () 
     const r = resolveIndicatorValue(
       "vnr_sigma",
       q({ change_percent: -1.06 }),
-      snap({ as_of: SESSIONS[1], values: { vnr_sigma: 0.0576 } }),
+      snap({ as_of: SESSIONS[1], values: { vnr_sigma: 0.0576 } })
     )
     expect(r).toEqual({ status: "ok", value: 0.0576, source: "settled", behind: 1 })
   })
@@ -91,7 +116,9 @@ describe("indicatorSortKey", () => {
   it("is the number the row renders, so the sort cannot order by a hidden value", () => {
     const withheld = resolveIndicatorValue("rvol", q(), snap({ as_of: SESSIONS[0] }))
     expect(indicatorSortKey(withheld)).toBeNull()
-    expect(indicatorSortKey(resolveIndicatorValue("rvol", q(), snap({ values: { rvol: 2 } })))).toBe(2)
+    expect(
+      indicatorSortKey(resolveIndicatorValue("rvol", q(), snap({ values: { rvol: 2 } })))
+    ).toBe(2)
   })
 })
 
@@ -113,19 +140,25 @@ describe("isAbnormallyBehind", () => {
     const live = resolveIndicatorValue(
       "vnr",
       q({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 28300, as_of: SESSIONS[1], values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      snap({ close: 28300, as_of: SESSIONS[1], values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(isAbnormallyBehind(live)).toBe(false)
   })
 
   it("does not flag an undatable bar as behind", () => {
-    expect(isAbnormallyBehind(resolveIndicatorValue("rvol", undefined, snap({ values: { rvol: 1 } })))).toBe(false)
+    expect(
+      isAbnormallyBehind(resolveIndicatorValue("rvol", undefined, snap({ values: { rvol: 1 } })))
+    ).toBe(false)
   })
 })
 
 describe("settledSessionTitle", () => {
   it("names the session a one-bar-old value describes", () => {
-    const r = resolveIndicatorValue("rvol", q(), snap({ as_of: SESSIONS[1], values: { rvol: 4.55 } }))
+    const r = resolveIndicatorValue(
+      "rvol",
+      q(),
+      snap({ as_of: SESSIONS[1], values: { rvol: 4.55 } })
+    )
     expect(settledSessionTitle("RVOL", r, snap({ as_of: SESSIONS[1] }))).toContain(SESSIONS[1])
   })
 
@@ -138,7 +171,7 @@ describe("settledSessionTitle", () => {
     const live = resolveIndicatorValue(
       "vnr",
       q({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      snap({ close: 28300, as_of: SESSIONS[1], values: { vnr: 1.56, vnr_sigma: 0.0576 } }),
+      snap({ close: 28300, as_of: SESSIONS[1], values: { vnr: 1.56, vnr_sigma: 0.0576 } })
     )
     expect(settledSessionTitle("σ-Move", live, snap({ as_of: SESSIONS[1] }))).toBeNull()
   })

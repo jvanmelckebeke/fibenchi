@@ -105,6 +105,7 @@ MIN_SEPARATION_BAND = 0.05
 # Lives here rather than in the heal job so "split-sized" has one definition.
 SPLIT_STEP_FACTOR = 1.4
 
+
 def separation_band(closes: pd.Series, events: pd.Series) -> float:
     """The frame's own median absolute log return, scaled by ``NOISE_K``.
 
@@ -112,9 +113,7 @@ def separation_band(closes: pd.Series, events: pd.Series) -> float:
     step and a couple of earnings days cannot inflate the band that judges
     them. Falls back to the floor when the frame is too short to say anything.
     """
-    log_returns = (closes / closes.shift(1)).apply(
-        lambda v: math.log(v) if v and v > 0 else float("nan")
-    )
+    log_returns = (closes / closes.shift(1)).apply(lambda v: math.log(v) if v and v > 0 else float("nan"))
     # Drop the ex-date steps themselves and their carry into the next bar.
     on_event = events > 0
     log_returns = log_returns.where(~(on_event | on_event.shift(-1, fill_value=False)))
@@ -151,7 +150,9 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
             # unusable. Adjusting on the event alone would be adjusting blind.
             logger.info(
                 "%s: split %s on %s has no usable predecessor in this frame; leaving it alone",
-                symbol or "?", ratio, df.index[pos],
+                symbol or "?",
+                ratio,
+                df.index[pos],
             )
             continue
 
@@ -163,16 +164,24 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
         if to_unadjusted <= band < to_adjusted:
             ratios.iat[pos] = float(ratio)
             logger.info(
-                "%s: split %s on %s corroborated (step %.4f, expected ~%.4f, "
-                "band %.4f); rebasing the bars before it",
-                symbol or "?", ratio, df.index[pos], observed, 1.0 / ratio, band,
+                "%s: split %s on %s corroborated (step %.4f, expected ~%.4f, band %.4f); rebasing the bars before it",
+                symbol or "?",
+                ratio,
+                df.index[pos],
+                observed,
+                1.0 / ratio,
+                band,
             )
             continue
 
         if to_adjusted <= band < to_unadjusted:
             logger.debug(
                 "%s: split %s on %s already applied by the provider (step %.4f, band %.4f)",
-                symbol or "?", ratio, df.index[pos], observed, band,
+                symbol or "?",
+                ratio,
+                df.index[pos],
+                observed,
+                band,
             )
             continue
 
@@ -182,11 +191,14 @@ def _confirmed_ratios(df: pd.DataFrame, symbol: str | None) -> pd.Series:
         both = to_unadjusted <= band and to_adjusted <= band
         level = logger.info if both else logger.warning
         level(
-            "%s: split %s on %s %s (step %.4f, expected ~%.4f, band %.4f); "
-            "leaving the frame alone",
-            symbol or "?", ratio, df.index[pos],
+            "%s: split %s on %s %s (step %.4f, expected ~%.4f, band %.4f); leaving the frame alone",
+            symbol or "?",
+            ratio,
+            df.index[pos],
             "is too small for this frame to resolve" if both else "is not corroborated",
-            observed, 1.0 / ratio, band,
+            observed,
+            1.0 / ratio,
+            band,
         )
 
     return ratios
@@ -239,6 +251,8 @@ def normalize_splits(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFram
     adjusted = int((divisor != 1.0).sum())
     logger.info(
         "%s: rebased %d pre-split bar(s) onto the current share basis (factor %.4f)",
-        symbol or "?", adjusted, float(divisor.iloc[0]),
+        symbol or "?",
+        adjusted,
+        float(divisor.iloc[0]),
     )
     return out

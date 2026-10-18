@@ -28,22 +28,20 @@ export function ScannerView({ assets, descriptorId, period }: ScannerViewProps) 
     <div className="space-y-2">
       {/* Symbol filter chips */}
       {hiddenAssets.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Hidden:</span>
           {hiddenAssets.map((a) => (
             <button
               key={a.symbol}
               onClick={() => toggleHide(a.symbol)}
-              className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-            >
+              className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground">
               +{a.symbol}
             </button>
           ))}
           {hiddenAssets.length > 1 && (
             <button
               onClick={() => setHiddenSymbols(new Set())}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
+              className="text-xs text-muted-foreground hover:text-foreground">
               Show all
             </button>
           )}
@@ -83,7 +81,7 @@ function ScannerRow({ symbol, name, descriptorId, period, onHide }: ScannerRowPr
   if (isLoading || !prices?.length) {
     return (
       <div className="rounded-md border border-border p-3">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="mb-2 flex items-center gap-2">
           <Skeleton className="h-4 w-16" />
           <Skeleton className="h-3 w-32" />
         </div>
@@ -95,19 +93,15 @@ function ScannerRow({ symbol, name, descriptorId, period, onHide }: ScannerRowPr
   return (
     <ChartSyncProvider prices={prices} indicators={indicators ?? []}>
       <div className="rounded-md border border-border p-3">
-        <div className="flex items-center gap-2 mb-1">
-          <Link
-            to={`/asset/${symbol}`}
-            className="text-sm font-semibold hover:underline"
-          >
+        <div className="mb-1 flex items-center gap-2">
+          <Link to={`/asset/${symbol}`} className="text-sm font-semibold hover:underline">
             {symbol}
           </Link>
-          <span className="text-xs text-muted-foreground truncate">{name}</span>
+          <span className="truncate text-xs text-muted-foreground">{name}</span>
           <button
             onClick={onHide}
-            className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
-            title={`Hide ${symbol}`}
-          >
+            className="ml-auto text-muted-foreground transition-colors hover:text-foreground"
+            title={`Hide ${symbol}`}>
             <X className="h-3.5 w-3.5" />
           </button>
         </div>

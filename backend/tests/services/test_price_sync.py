@@ -29,26 +29,32 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 def _make_df(n=10, base_price=100.0):
     """Create a minimal OHLCV DataFrame."""
     dates = pd.bdate_range("2025-01-02", periods=n)
-    return pd.DataFrame({
-        "open": [base_price] * n,
-        "high": [base_price + 1] * n,
-        "low": [base_price - 1] * n,
-        "close": [base_price + 0.5] * n,
-        "volume": [1_000_000] * n,
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "open": [base_price] * n,
+            "high": [base_price + 1] * n,
+            "low": [base_price - 1] * n,
+            "close": [base_price + 0.5] * n,
+            "volume": [1_000_000] * n,
+        },
+        index=dates,
+    )
 
 
 def _df_from_closes(closes):
     """OHLCV DataFrame with the given trailing close sequence (bdate index)."""
     n = len(closes)
     dates = pd.bdate_range("2025-01-02", periods=n)
-    return pd.DataFrame({
-        "open": closes,
-        "high": [c + 1 for c in closes],
-        "low": [c - 1 for c in closes],
-        "close": closes,
-        "volume": [1_000_000] * n,
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "open": closes,
+            "high": [c + 1 for c in closes],
+            "low": [c - 1 for c in closes],
+            "close": closes,
+            "volume": [1_000_000] * n,
+        },
+        index=dates,
+    )
 
 
 def _mock_provider(**overrides):
@@ -62,6 +68,7 @@ def _mock_provider(**overrides):
 
 # --- sync_asset_prices ---
 
+
 async def test_sync_calls_fetch_with_period(db):
     """sync_asset_prices passes the period to fetch_history."""
     asset = Asset(symbol="TEST", name="Test", type=AssetType.STOCK, currency="USD")
@@ -69,8 +76,10 @@ async def test_sync_calls_fetch_with_period(db):
     await db.flush()
 
     mock_prov = _mock_provider()
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10),
+    ):
         count = await sync_asset_prices(db, AssetRef.of(asset), period="6mo")
 
     mock_prov.fetch_history.assert_awaited_once_with("TEST", period="6mo")
@@ -84,12 +93,15 @@ async def test_sync_returns_upsert_count(db):
     await db.flush()
 
     mock_prov = _mock_provider()
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=7):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=7),
+    ):
         assert await sync_asset_prices(db, asset) == 7
 
 
 # --- sync_asset_prices_range ---
+
 
 async def test_sync_range_passes_dates(db):
     """sync_asset_prices_range passes start/end to fetch_history."""
@@ -99,8 +111,10 @@ async def test_sync_range_passes_dates(db):
 
     start, end = date(2025, 1, 1), date(2025, 6, 30)
     mock_prov = _mock_provider()
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=5):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=5),
+    ):
         count = await sync_asset_prices_range(db, AssetRef.of(asset), start, end)
 
     mock_prov.fetch_history.assert_awaited_once_with("RNG", start=start, end=end)
@@ -114,8 +128,10 @@ async def test_sync_range_past_skips_quote_roundtrip(db):
     await db.flush()
 
     mock_prov = _mock_provider()
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=3),
+    ):
         await sync_asset_prices_range(db, AssetRef.of(asset), date(2025, 1, 1), date(2025, 6, 30))
 
     mock_prov.batch_fetch_quotes.assert_not_awaited()
@@ -134,8 +150,7 @@ async def test_sync_range_to_today_drops_unsettled_bar(db):
 
     # Last close is today's live partial; its predecessor equals previous_close.
     df = _df_from_closes([60.0, 64.44, 63.10])
-    quotes = [Quote(**{"symbol": "MT.AS", "price": 64.28, "previous_close": 64.44,
-               "market_state": "REGULAR"})]
+    quotes = [Quote(**{"symbol": "MT.AS", "price": 64.28, "previous_close": 64.44, "market_state": "REGULAR"})]
     mock_prov = _mock_provider(fetch_history=df, batch_fetch_quotes=quotes)
 
     captured = {}
@@ -144,8 +159,10 @@ async def test_sync_range_to_today_drops_unsettled_bar(db):
         captured["len"] = len(args[2])
         return len(args[2])
 
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", side_effect=_capture):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", side_effect=_capture),
+    ):
         await sync_asset_prices_range(db, AssetRef.of(asset), date(2026, 1, 1), date.today())
 
     assert captured["len"] == 2  # partial dropped
@@ -171,14 +188,17 @@ async def test_sync_range_to_today_without_quote_stores_settled_bars(db):
         captured["len"] = len(args[2])
         return len(args[2])
 
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", side_effect=_capture):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", side_effect=_capture),
+    ):
         await sync_asset_prices_range(db, AssetRef.of(asset), date(2026, 1, 1), date.today())
 
     assert captured["len"] == 3
 
 
 # --- _upsert_prices ---
+
 
 async def test_upsert_empty_dataframe(db):
     """Empty DataFrame returns 0 without touching the DB."""
@@ -187,6 +207,7 @@ async def test_upsert_empty_dataframe(db):
 
 
 # --- sync_all_prices ---
+
 
 async def test_sync_all_fetches_batch(db):
     """sync_all_prices calls batch_fetch_history for all assets in DB."""
@@ -197,8 +218,10 @@ async def test_sync_all_fetches_batch(db):
 
     mock_data = {"AAPL": _make_df(), "MSFT": _make_df()}
     mock_prov = _mock_provider(batch_fetch_history=mock_data)
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10),
+    ):
         counts = await sync_all_prices(db, period="1y")
 
     # Verify batch_fetch_history was called with both symbols
@@ -223,8 +246,10 @@ async def test_sync_all_skips_unknown_symbols(db):
     # Provider returns data for AAPL and an unknown EXTRA symbol
     mock_data = {"AAPL": _make_df(), "EXTRA": _make_df()}
     mock_prov = _mock_provider(batch_fetch_history=mock_data)
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10),
+    ):
         counts = await sync_all_prices(db, period="1y")
 
     assert "AAPL" in counts
@@ -240,9 +265,11 @@ async def test_sync_all_retries_symbols_missing_from_batch(db, caplog):
 
     # Batch response only contains AAPL; PRY.MI must come from the per-symbol retry.
     mock_prov = _mock_provider(batch_fetch_history={"AAPL": _make_df()})
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10), \
-         caplog.at_level(logging.WARNING, logger="app.services.price_sync"):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10),
+        caplog.at_level(logging.WARNING, logger="app.services.price_sync"),
+    ):
         counts = await sync_all_prices(db, period="1y")
 
     mock_prov.fetch_history.assert_awaited_once_with("PRY.MI", period="1y")
@@ -258,9 +285,11 @@ async def test_sync_all_no_retry_when_batch_entirely_empty(db, caplog):
     await db.commit()
 
     mock_prov = _mock_provider(batch_fetch_history={})
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10), \
-         caplog.at_level(logging.ERROR, logger="app.services.price_sync"):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10),
+        caplog.at_level(logging.ERROR, logger="app.services.price_sync"),
+    ):
         counts = await sync_all_prices(db)
 
     mock_prov.fetch_history.assert_not_awaited()
@@ -284,12 +313,14 @@ async def test_sync_all_subunit_venue_survives_a_dropped_quote(db, caplog):
 
     dates = pd.bdate_range(end=date.today(), periods=3)
     batch_df = pd.DataFrame(
-        {"open": [15000, 15100, 15200] * 2, "high": [15100, 15200, 15300] * 2,
-         "low": [14900, 15000, 15100] * 2, "close": [15050, 15150, 15250] * 2,
-         "volume": [500_000] * 6},
-        index=pd.MultiIndex.from_tuples(
-            [(s, d) for s in ("AAPL", "RR.L") for d in dates], names=["symbol", "date"]
-        ),
+        {
+            "open": [15000, 15100, 15200] * 2,
+            "high": [15100, 15200, 15300] * 2,
+            "low": [14900, 15000, 15100] * 2,
+            "close": [15050, 15150, 15250] * 2,
+            "volume": [500_000] * 6,
+        },
+        index=pd.MultiIndex.from_tuples([(s, d) for s in ("AAPL", "RR.L") for d in dates], names=["symbol", "date"]),
     )
     ticker = MagicMock()
     ticker._get_data.return_value = {"AAPL": {"timestamp": [1]}, "RR.L": {"timestamp": [1]}}
@@ -300,10 +331,12 @@ async def test_sync_all_subunit_venue_survives_a_dropped_quote(db, caplog):
     ticker.quotes = {"AAPL": {"currency": "USD"}}
 
     upserted = AsyncMock(return_value=10)
-    with patch("app.services.yahoo.client.Ticker", return_value=ticker), \
-         patch("app.services.price_sync.get_price_provider", return_value=YahooPriceProvider()), \
-         patch("app.services.price_sync._upsert_prices", new=upserted), \
-         caplog.at_level(logging.WARNING, logger="app.services.price_sync"):
+    with (
+        patch("app.services.yahoo.client.Ticker", return_value=ticker),
+        patch("app.services.price_sync.get_price_provider", return_value=YahooPriceProvider()),
+        patch("app.services.price_sync._upsert_prices", new=upserted),
+        caplog.at_level(logging.WARNING, logger="app.services.price_sync"),
+    ):
         counts = await sync_all_prices(db, period="1y")
 
     assert "RR.L" not in counts
@@ -320,8 +353,10 @@ async def test_sync_all_retry_failure_is_non_fatal(db):
 
     mock_prov = _mock_provider(batch_fetch_history={"AAPL": _make_df()})
     mock_prov.fetch_history = AsyncMock(side_effect=Exception("boom"))
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", new_callable=AsyncMock, return_value=10),
+    ):
         counts = await sync_all_prices(db)
 
     assert counts == {"AAPL": 10}
@@ -331,10 +366,12 @@ async def test_sync_all_main_loop_failure_is_non_fatal(db):
     """A symbol raising during persist in the main batch loop doesn't abort the
     rest of the run, and its half-applied transaction is rolled back so it can't
     poison the symbols that follow it on the shared session."""
-    db.add_all([
-        Asset(symbol="BAD", name="Bad", type=AssetType.STOCK, currency="USD"),
-        Asset(symbol="GOOD", name="Good", type=AssetType.STOCK, currency="USD"),
-    ])
+    db.add_all(
+        [
+            Asset(symbol="BAD", name="Bad", type=AssetType.STOCK, currency="USD"),
+            Asset(symbol="GOOD", name="Good", type=AssetType.STOCK, currency="USD"),
+        ]
+    )
     await db.commit()
 
     async def fake_persist(_db, ref, _df, _anchor):
@@ -345,9 +382,11 @@ async def test_sync_all_main_loop_failure_is_non_fatal(db):
     # "BAD" is ordered before "GOOD" in the batch, so GOOD only syncs if the loop
     # survives BAD's failure rather than aborting on it.
     mock_prov = _mock_provider(batch_fetch_history={"BAD": _make_df(), "GOOD": _make_df()})
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._drop_and_persist", side_effect=fake_persist), \
-         patch.object(db, "rollback", new_callable=AsyncMock) as mock_rollback:
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._drop_and_persist", side_effect=fake_persist),
+        patch.object(db, "rollback", new_callable=AsyncMock) as mock_rollback,
+    ):
         counts = await sync_all_prices(db, period="1y")
 
     assert counts == {"GOOD": 10}
@@ -360,22 +399,26 @@ async def test_sync_all_main_loop_failure_is_non_fatal(db):
 # The last stored bar must reconcile with the live quote or the frontend blanks
 # σ-Move. Each case names a real ticker observed on the watchlist (group 5).
 
-@pytest.mark.parametrize("name,closes,price,prev,state,expect_drop", [
-    # In-progress US session (REGULAR): partial bar, drop even though it matched
-    # the live price at capture — it drifts as the session continues (IBM's case).
-    ("IBM open-partial", [305.0, 290.23, 224.14], 220.84, 290.23, "REGULAR", True),
-    # Open session whose partial still matches the live price now: still dropped,
-    # because keeping it would blank σ-Move once the price moves on (MNST's case).
-    ("MNST open", [96.5, 97.07, 97.44], 97.565, 97.07, "REGULAR", True),
-    # Closed EU session, Yahoo daily bar not yet settled to the official close.
-    ("PRY.MI unsettled", [130.0, 133.35, 137.0], 137.85, 133.35, "POSTPOST", True),
-    # Closed session, within 0.5% of the settled close — keep (shows stored vnr).
-    ("MT.AS within-tol", [57.5, 58.04, 59.0], 58.72, 58.04, "POSTPOST", False),
-    # Closed, exact settled close — keep (Asian bar published overnight: f69ff59).
-    ("001440.KS settled", [28500.0, 28300.0, 28000.0], 28000.0, 28300.0, "PREPRE", False),
-    # Fully closed session, last bar equals current price — keep.
-    ("completed bar", [90.0, 95.0, 100.0], 100.0, 95.0, "CLOSED", False),
-])
+
+@pytest.mark.parametrize(
+    "name,closes,price,prev,state,expect_drop",
+    [
+        # In-progress US session (REGULAR): partial bar, drop even though it matched
+        # the live price at capture — it drifts as the session continues (IBM's case).
+        ("IBM open-partial", [305.0, 290.23, 224.14], 220.84, 290.23, "REGULAR", True),
+        # Open session whose partial still matches the live price now: still dropped,
+        # because keeping it would blank σ-Move once the price moves on (MNST's case).
+        ("MNST open", [96.5, 97.07, 97.44], 97.565, 97.07, "REGULAR", True),
+        # Closed EU session, Yahoo daily bar not yet settled to the official close.
+        ("PRY.MI unsettled", [130.0, 133.35, 137.0], 137.85, 133.35, "POSTPOST", True),
+        # Closed session, within 0.5% of the settled close — keep (shows stored vnr).
+        ("MT.AS within-tol", [57.5, 58.04, 59.0], 58.72, 58.04, "POSTPOST", False),
+        # Closed, exact settled close — keep (Asian bar published overnight: f69ff59).
+        ("001440.KS settled", [28500.0, 28300.0, 28000.0], 28000.0, 28300.0, "PREPRE", False),
+        # Fully closed session, last bar equals current price — keep.
+        ("completed bar", [90.0, 95.0, 100.0], 100.0, 95.0, "CLOSED", False),
+    ],
+)
 async def test_drop_unsettled_cases(name, closes, price, prev, state, expect_drop):
     df = _df_from_closes(closes)
     out = drop_unsettled_last_bar(df, price, prev, state)
@@ -431,8 +474,7 @@ async def test_sync_all_drops_unsettled_bar(db):
 
     # 3 bars; last (224.14) is today's partial, predecessor (290.23) == prev close.
     mock_data = {"IBM": _df_from_closes([305.0, 290.23, 224.14])}
-    quotes = [Quote(**{"symbol": "IBM", "price": 220.84, "previous_close": 290.23,
-               "market_state": "REGULAR"})]
+    quotes = [Quote(**{"symbol": "IBM", "price": 220.84, "previous_close": 290.23, "market_state": "REGULAR"})]
     mock_prov = _mock_provider(batch_fetch_history=mock_data, batch_fetch_quotes=quotes)
 
     captured = {}
@@ -443,8 +485,10 @@ async def test_sync_all_drops_unsettled_bar(db):
         captured["last_close"] = float(df.iloc[-1]["close"])
         return len(df)
 
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", side_effect=_capture):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", side_effect=_capture),
+    ):
         await sync_all_prices(db, period="1y")
 
     assert captured["len"] == 2  # 3 bars minus the dropped partial
@@ -459,8 +503,7 @@ async def test_sync_all_keeps_settled_bar(db):
 
     # Market closed (POSTPOST), last bar within tolerance of the settled close.
     mock_data = {"MT.AS": _df_from_closes([57.5, 58.04, 59.0])}
-    quotes = [Quote(**{"symbol": "MT.AS", "price": 58.72, "previous_close": 58.04,
-               "market_state": "POSTPOST"})]
+    quotes = [Quote(**{"symbol": "MT.AS", "price": 58.72, "previous_close": 58.04, "market_state": "POSTPOST"})]
     mock_prov = _mock_provider(batch_fetch_history=mock_data, batch_fetch_quotes=quotes)
 
     captured = {}
@@ -469,8 +512,10 @@ async def test_sync_all_keeps_settled_bar(db):
         captured["len"] = len(args[2])
         return len(args[2])
 
-    with patch("app.services.price_sync.get_price_provider", return_value=mock_prov), \
-         patch("app.services.price_sync._upsert_prices", side_effect=_capture):
+    with (
+        patch("app.services.price_sync.get_price_provider", return_value=mock_prov),
+        patch("app.services.price_sync._upsert_prices", side_effect=_capture),
+    ):
         await sync_all_prices(db, period="1y")
 
     assert captured["len"] == 3  # nothing dropped
@@ -483,6 +528,7 @@ async def test_sync_all_keeps_settled_bar(db):
 # tol of previous_close (a flat prior day). The close heuristic alone would drop
 # that real bar; the session date keeps it.
 
+
 async def test_drop_unsettled_keeps_completed_bar_before_session():
     """A trailing bar dated before the live session is completed → kept, even
     when its predecessor reconciles with previous_close (the flat-day misfire)."""
@@ -491,7 +537,10 @@ async def test_drop_unsettled_keeps_completed_bar_before_session():
     df = _df_from_closes([100.0, 99.8, 100.0])
     session_date = date(2025, 1, 7)  # after the last bar's date (2025-01-06)
     out = drop_unsettled_last_bar(
-        df, price=102.0, previous_close=100.0, market_state="REGULAR",
+        df,
+        price=102.0,
+        previous_close=100.0,
+        market_state="REGULAR",
         session_date=session_date,
     )
     assert len(out) == len(df)  # kept — it is a completed prior session
@@ -506,7 +555,10 @@ async def test_drop_unsettled_drops_forming_bar_on_session_date():
     """A trailing bar dated on the live session is the forming bar → still dropped."""
     df = _df_from_closes([305.0, 290.23, 224.14])
     out = drop_unsettled_last_bar(
-        df, price=220.84, previous_close=290.23, market_state="REGULAR",
+        df,
+        price=220.84,
+        previous_close=290.23,
+        market_state="REGULAR",
         session_date=date(2025, 1, 6),  # == the last bar's date
     )
     assert len(out) == len(df) - 1
@@ -520,18 +572,21 @@ async def test_drop_unsettled_drops_forming_bar_on_session_date():
 # close. Without an anchor the trailing bar dated on the venue's current local
 # date is withheld; everything earlier is settled and stores as usual.
 
+
 def _df_ending(end, closes):
     """OHLCV frame whose last bar is dated ``end`` (consecutive calendar days)."""
     n = len(closes)
-    dates = pd.DatetimeIndex([pd.Timestamp(end) - pd.Timedelta(days=n - 1 - i)
-                              for i in range(n)])
-    return pd.DataFrame({
-        "open": closes,
-        "high": [c + 1 for c in closes],
-        "low": [c - 1 for c in closes],
-        "close": closes,
-        "volume": [1_000_000] * n,
-    }, index=dates)
+    dates = pd.DatetimeIndex([pd.Timestamp(end) - pd.Timedelta(days=n - 1 - i) for i in range(n)])
+    return pd.DataFrame(
+        {
+            "open": closes,
+            "high": [c + 1 for c in closes],
+            "low": [c - 1 for c in closes],
+            "close": closes,
+            "volume": [1_000_000] * n,
+        },
+        index=dates,
+    )
 
 
 async def test_anchorless_withholds_current_session_bar():
@@ -564,8 +619,7 @@ async def test_anchorless_persist_withholds_and_never_purges(db):
     db.add(asset)
     await db.flush()
     # A stored row dated after everything the anchorless upsert will keep.
-    db.add(PriceHistory(asset_id=asset.id, date=date.today(),
-                        open=1, high=1, low=1, close=500.0, volume=0))
+    db.add(PriceHistory(asset_id=asset.id, date=date.today(), open=1, high=1, low=1, close=500.0, volume=0))
     await db.commit()
 
     # Bar dated the server's today is >= the venue-local (NY) date, so the
@@ -588,6 +642,7 @@ async def test_anchorless_persist_withholds_and_never_purges(db):
 
 # --- _drop_and_persist: purge an orphaned partial a re-sync can't upsert away ---
 
+
 async def test_drop_and_persist_deletes_orphaned_partial(db):
     """When a bar is dropped, a stale partial persisted past it is purged, so an
     upsert-only re-sync can't leave σ-Move blank all session."""
@@ -595,8 +650,7 @@ async def test_drop_and_persist_deletes_orphaned_partial(db):
     db.add(asset)
     await db.flush()
     # A leftover partial at a later date than anything the fetch will keep.
-    db.add(PriceHistory(asset_id=asset.id, date=date(2025, 6, 30),
-                        open=1, high=1, low=1, close=999.0, volume=0))
+    db.add(PriceHistory(asset_id=asset.id, date=date(2025, 6, 30), open=1, high=1, low=1, close=999.0, volume=0))
     await db.commit()
 
     # Fetched frame's last bar is a forming partial (predecessor == previous_close),
@@ -619,8 +673,7 @@ async def test_drop_and_persist_keeps_rows_when_the_frame_is_stale(db):
     asset = Asset(symbol="KEEP", name="Keep", type=AssetType.STOCK, currency="USD")
     db.add(asset)
     await db.flush()
-    db.add(PriceHistory(asset_id=asset.id, date=date(2025, 6, 30),
-                        open=1, high=1, low=1, close=500.0, volume=0))
+    db.add(PriceHistory(asset_id=asset.id, date=date(2025, 6, 30), open=1, high=1, low=1, close=500.0, volume=0))
     await db.commit()
 
     # Closed, settled bar (matches live price) → drop_unsettled keeps everything,
@@ -646,8 +699,7 @@ async def test_drop_and_persist_purges_orphan_the_provider_stopped_reporting(db)
     db.add(asset)
     await db.flush()
     orphan = date.today() + timedelta(days=1)  # past anything a fetch can return
-    db.add(PriceHistory(asset_id=asset.id, date=orphan,
-                        open=1, high=1, low=1, close=999.0, volume=0))
+    db.add(PriceHistory(asset_id=asset.id, date=orphan, open=1, high=1, low=1, close=999.0, volume=0))
     await db.commit()
 
     # Settled frame ending today: nothing to drop, but authoritative about now.
@@ -667,8 +719,7 @@ async def test_drop_and_persist_current_frame_keeps_its_own_last_bar(db):
     db.add(asset)
     await db.flush()
     today = date.today()
-    db.add(PriceHistory(asset_id=asset.id, date=today,
-                        open=1, high=1, low=1, close=59.0, volume=0))
+    db.add(PriceHistory(asset_id=asset.id, date=today, open=1, high=1, low=1, close=59.0, volume=0))
     await db.commit()
 
     df = _df_ending(today, [57.5, 58.04, 59.0])
@@ -681,6 +732,7 @@ async def test_drop_and_persist_current_frame_keeps_its_own_last_bar(db):
 
 
 # --- writes tell the indicator cache their series changed (#628) ------------
+
 
 async def test_upsert_invalidates_the_indicator_cache(db):
     """The cache key is (symbols, set-wide max date), which a corrected close or
@@ -724,6 +776,7 @@ async def test_upsert_of_nothing_leaves_the_cache_alone(db):
 
 # --- #635: the session date is direct evidence, so it outranks the heuristic --
 
+
 async def test_drop_unsettled_uses_session_date_when_predecessor_does_not_match():
     """The regression: an interior hole right before today leaves the frame's
     second-to-last bar unmatched with `previous_close`, which used to early-
@@ -731,8 +784,11 @@ async def test_drop_unsettled_uses_session_date_when_predecessor_does_not_match(
     today = date.today()
     df = _df_ending(today, [90.0, 100.0, 103.0])
     kept = drop_unsettled_last_bar(
-        df, price=103.0, previous_close=101.0,   # predecessor 100.0 != 101.0
-        market_state="REGULAR", session_date=today,
+        df,
+        price=103.0,
+        previous_close=101.0,  # predecessor 100.0 != 101.0
+        market_state="REGULAR",
+        session_date=today,
     )
     assert len(kept) == len(df) - 1
 
@@ -743,8 +799,11 @@ async def test_drop_unsettled_drops_a_lagging_bar_dated_the_live_session():
     today = date.today()
     df = _df_ending(today, [90.0, 100.0, 103.0])
     kept = drop_unsettled_last_bar(
-        df, price=108.0, previous_close=101.0,   # 103 hasn't settled to 108
-        market_state="POSTPOST", session_date=today,
+        df,
+        price=108.0,
+        previous_close=101.0,  # 103 hasn't settled to 108
+        market_state="POSTPOST",
+        session_date=today,
     )
     assert len(kept) == len(df) - 1
 
@@ -753,13 +812,17 @@ async def test_drop_unsettled_keeps_a_settled_bar_dated_the_live_session():
     today = date.today()
     df = _df_ending(today, [90.0, 100.0, 103.0])
     kept = drop_unsettled_last_bar(
-        df, price=103.0, previous_close=101.0,
-        market_state="POSTPOST", session_date=today,
+        df,
+        price=103.0,
+        previous_close=101.0,
+        market_state="POSTPOST",
+        session_date=today,
     )
     assert len(kept) == len(df)
 
 
 # --- #635: impossible bars are rejected at the write path --------------------
+
 
 def _bar(o, h, low, c, vol=1000):
     return {"open": o, "high": h, "low": low, "close": c, "volume": vol}
@@ -771,9 +834,9 @@ def test_build_price_rows_rejects_self_contradictory_bars():
     ref = AssetRef("TEST", 1)
     df = pd.DataFrame(
         [
-            _bar(100, 105, 99, 102),      # fine
-            _bar(100, 95, 99, 97),        # high below low
-            _bar(100, 105, -1, 102),      # non-positive
+            _bar(100, 105, 99, 102),  # fine
+            _bar(100, 95, 99, 97),  # high below low
+            _bar(100, 105, -1, 102),  # non-positive
         ],
         index=pd.bdate_range("2025-01-02", periods=3),
     )

@@ -51,7 +51,11 @@ async def remove_asset_from_group(group_id: int, asset_id: int, db: AsyncSession
     return await group_service.remove_asset(db, group_id, asset_id)
 
 
-@router.get("/{group_id}/sparklines", response_model=dict[str, list[SparklinePointResponse]], summary="Batch close prices for group assets")
+@router.get(
+    "/{group_id}/sparklines",
+    response_model=dict[str, list[SparklinePointResponse]],
+    summary="Batch close prices for group assets",
+)
 async def group_sparklines(
     group_id: int,
     period: PeriodType = Query("3mo"),
@@ -61,7 +65,11 @@ async def group_sparklines(
     return await get_batch_sparklines(db, period, group_id=group_id)
 
 
-@router.get("/{group_id}/indicators", response_model=dict[str, IndicatorSnapshotBase], summary="Batch indicators for group assets")
+@router.get(
+    "/{group_id}/indicators",
+    response_model=dict[str, IndicatorSnapshotBase],
+    summary="Batch indicators for group assets",
+)
 async def group_indicators(
     group_id: int,
     db: AsyncSession = Depends(get_db),

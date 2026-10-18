@@ -31,9 +31,15 @@ function OverlayEntry({ descriptor, v }: { descriptor: IndicatorDescriptor; v: L
     const color = seriesTextColor(s)
     return (
       <span>
-        <span className="inline-block w-2 h-0.5 mr-1 align-middle" style={{ backgroundColor: color }} />
+        <span
+          className="mr-1 inline-block h-0.5 w-2 align-middle"
+          style={{ backgroundColor: color }}
+        />
         {s.label}{" "}
-        <span style={{ color }}>{val?.toFixed(descriptor.decimals)}{descriptor.suffix ?? ""}</span>
+        <span style={{ color }}>
+          {val?.toFixed(descriptor.decimals)}
+          {descriptor.suffix ?? ""}
+        </span>
       </span>
     )
   }
@@ -46,23 +52,26 @@ function OverlayEntry({ descriptor, v }: { descriptor: IndicatorDescriptor; v: L
       {descriptor.series.map((s, i) => (
         <Fragment key={s.field}>
           {i > 0 && " / "}
-          <span>{v.indicators[s.field]?.toFixed(descriptor.decimals)}{descriptor.suffix ?? ""}</span>
+          <span>
+            {v.indicators[s.field]?.toFixed(descriptor.decimals)}
+            {descriptor.suffix ?? ""}
+          </span>
         </Fragment>
       ))}
     </span>
   )
 }
 
-function hasOHLC(v: LegendValues): v is LegendValues & { o: number; h: number; l: number; c: number } {
+function hasOHLC(
+  v: LegendValues
+): v is LegendValues & { o: number; h: number; l: number; c: number } {
   return v.o != null && v.h != null && v.l != null && v.c != null
 }
 
 export function Legend({ values, latest }: { values: LegendValues | null; latest: LegendValues }) {
   const v = values ?? latest
   const ohlc = hasOHLC(v)
-  const changeColor = ohlc
-    ? v.c >= v.o ? "text-emerald-500" : "text-red-500"
-    : ""
+  const changeColor = ohlc ? (v.c >= v.o ? "text-emerald-500" : "text-red-500") : ""
 
   const overlays = getOverlayDescriptors()
 
@@ -70,12 +79,22 @@ export function Legend({ values, latest }: { values: LegendValues | null; latest
     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
       {ohlc && (
         <>
-          <span className="text-muted-foreground">O <span className={changeColor}>{v.o.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">H <span className={changeColor}>{v.h.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">L <span className={changeColor}>{v.l.toFixed(2)}</span></span>
-          <span className="text-muted-foreground">C <span className={changeColor}>{v.c.toFixed(2)}</span></span>
+          <span className="text-muted-foreground">
+            O <span className={changeColor}>{v.o.toFixed(2)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            H <span className={changeColor}>{v.h.toFixed(2)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            L <span className={changeColor}>{v.l.toFixed(2)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            C <span className={changeColor}>{v.c.toFixed(2)}</span>
+          </span>
           {v.vol != null && (
-            <span className="text-muted-foreground">V <span className={changeColor}>{formatCompactNumber(v.vol)}</span></span>
+            <span className="text-muted-foreground">
+              V <span className={changeColor}>{formatCompactNumber(v.vol)}</span>
+            </span>
           )}
         </>
       )}
@@ -86,7 +105,11 @@ export function Legend({ values, latest }: { values: LegendValues | null; latest
   )
 }
 
-export function SubChartLegend({ descriptorId, values, latest }: {
+export function SubChartLegend({
+  descriptorId,
+  values,
+  latest,
+}: {
   descriptorId: string
   values: LegendValues | null
   latest: LegendValues
@@ -110,16 +133,23 @@ export function SubChartLegend({ descriptorId, values, latest }: {
         if (thresholdClass) {
           return (
             <span key={s.field} className={thresholdClass}>
-              {s.label} {val.toFixed(desc.decimals)}{desc.suffix ?? ""}
+              {s.label} {val.toFixed(desc.decimals)}
+              {desc.suffix ?? ""}
             </span>
           )
         }
 
         return (
           <span key={s.field}>
-            <span className="inline-block w-2 h-0.5 mr-1 align-middle" style={{ backgroundColor: color }} />
+            <span
+              className="mr-1 inline-block h-0.5 w-2 align-middle"
+              style={{ backgroundColor: color }}
+            />
             {s.label}{" "}
-            <span style={{ color }}>{val.toFixed(desc.decimals)}{desc.suffix ?? ""}</span>
+            <span style={{ color }}>
+              {val.toFixed(desc.decimals)}
+              {desc.suffix ?? ""}
+            </span>
           </span>
         )
       })}

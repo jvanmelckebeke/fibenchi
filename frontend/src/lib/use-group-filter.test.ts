@@ -14,7 +14,7 @@ const indicators = (
   close: number | null,
   vnr: number,
   vnr_sigma: number,
-  as_of: string | null = null,
+  as_of: string | null = null
 ): Record<string, IndicatorSummary> => ({
   "001440.KS": { close, as_of, change_pct: null, bars: null, values: { vnr, vnr_sigma } },
 })
@@ -25,7 +25,7 @@ describe("getSortValue — σ-Move (vnr)", () => {
       asset,
       "vnr",
       quote({ change_percent: -1.06, previous_close: 28300, price: 28100 }),
-      indicators(28300, 1.56, 0.0576),
+      indicators(28300, 1.56, 0.0576)
     )
     // Live: -1.06% / 5.76% ≈ -0.184 — NOT the stale stored +1.56.
     expect(v).toBeCloseTo(-0.184, 3)
@@ -36,7 +36,7 @@ describe("getSortValue — σ-Move (vnr)", () => {
       asset,
       "vnr",
       quote({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      indicators(30250, 1.56, 0.0576), // Friday's stored bar — 2 sessions behind
+      indicators(30250, 1.56, 0.0576) // Friday's stored bar — 2 sessions behind
     )
     expect(v).toBeNull()
   })
@@ -46,7 +46,7 @@ describe("getSortValue — σ-Move (vnr)", () => {
       asset,
       "vnr",
       quote({ change_percent: -1.06, previous_close: 28300, price: 28000 }),
-      indicators(28000, -0.18, 0.0576), // today's bar synced → dbClose == price
+      indicators(28000, -0.18, 0.0576) // today's bar synced → dbClose == price
     )
     expect(v).toBe(-0.18)
   })

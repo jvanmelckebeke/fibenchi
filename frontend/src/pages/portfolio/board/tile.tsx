@@ -32,12 +32,27 @@ export function PhaseIcon({ phase, live }: { phase: TileData["phase"]; live?: bo
     )
   }
   if (phase === "premarket") {
-    return <ArrowRightToLine className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Pre-market" />
+    return (
+      <ArrowRightToLine
+        className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4"
+        aria-label="Pre-market"
+      />
+    )
   }
   if (phase === "aftermarket") {
-    return <ArrowRightFromLine className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="After-hours" />
+    return (
+      <ArrowRightFromLine
+        className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4"
+        aria-label="After-hours"
+      />
+    )
   }
-  return <Moon className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4" aria-label="Closed" />
+  return (
+    <Moon
+      className="phase-icon h-3.5 w-3.5 shrink-0 text-current opacity-80 2xl:h-4 2xl:w-4"
+      aria-label="Closed"
+    />
+  )
 }
 
 function fmtSigma(v: number): string {
@@ -88,17 +103,17 @@ export const BoardTile = memo(function BoardTile({
       <TooltipTrigger asChild>
         <Link
           to={`/asset/${tile.symbol}`}
-          className={`board-tile flex h-[62px] flex-col justify-between rounded-[3px] px-2 py-1.5 2xl:h-[80px] 2xl:px-3 2xl:py-2.5 outline-none transition-[filter] hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring ${pending ? "board-tile-pending" : noReading ? "board-tile-unread" : ""}`}
-          style={stop ? { backgroundColor: stop.color, color: stop.ink } : undefined}
-        >
+          className={`board-tile flex h-[62px] flex-col justify-between rounded-[3px] px-2 py-1.5 transition-[filter] outline-none hover:brightness-125 focus-visible:ring-2 focus-visible:ring-ring 2xl:h-[80px] 2xl:px-3 2xl:py-2.5 ${pending ? "board-tile-pending" : noReading ? "board-tile-unread" : ""}`}
+          style={stop ? { backgroundColor: stop.color, color: stop.ink } : undefined}>
           <span className="flex items-center justify-between gap-1">
-            <span className="truncate font-mono text-[12px] font-semibold 2xl:text-[14px] leading-none">{tile.symbol}</span>
+            <span className="truncate font-mono text-[12px] leading-none font-semibold 2xl:text-[14px]">
+              {tile.symbol}
+            </span>
             <PhaseIcon phase={tile.phase} live={tile.liveState} />
           </span>
           <span
-            className="flex items-center text-[11px] leading-none tabular-nums 2xl:text-[13px] opacity-90"
-            aria-busy={pending || undefined}
-          >
+            className="flex items-center text-[11px] leading-none tabular-nums opacity-90 2xl:text-[13px]"
+            aria-busy={pending || undefined}>
             {valueEl}
           </span>
           <WindowBars windowPct={tile.windowPct} windowPercentile={tile.windowPercentile} />
@@ -115,8 +130,7 @@ export const BoardTile = memo(function BoardTile({
           div, so its own icons and sparkline aren't direct children. */}
       <TooltipContent
         side="top"
-        className="w-fit max-w-none rounded-lg border border-border bg-popover p-0 text-foreground shadow-lg [&>svg]:fill-popover"
-      >
+        className="w-fit max-w-none rounded-lg border border-border bg-popover p-0 text-foreground shadow-lg [&>svg]:fill-popover">
         <TileTooltip tile={tile} mode={mode} span={span} />
       </TooltipContent>
     </Tooltip>

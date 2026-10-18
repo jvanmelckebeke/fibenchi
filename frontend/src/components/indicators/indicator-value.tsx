@@ -39,9 +39,7 @@ export function IndicatorValue({
   if (main.text === "--") {
     return (
       <div className="flex flex-col">
-        <span className={`${sizeClass} font-semibold tabular-nums text-muted-foreground`}>
-          --
-        </span>
+        <span className={`${sizeClass} font-semibold text-muted-foreground tabular-nums`}>--</span>
       </div>
     )
   }
@@ -51,15 +49,14 @@ export function IndicatorValue({
 
   return (
     <div className="flex flex-col">
-      <span
-        className={`${sizeClass} font-semibold tabular-nums ${main.colorClass}`}
-      >
+      <span className={`${sizeClass} font-semibold tabular-nums ${main.colorClass}`}>
         {main.text}
       </span>
 
       {/* ADX: show +DI / -DI below the main value */}
       {descriptor.id === "adx" && (
-        <div className={`flex ${expanded ? "justify-center" : ""} ${subGap} tabular-nums mt-0.5 ${subSize}`}>
+        <div
+          className={`flex ${expanded ? "justify-center" : ""} ${subGap} mt-0.5 tabular-nums ${subSize}`}>
           <span className="text-emerald-500">
             +DI {getNumericValue(values, "plus_di")?.toFixed(1) ?? "--"}
           </span>
@@ -71,12 +68,15 @@ export function IndicatorValue({
 
       {/* MACD: show line + signal below histogram */}
       {descriptor.id === "macd" && (
-        <div className={`flex ${expanded ? "justify-center" : ""} ${subGap} tabular-nums mt-0.5 ${subSize}`}>
+        <div
+          className={`flex ${expanded ? "justify-center" : ""} ${subGap} mt-0.5 tabular-nums ${subSize}`}>
           <span className="text-sky-400">
-            <span className="text-muted-foreground">{expanded ? "MACD" : "M"}</span> {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
+            <span className="text-muted-foreground">{expanded ? "MACD" : "M"}</span>{" "}
+            {getNumericValue(values, "macd")?.toFixed(2) ?? "--"}
           </span>
           <span className="text-orange-400">
-            <span className="text-muted-foreground">{expanded ? "Signal" : "S"}</span> {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
+            <span className="text-muted-foreground">{expanded ? "Signal" : "S"}</span>{" "}
+            {getNumericValue(values, "macd_signal")?.toFixed(2) ?? "--"}
           </span>
         </div>
       )}

@@ -79,10 +79,7 @@ def _declared_ratios(df: pd.DataFrame) -> list[tuple[int, float]]:
 
 def _priced(closes: pd.Series) -> list[int]:
     """Positions the frame actually prices, oldest first."""
-    return [
-        pos for pos in range(len(closes))
-        if pd.notna(closes.iat[pos]) and closes.iat[pos] > 0
-    ]
+    return [pos for pos in range(len(closes)) if pd.notna(closes.iat[pos]) and closes.iat[pos] > 0]
 
 
 def _breaks(
@@ -115,9 +112,7 @@ def _breaks(
     return found
 
 
-def _displaced(
-    breaks: list[tuple[int, float]], priced: list[int]
-) -> list[tuple[list[int], float]]:
+def _displaced(breaks: list[tuple[int, float]], priced: list[int]) -> list[tuple[list[int], float]]:
     """Groups that step away by a factor and step straight back.
 
     Both factors come from ``{ratio, 1/ratio}``, so "steps back" is the exact
@@ -159,9 +154,7 @@ def normalize_basis(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame
 
     for ex_pos, ratio in declared:
         priced = _priced(closes)
-        for positions, factor in _displaced(
-            _breaks(closes, priced, band, ratio, ex_positions, ex_pos), priced
-        ):
+        for positions, factor in _displaced(_breaks(closes, priced, band, ratio, ex_positions, ex_pos), priced):
             for pos in positions:
                 divisor.iat[pos] *= factor
                 closes.iat[pos] = float(closes.iat[pos]) / factor
@@ -169,8 +162,13 @@ def normalize_basis(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame
                 "%s: %d bar(s) from %s sit %.4fx off their neighbours and step "
                 "straight back; requoting them in the basis around them "
                 "(split %s on %s, band %.4f)",
-                symbol or "?", len(positions), df.index[positions[0]], factor,
-                ratio, df.index[ex_pos], band,
+                symbol or "?",
+                len(positions),
+                df.index[positions[0]],
+                factor,
+                ratio,
+                df.index[ex_pos],
+                band,
             )
 
     if (divisor == 1.0).all():

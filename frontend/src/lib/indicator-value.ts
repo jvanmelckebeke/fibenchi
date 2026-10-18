@@ -29,7 +29,7 @@ import { resolveSigma, sessionsBehind, sigmaWithheldTitle } from "@/lib/sigma"
 /** A resolver turns quote + snapshot into one live-or-settled number. */
 type LiveResolver = (
   quote: Quote | undefined,
-  snapshot: IndicatorSummary | undefined,
+  snapshot: IndicatorSummary | undefined
 ) => LiveResolution
 
 const LIVE_RESOLVERS: Record<LiveResolverId, LiveResolver> = {
@@ -37,9 +37,7 @@ const LIVE_RESOLVERS: Record<LiveResolverId, LiveResolver> = {
   // adapting it here is cheaper than renaming through its test suite.
   sigma: (quote, snapshot) => {
     const r = resolveSigma(quote, snapshot)
-    return r.status === "ok"
-      ? { status: "ok", value: r.sigma, source: r.source }
-      : r
+    return r.status === "ok" ? { status: "ok", value: r.sigma, source: r.source } : r
   },
   rvol: resolveRvol,
 }
@@ -76,7 +74,7 @@ export type IndicatorValueResolution =
 export function resolveIndicatorValue(
   field: string,
   quote: Quote | undefined,
-  snapshot: IndicatorSummary | undefined,
+  snapshot: IndicatorSummary | undefined
 ): IndicatorValueResolution {
   const behind = snapshot ? sessionsBehind(snapshot, quote) : null
   const descriptor = getDescriptorByField(field)
@@ -98,10 +96,7 @@ export function resolveIndicatorValue(
 
 /** Human explanation for a blanked cell, or null when there is nothing useful
  * to say (the cell is then a mute dash rather than a lying tooltip). */
-export function indicatorWithheldTitle(
-  field: string,
-  reason: WithheldReason,
-): string | null {
+export function indicatorWithheldTitle(field: string, reason: WithheldReason): string | null {
   const live = getDescriptorByField(field)?.live
   if (!live || live.field !== field) return null
   return WITHHELD_TITLES[live.resolver](reason)
@@ -132,7 +127,7 @@ export function isAbnormallyBehind(resolution: IndicatorValueResolution): boolea
 export function settledSessionTitle(
   label: string,
   resolution: IndicatorValueResolution,
-  snapshot: IndicatorSummary | undefined,
+  snapshot: IndicatorSummary | undefined
 ): string | null {
   if (resolution.status !== "ok" || resolution.source === "live") return null
   const { behind } = resolution

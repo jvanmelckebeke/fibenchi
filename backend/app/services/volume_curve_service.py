@@ -42,9 +42,7 @@ CURVE_FIT_SYMBOLS_PER_VENUE = 5
 _curves: dict[str, list[float]] = {}
 
 
-def _bucket_frames(
-    df: pd.DataFrame, venue: Venue
-) -> list[tuple[pd.Series, datetime, datetime]]:
+def _bucket_frames(df: pd.DataFrame, venue: Venue) -> list[tuple[pd.Series, datetime, datetime]]:
     """Split one symbol's multi-session frame into per-session volume series.
 
     Each session is paired with its own open and close from the venue calendar,
@@ -120,24 +118,22 @@ async def fit_venue_curves(db: AsyncSession, refs: list[AssetRef]) -> dict[str, 
     return fitted
 
 
-async def _store_curve(
-    db: AsyncSession, calendar: str, curve: list[float], samples: int
-) -> None:
+async def _store_curve(db: AsyncSession, calendar: str, curve: list[float], samples: int) -> None:
     """Replace a venue's stored curve. Delete-then-insert rather than upsert:
     the bucket count is a constant that could change, and a shrunk curve must
     not leave the tail of the previous one behind it."""
-    await db.execute(
-        delete(VolumeCurvePoint).where(VolumeCurvePoint.calendar == calendar)
+    await db.execute(delete(VolumeCurvePoint).where(VolumeCurvePoint.calendar == calendar))
+    db.add_all(
+        [
+            VolumeCurvePoint(
+                calendar=calendar,
+                bucket=bucket,
+                cumulative_fraction=round(value, 5),
+                samples=samples,
+            )
+            for bucket, value in enumerate(curve)
+        ]
     )
-    db.add_all([
-        VolumeCurvePoint(
-            calendar=calendar,
-            bucket=bucket,
-            cumulative_fraction=round(value, 5),
-            samples=samples,
-        )
-        for bucket, value in enumerate(curve)
-    ])
     await db.commit()
 
 
@@ -148,11 +144,7 @@ async def load_curve_cache(db: AsyncSession) -> int:
     checked at each use — an unusable curve and a missing one produce the same
     answer, so there is no reason for two ways to say it.
     """
-    result = await db.execute(
-        select(VolumeCurvePoint).order_by(
-            VolumeCurvePoint.calendar, VolumeCurvePoint.bucket
-        )
-    )
+    result = await db.execute(select(VolumeCurvePoint).order_by(VolumeCurvePoint.calendar, VolumeCurvePoint.bucket))
     collected: dict[str, list[float]] = defaultdict(list)
     thin: set[str] = set()
     for point in result.scalars():
@@ -168,7 +160,8 @@ async def load_curve_cache(db: AsyncSession) -> int:
     if thin:
         logger.info(
             "Volume curves below %d samples, not loaded: %s",
-            MIN_CURVE_SAMPLES, ", ".join(sorted(thin)),
+            MIN_CURVE_SAMPLES,
+            ", ".join(sorted(thin)),
         )
     return len(_curves)
 

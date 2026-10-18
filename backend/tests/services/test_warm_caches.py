@@ -20,7 +20,9 @@ def _make_group(gid: int, name: str = "G"):
 @patch("app.background_tasks.jobs.async_session")
 @patch("app.repositories.group_repo.GroupRepository")
 async def test_warm_all_group_caches_iterates_every_group(
-    MockGroupRepo, mock_async_session, mock_compute,
+    MockGroupRepo,
+    mock_async_session,
+    mock_compute,
 ):
     """Pre-warm should call compute_and_cache_indicators once per group."""
     groups = [_make_group(1, "Watchlist"), _make_group(2, "Hotlist"), _make_group(3, "Crypto")]
@@ -43,7 +45,9 @@ async def test_warm_all_group_caches_iterates_every_group(
 @patch("app.background_tasks.jobs.async_session")
 @patch("app.repositories.group_repo.GroupRepository")
 async def test_warm_all_group_caches_continues_on_per_group_failure(
-    MockGroupRepo, mock_async_session, mock_compute,
+    MockGroupRepo,
+    mock_async_session,
+    mock_compute,
 ):
     """A failure on one group must not stop the loop."""
     groups = [_make_group(1), _make_group(2), _make_group(3)]
@@ -65,7 +69,9 @@ async def test_warm_all_group_caches_continues_on_per_group_failure(
 @patch("app.background_tasks.jobs.async_session")
 @patch("app.repositories.group_repo.GroupRepository")
 async def test_warm_all_group_caches_handles_no_groups(
-    MockGroupRepo, mock_async_session, mock_compute,
+    MockGroupRepo,
+    mock_async_session,
+    mock_compute,
 ):
     MockGroupRepo.return_value.list_all = AsyncMock(return_value=[])
 

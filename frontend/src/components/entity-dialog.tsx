@@ -25,9 +25,7 @@ export function EntityDialog<T extends { id: number }>({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={contentClassName}>
         {entity && (
-          <Fragment key={entity.id}>
-            {children(entity, () => onOpenChange(false))}
-          </Fragment>
+          <Fragment key={entity.id}>{children(entity, () => onOpenChange(false))}</Fragment>
         )}
       </DialogContent>
     </Dialog>

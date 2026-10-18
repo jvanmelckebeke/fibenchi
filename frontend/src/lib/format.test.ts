@@ -95,26 +95,31 @@ describe("formatAssetPrice / unit_kind", () => {
 
   it("prints a percent-quoted index as a rate", () => {
     expect(
-      formatAssetPrice(4.628, hints({ symbol: "^TYX", type: "index", unit_kind: "percent" })),
+      formatAssetPrice(4.628, hints({ symbol: "^TYX", type: "index", unit_kind: "percent" }))
     ).toBe("4.63%")
   })
 
   it("prints a points-quoted index bare — no symbol, no percent", () => {
-    const s = formatAssetPrice(6912.34, hints({ symbol: "^GSPC", type: "index", unit_kind: "points" }), undefined, true)
+    const s = formatAssetPrice(
+      6912.34,
+      hints({ symbol: "^GSPC", type: "index", unit_kind: "points" }),
+      undefined,
+      true
+    )
     expect(s).toBe("6,912.34")
   })
 
   it("honours unit_kind over the ticker, so any yield index can be marked", () => {
     // ^BVSP was never in the old hardcoded set; the user can now say so.
     expect(
-      formatAssetPrice(10.5, hints({ symbol: "^BVSP", type: "index", unit_kind: "percent" })),
+      formatAssetPrice(10.5, hints({ symbol: "^BVSP", type: "index", unit_kind: "percent" }))
     ).toBe("10.50%")
   })
 
   it("honours unit_kind over the ticker in the other direction too", () => {
     // Currency wins even on a caret symbol, if that is what the user chose.
     expect(
-      formatAssetPrice(46.28, hints({ symbol: "^TYX", type: "index", unit_kind: "currency" })),
+      formatAssetPrice(46.28, hints({ symbol: "^TYX", type: "index", unit_kind: "currency" }))
     ).toBe("$46.28")
   })
 

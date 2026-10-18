@@ -21,7 +21,7 @@ export function CreateForm({ onClose }: { onClose: () => void }) {
 
   return (
     <Card>
-      <CardContent className="pt-6 space-y-3">
+      <CardContent className="space-y-3 pt-6">
         <Input
           placeholder="Name (e.g. Quantum Computing)"
           value={name}
@@ -35,7 +35,9 @@ export function CreateForm({ onClose }: { onClose: () => void }) {
           className="min-h-[60px]"
         />
         <div className="flex items-center gap-2">
-          <label htmlFor="pseudo-etf-base-date" className="text-sm text-muted-foreground">Base date:</label>
+          <label htmlFor="pseudo-etf-base-date" className="text-sm text-muted-foreground">
+            Base date:
+          </label>
           <Input
             id="pseudo-etf-base-date"
             type="date"
@@ -47,8 +49,12 @@ export function CreateForm({ onClose }: { onClose: () => void }) {
         </div>
         {create.isError && <p className="text-sm text-destructive">{create.error.message}</p>}
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={create.isPending}>Create</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={create.isPending}>
+            Create
+          </Button>
         </div>
       </CardContent>
     </Card>

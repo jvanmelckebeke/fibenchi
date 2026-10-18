@@ -62,11 +62,7 @@ class _IntradayMixin(_YahooBase):
             if hist.empty:
                 return {}
 
-            available = (
-                set(hist.index.get_level_values(0).unique())
-                if isinstance(hist.index, pd.MultiIndex)
-                else None
-            )
+            available = set(hist.index.get_level_values(0).unique()) if isinstance(hist.index, pd.MultiIndex) else None
 
             out: dict[str, list[ProviderIntradayBar]] = {}
             for sym in symbols:
@@ -87,7 +83,8 @@ class _IntradayMixin(_YahooBase):
                     if divisor is None:
                         logger.warning(
                             "intraday: no currency for %s and its venue quotes in "
-                            "subunits; skipping rather than guessing a basis", sym,
+                            "subunits; skipping rather than guessing a basis",
+                            sym,
                         )
                         continue
                     tz_name = info.get("exchangeTimezoneName")
@@ -114,12 +111,14 @@ class _IntradayMixin(_YahooBase):
                         if divisor != 1:
                             close_val = close_val / divisor
 
-                        bars.append(ProviderIntradayBar(
-                            timestamp=dt,
-                            price=round(close_val, 4),
-                            volume=int(row["volume"]) if pd.notna(row.get("volume", None)) else 0,
-                            tz_name=tz_name,
-                        ))
+                        bars.append(
+                            ProviderIntradayBar(
+                                timestamp=dt,
+                                price=round(close_val, 4),
+                                volume=int(row["volume"]) if pd.notna(row.get("volume", None)) else 0,
+                                tz_name=tz_name,
+                            )
+                        )
                     if bars:
                         out[sym] = bars
                 except (KeyError, TypeError) as exc:
@@ -130,7 +129,11 @@ class _IntradayMixin(_YahooBase):
         return await asyncio.to_thread(self._call, _fetch, lambda: {})
 
     async def intraday_history(
-        self, symbols: list[str], *, days: int = 60, interval: str = "5m",
+        self,
+        symbols: list[str],
+        *,
+        days: int = 60,
+        interval: str = "5m",
     ) -> dict[str, pd.DataFrame]:
         """Fetch several sessions of intraday bars, for fitting volume curves.
 
@@ -161,11 +164,7 @@ class _IntradayMixin(_YahooBase):
             if hist.empty:
                 return {}
 
-            available = (
-                set(hist.index.get_level_values(0).unique())
-                if isinstance(hist.index, pd.MultiIndex)
-                else None
-            )
+            available = set(hist.index.get_level_values(0).unique()) if isinstance(hist.index, pd.MultiIndex) else None
 
             out: dict[str, pd.DataFrame] = {}
             for sym in symbols:

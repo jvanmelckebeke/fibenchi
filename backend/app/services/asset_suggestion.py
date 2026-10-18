@@ -90,7 +90,11 @@ def suggest_for_asset(asset: Classified) -> AssetSuggestion:
     disagrees = {f for f in differs if source[f].is_auto}
 
     return AssetSuggestion(
-        base.type, base.unit_kind, base.currency, frozenset(differs), frozenset(disagrees),
+        base.type,
+        base.unit_kind,
+        base.currency,
+        frozenset(differs),
+        frozenset(disagrees),
     )
 
 

@@ -24,12 +24,8 @@ export function TagBadge({
           ? "bg-secondary text-secondary-foreground"
           : "bg-muted/50 text-muted-foreground opacity-60"
       )}
-      onClick={onClick}
-    >
-      <span
-        className="h-2 w-2 rounded-full shrink-0"
-        style={{ backgroundColor: color }}
-      />
+      onClick={onClick}>
+      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       {name}
       {onRemove && (
         <button
@@ -38,8 +34,7 @@ export function TagBadge({
           onClick={(e) => {
             e.stopPropagation()
             onRemove()
-          }}
-        >
+          }}>
           &times;
         </button>
       )}

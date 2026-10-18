@@ -10,7 +10,9 @@ class QuoteResponse(BaseModel):
     volume: int | None = Field(default=None, description="Current session trading volume")
     avg_volume: int | None = Field(default=None, description="10-day average daily volume")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
-    market_state: str | None = Field(default=None, description="Market state: REGULAR, PRE, POST, PREPRE, POSTPOST, or CLOSED")
+    market_state: str | None = Field(
+        default=None, description="Market state: REGULAR, PRE, POST, PREPRE, POSTPOST, or CLOSED"
+    )
     session_date: str | None = Field(
         default=None,
         description="Exchange-local ISO date of the quote's live session. Together with "

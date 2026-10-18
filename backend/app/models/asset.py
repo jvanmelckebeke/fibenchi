@@ -27,17 +27,23 @@ class Asset(Base):
     # can't express "percent" or "no unit at all" — an index had to claim a
     # denomination it doesn't have. Only meaningful when unit_kind is CURRENCY.
     unit_kind: Mapped[UnitKind] = mapped_column(
-        Enum(UnitKind), default=UnitKind.CURRENCY, server_default="CURRENCY",
+        Enum(UnitKind),
+        default=UnitKind.CURRENCY,
+        server_default="CURRENCY",
     )
     # Provenance, per editable concept: did Fibenchi work this out, or did a
     # human say so? AUTO fields may be re-suggested when the guess improves;
     # USER fields are left alone. ``unit_source`` covers unit_kind *and*
     # currency — they're one decision ("how is this quoted"), not two.
     type_source: Mapped[FieldSource] = mapped_column(
-        Enum(FieldSource), default=FieldSource.AUTO, server_default="AUTO",
+        Enum(FieldSource),
+        default=FieldSource.AUTO,
+        server_default="AUTO",
     )
     unit_source: Mapped[FieldSource] = mapped_column(
-        Enum(FieldSource), default=FieldSource.AUTO, server_default="AUTO",
+        Enum(FieldSource),
+        default=FieldSource.AUTO,
+        server_default="AUTO",
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

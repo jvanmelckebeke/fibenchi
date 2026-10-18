@@ -21,11 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { getSeriesByField } from "@/lib/indicator-registry"
 import { BASE_COLUMN_DEFS, isColumnVisible } from "./shared"
 
@@ -52,8 +48,9 @@ function SortableIndicatorRow({
   narrow: boolean
   onToggle: (key: string) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: field })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: field,
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -65,15 +62,13 @@ function SortableIndicatorRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 rounded px-1 py-1 hover:bg-accent"
-    >
+      className="flex items-center gap-2 rounded px-1 py-1 hover:bg-accent">
       <button
         type="button"
         aria-label={`Reorder ${label} column`}
-        className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground shrink-0"
+        className="shrink-0 cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground"
         {...attributes}
-        {...listeners}
-      >
+        {...listeners}>
         <GripVertical className="h-3.5 w-3.5" />
       </button>
       <Checkbox
@@ -84,8 +79,7 @@ function SortableIndicatorRow({
       />
       <Label
         htmlFor={`col-${field}`}
-        className="flex flex-1 items-center justify-between gap-2 text-sm font-normal"
-      >
+        className="flex flex-1 items-center justify-between gap-2 text-sm font-normal">
         {label}
         {narrow && <span className="text-[10px] text-muted-foreground">narrow</span>}
       </Label>
@@ -102,7 +96,7 @@ export function ColumnVisibilityMenu({
 }: ColumnVisibilityMenuProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
   const indicatorLabels = useMemo(() => {
@@ -125,12 +119,7 @@ export function ColumnVisibilityMenu({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          aria-label="Configure columns"
-        >
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" aria-label="Configure columns">
           <Settings2 className="h-3.5 w-3.5" />
         </Button>
       </PopoverTrigger>
@@ -159,12 +148,10 @@ export function ColumnVisibilityMenu({
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
+              onDragEnd={handleDragEnd}>
               <SortableContext
                 items={orderedIndicatorFields}
-                strategy={verticalListSortingStrategy}
-              >
+                strategy={verticalListSortingStrategy}>
                 <div className="flex flex-col">
                   {orderedIndicatorFields.map((field) => (
                     <SortableIndicatorRow

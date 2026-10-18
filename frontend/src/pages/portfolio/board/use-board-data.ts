@@ -124,7 +124,7 @@ export function relevanceCutoff(now: Date): Date {
 export function applyPhaseFilter(
   tiles: Map<string, Tile>,
   filter: PhaseFilter,
-  now: Date = new Date(),
+  now: Date = new Date()
 ): Map<string, Tile> {
   if (filter === "all") return tiles
   if (filter === "open") return new Map([...tiles].filter(([, t]) => t.phase === "open"))
@@ -132,8 +132,8 @@ export function applyPhaseFilter(
   return new Map(
     [...tiles].filter(
       ([, t]) =>
-        t.phase === "open" || (t.lastClose != null && new Date(t.lastClose).getTime() > cutoff),
-    ),
+        t.phase === "open" || (t.lastClose != null && new Date(t.lastClose).getTime() > cutoff)
+    )
   )
 }
 
@@ -281,19 +281,20 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       // knows: when the next hole scan runs, and whether the snapshot is merely
       // late. `pending` wins — the resolver reports an absent snapshot as
       // `no_data`, and cannot tell "not fetched" from "nothing to fetch".
-      const reason: NoReadingReason | null = resolved.status !== "withheld"
-        ? null
-        : snap == null && snapshotsPending
-          ? { kind: "pending" }
-          : resolved.reason.kind === "gap"
-            ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
-            : resolved.reason
+      const reason: NoReadingReason | null =
+        resolved.status !== "withheld"
+          ? null
+          : snap == null && snapshotsPending
+            ? { kind: "pending" }
+            : resolved.reason.kind === "gap"
+              ? { ...resolved.reason, nextScanSeconds: health?.next_scan_in_seconds ?? null }
+              : resolved.reason
 
       const scheduled = symbolPhase[symbol]
       const liveState = quote?.market_state != null
       const phase: Phase | null = liveState
         ? marketState(quote.market_state).phase
-        : scheduled?.phase ?? null
+        : (scheduled?.phase ?? null)
 
       out.set(symbol, {
         symbol,
@@ -315,7 +316,18 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
       })
     }
     return out
-  }, [roster, quotes, snapshots, snapshotsPending, windowReturns, windowPercentiles, series, sectionsBySymbol, symbolPhase, health])
+  }, [
+    roster,
+    quotes,
+    snapshots,
+    snapshotsPending,
+    windowReturns,
+    windowPercentiles,
+    series,
+    sectionsBySymbol,
+    symbolPhase,
+    health,
+  ])
 
   // Filtering happens on the tile map, before sections are assembled: the
   // lookups below then drop the hidden symbols by themselves, the
@@ -324,10 +336,7 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   //
   // `tiles` itself stays whole — the rail and the coverage badge summarise the
   // day, which includes the venues that have already gone home.
-  const visibleTiles = useMemo(
-    () => applyPhaseFilter(tiles, phaseFilter),
-    [tiles, phaseFilter],
-  )
+  const visibleTiles = useMemo(() => applyPhaseFilter(tiles, phaseFilter), [tiles, phaseFilter])
 
   const sections = useMemo<BoardSection[]>(() => {
     const toTiles = (list: Asset[]) =>

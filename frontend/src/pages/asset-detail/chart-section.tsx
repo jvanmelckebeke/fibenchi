@@ -53,12 +53,8 @@ function LiveChartSection({ symbol }: { symbol: string }) {
   }
 
   return (
-    <div className="h-[520px] rounded-md border border-border/50 overflow-hidden">
-      <IntradayChart
-        points={points}
-        previousClose={previousClose}
-        interactive
-      />
+    <div className="h-[520px] overflow-hidden rounded-md border border-border/50">
+      <IntradayChart points={points} previousClose={previousClose} interactive />
     </div>
   )
 }
@@ -78,8 +74,13 @@ function HistoricalChartSection({
   currency?: string
   assetType?: AssetType
 }) {
-  const { prices, indicators, windowEmpty, isLoading: detailLoading, isFetching: detailFetching } =
-    useAssetWindow(symbol, assetWindow)
+  const {
+    prices,
+    indicators,
+    windowEmpty,
+    isLoading: detailLoading,
+    isFetching: detailFetching,
+  } = useAssetWindow(symbol, assetWindow)
   const { data: annotations } = useAnnotations(symbol)
 
   if (detailLoading) {
@@ -88,7 +89,7 @@ function HistoricalChartSection({
 
   if (!prices?.length) {
     return (
-      <div className="h-[520px] flex items-center justify-center text-muted-foreground">
+      <div className="flex h-[520px] items-center justify-center text-muted-foreground">
         {windowEmpty
           ? "No data in this window — try a wider range."
           : "No price data. Click Refresh to fetch."}
@@ -99,8 +100,8 @@ function HistoricalChartSection({
   return (
     <div className="relative">
       {detailFetching && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10 rounded-t-md">
-          <div className="h-full w-1/3 bg-primary animate-[slide_1s_ease-in-out_infinite]" />
+        <div className="absolute top-0 right-0 left-0 z-10 h-0.5 overflow-hidden rounded-t-md bg-primary/20">
+          <div className="h-full w-1/3 animate-[slide_1s_ease-in-out_infinite] bg-primary" />
         </div>
       )}
       <PriceChart

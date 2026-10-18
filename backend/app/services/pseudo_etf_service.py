@@ -80,6 +80,7 @@ async def remove_constituent(db: AsyncSession, etf_id: int, asset_id: int):
 
 # --- Note ---
 
+
 async def get_note(db: AsyncSession, etf_id: int):
     etf = await get_pseudo_etf(etf_id, db)
     note = await PseudoEtfRepository(db).get_note(etf_id)
@@ -94,6 +95,7 @@ async def upsert_note(db: AsyncSession, etf_id: int, content: str):
 
 
 # --- Annotations ---
+
 
 async def list_annotations(db: AsyncSession, etf_id: int):
     await get_pseudo_etf(etf_id, db)

@@ -20,27 +20,24 @@ export function useCrosshairHover<H>(latest: H | null): {
   const [hover, setHover] = useState<H | null>(null)
   const hoverRef = useRef(new Map<string, H>())
 
-  const subscribe = useCallback(
-    (chart: IChartApi, onHover?: (h: H, time: Time) => void) => {
-      let reentrant = false
-      chart.subscribeCrosshairMove((param) => {
-        if (param.time) {
-          const h = hoverRef.current.get(String(param.time))
-          if (h !== undefined) {
-            setHover(h)
-            if (onHover && !reentrant) {
-              reentrant = true
-              onHover(h, param.time)
-              reentrant = false
-            }
+  const subscribe = useCallback((chart: IChartApi, onHover?: (h: H, time: Time) => void) => {
+    let reentrant = false
+    chart.subscribeCrosshairMove((param) => {
+      if (param.time) {
+        const h = hoverRef.current.get(String(param.time))
+        if (h !== undefined) {
+          setHover(h)
+          if (onHover && !reentrant) {
+            reentrant = true
+            onHover(h, param.time)
+            reentrant = false
           }
-        } else {
-          setHover(null)
         }
-      })
-    },
-    [],
-  )
+      } else {
+        setHover(null)
+      }
+    })
+  }, [])
 
   return { hoverRef, subscribe, displayData: hover ?? latest }
 }

@@ -41,25 +41,28 @@ export function SearchResultsList({
         const isYahooBoundary = i === localCount && localCount > 0
         return (
           <div key={r.symbol}>
-            {isYahooBoundary && <div className="border-t border-border my-1" />}
+            {isYahooBoundary && <div className="my-1 border-t border-border" />}
             <button
-              className={`flex w-full items-center gap-3 text-sm text-left transition-colors ${rowClassName} ${
+              className={`flex w-full items-center gap-3 text-left text-sm transition-colors ${rowClassName} ${
                 i === selectedIndex
                   ? "bg-primary/10 text-foreground"
                   : "text-foreground hover:bg-muted"
               }`}
               onMouseEnter={() => onHover?.(i)}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onSelect(r)}
-            >
-              <SearchResultItem result={r} isTracked={isTracked} symbolClassName={symbolClassName} />
+              onClick={() => onSelect(r)}>
+              <SearchResultItem
+                result={r}
+                isTracked={isTracked}
+                symbolClassName={symbolClassName}
+              />
             </button>
           </div>
         )
       })}
       {yahooLoading && (
         <>
-          {allResults.length > 0 && <div className="border-t border-border my-1" />}
+          {allResults.length > 0 && <div className="my-1 border-t border-border" />}
           <div className="flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
             Searching Yahoo Finance…

@@ -9,9 +9,7 @@ class SettingsRepository:
         self.db = db
 
     async def get(self) -> UserSettings | None:
-        result = await self.db.execute(
-            select(UserSettings).where(UserSettings.id == 1)
-        )
+        result = await self.db.execute(select(UserSettings).where(UserSettings.id == 1))
         return result.scalar_one_or_none()
 
     async def upsert(self, data: dict) -> UserSettings:

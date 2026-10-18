@@ -40,7 +40,7 @@ export function groupTargetActions(
   groups: Group[],
   assetId: number,
   symbol: string,
-  onAdd: (groupId: number) => void,
+  onAdd: (groupId: number) => void
 ): ContextAction[] {
   return groups.map((g) => {
     const alreadyIn = g.assets.some((a) => a.id === assetId)

@@ -16,7 +16,7 @@ export function useAssetDetail(symbol: string, period?: string, opts?: { enabled
 
 function sliceFrom<T extends { date: string }>(
   rows: T[] | undefined,
-  startDate: string | null,
+  startDate: string | null
 ): T[] | undefined {
   if (!rows || !startDate) return rows
   return rows.filter((r) => r.date >= startDate) // ISO dates compare lexicographically
@@ -33,13 +33,20 @@ function sliceFrom<T extends { date: string }>(
  * a "since" date with no trading days yet), so callers can distinguish that
  * from "the asset has no data at all".
  */
-export function useAssetWindow(symbol: string, assetWindow: AssetWindow, opts?: { enabled?: boolean }) {
+export function useAssetWindow(
+  symbol: string,
+  assetWindow: AssetWindow,
+  opts?: { enabled?: boolean }
+) {
   const { fetchPeriod, startDate, label } = resolveWindow(assetWindow)
   const query = useAssetDetail(symbol, fetchPeriod, opts)
-  const prices = useMemo(() => sliceFrom(query.data?.prices, startDate), [query.data?.prices, startDate])
+  const prices = useMemo(
+    () => sliceFrom(query.data?.prices, startDate),
+    [query.data?.prices, startDate]
+  )
   const indicators = useMemo(
     () => sliceFrom(query.data?.indicators, startDate),
-    [query.data?.indicators, startDate],
+    [query.data?.indicators, startDate]
   )
   const windowEmpty = !!query.data?.prices?.length && !prices?.length
   return { ...query, prices, indicators, fetchPeriod, windowLabel: label, windowEmpty }
@@ -66,7 +73,7 @@ export function useHoldingsIndicators(symbol: string, enabled: boolean) {
 export function useRefreshPrices(symbol: string) {
   return useInvalidatingMutation(
     (period?: string) => api.prices.refresh(symbol, period),
-    [["asset-detail", symbol]],
+    [["asset-detail", symbol]]
   )
 }
 
@@ -80,6 +87,6 @@ export function usePrefetchAssetDetail(period: string) {
         queryFn: () => api.prices.detail(symbol, period),
         staleTime: STALE_5MIN,
       }),
-    [qc, period],
+    [qc, period]
   )
 }

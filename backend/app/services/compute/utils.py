@@ -17,12 +17,17 @@ def prices_to_df(prices: list[PriceHistory]) -> pd.DataFrame:
     dividend becomes 0.0: for the total-return numerator, "unknown" and "none"
     both mean there is no cash to add back.
     """
-    return pd.DataFrame([{
-        "date": p.date,
-        "open": p.open,
-        "high": p.high,
-        "low": p.low,
-        "close": p.close,
-        "volume": p.volume,
-        "dividends": p.dividend or 0.0,
-    } for p in prices]).set_index("date")
+    return pd.DataFrame(
+        [
+            {
+                "date": p.date,
+                "open": p.open,
+                "high": p.high,
+                "low": p.low,
+                "close": p.close,
+                "volume": p.volume,
+                "dividends": p.dividend or 0.0,
+            }
+            for p in prices
+        ]
+    ).set_index("date")

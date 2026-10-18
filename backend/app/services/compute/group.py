@@ -53,7 +53,9 @@ async def _get_default_group_refs(db: AsyncSession) -> list[AssetRef]:
 
 
 async def get_batch_sparklines(
-    db: AsyncSession, period: str = "3mo", group_id: int | None = None,
+    db: AsyncSession,
+    period: str = "3mo",
+    group_id: int | None = None,
 ) -> dict[str, list[dict]]:
     """Return close-price sparkline data for assets in a group.
 
@@ -67,7 +69,9 @@ async def get_batch_sparklines(
 
 
 async def get_sparklines_for_symbols(
-    db: AsyncSession, symbols: list[str], period: str = "3mo",
+    db: AsyncSession,
+    symbols: list[str],
+    period: str = "3mo",
 ) -> dict[str, list[dict]]:
     """Close-price sparklines for specific tracked symbols, keyed by symbol.
 
@@ -84,7 +88,9 @@ async def get_sparklines_for_symbols(
 
 
 async def _sparklines_for_refs(
-    db: AsyncSession, period: str, refs: list[AssetRef],
+    db: AsyncSession,
+    period: str,
+    refs: list[AssetRef],
 ) -> dict[str, list[dict]]:
     """Close-price series per symbol over the period, in one price query."""
     days = PERIOD_DAYS.get(period, 90)
@@ -116,7 +122,8 @@ def indicator_history_start() -> date:
 
 
 async def load_indicator_history(
-    db: AsyncSession, refs: list[AssetRef],
+    db: AsyncSession,
+    refs: list[AssetRef],
 ) -> dict[AssetRef, list[PriceHistory]]:
     """Stored bars since :func:`indicator_history_start` per ref, in one query.
 
@@ -141,7 +148,8 @@ def compute_ref_indicators(ref: AssetRef, prices: list[PriceHistory]) -> pd.Data
 
 
 async def _compute_snapshots_for_refs(
-    db: AsyncSession, refs: list[AssetRef],
+    db: AsyncSession,
+    refs: list[AssetRef],
 ) -> dict[str, IndicatorSnapshotBase]:
     """Compute DB-backed indicator snapshots for the refs, with caching.
 
@@ -184,7 +192,8 @@ async def _compute_snapshots_for_refs(
 
 
 async def compute_and_cache_indicators(
-    db: AsyncSession, group_id: int | None = None,
+    db: AsyncSession,
+    group_id: int | None = None,
 ) -> dict[str, IndicatorSnapshotBase]:
     """Compute indicator snapshots for assets in a group, with caching.
 
@@ -199,7 +208,8 @@ async def compute_and_cache_indicators(
 
 
 async def compute_indicators_for_symbols(
-    db: AsyncSession, symbols: list[str],
+    db: AsyncSession,
+    symbols: list[str],
 ) -> dict[str, IndicatorSnapshotBase]:
     """Compute indicator snapshots for specific tracked symbols (DB-backed).
 

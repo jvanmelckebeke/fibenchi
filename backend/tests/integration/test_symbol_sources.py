@@ -1,6 +1,5 @@
 """Integration tests for the symbol sources router."""
 
-
 import pytest
 
 from app.models.symbol_directory import SymbolDirectory
@@ -9,11 +8,14 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 async def _create_source(client, name: str = "Test Source", provider_type: str = "euronext") -> dict:
-    resp = await client.post("/api/symbol-sources", json={
-        "name": name,
-        "provider_type": provider_type,
-        "config": {"markets": ["amsterdam"]},
-    })
+    resp = await client.post(
+        "/api/symbol-sources",
+        json={
+            "name": name,
+            "provider_type": provider_type,
+            "config": {"markets": ["amsterdam"]},
+        },
+    )
     assert resp.status_code == 201
     return resp.json()
 
@@ -54,9 +56,14 @@ class TestCreateSource:
         assert data["symbol_count"] == 0
 
     async def test_invalid_provider_type(self, client):
-        resp = await client.post("/api/symbol-sources", json={
-            "name": "Bad", "provider_type": "nonexistent", "config": {},
-        })
+        resp = await client.post(
+            "/api/symbol-sources",
+            json={
+                "name": "Bad",
+                "provider_type": "nonexistent",
+                "config": {},
+            },
+        )
         assert resp.status_code == 400
         assert "Unknown provider" in resp.json()["detail"]
 

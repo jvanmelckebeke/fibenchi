@@ -24,14 +24,14 @@ const MIX_SEGMENTS = [
 
 /** Asset-mix breakdown: stacked proportion bar + per-kind legend counts. */
 function AssetMixCard({ stats }: { stats: Stats }) {
-  const segments = MIX_SEGMENTS
-    .map((s) => ({ ...s, count: stats[s.key] }))
-    .filter((s) => s.count > 0)
+  const segments = MIX_SEGMENTS.map((s) => ({ ...s, count: stats[s.key] })).filter(
+    (s) => s.count > 0
+  )
   const total = segments.reduce((acc, s) => acc + s.count, 0)
 
   return (
     <Card className="col-span-2">
-      <CardContent className="pt-6 space-y-3">
+      <CardContent className="space-y-3 pt-6">
         <div className="flex items-baseline justify-between">
           <p className="text-sm text-muted-foreground">Tracked tickers</p>
           <p className="text-2xl font-bold tabular-nums">{num(stats.assets_tracked)}</p>
@@ -39,8 +39,10 @@ function AssetMixCard({ stats }: { stats: Stats }) {
 
         {total > 0 && (
           <>
-            <div className="flex h-3 w-full overflow-hidden rounded-full" role="img"
-                 aria-label={segments.map((s) => `${s.count} ${s.label}`).join(", ")}>
+            <div
+              className="flex h-3 w-full overflow-hidden rounded-full"
+              role="img"
+              aria-label={segments.map((s) => `${s.count} ${s.label}`).join(", ")}>
               {segments.map((s) => (
                 <div
                   key={s.key}
@@ -53,7 +55,7 @@ function AssetMixCard({ stats }: { stats: Stats }) {
               {segments.map((s) => (
                 <span key={s.key} className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                  <span className="tabular-nums font-medium">{num(s.count)}</span>
+                  <span className="font-medium tabular-nums">{num(s.count)}</span>
                   <span className="text-muted-foreground">{s.label}</span>
                 </span>
               ))}
@@ -78,13 +80,21 @@ function AssetMixCard({ stats }: { stats: Stats }) {
   )
 }
 
-function StatTile({ label, value, detail }: { label: string; value: ReactNode; detail?: ReactNode }) {
+function StatTile({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: ReactNode
+  detail?: ReactNode
+}) {
   return (
     <Card>
       <CardContent className="pt-6">
         <p className="text-sm text-muted-foreground">{label}</p>
         <p className="text-2xl font-bold tabular-nums">{value}</p>
-        {detail && <p className="text-xs text-muted-foreground mt-1">{detail}</p>}
+        {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
       </CardContent>
     </Card>
   )
@@ -132,8 +142,7 @@ function DataQualityCard() {
             } 0)`,
           }}
           role="img"
-          aria-label={`${covered - affected} of ${covered} tickers healthy`}
-        >
+          aria-label={`${covered - affected} of ${covered} tickers healthy`}>
           <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-card">
             <span className="text-2xl font-bold tabular-nums">
               {num(covered - affected)}/{num(covered)}
@@ -145,19 +154,18 @@ function DataQualityCard() {
         <div className="space-y-2 text-sm">
           {healthy ? (
             <p>
-              All {num(covered)} tickers have their full {num(expected)} expected session bars
-              for the last {data.scan_window_days} days. Nothing to heal.
+              All {num(covered)} tickers have their full {num(expected)} expected session bars for
+              the last {data.scan_window_days} days. Nothing to heal.
             </p>
           ) : (
             <>
               <p>
                 <span className="font-medium">
-                  {affected} of {num(covered)} tickers {affected === 1 ? "is" : "are"} missing
-                  data
+                  {affected} of {num(covered)} tickers {affected === 1 ? "is" : "are"} missing data
                 </span>{" "}
                 — {missing} session {missing === 1 ? "bar" : "bars"} in total (
-                {num(expected - missing)} of {num(expected)} expected bars present). Their
-                σ-Move shows "—" until repaired.
+                {num(expected - missing)} of {num(expected)} expected bars present). Their σ-Move
+                shows "—" until repaired.
               </p>
               <p className="text-muted-foreground">
                 Self-heals automatically: next scan {formatEta(data.next_scan_in_seconds)}, up to{" "}
@@ -169,7 +177,7 @@ function DataQualityCard() {
                   {data.hole_symbols.map((h) => (
                     <li key={h.symbol} className="flex justify-between gap-4">
                       <span className="font-medium">{h.symbol}</span>
-                      <span className="text-muted-foreground truncate">
+                      <span className="truncate text-muted-foreground">
                         {h.missing_sessions.join(", ")}
                       </span>
                     </li>
@@ -190,7 +198,7 @@ export function StatsPage() {
   const years = stats && stats.collected_days > 0 ? stats.collected_days / 365 : 0
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <h1 className="text-2xl font-bold">Stats</h1>
 
       <DataQualityCard />

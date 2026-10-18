@@ -15,7 +15,7 @@ export function useNote(symbol: string) {
 export function useUpdateNote(symbol: string) {
   return useInvalidatingMutation(
     (content: string) => api.note.update(symbol, content),
-    [keys.note(symbol)],
+    [keys.note(symbol)]
   )
 }
 
@@ -32,13 +32,13 @@ export function useAnnotations(symbol: string) {
 export function useCreateAnnotation(symbol: string) {
   return useInvalidatingMutation(
     (data: AnnotationCreate) => api.annotations.create(symbol, data),
-    [keys.annotations(symbol)],
+    [keys.annotations(symbol)]
   )
 }
 
 export function useDeleteAnnotation(symbol: string) {
   return useInvalidatingMutation(
     (id: number) => api.annotations.delete(symbol, id),
-    [keys.annotations(symbol)],
+    [keys.annotations(symbol)]
   )
 }

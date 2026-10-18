@@ -13,6 +13,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 # ── Pure unit tests for bb_position ───────────────────────────────────
 
+
 def test_bb_position_above():
     assert bb_position(close=110, upper=105, middle=100, lower=95) == "above"
 
@@ -40,6 +41,7 @@ _MOCK_HOLDINGS = {
 
 
 # ── Integration tests ────────────────────────────────────────────────
+
 
 async def test_holdings_indicators_success(client):
     """Holdings indicators endpoint returns data for ETF with mocked Yahoo."""
@@ -70,6 +72,7 @@ async def test_holdings_indicators_success(client):
 
     # Verify indicator values are nested under 'values'
     from app.services.compute.indicators import get_all_output_fields
+
     expected_fields = set(get_all_output_fields())
     for item in data:
         assert "values" in item

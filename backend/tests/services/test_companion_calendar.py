@@ -17,9 +17,7 @@ def test_known_holidays_and_half_days_are_listed():
     assert paris.timezone == "Europe/Paris"
     assert datetime.date(2025, 12, 26) in paris.closures
     assert datetime.date(2025, 12, 26) not in nyse.closures
-    assert (datetime.date(2025, 12, 24), datetime.time(14, 5)) in [
-        (h.date, h.close) for h in paris.half_days
-    ]
+    assert (datetime.date(2025, 12, 24), datetime.time(14, 5)) in [(h.date, h.close) for h in paris.half_days]
 
 
 def test_closures_stay_inside_the_window():
@@ -57,12 +55,11 @@ def test_session_rule_reproduces_the_calendar():
         trading = {d - 1 for d in cal.trading_days}
         closures, extra = set(cal.closures), set(cal.extra_sessions)
         derived = {
-            d for d in (window[0] + datetime.timedelta(n) for n in range((window[1] - window[0]).days + 1))
+            d
+            for d in (window[0] + datetime.timedelta(n) for n in range((window[1] - window[0]).days + 1))
             if d in extra or (d.weekday() in trading and d not in closures)
         }
-        actual = {
-            ts.date() for ts in xcals.get_calendar(name).sessions_in_range(str(window[0]), str(window[1]))
-        }
+        actual = {ts.date() for ts in xcals.get_calendar(name).sessions_in_range(str(window[0]), str(window[1]))}
         assert derived == actual, name
 
 

@@ -23,10 +23,17 @@ async def _asset(db, symbol: str, closes: list[float]) -> Asset:
     await db.flush()
     start = date(2026, 1, 5)
     for i, c in enumerate(closes):
-        db.add(PriceHistory(
-            asset_id=asset.id, date=start + timedelta(days=i),
-            open=c, high=c * 1.01, low=c * 0.99, close=c, volume=1_000_000,
-        ))
+        db.add(
+            PriceHistory(
+                asset_id=asset.id,
+                date=start + timedelta(days=i),
+                open=c,
+                high=c * 1.01,
+                low=c * 0.99,
+                close=c,
+                volume=1_000_000,
+            )
+        )
     await db.commit()
     return asset
 
@@ -79,8 +86,7 @@ class TestDetection:
 def _frame(closes: dict, splits: dict | None = None) -> pd.DataFrame:
     """A provider frame: {date: close}, already normalized by the fetch path."""
     vals = list(closes.values())
-    data = {"open": vals, "high": vals, "low": vals, "close": vals,
-            "volume": [1_000_000] * len(vals)}
+    data = {"open": vals, "high": vals, "low": vals, "close": vals, "volume": [1_000_000] * len(vals)}
     if splits is not None:
         data["splits"] = [splits.get(d, 0.0) for d in closes]
     return pd.DataFrame(data, index=pd.Index(list(closes), name="date"))
@@ -238,7 +244,8 @@ class TestStepsInsideASplitWindow:
     async def test_the_step_is_retried_rather_than_written_off(self, db):
         await _asset(db, "MNST", [94.4, 91.43, 45.53])
         still_stepped = _frame(
-            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53}, splits={D[2]: 2.0},
+            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53},
+            splits={D[2]: 2.0},
         )
 
         with _provider(still_stepped) as calls:
@@ -251,7 +258,8 @@ class TestStepsInsideASplitWindow:
     async def test_it_is_written_off_once_the_retries_run_out(self, db):
         await _asset(db, "MNST", [94.4, 91.43, 45.53])
         still_stepped = _frame(
-            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53}, splits={D[2]: 2.0},
+            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53},
+            splits={D[2]: 2.0},
         )
 
         with _provider(still_stepped) as calls:
@@ -277,10 +285,12 @@ class TestStepsInsideASplitWindow:
     async def test_a_resolved_step_forgets_its_attempts(self, db):
         await _asset(db, "MNST", [94.4, 91.43, 45.53, 46.0])
         stepped = _frame(
-            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53, D[3]: 46.0}, splits={D[2]: 2.0},
+            {D[0]: 94.4, D[1]: 91.43, D[2]: 45.53, D[3]: 46.0},
+            splits={D[2]: 2.0},
         )
         rebased = _frame(
-            {D[0]: 47.20, D[1]: 45.715, D[2]: 45.53, D[3]: 46.0}, splits={D[2]: 2.0},
+            {D[0]: 47.20, D[1]: 45.715, D[2]: 45.53, D[3]: 46.0},
+            splits={D[2]: 2.0},
         )
 
         with _provider(stepped):

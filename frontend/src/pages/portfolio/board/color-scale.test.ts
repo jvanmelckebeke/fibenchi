@@ -112,7 +112,12 @@ describe("boardScale — the one ramp the board shares", () => {
 
   it("counts the blanks in the denominator rather than dropping them", () => {
     // Seven of ten blank: the calm survivors must not pull the ramp in.
-    const tiles = [tile(0.2, 0.3), tile(-0.3, -0.4), tile(0.1, 0.2), ...Array.from({ length: 7 }, () => tile(null, null))]
+    const tiles = [
+      tile(0.2, 0.3),
+      tile(-0.3, -0.4),
+      tile(0.1, 0.2),
+      ...Array.from({ length: 7 }, () => tile(null, null)),
+    ]
     const { span, unread, tightened } = boardScale(tiles, "sigma")
     expect(tightened).toBe(false)
     expect(span).toBe(3) // canonical ±3σ, not the 1.5 the survivors would give
@@ -122,7 +127,11 @@ describe("boardScale — the one ramp the board shares", () => {
   it("reads todayPct in % mode, which blanks on its own conditions", () => {
     // A tile can carry a σ and no %, or a % and no σ: the mode decides which
     // column is the reading, so each mode gates on its own coverage.
-    const tiles = [tile(null, 1.2), tile(0.4, null), ...Array.from({ length: 8 }, () => tile(0.2, 0.8))]
+    const tiles = [
+      tile(null, 1.2),
+      tile(0.4, null),
+      ...Array.from({ length: 8 }, () => tile(0.2, 0.8)),
+    ]
     expect(boardScale(tiles, "pct").unread).toBe(1)
     expect(boardScale(tiles, "sigma").unread).toBe(1)
     expect(boardScale(tiles, "pct").tightened).toBe(true)

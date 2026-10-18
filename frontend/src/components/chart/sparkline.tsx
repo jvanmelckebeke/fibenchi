@@ -4,11 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { attachResizeAndCleanup } from "@/hooks/use-chart-lifecycle"
 import type { SparklinePoint } from "@/lib/api"
 
-export function SparklineChart({
-  batchData,
-}: {
-  batchData?: SparklinePoint[]
-}) {
+export function SparklineChart({ batchData }: { batchData?: SparklinePoint[] }) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -46,9 +42,7 @@ export function SparklineChart({
       crosshairMarkerVisible: false,
     })
 
-    series.setData(
-      batchData.map((p) => ({ time: p.date, value: p.close }))
-    )
+    series.setData(batchData.map((p) => ({ time: p.date, value: p.close })))
 
     chart.timeScale().fitContent()
 
@@ -60,7 +54,11 @@ export function SparklineChart({
   }
 
   if (!batchData.length) {
-    return <div className="h-[60px] flex items-center justify-center text-xs text-muted-foreground">No data</div>
+    return (
+      <div className="flex h-[60px] items-center justify-center text-xs text-muted-foreground">
+        No data
+      </div>
+    )
   }
 
   return <div ref={containerRef} className="w-full" />
@@ -72,9 +70,7 @@ export function SparklineChart({
  * simultaneously when switching from table to card view, which would block
  * the main thread and cause a visible freeze.
  */
-export function DeferredSparkline(props: {
-  batchData?: SparklinePoint[]
-}) {
+export function DeferredSparkline(props: { batchData?: SparklinePoint[] }) {
   const [isVisible, setIsVisible] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
 

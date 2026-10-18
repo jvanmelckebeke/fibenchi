@@ -72,7 +72,12 @@ export function ComboCreateInput<T extends ComboItem>({
       <h3 className="text-sm font-semibold">{label}</h3>
       <div className="flex flex-wrap gap-1.5">
         {current.map((item) => (
-          <TagBadge key={item.id} name={item.name} color={item.color} onRemove={() => onRemove(item)} />
+          <TagBadge
+            key={item.id}
+            name={item.name}
+            color={item.color}
+            onRemove={() => onRemove(item)}
+          />
         ))}
       </div>
       <div ref={ref} className="relative">
@@ -97,7 +102,9 @@ export function ComboCreateInput<T extends ComboItem>({
           className="h-8 text-sm"
         />
         {open && (search || filtered.length > 0) && (
-          <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md" role="listbox">
+          <div
+            className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md"
+            role="listbox">
             <div className="max-h-48 overflow-y-auto p-1">
               {filtered.map((item) => (
                 <button
@@ -107,22 +114,23 @@ export function ComboCreateInput<T extends ComboItem>({
                   onClick={() => {
                     onSelect(item)
                     setOpen(false)
-                  }}
-                >
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                  }}>
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
                   {item.name}
                 </button>
               ))}
               {search.trim() && !exactMatch && create && (
-                <div className={create.extras ? "border-t p-2 space-y-2" : "border-t p-1"}>
+                <div className={create.extras ? "space-y-2 border-t p-2" : "border-t p-1"}>
                   {create.extras}
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent text-muted-foreground"
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent"
                     onClick={() => {
                       Promise.resolve(create.onCreate(search.trim())).then(close, () => {})
-                    }}
-                  >
+                    }}>
                     {create.label(search.trim())}
                   </button>
                 </div>

@@ -52,10 +52,17 @@ def _quote_session_date(info: dict) -> str | None:
 
 # Period strings accepted by Yahoo's history endpoint.
 PERIOD_MAP: dict[str, str] = {
-    "1d": "1d", "5d": "5d", "1w": "5d",
-    "1mo": "1mo", "3mo": "3mo", "6mo": "6mo",
-    "1y": "1y", "2y": "2y", "5y": "5y",
-    "ytd": "ytd", "max": "max",
+    "1d": "1d",
+    "5d": "5d",
+    "1w": "5d",
+    "1mo": "1mo",
+    "3mo": "3mo",
+    "6mo": "6mo",
+    "1y": "1y",
+    "2y": "2y",
+    "5y": "5y",
+    "ytd": "ytd",
+    "max": "max",
 }
 
 # Mapping: output_field → (yahoo_module, yahoo_key, decimals, multiplier)
@@ -174,11 +181,16 @@ def parse_quotes(symbols: list[str], price_data: dict) -> list[Quote]:
 
         if info.get("regularMarketPrice") is not None and sanitize_float(info["regularMarketPrice"]) is None:
             nan_fields.append(f"{sym}.price")
-        if info.get("regularMarketChangePercent") is not None and sanitize_float(info["regularMarketChangePercent"]) is None:
+        if (
+            info.get("regularMarketChangePercent") is not None
+            and sanitize_float(info["regularMarketChangePercent"]) is None
+        ):
             nan_fields.append(f"{sym}.change_percent")
-        if (info.get("regularMarketPrice") is None
-                and info.get("regularMarketChangePercent") is None
-                and info.get("marketState") is None):
+        if (
+            info.get("regularMarketPrice") is None
+            and info.get("regularMarketChangePercent") is None
+            and info.get("marketState") is None
+        ):
             null_symbols.append(sym)
 
         results.append(parse_quote_row(sym, info))
@@ -187,9 +199,10 @@ def parse_quotes(symbols: list[str], price_data: dict) -> list[Quote]:
         logger.warning("Yahoo returned NaN/Infinity for: %s", ", ".join(nan_fields))
     if null_symbols:
         logger.warning(
-            "Yahoo returned all-null data for %d/%d symbols: %s — "
-            "possible rate-limiting or auth issue",
-            len(null_symbols), len(symbols), ", ".join(null_symbols[:10]),
+            "Yahoo returned all-null data for %d/%d symbols: %s — possible rate-limiting or auth issue",
+            len(null_symbols),
+            len(symbols),
+            ", ".join(null_symbols[:10]),
         )
 
     return results
@@ -202,21 +215,25 @@ def parse_holdings(info: dict) -> dict | None:
 
     holdings = []
     for h in info.get("holdings", []):
-        holdings.append({
-            "symbol": h.get("symbol", ""),
-            "name": h.get("holdingName", ""),
-            "percent": round(h.get("holdingPercent", 0) * 100, 2),
-        })
+        holdings.append(
+            {
+                "symbol": h.get("symbol", ""),
+                "name": h.get("holdingName", ""),
+                "percent": round(h.get("holdingPercent", 0) * 100, 2),
+            }
+        )
 
     sectors = []
     for entry in info.get("sectorWeightings", []):
         for key, val in entry.items():
             pct = round(val * 100, 2)
             if pct > 0:
-                sectors.append({
-                    "sector": SECTOR_NAMES.get(key, key),
-                    "percent": pct,
-                })
+                sectors.append(
+                    {
+                        "sector": SECTOR_NAMES.get(key, key),
+                        "percent": pct,
+                    }
+                )
     sectors.sort(key=lambda s: s["percent"], reverse=True)
 
     total = round(sum(h["percent"] for h in holdings), 2)

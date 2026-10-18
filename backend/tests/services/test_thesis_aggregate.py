@@ -55,12 +55,16 @@ def test_series_empty():
 
 
 def test_series_single_member_curve():
-    pts = aggregate_return_series([[
-        (date(2026, 3, 1), 100.0),
-        (date(2026, 3, 2), 110.0),
-        (date(2026, 3, 3), 120.0),
-    ]])
-    assert pts[0] == {"date": "2026-03-01", "pct": 0.0}   # anchored to the open
+    pts = aggregate_return_series(
+        [
+            [
+                (date(2026, 3, 1), 100.0),
+                (date(2026, 3, 2), 110.0),
+                (date(2026, 3, 3), 120.0),
+            ]
+        ]
+    )
+    assert pts[0] == {"date": "2026-03-01", "pct": 0.0}  # anchored to the open
     assert pts[-1] == {"date": "2026-03-03", "pct": 20.0}
 
 
@@ -86,7 +90,7 @@ def test_series_carries_forward_over_gaps():
 
 
 def test_series_zero_open_member_excluded():
-    a = [(date(2026, 3, 1), 0.0), (date(2026, 3, 2), 50.0)]   # zero open -> dropped
+    a = [(date(2026, 3, 1), 0.0), (date(2026, 3, 2), 50.0)]  # zero open -> dropped
     b = [(date(2026, 3, 1), 100.0), (date(2026, 3, 2), 110.0)]
     by_date = {p["date"]: p["pct"] for p in aggregate_return_series([a, b])}
     assert by_date["2026-03-02"] == 10.0
@@ -98,7 +102,7 @@ def test_series_downsample_caps_and_keeps_ends():
     assert len(pts) <= 10
     assert pts[0]["date"] == "2026-01-01"
     assert pts[-1]["date"] == (date(2026, 1, 1) + timedelta(days=199)).isoformat()
-    assert pts[-1]["pct"] == 199.0   # 100 -> 299 = +199%
+    assert pts[-1]["pct"] == 199.0  # 100 -> 299 = +199%
 
 
 def test_series_last_point_equals_aggregate():

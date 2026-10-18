@@ -3,13 +3,27 @@ import { resolveRvol, MIN_VOLUME_PACE } from "./rvol"
 import type { IndicatorSummary, Quote } from "@/lib/types"
 
 const q = (over: Partial<Quote> = {}): Quote => ({
-  symbol: "KOG.OL", price: null, previous_close: null, change: null, change_percent: null,
-  volume: null, avg_volume: null, currency: "NOK", market_state: null,
-  session_date: null, recent_sessions: null, volume_pace: null, ...over,
+  symbol: "KOG.OL",
+  price: null,
+  previous_close: null,
+  change: null,
+  change_percent: null,
+  volume: null,
+  avg_volume: null,
+  currency: "NOK",
+  market_state: null,
+  session_date: null,
+  recent_sessions: null,
+  volume_pace: null,
+  ...over,
 })
 
 const snap = (values: Record<string, number | string | null> = {}): IndicatorSummary => ({
-  close: null, as_of: "2026-09-18", change_pct: null, bars: 300, values,
+  close: null,
+  as_of: "2026-09-18",
+  change_pct: null,
+  bars: 300,
+  values,
 })
 
 // KOG.OL: 4.85M on Friday against a 1.27M 20-day average — a true 3.8x that
@@ -37,10 +51,7 @@ describe("resolveRvol", () => {
   })
 
   it("falls back before enough of the session has traded to divide by", () => {
-    const r = resolveRvol(
-      q({ volume: 30_000, volume_pace: MIN_VOLUME_PACE / 2 }),
-      snap(FRIDAY),
-    )
+    const r = resolveRvol(q({ volume: 30_000, volume_pace: MIN_VOLUME_PACE / 2 }), snap(FRIDAY))
     expect(r).toMatchObject({ source: "settled" })
   })
 
@@ -60,25 +71,30 @@ describe("resolveRvol", () => {
     // readings incomparable across the session boundary.
     const r = resolveRvol(
       q({ volume: 700_000, volume_pace: 0.3, avg_volume: 500_000 }),
-      snap(FRIDAY),
+      snap(FRIDAY)
     )
     expect(r).toMatchObject({ value: expect.closeTo(1.838, 3) })
   })
 
   it("withholds when there is no snapshot at all", () => {
     expect(resolveRvol(q({ volume: 1, volume_pace: 0.5 }), undefined)).toEqual({
-      status: "withheld", reason: { kind: "no_data" },
+      status: "withheld",
+      reason: { kind: "no_data" },
     })
   })
 
   it("withholds when the snapshot carries neither a stored value nor a baseline", () => {
     expect(resolveRvol(q(), snap({}))).toEqual({
-      status: "withheld", reason: { kind: "no_data" },
+      status: "withheld",
+      reason: { kind: "no_data" },
     })
   })
 
   it("does not divide by a zero baseline", () => {
-    const r = resolveRvol(q({ volume: 700_000, volume_pace: 0.3 }), snap({ rvol: 1, avg_volume: 0 }))
+    const r = resolveRvol(
+      q({ volume: 700_000, volume_pace: 0.3 }),
+      snap({ rvol: 1, avg_volume: 0 })
+    )
     expect(r).toEqual({ status: "ok", value: 1, source: "settled" })
   })
 })

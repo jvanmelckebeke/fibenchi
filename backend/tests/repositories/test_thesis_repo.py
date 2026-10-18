@@ -12,8 +12,11 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 async def test_create_and_get_by_id(db):
     repo = ThesisRepository(db)
     created = await repo.create(
-        name="El Niño", color="#22c55e", description="advisories",
-        status="watching", opened_at=date(2026, 3, 1),
+        name="El Niño",
+        color="#22c55e",
+        description="advisories",
+        status="watching",
+        opened_at=date(2026, 3, 1),
     )
     assert created.id is not None
 
@@ -28,8 +31,11 @@ async def test_create_and_get_by_id(db):
 async def test_get_by_name(db):
     repo = ThesisRepository(db)
     await repo.create(
-        name="Cables", color="#3b82f6", description=None,
-        status="live", opened_at=date(2026, 1, 1),
+        name="Cables",
+        color="#3b82f6",
+        description=None,
+        status="live",
+        opened_at=date(2026, 1, 1),
     )
     found = await repo.get_by_name("Cables")
     assert found is not None
@@ -41,8 +47,11 @@ async def test_list_all_ordered_by_name(db):
     repo = ThesisRepository(db)
     for name in ("Zinc", "Aluminium", "Copper"):
         await repo.create(
-            name=name, color="#3b82f6", description=None,
-            status="watching", opened_at=date(2026, 1, 1),
+            name=name,
+            color="#3b82f6",
+            description=None,
+            status="watching",
+            opened_at=date(2026, 1, 1),
         )
     names = [t.name for t in await repo.list_all()]
     assert names == sorted(names)
@@ -51,8 +60,11 @@ async def test_list_all_ordered_by_name(db):
 async def test_delete(db):
     repo = ThesisRepository(db)
     created = await repo.create(
-        name="Temp", color="#3b82f6", description=None,
-        status="watching", opened_at=date(2026, 1, 1),
+        name="Temp",
+        color="#3b82f6",
+        description=None,
+        status="watching",
+        opened_at=date(2026, 1, 1),
     )
     await repo.delete(created)
     assert await repo.get_by_id(created.id) is None

@@ -19,7 +19,7 @@ export function SegmentedControl<T extends string>({
   onChange,
 }: SegmentedControlProps<T>) {
   return (
-    <div className="flex rounded-md border border-border overflow-hidden">
+    <div className="flex overflow-hidden rounded-md border border-border">
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -29,9 +29,8 @@ export function SegmentedControl<T extends string>({
           className={`px-2.5 py-1 text-xs font-medium transition-colors ${
             value === opt.value
               ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-          }`}
-        >
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}>
           {opt.label}
         </button>
       ))}

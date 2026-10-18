@@ -9,6 +9,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 # --- GET /portfolio/index ---
 
+
 async def test_index_empty_portfolio(client):
     """Empty portfolio returns zero values."""
     resp = await client.get("/api/portfolio/index?period=1y")
@@ -55,6 +56,7 @@ async def test_index_period_affects_length(client, db):
 
 
 # --- GET /portfolio/performers ---
+
 
 async def test_performers_empty(client):
     resp = await client.get("/api/portfolio/performers?period=1y")

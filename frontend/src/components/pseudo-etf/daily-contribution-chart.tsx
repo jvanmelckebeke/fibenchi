@@ -1,9 +1,5 @@
 import { useEffect, useRef, useMemo } from "react"
-import {
-  createChart,
-  type IChartApi,
-  HistogramSeries,
-} from "lightweight-charts"
+import { createChart, type IChartApi, HistogramSeries } from "lightweight-charts"
 import { baseChartOptions, STACK_COLORS } from "@/lib/chart-utils"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
 import { useCrosshairHover } from "@/hooks/use-crosshair-hover"
@@ -20,7 +16,11 @@ function sumDeltas(deltas: Record<string, number>): number {
   return Object.values(deltas).reduce((s, v) => s + v, 0)
 }
 
-export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: BreakdownChartProps) {
+export function DailyContributionChart({
+  data,
+  sortedSymbols,
+  symbolColorMap,
+}: BreakdownChartProps) {
   const ref = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const { startLifecycle } = useChartLifecycle(ref, [chartRef])
@@ -120,26 +120,38 @@ export function DailyContributionChart({ data, sortedSymbols, symbolColorMap }: 
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold px-1">Daily Contribution</h3>
-      <div ref={ref} className="w-full rounded-md overflow-hidden" />
+      <h3 className="px-1 text-sm font-semibold">Daily Contribution</h3>
+      <div ref={ref} className="w-full overflow-hidden rounded-md" />
       <SymbolLegend
         sortedSymbols={sortedSymbols}
         symbolColorMap={symbolColorMap}
-        values={displayData ? sortedSymbols.map((sym) => {
-          const v = displayData.deltas[sym]
-          return v !== undefined ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : undefined
-        }) : undefined}
-        valueColors={displayData ? sortedSymbols.map((sym) => {
-          const v = displayData.deltas[sym]
-          return v !== undefined ? (v >= 0 ? "text-emerald-500" : "text-red-500") : undefined
-        }) : undefined}
-        suffix={displayData ? (
-          <span className="text-xs font-medium ml-auto">
-            Net: <span className={displayData.total >= 0 ? "text-emerald-500" : "text-red-500"}>
-              {displayData.total >= 0 ? "+" : ""}{displayData.total.toFixed(2)}
+        values={
+          displayData
+            ? sortedSymbols.map((sym) => {
+                const v = displayData.deltas[sym]
+                return v !== undefined ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : undefined
+              })
+            : undefined
+        }
+        valueColors={
+          displayData
+            ? sortedSymbols.map((sym) => {
+                const v = displayData.deltas[sym]
+                return v !== undefined ? (v >= 0 ? "text-emerald-500" : "text-red-500") : undefined
+              })
+            : undefined
+        }
+        suffix={
+          displayData ? (
+            <span className="ml-auto text-xs font-medium">
+              Net:{" "}
+              <span className={displayData.total >= 0 ? "text-emerald-500" : "text-red-500"}>
+                {displayData.total >= 0 ? "+" : ""}
+                {displayData.total.toFixed(2)}
+              </span>
             </span>
-          </span>
-        ) : undefined}
+          ) : undefined
+        }
       />
     </div>
   )

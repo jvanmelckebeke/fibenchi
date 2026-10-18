@@ -47,7 +47,14 @@ async def test_create_asset_uppercase_symbol(MockAssetRepo, mock_validate, _mock
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "type": "EQUITY",
+        "currency": "USD",
+        "currency_code": "USD",
+    }
     new_asset = _make_asset()
     mock_repo.create = AsyncMock(return_value=new_asset)
 
@@ -88,7 +95,14 @@ async def test_create_asset_does_not_touch_groups(MockAssetRepo, mock_validate, 
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "type": "EQUITY",
+        "currency": "USD",
+        "currency_code": "USD",
+    }
     mock_repo.create = AsyncMock(return_value=_make_asset())
 
     with patch("app.services.asset_service.GroupRepository") as MockGroupRepo:
@@ -105,7 +119,14 @@ async def test_create_asset_auto_resolves_from_yahoo(MockAssetRepo, mock_validat
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
 
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {"symbol": "NVDA", "name": "NVIDIA Corporation", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "NVDA",
+        "name": "NVIDIA Corporation",
+        "type": "EQUITY",
+        "currency": "USD",
+        "currency_code": "USD",
+    }
     new_asset = _make_asset(symbol="NVDA", name="NVIDIA Corporation")
     mock_repo.create = AsyncMock(return_value=new_asset)
 
@@ -123,9 +144,11 @@ async def test_create_asset_yahoo_not_found_raises_404(MockRepo, mock_validate):
     db = AsyncMock()
     mock_repo = MockRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = None
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = None
 
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         await create_asset(db, symbol="XXXX", name=None, asset_type=AssetType.STOCK)
     assert exc_info.value.status_code == 404
@@ -138,7 +161,14 @@ async def test_create_asset_detects_etf_type(MockAssetRepo, mock_validate, _mock
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {"symbol": "SPY", "name": "SPDR S&P 500", "type": "ETF", "currency": "USD", "currency_code": "USD"}
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "SPY",
+        "name": "SPDR S&P 500",
+        "type": "ETF",
+        "currency": "USD",
+        "currency_code": "USD",
+    }
     new_asset = _make_asset(symbol="SPY", type=AssetType.ETF)
     mock_repo.create = AsyncMock(return_value=new_asset)
 
@@ -158,8 +188,13 @@ async def test_create_asset_detects_index_type(MockAssetRepo, mock_validate, _mo
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {
-        "symbol": "^TYX", "name": "Treasury Yield 30 Years", "type": "INDEX", "currency": "USD", "currency_code": "USD",
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "^TYX",
+        "name": "Treasury Yield 30 Years",
+        "type": "INDEX",
+        "currency": "USD",
+        "currency_code": "USD",
     }
     new_asset = _make_asset(symbol="^TYX", type=AssetType.INDEX)
     mock_repo.create = AsyncMock(return_value=new_asset)
@@ -182,8 +217,13 @@ async def test_create_asset_explicit_type_beats_detection(MockAssetRepo, mock_va
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {
-        "symbol": "^TYX", "name": "Treasury Yield 30 Years", "type": "INDEX", "currency": "USD", "currency_code": "USD",
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "^TYX",
+        "name": "Treasury Yield 30 Years",
+        "type": "INDEX",
+        "currency": "USD",
+        "currency_code": "USD",
     }
     mock_repo.create = AsyncMock(return_value=_make_asset(symbol="^TYX", type=AssetType.STOCK))
 
@@ -202,8 +242,13 @@ async def test_create_asset_krw_currency_from_yahoo(MockAssetRepo, mock_validate
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {
-        "symbol": "006260.KS", "name": "LS Corp", "type": "EQUITY", "currency": "KRW", "currency_code": "KRW",
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "006260.KS",
+        "name": "LS Corp",
+        "type": "EQUITY",
+        "currency": "KRW",
+        "currency_code": "KRW",
     }
     new_asset = _make_asset(symbol="006260.KS", name="LS Corp", currency="KRW")
     mock_repo.create = AsyncMock(return_value=new_asset)
@@ -222,8 +267,13 @@ async def test_create_asset_with_name_still_detects_currency(MockAssetRepo, mock
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = {
-        "symbol": "006260.KS", "name": "LS Corp", "type": "EQUITY", "currency": "KRW", "currency_code": "KRW",
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = {
+        "symbol": "006260.KS",
+        "name": "LS Corp",
+        "type": "EQUITY",
+        "currency": "KRW",
+        "currency_code": "KRW",
     }
     new_asset = _make_asset(symbol="006260.KS", name="LS Corp", currency="KRW")
     mock_repo.create = AsyncMock(return_value=new_asset)
@@ -244,7 +294,8 @@ async def test_create_asset_with_name_yahoo_fails_uses_suffix(MockAssetRepo, moc
     db = AsyncMock()
     mock_repo = MockAssetRepo.return_value
     mock_repo.find_by_symbol = AsyncMock(return_value=None)
-    mock_validate.validate = AsyncMock(); mock_validate.validate.return_value = None  # Yahoo validation fails
+    mock_validate.validate = AsyncMock()
+    mock_validate.validate.return_value = None  # Yahoo validation fails
 
     new_asset = _make_asset(symbol="006260.KS", name="LS Corp", currency="KRW")
     mock_repo.create = AsyncMock(return_value=new_asset)
@@ -293,6 +344,7 @@ async def test_update_asset_missing_raises_404():
     db.get = AsyncMock(return_value=None)
 
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         await update_asset(db, asset_id=999, name="x")
     assert exc_info.value.status_code == 404

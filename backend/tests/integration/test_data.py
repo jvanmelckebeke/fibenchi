@@ -86,9 +86,15 @@ async def test_quote_multiple_symbols(client):
 
 async def test_snapshot_field(client):
     mock_snapshots = [
-        SymbolIndicatorSnapshot(**{"symbol": "AAPL", "close": 185.5, "change_pct": 0.65, "currency": "USD", "values": {"rsi": 62.3}}),
+        SymbolIndicatorSnapshot(
+            **{"symbol": "AAPL", "close": 185.5, "change_pct": 0.65, "currency": "USD", "values": {"rsi": 62.3}}
+        ),
     ]
-    with patch("app.services.data_service.compute_batch_indicator_snapshots", new_callable=AsyncMock, return_value=mock_snapshots):
+    with patch(
+        "app.services.data_service.compute_batch_indicator_snapshots",
+        new_callable=AsyncMock,
+        return_value=mock_snapshots,
+    ):
         resp = await client.get("/api/data?symbols=AAPL&fields=snapshot")
     assert resp.status_code == 200
     data = resp.json()
@@ -163,7 +169,11 @@ async def test_default_fields(client):
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with (
         patch("app.services.data_service.get_price_provider", return_value=mock_prov),
-        patch("app.services.data_service.compute_batch_indicator_snapshots", new_callable=AsyncMock, return_value=mock_snapshots),
+        patch(
+            "app.services.data_service.compute_batch_indicator_snapshots",
+            new_callable=AsyncMock,
+            return_value=mock_snapshots,
+        ),
     ):
         resp = await client.get("/api/data?symbols=AAPL")
     assert resp.status_code == 200
@@ -186,7 +196,11 @@ async def test_all_fields(client, db):
     mock_prov.batch_fetch_quotes = AsyncMock(return_value=mock_quotes)
     with (
         patch("app.services.data_service.get_price_provider", return_value=mock_prov),
-        patch("app.services.data_service.compute_batch_indicator_snapshots", new_callable=AsyncMock, return_value=mock_snapshots),
+        patch(
+            "app.services.data_service.compute_batch_indicator_snapshots",
+            new_callable=AsyncMock,
+            return_value=mock_snapshots,
+        ),
     ):
         resp = await client.get("/api/data?symbols=TEST&fields=quote,snapshot,prices,indicators&period=3mo")
     assert resp.status_code == 200

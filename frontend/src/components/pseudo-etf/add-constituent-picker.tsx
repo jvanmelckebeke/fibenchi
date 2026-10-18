@@ -3,11 +3,7 @@ import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import {
-  useAssets,
-  useAddPseudoEtfConstituents,
-  useCreateAsset,
-} from "@/lib/queries"
+import { useAssets, useAddPseudoEtfConstituents, useCreateAsset } from "@/lib/queries"
 
 export function AddConstituentPicker({
   etfId,
@@ -45,7 +41,12 @@ export function AddConstituentPicker({
         onSuccess: (asset) => {
           addConstituents.mutate(
             { etfId, assetIds: [asset.id] },
-            { onSuccess: () => { setNewTicker(""); onClose() } }
+            {
+              onSuccess: () => {
+                setNewTicker("")
+                onClose()
+              },
+            }
           )
         },
         onError: (err) => setTickerError(err.message),
@@ -54,17 +55,23 @@ export function AddConstituentPicker({
   }
 
   return (
-    <div className="p-3 rounded-md border bg-muted/30 space-y-3">
-      <div className="flex gap-2 items-center">
+    <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+      <div className="flex items-center gap-2">
         <Input
           placeholder="New ticker (e.g. AAPL)"
           value={newTicker}
-          onChange={(e) => { setNewTicker(e.target.value); setTickerError("") }}
+          onChange={(e) => {
+            setNewTicker(e.target.value)
+            setTickerError("")
+          }}
           onKeyDown={(e) => e.key === "Enter" && handleNewTicker()}
           className="w-48"
         />
-        <Button size="sm" onClick={handleNewTicker} disabled={!newTicker.trim() || createAsset.isPending}>
-          <Plus className="h-3.5 w-3.5 mr-1" />
+        <Button
+          size="sm"
+          onClick={handleNewTicker}
+          disabled={!newTicker.trim() || createAsset.isPending}>
+          <Plus className="mr-1 h-3.5 w-3.5" />
           {createAsset.isPending ? "Adding..." : "Add new"}
         </Button>
         {tickerError && <span className="text-xs text-destructive">{tickerError}</span>}
@@ -79,8 +86,7 @@ export function AddConstituentPicker({
                 key={a.id}
                 variant={selected.includes(a.id) ? "default" : "outline"}
                 className="cursor-pointer"
-                onClick={() => toggle(a.id)}
-              >
+                onClick={() => toggle(a.id)}>
                 {a.symbol}
               </Badge>
             ))}
@@ -89,7 +95,9 @@ export function AddConstituentPicker({
       )}
 
       <div className="flex justify-end gap-1">
-        <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
         {selected.length > 0 && (
           <Button size="sm" onClick={handleAdd} disabled={addConstituents.isPending}>
             Add ({selected.length})

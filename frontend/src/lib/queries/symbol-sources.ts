@@ -3,24 +3,32 @@ import { api, type SymbolSourceCreate, type SymbolSourceUpdate } from "../api"
 import { keys, STALE_5MIN, STALE_24H, useInvalidatingMutation } from "./shared"
 
 export function useSymbolSources() {
-  return useQuery({ queryKey: keys.symbolSources, queryFn: api.symbolSources.list, staleTime: STALE_5MIN })
+  return useQuery({
+    queryKey: keys.symbolSources,
+    queryFn: api.symbolSources.list,
+    staleTime: STALE_5MIN,
+  })
 }
 
 export function useSymbolSourceProviders() {
-  return useQuery({ queryKey: keys.symbolSourceProviders, queryFn: api.symbolSources.providers, staleTime: STALE_24H })
+  return useQuery({
+    queryKey: keys.symbolSourceProviders,
+    queryFn: api.symbolSources.providers,
+    staleTime: STALE_24H,
+  })
 }
 
 export function useCreateSymbolSource() {
   return useInvalidatingMutation(
     (data: SymbolSourceCreate) => api.symbolSources.create(data),
-    [keys.symbolSources],
+    [keys.symbolSources]
   )
 }
 
 export function useUpdateSymbolSource() {
   return useInvalidatingMutation(
     ({ id, data }: { id: number; data: SymbolSourceUpdate }) => api.symbolSources.update(id, data),
-    [keys.symbolSources],
+    [keys.symbolSources]
   )
 }
 
@@ -36,8 +44,5 @@ export function useSyncSymbolSource() {
 }
 
 export function useDeleteSymbolSource() {
-  return useInvalidatingMutation(
-    (id: number) => api.symbolSources.delete(id),
-    [keys.symbolSources],
-  )
+  return useInvalidatingMutation((id: number) => api.symbolSources.delete(id), [keys.symbolSources])
 }

@@ -58,7 +58,9 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
 
   // Lookup maps for fast crosshair snapping
   const closeByTime = useRef(new Map<string, number>())
-  const ohlcByTime = useRef(new Map<string, { o: number; h: number; l: number; c: number; vol: number }>())
+  const ohlcByTime = useRef(
+    new Map<string, { o: number; h: number; l: number; c: number; vol: number }>()
+  )
   const indicatorsByTime = useRef(new Map<string, Record<string, number>>())
 
   // Registry of charts participating in sync
@@ -152,8 +154,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
     const reversed = [...indicators].reverse()
     const findVal = (field: string): number | undefined =>
       (reversed.find((i) => i.values[field] != null)?.values[field] ?? undefined) as
-        | number
-        | undefined
+        number | undefined
 
     const indicatorValues: Record<string, number | undefined> = {}
     for (const field of getAllIndicatorFields()) {
@@ -284,7 +285,7 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
 
       cleanupFns.current.set(entry.chart, fns)
     },
-    [getValuesForTime, timeSync],
+    [getValuesForTime, timeSync]
   )
 
   const register = useCallback(
@@ -316,12 +317,12 @@ export function ChartSyncProvider({ prices, indicators, children }: ChartSyncPro
         }
       }
     },
-    [wireSync, wireSingleCrosshair],
+    [wireSync, wireSingleCrosshair]
   )
 
   const value = useMemo<ChartSyncContextValue>(
     () => ({ register, hoverValues, latestValues, prices, indicators }),
-    [register, hoverValues, latestValues, prices, indicators],
+    [register, hoverValues, latestValues, prices, indicators]
   )
 
   return <ChartSyncContext.Provider value={value}>{children}</ChartSyncContext.Provider>
@@ -347,7 +348,10 @@ export function useRegisterChart() {
 
 /** Read crosshair-position hover values. Works from any component inside ChartSyncProvider. */
 // eslint-disable-next-line react-refresh/only-export-components
-export function useChartHoverValues(): { hoverValues: LegendValues | null; latestValues: LegendValues } {
+export function useChartHoverValues(): {
+  hoverValues: LegendValues | null
+  latestValues: LegendValues
+} {
   const { hoverValues, latestValues } = useChartSyncContext()
   return { hoverValues, latestValues }
 }

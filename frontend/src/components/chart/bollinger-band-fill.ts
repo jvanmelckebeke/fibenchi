@@ -1,9 +1,4 @@
-import type {
-  IChartApi,
-  ISeriesApi,
-  SeriesType,
-  Time,
-} from "lightweight-charts"
+import type { IChartApi, ISeriesApi, SeriesType, Time } from "lightweight-charts"
 
 export interface BandPoint {
   time: string
@@ -22,7 +17,9 @@ class BandFillRenderer {
     // intentionally empty — all drawing is in drawBackground
   }
 
-  drawBackground(target: { useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T }) {
+  drawBackground(target: {
+    useMediaCoordinateSpace: <T>(fn: (scope: { context: CanvasRenderingContext2D }) => T) => T
+  }) {
     const { chart, series, data } = this._source
     if (!chart || !series || !data.length) return
 

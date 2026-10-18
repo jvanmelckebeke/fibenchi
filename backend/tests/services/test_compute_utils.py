@@ -10,7 +10,12 @@ from app.services.compute.utils import prices_to_df
 
 
 def _make_price(
-    d: date, open_: float, high: float, low: float, close: float, volume: int,
+    d: date,
+    open_: float,
+    high: float,
+    low: float,
+    close: float,
+    volume: int,
     dividend: float | None = None,
 ):
     """Create a mock PriceHistory object."""
@@ -36,7 +41,12 @@ class TestPricesToDf:
         assert isinstance(df, pd.DataFrame)
         assert df.index.name == "date"
         assert list(df.columns) == [
-            "open", "high", "low", "close", "volume", "dividends",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "dividends",
         ]
         assert len(df) == 2
 

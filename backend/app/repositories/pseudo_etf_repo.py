@@ -18,9 +18,7 @@ class PseudoEtfRepository:
         return await self.db.get(PseudoETF, etf_id)
 
     async def get_by_name(self, name: str) -> PseudoETF | None:
-        result = await self.db.execute(
-            select(PseudoETF).where(PseudoETF.name == name)
-        )
+        result = await self.db.execute(select(PseudoETF).where(PseudoETF.name == name))
         return result.scalar_one_or_none()
 
     async def create(self, **kwargs) -> PseudoETF:
@@ -42,9 +40,7 @@ class PseudoEtfRepository:
     # --- Note ---
 
     async def get_note(self, etf_id: int) -> PseudoEtfNote | None:
-        result = await self.db.execute(
-            select(PseudoEtfNote).where(PseudoEtfNote.pseudo_etf_id == etf_id)
-        )
+        result = await self.db.execute(select(PseudoEtfNote).where(PseudoEtfNote.pseudo_etf_id == etf_id))
         return result.scalar_one_or_none()
 
     async def upsert_note(self, etf_id: int, content: str) -> PseudoEtfNote:

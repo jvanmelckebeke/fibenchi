@@ -112,8 +112,7 @@ def _calc_static(
         if include_breakdown:
             constituent_values = shares * prices
             point["breakdown"] = {
-                symbol_map.get(aid, str(aid)): round(float(val), 4)
-                for aid, val in constituent_values.items()
+                symbol_map.get(aid, str(aid)): round(float(val), 4) for aid, val in constituent_values.items()
             }
 
         results.append(point)
@@ -177,8 +176,7 @@ def _calc_dynamic(
         if include_breakdown:
             constituent_values = shares * prices.reindex(list(active))
             point["breakdown"] = {
-                symbol_map.get(aid, str(aid)): round(float(val), 4)
-                for aid, val in constituent_values.items()
+                symbol_map.get(aid, str(aid)): round(float(val), 4) for aid, val in constituent_values.items()
             }
 
         results.append(point)

@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import type { Quote } from "./api"
 import type { IntradayPoint } from "./types"
 
@@ -151,7 +159,12 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
           setStatus("connected")
           backoffMs.current = 1_000 // reset backoff on successful data
         } catch (err) {
-          console.error("[QuoteStream] Failed to parse SSE event:", err, "raw:", e.data?.slice(0, 200))
+          console.error(
+            "[QuoteStream] Failed to parse SSE event:",
+            err,
+            "raw:",
+            e.data?.slice(0, 200)
+          )
         }
       })
 
@@ -187,7 +200,10 @@ export function QuoteStreamProvider({ children }: { children: React.ReactNode })
 
       es.addEventListener("message", (e) => {
         // SSE events without an "event:" field arrive as "message" — log if this happens
-        console.warn("[QuoteStream] Received unnamed SSE event (expected 'quotes'):", e.data?.slice(0, 200))
+        console.warn(
+          "[QuoteStream] Received unnamed SSE event (expected 'quotes'):",
+          e.data?.slice(0, 200)
+        )
       })
 
       es.addEventListener("open", () => {
@@ -258,7 +274,7 @@ export function useQuote(symbol: string): Quote | undefined {
   const { store } = useContext(QuoteStreamContext)
   const subscribe = useCallback(
     (cb: Listener) => store.subscribeSymbol(symbol, cb),
-    [store, symbol],
+    [store, symbol]
   )
   const getSnapshot = useCallback(() => store.getQuote(symbol), [store, symbol])
   return useSyncExternalStore(subscribe, getSnapshot)
@@ -286,10 +302,7 @@ export function useIntradaySubscription(symbols: string[]): void {
   // The array identity changes every render at most call sites; the joined
   // string is what actually decides whether the demand changed.
   const key = symbols.join(",")
-  useEffect(
-    () => subscribeIntraday(key ? key.split(",") : []),
-    [subscribeIntraday, key],
-  )
+  useEffect(() => subscribeIntraday(key ? key.split(",") : []), [subscribeIntraday, key])
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

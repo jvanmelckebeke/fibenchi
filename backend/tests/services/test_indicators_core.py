@@ -68,7 +68,8 @@ async def test_batch_snapshots_fetch_enough_history_for_nefi():
     provider.batch_fetch_currencies = AsyncMock(return_value={"AAPL": "USD"})
 
     with patch(
-        "app.services.compute.indicators.get_price_provider", return_value=provider,
+        "app.services.compute.indicators.get_price_provider",
+        return_value=provider,
     ):
         results = await compute_batch_indicator_snapshots(["AAPL"])
 

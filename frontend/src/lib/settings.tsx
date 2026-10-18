@@ -47,7 +47,7 @@ export interface AppSettings {
  */
 function migrateOldVisibility(
   groupVis?: Record<string, boolean>,
-  detailVis?: Record<string, boolean>,
+  detailVis?: Record<string, boolean>
 ): Record<string, Placement[]> {
   const result: Record<string, Placement[]> = {}
   for (const desc of INDICATOR_REGISTRY) {
@@ -116,7 +116,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   yahoo_link_mode: "chart",
 }
 
-
 const STORAGE_KEY = "fibenchi-settings"
 
 function loadFromStorage(): AppSettings {
@@ -128,12 +127,15 @@ function loadFromStorage(): AppSettings {
       if ("group_indicator_visibility" in parsed || "detail_indicator_visibility" in parsed) {
         parsed.indicator_visibility = migrateOldVisibility(
           parsed.group_indicator_visibility,
-          parsed.detail_indicator_visibility,
+          parsed.detail_indicator_visibility
         )
         delete parsed.group_indicator_visibility
         delete parsed.detail_indicator_visibility
         // Persist migrated settings
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...migrateThesisSettings(parsed) }))
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...DEFAULT_SETTINGS, ...migrateThesisSettings(parsed) })
+        )
       }
       // Migrate before merging defaults so legacy thesis values aren't masked.
       return { ...DEFAULT_SETTINGS, ...migrateThesisSettings(parsed) }

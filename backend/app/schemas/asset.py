@@ -10,7 +10,9 @@ from app.services.currency_service import lookup as currency_lookup
 
 class AssetCreate(BaseModel):
     symbol: str = Field(max_length=20, description="Ticker symbol (e.g. AAPL, VOO). Validated against Yahoo Finance.")
-    name: str | None = Field(default=None, max_length=200, description="Display name. Auto-detected from Yahoo Finance if omitted.")
+    name: str | None = Field(
+        default=None, max_length=200, description="Display name. Auto-detected from Yahoo Finance if omitted."
+    )
     type: AssetType | None = Field(
         default=None,
         description=(
@@ -108,10 +110,12 @@ class AssetResponse(BaseModel):
     )
     type_source: FieldSource = Field(default=FieldSource.AUTO, description="Who set 'type': auto or user")
     unit_source: FieldSource = Field(
-        default=FieldSource.AUTO, description="Who set 'unit_kind'/'currency': auto or user",
+        default=FieldSource.AUTO,
+        description="Who set 'unit_kind'/'currency': auto or user",
     )
     suggested: AssetSuggestionResponse | None = Field(
-        default=None, description="Fibenchi's read on this ticker",
+        default=None,
+        description="Fibenchi's read on this ticker",
     )
     created_at: datetime.datetime = Field(description="Timestamp when the asset was first added")
     tags: list[TagBrief] = Field(default=[], description="Tags attached to this asset")
@@ -140,6 +144,7 @@ class AssetResponse(BaseModel):
 
         if self.suggested is None:
             self.suggested = AssetSuggestionResponse.model_validate(
-                suggest_for_asset(self), from_attributes=True,
+                suggest_for_asset(self),
+                from_attributes=True,
             )
         return self

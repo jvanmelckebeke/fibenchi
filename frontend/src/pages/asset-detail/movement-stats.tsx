@@ -18,11 +18,11 @@ export function MovementStats({ prices, label, symbol, asset }: MovementStatsPro
   const ret = formatChangePct(stats.periodReturnPct)
 
   return (
-    <div className="rounded-lg border bg-card text-card-foreground px-4 py-3">
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+    <div className="rounded-lg border bg-card px-4 py-3 text-card-foreground">
+      <h3 className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
         Movement · {label}
       </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatTile
           label="Period return"
           valueText={ret.text}
@@ -75,9 +75,11 @@ function StatTile({
 }) {
   return (
     <div className="rounded-md bg-muted/40 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-[10px] tracking-wider text-muted-foreground uppercase">{label}</div>
       <div className={`text-lg font-semibold tabular-nums ${valueClass}`}>{valueText ?? "—"}</div>
-      {sub && <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5 truncate">{sub}</div>}
+      {sub && (
+        <div className="mt-0.5 truncate text-[11px] text-muted-foreground tabular-nums">{sub}</div>
+      )}
     </div>
   )
 }

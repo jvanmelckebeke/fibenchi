@@ -1,11 +1,7 @@
 import { useEffect, useRef, Fragment } from "react"
 import type { IChartApi } from "lightweight-charts"
 import { useChartLifecycle } from "@/hooks/use-chart-lifecycle"
-import {
-  createSubChart,
-  setSubChartData,
-  type SubChartState,
-} from "./chart-builders"
+import { createSubChart, setSubChartData, type SubChartState } from "./chart-builders"
 import { SubChartLegend } from "./chart-legends"
 import { useRegisterChart, useChartHoverValues, useChartData } from "./chart-sync-provider"
 import { getDescriptorById } from "@/lib/indicator-registry"

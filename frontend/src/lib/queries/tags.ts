@@ -8,10 +8,7 @@ export function useTags() {
 }
 
 export function useCreateTag() {
-  return useInvalidatingMutation(
-    (data: TagCreate) => api.tags.create(data),
-    [keys.tags],
-  )
+  return useInvalidatingMutation((data: TagCreate) => api.tags.create(data), [keys.tags])
 }
 
 export function useAttachTag() {
@@ -29,8 +26,8 @@ export function useAttachTag() {
           old?.map((a) =>
             a.symbol === symbol && !a.tags.some((t) => t.id === tagId)
               ? { ...a, tags: [...a.tags, { id: tag.id, name: tag.name, color: tag.color }] }
-              : a,
-          ),
+              : a
+          )
         )
       }
       return { previous }
@@ -55,10 +52,8 @@ export function useDetachTag() {
       const previous = qc.getQueryData<Asset[]>(keys.assets)
       qc.setQueryData<Asset[]>(keys.assets, (old) =>
         old?.map((a) =>
-          a.symbol === symbol
-            ? { ...a, tags: a.tags.filter((t) => t.id !== tagId) }
-            : a,
-        ),
+          a.symbol === symbol ? { ...a, tags: a.tags.filter((t) => t.id !== tagId) } : a
+        )
       )
       return { previous }
     },
