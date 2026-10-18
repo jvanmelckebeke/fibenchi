@@ -36,7 +36,3 @@ export function windowBarFill(percentile: number | null): number | null {
   return percentile == null ? null : Math.max(MIN_WINDOW_FILL, percentile)
 }
 
-/** Width of a Movers row's background bar in percent. No scale, no bar. */
-export function moverBarWidth(percentile: number | null): number {
-  return percentile == null ? 0 : percentile * 100
-}

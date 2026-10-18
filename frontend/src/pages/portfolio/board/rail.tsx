@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { usePortfolioIndex } from "@/lib/queries"
 import { changeColor, formatChangePct } from "@/lib/format"
 import { PCT_WINDOWS, pctWindowDef, type PctWindow } from "./color-scale"
-import { moverBarWidth } from "./move-percentile"
+import { maxAbsMove, moverBarWidth } from "./mover-bars"
 import type { Tile } from "./use-board-data"
 
 const INDEX_PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
@@ -79,11 +79,8 @@ export function IndexCard() {
   )
 }
 
-// The background bar is how unusual the move is for this symbol, not its size:
-// rows still rank by %, so a quiet stock's top move can carry a longer bar
-// than a volatile one's bigger move.
-function MoverRow({ tile, pct, percentile }: { tile: Tile; pct: number; percentile: number | null }) {
-  const width = moverBarWidth(percentile)
+function MoverRow({ tile, pct, maxAbs }: { tile: Tile; pct: number; maxAbs: number }) {
+  const width = moverBarWidth(pct, maxAbs)
   return (
     <Link
       to={`/asset/${tile.symbol}`}
@@ -109,6 +106,7 @@ export function MoversCard({ tiles }: { tiles: Tile[] }) {
   const up = ranked.filter((r) => r.pct > 0).slice(0, 5)
   const down = ranked.filter((r) => r.pct < 0).slice(-5).reverse()
   const missing = tiles.length - ranked.length
+  const maxAbs = maxAbsMove([...up, ...down].map((r) => r.pct))
 
   return (
     <RailCard
@@ -128,11 +126,11 @@ export function MoversCard({ tiles }: { tiles: Tile[] }) {
       ) : (
         <div className="space-y-0.5">
           {up.map((r) => (
-            <MoverRow key={r.tile.symbol} tile={r.tile} pct={r.pct} percentile={r.tile.windowPercentile[window]} />
+            <MoverRow key={r.tile.symbol} tile={r.tile} pct={r.pct} maxAbs={maxAbs} />
           ))}
           {up.length > 0 && down.length > 0 && <div className="my-1 border-t border-border/60" />}
           {down.map((r) => (
-            <MoverRow key={r.tile.symbol} tile={r.tile} pct={r.pct} percentile={r.tile.windowPercentile[window]} />
+            <MoverRow key={r.tile.symbol} tile={r.tile} pct={r.pct} maxAbs={maxAbs} />
           ))}
           {/* Never average (or rank) over a hole without saying so. */}
           {missing > 0 && (

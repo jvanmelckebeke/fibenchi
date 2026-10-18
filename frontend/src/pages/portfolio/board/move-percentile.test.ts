@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { MIN_WINDOW_FILL, movePercentile, moverBarWidth, windowBarFill } from "./move-percentile"
+import { MIN_WINDOW_FILL, movePercentile, windowBarFill } from "./move-percentile"
 
 // 0, 1, 2, ..., 20: percentile = |move| * 5%.
 const LINEAR = Array.from({ length: 21 }, (_, i) => i)
@@ -51,17 +51,5 @@ describe("windowBarFill", () => {
 
   it("draws an empty track without a scale", () => {
     expect(windowBarFill(null)).toBeNull()
-  })
-})
-
-describe("moverBarWidth", () => {
-  it("is the percentile in percent, with no stub", () => {
-    expect(moverBarWidth(movePercentile(-4, LINEAR))).toBeCloseTo(20)
-    expect(moverBarWidth(0)).toBe(0)
-    expect(moverBarWidth(1)).toBe(100)
-  })
-
-  it("draws nothing without a scale", () => {
-    expect(moverBarWidth(null)).toBe(0)
   })
 })
