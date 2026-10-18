@@ -1,0 +1,7 @@
+# Mechanical reformats. `git config blame.ignoreRevsFile .git-blame-ignore-revs`
+# makes local blame skip them; GitHub reads this file on its own.
+
+# Reformat frontend with prettier
+1ea41034f5b8f54c6583eda76e30429dcc000fb5
+# Reformat backend with ruff format
+6a29c6e198215fb867b4d97d4e9d4c3ffb6be423
