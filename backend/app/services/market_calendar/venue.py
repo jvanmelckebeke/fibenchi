@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 class TradingWeek(NamedTuple):
     """A venue's trading week over a date range, plus its exceptions."""
 
-    weekdays: set[int]          # date.weekday() values, 0 = Monday
-    closures: list[date]        # trading weekdays in the range with no session
+    weekdays: set[int]  # date.weekday() values, 0 = Monday
+    closures: list[date]  # trading weekdays in the range with no session
     extra_sessions: list[date]  # sessions on a weekday outside the week
 
 
@@ -62,9 +62,7 @@ class Venue:
                 return None
             return {ts.date() for ts in self._cal.sessions_in_range(first, last)}
         except Exception:
-            logger.warning(
-                "Session query failed for %s (%s..%s)", self.name, start, end, exc_info=True
-            )
+            logger.warning("Session query failed for %s (%s..%s)", self.name, start, end, exc_info=True)
             return None
 
     def session_dates_for_index(self, index) -> set[date] | None:
@@ -187,9 +185,7 @@ class Venue:
                 extra_sessions=sorted(d for d in sessions if d.weekday() not in weekdays),
             )
         except Exception:
-            logger.warning(
-                "Trading-week query failed for %s (%s..%s)", self.name, start, end, exc_info=True
-            )
+            logger.warning("Trading-week query failed for %s (%s..%s)", self.name, start, end, exc_info=True)
             return None
 
     def early_closes(self, start: date, end: date) -> list[tuple[date, time]] | None:
@@ -203,9 +199,7 @@ class Venue:
                 if start <= ts.date() <= end
             ]
         except Exception:
-            logger.warning(
-                "Early-close query failed for %s (%s..%s)", self.name, start, end, exc_info=True
-            )
+            logger.warning("Early-close query failed for %s (%s..%s)", self.name, start, end, exc_info=True)
             return None
 
     def local_date(self, at: datetime | None = None) -> date | None:
@@ -305,8 +299,7 @@ class Venue:
                 elif (
                     # CLOSED: premarket start if this venue has one and it's
                     # still ahead, else the opening bell.
-                    self.extended_hours is not None
-                    and ts < (pre_start := nxt_open - self.extended_hours.pre_offset)
+                    self.extended_hours is not None and ts < (pre_start := nxt_open - self.extended_hours.pre_offset)
                 ):
                     candidate = pre_start
                 else:

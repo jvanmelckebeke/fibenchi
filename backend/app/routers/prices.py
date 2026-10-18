@@ -27,7 +27,11 @@ async def get_prices(symbol: str, period: PeriodType = Query("3mo"), db: AsyncSe
     return await price_service.get_prices(db, asset, symbol, period)
 
 
-@router.get("/indicators", response_model=list[IndicatorResponse], summary="Get technical indicators (RSI, SMA, MACD, Bollinger, ATR, ADX)")
+@router.get(
+    "/indicators",
+    response_model=list[IndicatorResponse],
+    summary="Get technical indicators (RSI, SMA, MACD, Bollinger, ATR, ADX)",
+)
 async def get_indicators(symbol: str, period: PeriodType = Query("3mo"), db: AsyncSession = Depends(get_db)):
     """Return daily indicator time series for a symbol.
 
@@ -62,7 +66,9 @@ async def get_earnings_date(symbol: str):
     return EarningsResponse(**result) if result else EarningsResponse()
 
 
-@router.post("/refresh", response_model=RefreshResponse, status_code=200, summary="Force-refresh prices from Yahoo Finance")
+@router.post(
+    "/refresh", response_model=RefreshResponse, status_code=200, summary="Force-refresh prices from Yahoo Finance"
+)
 async def refresh_prices(symbol: str, period: PeriodType = Query("3mo"), db: AsyncSession = Depends(get_db)):
     """Force a re-sync of price data from Yahoo Finance for a tracked asset.
 

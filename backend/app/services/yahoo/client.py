@@ -89,7 +89,9 @@ class YahooClient(
         self._throttle = throttle or _shared_throttle
         self._quote_cache = TTLCache(default_ttl=quote_cache_ttl, thread_safe=True)
         self._holdings_cache = TTLCache(
-            default_ttl=holdings_cache_ttl, max_size=100, thread_safe=True,
+            default_ttl=holdings_cache_ttl,
+            max_size=100,
+            thread_safe=True,
         )
         self._session_ttl = session_ttl
         self._session_lock = threading.Lock()
@@ -153,7 +155,8 @@ class YahooClient(
                 if attempt < retries:
                     logger.warning(
                         "Yahoo crumb rejected — retry %d/%d with fresh session",
-                        attempt + 1, retries,
+                        attempt + 1,
+                        retries,
                     )
                     continue
                 self._throttle.record_invalid_crumb()

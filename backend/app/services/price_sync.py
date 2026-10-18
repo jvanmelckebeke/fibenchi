@@ -102,15 +102,19 @@ def drop_unsettled_last_bar(
         if is_session_forming(market_state):
             logger.debug(
                 "%s: dropping trailing %s bar (dated the live session, market open)",
-                symbol or "?", last_bar_dt,
+                symbol or "?",
+                last_bar_dt,
             )
             return df.iloc[:-1]
         if _reconciles(last_close, price):
             return df  # closed and settled to the live close
         logger.info(
-            "%s: dropping trailing %s bar (dated the live session; market %s; "
-            "close=%s hasn't settled to quote %s)",
-            symbol or "?", last_bar_dt, market_state, last_close, price,
+            "%s: dropping trailing %s bar (dated the live session; market %s; close=%s hasn't settled to quote %s)",
+            symbol or "?",
+            last_bar_dt,
+            market_state,
+            last_close,
+            price,
         )
         return df.iloc[:-1]
 
@@ -124,7 +128,10 @@ def drop_unsettled_last_bar(
     if is_session_forming(market_state):
         logger.debug(
             "%s: dropping trailing %s bar (session open; close=%s, live=%s)",
-            symbol or "?", df.index[-1], last_close, price,
+            symbol or "?",
+            df.index[-1],
+            last_close,
+            price,
         )
         return df.iloc[:-1]
 
@@ -138,7 +145,11 @@ def drop_unsettled_last_bar(
     # bar reconciles with nothing and σ-Move blanks until a sync stores it.
     logger.info(
         "%s: dropping trailing %s bar (market %s; close=%s hasn't settled to quote %s)",
-        symbol or "?", df.index[-1], market_state, last_close, price,
+        symbol or "?",
+        df.index[-1],
+        market_state,
+        last_close,
+        price,
     )
     return df.iloc[:-1]
 
@@ -161,7 +172,8 @@ def _as_date(value: str | None) -> date | None:
 
 
 async def _quote_anchors(
-    provider: PriceProvider, symbols: list[str],
+    provider: PriceProvider,
+    symbols: list[str],
 ) -> dict[str, Anchor]:
     """Fetch ``{symbol: (price, previous_close, market_state, session_date)}``.
 
@@ -179,10 +191,7 @@ async def _quote_anchors(
             exc_info=True,
         )
         return {}
-    return {
-        q.symbol: (q.price, q.previous_close, q.market_state, _as_date(q.session_date))
-        for q in quotes
-    }
+    return {q.symbol: (q.price, q.previous_close, q.market_state, _as_date(q.session_date)) for q in quotes}
 
 
 def _drop_unanchored_trailing_bar(df: pd.DataFrame, ref: AssetRef) -> pd.DataFrame:
@@ -207,7 +216,8 @@ def _drop_unanchored_trailing_bar(df: pd.DataFrame, ref: AssetRef) -> pd.DataFra
         return df
     logger.info(
         "%s: withholding trailing %s bar (no quote anchor; may be a live partial)",
-        ref, df.index[-1],
+        ref,
+        df.index[-1],
     )
     return df.iloc[:-1]
 
@@ -238,7 +248,10 @@ def _frame_reaches_present(df: pd.DataFrame, ref: AssetRef) -> bool:
 
 
 async def _drop_and_persist(
-    db: AsyncSession, ref: AssetRef, df: pd.DataFrame, anchor: Anchor,
+    db: AsyncSession,
+    ref: AssetRef,
+    df: pd.DataFrame,
+    anchor: Anchor,
 ) -> int:
     """Drop the trailing unsettled bar (if any), upsert the rest, and purge any
     stale copy left behind. Returns the number of rows upserted.
@@ -271,7 +284,12 @@ async def _drop_and_persist(
         # quote, a stored later row can't be proven stale.
         return await _upsert_prices(db, ref, _drop_unanchored_trailing_bar(df, ref))
     kept = drop_unsettled_last_bar(
-        df, price, previous_close, market_state, symbol=ref, session_date=session_date,
+        df,
+        price,
+        previous_close,
+        market_state,
+        symbol=ref,
+        session_date=session_date,
     )
     count = await _upsert_prices(db, ref, kept)
     dropped = len(kept) < len(df)
@@ -287,13 +305,18 @@ async def _drop_and_persist(
             logger.info(
                 "%s: purged %d orphaned row(s) after %s — the provider no longer "
                 "reports them and this frame is current",
-                ref, removed, last_kept,
+                ref,
+                removed,
+                last_kept,
             )
     return count
 
 
 async def _persist_symbol(
-    db: AsyncSession, ref: AssetRef, df: pd.DataFrame, anchor: Anchor,
+    db: AsyncSession,
+    ref: AssetRef,
+    df: pd.DataFrame,
+    anchor: Anchor,
 ) -> int | None:
     """Persist one symbol's frame, isolating its failure from the rest of the run.
 
@@ -315,7 +338,10 @@ async def _persist_symbol(
 
 
 async def sync_asset_prices(
-    db: AsyncSession, ref: AssetRef, period: str = "3mo", anchor: Anchor | None = None,
+    db: AsyncSession,
+    ref: AssetRef,
+    period: str = "3mo",
+    anchor: Anchor | None = None,
 ) -> int:
     """Fetch and upsert price data for a single asset. Returns number of rows upserted.
 
@@ -330,9 +356,7 @@ async def sync_asset_prices(
     return await _drop_and_persist(db, ref, df, anchor)
 
 
-async def sync_asset_prices_range(
-    db: AsyncSession, ref: AssetRef, start: date, end: date
-) -> int:
+async def sync_asset_prices_range(db: AsyncSession, ref: AssetRef, start: date, end: date) -> int:
     """Fetch and upsert price data for a date range. Returns number of rows upserted.
 
     ``end`` is exclusive (Yahoo range semantics): a bar dated ``end`` itself
@@ -388,7 +412,9 @@ async def sync_all_prices(db: AsyncSession, period: str = "1y") -> dict[str, int
     elif missing:
         logger.warning(
             "Batch history missing %d/%d symbols; retrying individually: %s",
-            len(missing), len(symbols), ", ".join(sorted(missing)),
+            len(missing),
+            len(symbols),
+            ", ".join(sorted(missing)),
         )
         for sym in missing:
             try:

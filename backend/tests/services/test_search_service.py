@@ -55,7 +55,8 @@ def test_parse_yahoo_results_empty():
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
 @patch("app.services.search_service.yahoo_client")
 async def test_search_queries_yahoo_when_db_empty(mock_yahoo, mock_upsert, db):
-    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(
+    mock_yahoo.search = AsyncMock()
+    mock_yahoo.search.return_value = _yahoo_response(
         _equity("AAPL", "Apple Inc."),
         _etf("SPY", "SPDR S&P 500"),
     )
@@ -70,7 +71,8 @@ async def test_search_queries_yahoo_when_db_empty(mock_yahoo, mock_upsert, db):
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
 @patch("app.services.search_service.yahoo_client")
 async def test_search_strips_and_lowercases_query(mock_yahoo, mock_upsert, db):
-    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(_equity("AAPL", "Apple"))
+    mock_yahoo.search = AsyncMock()
+    mock_yahoo.search.return_value = _yahoo_response(_equity("AAPL", "Apple"))
 
     await search_symbols("  AAPL  ", db)
 
@@ -99,7 +101,8 @@ async def test_search_falls_back_to_yahoo_when_few_local(mock_yahoo, mock_upsert
     db.add(SymbolDirectory(symbol="AAPLX", name="Apple Extra", exchange="NYSE", type="stock"))
     await db.commit()
 
-    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(
+    mock_yahoo.search = AsyncMock()
+    mock_yahoo.search.return_value = _yahoo_response(
         _equity("AAPL", "Apple Inc."),
         _equity("AAPL2", "Apple 2"),
     )
@@ -113,7 +116,8 @@ async def test_search_falls_back_to_yahoo_when_few_local(mock_yahoo, mock_upsert
 @patch("app.services.search_service._upsert_symbols", new_callable=AsyncMock)
 @patch("app.services.search_service.yahoo_client")
 async def test_search_returns_empty_when_no_matches(mock_yahoo, mock_upsert, db):
-    mock_yahoo.search = AsyncMock(); mock_yahoo.search.return_value = _yahoo_response(
+    mock_yahoo.search = AsyncMock()
+    mock_yahoo.search.return_value = _yahoo_response(
         _mutual_fund("VFINX", "Vanguard 500"),
     )
 

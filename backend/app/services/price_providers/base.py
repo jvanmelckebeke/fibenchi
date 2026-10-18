@@ -32,9 +32,7 @@ class PriceProvider(ABC):
         """
 
     @abstractmethod
-    async def batch_fetch_history(
-        self, symbols: list[str], period: str = "1y"
-    ) -> dict[str, pd.DataFrame]:
+    async def batch_fetch_history(self, symbols: list[str], period: str = "1y") -> dict[str, pd.DataFrame]:
         """Fetch OHLCV history for multiple symbols in one call.
 
         Returns {symbol: DataFrame} for symbols that have data.

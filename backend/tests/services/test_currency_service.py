@@ -1,6 +1,5 @@
 """Tests for the currency lookup service (cache + DB integration)."""
 
-
 import pytest
 
 from app.models.currency import Currency
@@ -78,6 +77,7 @@ async def test_load_cache_includes_subunit_safety_net(db):
     """Even if DB is missing subunit entries, safety net fills them in."""
     # Clear the DB currencies and reload
     from sqlalchemy import delete
+
     await db.execute(delete(Currency))
     await db.commit()
 
@@ -113,6 +113,7 @@ async def test_ensure_currency_registers_unknown(db):
 
     # Verify it was persisted to the DB
     from sqlalchemy import select
+
     result = await db.execute(select(Currency).where(Currency.code == "NEW_CODE"))
     row = result.scalar_one()
     assert row.display_code == "NEW_CODE"

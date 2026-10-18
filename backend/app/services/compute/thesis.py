@@ -93,7 +93,4 @@ def aggregate_return_series(
         return []
 
     points = [(ts, round(val * 100.0, 2)) for ts, val in mean.items()]
-    return [
-        {"date": ts.date().isoformat(), "pct": pct}
-        for ts, pct in _downsample(points, max_points)
-    ]
+    return [{"date": ts.date().isoformat(), "pct": pct} for ts, pct in _downsample(points, max_points)]

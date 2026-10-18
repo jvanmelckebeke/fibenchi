@@ -18,6 +18,7 @@ class _EarningsMixin(_YahooBase):
         Returns ``{earnings_date, is_estimate, last_reported_date}`` or
         ``None`` when unavailable.
         """
+
         def _fetch() -> dict[str, object] | None:
             try:
                 ticker = self._ticker(symbol)

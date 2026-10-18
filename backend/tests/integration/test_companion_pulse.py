@@ -32,7 +32,11 @@ def _clear_pulse_cache():
 
 
 async def _seed(
-    db, symbol: str, closes: list[float], dates: list[date], currency: str = "USD",
+    db,
+    symbol: str,
+    closes: list[float],
+    dates: list[date],
+    currency: str = "USD",
     group: bool = True,
 ) -> Asset:
     asset = Asset(symbol=symbol, name=symbol, type=AssetType.STOCK, currency=currency)
@@ -42,9 +46,17 @@ async def _seed(
         watchlist = await GroupRepository(db).get_default()
         watchlist.assets.append(asset)
     for d, c in zip(dates, closes):
-        db.add(PriceHistory(
-            asset_id=asset.id, date=d, open=c, high=c * 1.01, low=c * 0.99, close=c, volume=1_000,
-        ))
+        db.add(
+            PriceHistory(
+                asset_id=asset.id,
+                date=d,
+                open=c,
+                high=c * 1.01,
+                low=c * 0.99,
+                close=c,
+                volume=1_000,
+            )
+        )
     await db.commit()
     return asset
 
@@ -60,9 +72,11 @@ def _weekdays(n: int) -> list[date]:
 
 async def _indicators(db, symbol: str) -> pd.DataFrame:
     asset = (await db.execute(Asset.__table__.select().where(Asset.symbol == symbol))).first()
-    rows = (await db.execute(
-        PriceHistory.__table__.select().where(PriceHistory.asset_id == asset.id).order_by(PriceHistory.date)
-    )).all()
+    rows = (
+        await db.execute(
+            PriceHistory.__table__.select().where(PriceHistory.asset_id == asset.id).order_by(PriceHistory.date)
+        )
+    ).all()
     since = indicator_history_start()
     return compute_ref_indicators(AssetRef(symbol, asset.id), [r for r in rows if r.date >= since])
 
@@ -147,10 +161,16 @@ async def test_one_bar_gives_a_tail_of_one(client, db):
 
     pulse = (await client.get("/api/companion/pulse")).json()["symbols"]["NEW"]
     assert pulse["closes"] == [{"date": (date.today() - timedelta(days=1)).isoformat(), "close": 10.0}]
-    assert pulse["tail"] == [{
-        "date": (date.today() - timedelta(days=1)).isoformat(), "close": 10.0,
-        "vnr": None, "vnrSigma": None, "gapSessions": None, "returns": 0,
-    }]
+    assert pulse["tail"] == [
+        {
+            "date": (date.today() - timedelta(days=1)).isoformat(),
+            "close": 10.0,
+            "vnr": None,
+            "vnrSigma": None,
+            "gapSessions": None,
+            "returns": 0,
+        }
+    ]
 
 
 async def test_pence_quoted_listing_reports_pounds(client, db):
@@ -195,7 +215,8 @@ async def test_cache_hit_until_a_price_write(client, db):
     await _seed(db, "AAPL", _walk(60), _weekdays(60))
 
     with patch(
-        "app.services.companion_pulse_service.compute_ref_indicators", wraps=compute_ref_indicators,
+        "app.services.companion_pulse_service.compute_ref_indicators",
+        wraps=compute_ref_indicators,
     ) as compute:
         first = (await client.get("/api/companion/pulse")).json()
         second = (await client.get("/api/companion/pulse")).json()
@@ -308,9 +329,17 @@ async def test_sse_stream_is_neither_compressed_nor_buffered():
         raise asyncio.CancelledError
 
     scope = {
-        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "GET",
-        "scheme": "http", "path": "/api/quotes/stream", "raw_path": b"/api/quotes/stream",
-        "query_string": b"", "root_path": "", "server": ("test", 80), "client": ("test", 1),
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/api/quotes/stream",
+        "raw_path": b"/api/quotes/stream",
+        "query_string": b"",
+        "root_path": "",
+        "server": ("test", 80),
+        "client": ("test", 1),
         "headers": [(b"host", b"test"), (b"accept-encoding", b"gzip")],
     }
     _reset_asset_list_cache()
@@ -369,7 +398,8 @@ async def test_move_scales_follow_a_price_write(client, db):
         index=[dates[-20]],
     )
     with patch(
-        "app.services.price_sync.PriceRepository.upsert_prices", new=AsyncMock(return_value=1),
+        "app.services.price_sync.PriceRepository.upsert_prices",
+        new=AsyncMock(return_value=1),
     ):
         await db.execute(
             PriceHistory.__table__.update()

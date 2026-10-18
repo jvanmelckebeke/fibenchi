@@ -129,8 +129,11 @@ def _refresh_trigger() -> CronTrigger | None:
         )
         return None
     return CronTrigger(
-        minute=parts[0], hour=parts[1], day=parts[2],
-        month=parts[3], day_of_week=parts[4],
+        minute=parts[0],
+        hour=parts[1],
+        day=parts[2],
+        month=parts[3],
+        day_of_week=parts[4],
     )
 
 
@@ -187,9 +190,7 @@ async def scheduled_split_heal():
         try:
             healed = await heal_split_discontinuities(db)
             if healed:
-                logger.info(
-                    f"Split heal: rebased {len(healed)} symbol(s): {', '.join(sorted(healed))}"
-                )
+                logger.info(f"Split heal: rebased {len(healed)} symbol(s): {', '.join(sorted(healed))}")
         except Exception:
             logger.exception("Split heal failed")
 
@@ -279,9 +280,7 @@ async def scheduled_price_heal():
         try:
             healed = await heal_unreconciled_prices(db)
             if healed:
-                logger.info(
-                    f"Price heal: refreshed {len(healed)} symbol(s): {', '.join(sorted(healed))}"
-                )
+                logger.info(f"Price heal: refreshed {len(healed)} symbol(s): {', '.join(sorted(healed))}")
         except Exception:
             logger.exception("Price heal failed")
         try:
@@ -289,8 +288,6 @@ async def scheduled_price_heal():
             # HOLE_SCAN_INTERVAL, so piggybacking on this job costs nothing.
             filled = await heal_interior_holes(db)
             if filled:
-                logger.info(
-                    f"Hole heal: refreshed {len(filled)} symbol(s): {', '.join(sorted(filled))}"
-                )
+                logger.info(f"Hole heal: refreshed {len(filled)} symbol(s): {', '.join(sorted(filled))}")
         except Exception:
             logger.exception("Hole heal failed")

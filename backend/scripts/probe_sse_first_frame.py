@@ -15,6 +15,7 @@ it. Run it late in a session, not on a freshly-wiped intraday table.
     docker compose exec backend python scripts/probe_sse_first_frame.py
     docker compose exec backend python scripts/probe_sse_first_frame.py --toon
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,13 +48,15 @@ async def collect() -> dict:
         # The stream's roster is every grouped asset, but a page renders one
         # group. The biggest group bounds what any single view can consume —
         # the gap is bars nobody on that page will draw.
-        biggest = (await db.execute(
-            select(Group.name, func.count(group_assets.c.asset_id).label("n"))
-            .join(group_assets, group_assets.c.group_id == Group.id)
-            .group_by(Group.id)
-            .order_by(func.count(group_assets.c.asset_id).desc())
-            .limit(1)
-        )).first()
+        biggest = (
+            await db.execute(
+                select(Group.name, func.count(group_assets.c.asset_id).label("n"))
+                .join(group_assets, group_assets.c.group_id == Group.id)
+                .group_by(Group.id)
+                .order_by(func.count(group_assets.c.asset_id).desc())
+                .limit(1)
+            )
+        ).first()
 
     frame = _intraday_payload_adapter.dump_json(all_bars)
     # The bytes actually written to the socket, not just the JSON.
@@ -112,8 +115,7 @@ def format_human(d: dict) -> str:
         f" — a page can render at most this many",
         f"  bars total            {d['bars']}",
         f"  frame on the wire     {_human(d['frame_bytes'])}  ({d['frame_bytes']} B)",
-        f"  gzipped               {_human(d['frame_gzip_bytes'])}"
-        "   (no GZipMiddleware today — SSE is sent raw)",
+        f"  gzipped               {_human(d['frame_gzip_bytes'])}   (no GZipMiddleware today — SSE is sent raw)",
         "",
         f"  bytes per bar         {d['frame_bytes'] / max(d['bars'], 1):.0f}",
         "",

@@ -70,9 +70,7 @@ class TestRecovery:
 
     def test_rerunning_on_the_same_provider_frame_is_stable(self):
         df = frame(DEFECTIVE)
-        assert recover_fx_close(df, "JPY=X").equals(
-            recover_fx_close(df.copy(), "JPY=X")
-        )
+        assert recover_fx_close(df, "JPY=X").equals(recover_fx_close(df.copy(), "JPY=X"))
 
 
 class TestGating:
@@ -82,7 +80,7 @@ class TestGating:
         assert recover_fx_close(df, "JPY=X") is df
 
     def test_a_frame_too_short_to_judge_is_left_alone(self):
-        df = frame(DEFECTIVE[:MIN_BODY_SAMPLE - 1])
+        df = frame(DEFECTIVE[: MIN_BODY_SAMPLE - 1])
         assert recover_fx_close(df, "JPY=X") is df
 
     def test_empty_frame(self):

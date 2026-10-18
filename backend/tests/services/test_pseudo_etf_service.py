@@ -25,6 +25,7 @@ _PATCH_GET_ETF = "app.services.pseudo_etf_service.get_pseudo_etf"
 
 def _make_etf(**overrides) -> PseudoETF:
     from datetime import date, datetime
+
     defaults = dict(id=1, name="Quantum", base_date=date(2025, 1, 1), base_value=100.0)
     defaults.update(overrides)
     etf = MagicMock(spec=PseudoETF)
@@ -37,6 +38,7 @@ def _make_etf(**overrides) -> PseudoETF:
 
 def _make_asset(id: int, symbol: str) -> Asset:
     from tests.helpers import make_mock_asset
+
     return make_mock_asset(symbol=symbol, id=id)
 
 
@@ -47,6 +49,7 @@ async def test_create_duplicate_name_raises_400(MockRepo):
     mock_repo.get_by_name = AsyncMock(return_value=_make_etf())
 
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         await create_pseudo_etf(db, name="Quantum", base_date="2025-01-01")
     assert exc_info.value.status_code == 400
@@ -56,9 +59,7 @@ async def test_create_duplicate_name_raises_400(MockRepo):
 @patch("app.services.pseudo_etf_service.PriceRepository")
 @patch("app.services.pseudo_etf_service.AssetRepository")
 @patch("app.services.pseudo_etf_service.PseudoEtfRepository")
-async def test_add_constituents_skips_duplicates(
-    MockPetfRepo, MockAssetRepo, MockPriceRepo, mock_sync
-):
+async def test_add_constituents_skips_duplicates(MockPetfRepo, MockAssetRepo, MockPriceRepo, mock_sync):
     db = AsyncMock()
     etf = _make_etf()
     existing_asset = _make_asset(1, "AAPL")
@@ -114,6 +115,7 @@ async def test_remove_constituent_not_found_raises_404(MockRepo):
 
     with patch(_PATCH_GET_ETF, new_callable=AsyncMock, return_value=etf):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await remove_constituent(db, etf_id=1, asset_id=999)
         assert exc_info.value.status_code == 404
@@ -169,6 +171,7 @@ async def test_delete_annotation_not_found_raises_404(MockRepo):
 
     with patch(_PATCH_GET_ETF, new_callable=AsyncMock):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await delete_annotation(db, etf_id=1, annotation_id=999)
         assert exc_info.value.status_code == 404

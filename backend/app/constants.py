@@ -23,6 +23,7 @@ def _compute_warmup_days() -> int:
     ~2x the max warmup periods to account for weekends/holidays.
     """
     from app.services.compute.indicators import get_max_warmup_periods
+
     return int(get_max_warmup_periods() * 2.3)
 
 

@@ -39,7 +39,10 @@ async def test_get_by_id_and_asset_finds_existing(db):
     repo = AnnotationRepository(db)
 
     created = await repo.create(
-        asset_id=asset.id, date=date(2024, 5, 1), title="Earnings", color="#3b82f6",
+        asset_id=asset.id,
+        date=date(2024, 5, 1),
+        title="Earnings",
+        color="#3b82f6",
     )
 
     result = await repo.get_by_id_and_asset(created.id, asset.id)
@@ -54,7 +57,10 @@ async def test_get_by_id_and_asset_returns_none_when_wrong_asset(db):
     repo = AnnotationRepository(db)
 
     created = await repo.create(
-        asset_id=asset_a.id, date=date(2024, 5, 1), title="Earnings", color="#3b82f6",
+        asset_id=asset_a.id,
+        date=date(2024, 5, 1),
+        title="Earnings",
+        color="#3b82f6",
     )
 
     result = await repo.get_by_id_and_asset(created.id, asset_b.id)
@@ -86,7 +92,10 @@ async def test_delete_removes_the_row(db):
     repo = AnnotationRepository(db)
 
     annotation = await repo.create(
-        asset_id=asset.id, date=date(2024, 7, 1), title="Remove me", color="#ef4444",
+        asset_id=asset.id,
+        date=date(2024, 7, 1),
+        title="Remove me",
+        color="#ef4444",
     )
     annotation_id = annotation.id
 

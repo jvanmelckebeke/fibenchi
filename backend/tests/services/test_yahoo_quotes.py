@@ -26,12 +26,11 @@ class TestSessionDate:
     def test_uses_exchange_timezone(self):
         # 23:30 UTC is already the next calendar day in Tokyo but not in New York.
         epoch = int(datetime(2024, 1, 1, 23, 30, tzinfo=timezone.utc).timestamp())
-        assert _quote_session_date(
-            {"regularMarketTime": epoch, "exchangeTimezoneName": "Asia/Tokyo"}
-        ) == "2024-01-02"
-        assert _quote_session_date(
-            {"regularMarketTime": epoch, "exchangeTimezoneName": "America/New_York"}
-        ) == "2024-01-01"
+        assert _quote_session_date({"regularMarketTime": epoch, "exchangeTimezoneName": "Asia/Tokyo"}) == "2024-01-02"
+        assert (
+            _quote_session_date({"regularMarketTime": epoch, "exchangeTimezoneName": "America/New_York"})
+            == "2024-01-01"
+        )
 
     def test_missing_fields_return_none(self):
         assert _quote_session_date({}) is None
@@ -39,17 +38,21 @@ class TestSessionDate:
         assert _quote_session_date({"exchangeTimezoneName": "Asia/Tokyo"}) is None
 
     def test_bad_timezone_returns_none(self):
-        assert _quote_session_date(
-            {"regularMarketTime": 1704151800, "exchangeTimezoneName": "Not/AZone"}
-        ) is None
+        assert _quote_session_date({"regularMarketTime": 1704151800, "exchangeTimezoneName": "Not/AZone"}) is None
 
     def test_parse_quote_row_includes_session_date(self):
         epoch = int(datetime(2024, 1, 2, 15, 0, tzinfo=timezone.utc).timestamp())
-        row = parse_quote_row("AAPL", {
-            "currency": "USD", "regularMarketPrice": 100.0,
-            "regularMarketPreviousClose": 99.0, "marketState": "REGULAR",
-            "regularMarketTime": epoch, "exchangeTimezoneName": "America/New_York",
-        })
+        row = parse_quote_row(
+            "AAPL",
+            {
+                "currency": "USD",
+                "regularMarketPrice": 100.0,
+                "regularMarketPreviousClose": 99.0,
+                "marketState": "REGULAR",
+                "regularMarketTime": epoch,
+                "exchangeTimezoneName": "America/New_York",
+            },
+        )
         assert row.session_date == "2024-01-02"
 
     def test_parse_quote_row_placeholder_when_basis_unknown(self):
@@ -167,16 +170,24 @@ class TestParseQuotes:
     def test_multiple_symbols(self):
         price_data = {
             "AAPL": {
-                "currency": "USD", "regularMarketPrice": 185.0,
-                "regularMarketPreviousClose": 184.0, "regularMarketChange": 1.0,
-                "regularMarketChangePercent": 0.5, "regularMarketVolume": 50_000_000,
-                "averageDailyVolume10Day": None, "marketState": "REGULAR",
+                "currency": "USD",
+                "regularMarketPrice": 185.0,
+                "regularMarketPreviousClose": 184.0,
+                "regularMarketChange": 1.0,
+                "regularMarketChangePercent": 0.5,
+                "regularMarketVolume": 50_000_000,
+                "averageDailyVolume10Day": None,
+                "marketState": "REGULAR",
             },
             "MSFT": {
-                "currency": "USD", "regularMarketPrice": 420.0,
-                "regularMarketPreviousClose": 418.0, "regularMarketChange": 2.0,
-                "regularMarketChangePercent": 0.5, "regularMarketVolume": 30_000_000,
-                "averageDailyVolume10Day": None, "marketState": "REGULAR",
+                "currency": "USD",
+                "regularMarketPrice": 420.0,
+                "regularMarketPreviousClose": 418.0,
+                "regularMarketChange": 2.0,
+                "regularMarketChangePercent": 0.5,
+                "regularMarketVolume": 30_000_000,
+                "averageDailyVolume10Day": None,
+                "marketState": "REGULAR",
             },
         }
         results = _parse_quotes(["AAPL", "MSFT"], price_data)
@@ -220,12 +231,18 @@ class TestQuotes:
     @patch("app.services.yahoo.client.Ticker")
     async def test_retries_on_invalid_crumb(self, mock_ticker_cls):
         bad = {"AAPL": "Invalid Crumb"}
-        good = {"AAPL": {
-            "currency": "USD", "regularMarketPrice": 185.0,
-            "regularMarketPreviousClose": 184.0, "regularMarketChange": 1.0,
-            "regularMarketChangePercent": 0.5, "regularMarketVolume": 50_000_000,
-            "averageDailyVolume10Day": None, "marketState": "REGULAR",
-        }}
+        good = {
+            "AAPL": {
+                "currency": "USD",
+                "regularMarketPrice": 185.0,
+                "regularMarketPreviousClose": 184.0,
+                "regularMarketChange": 1.0,
+                "regularMarketChangePercent": 0.5,
+                "regularMarketVolume": 50_000_000,
+                "averageDailyVolume10Day": None,
+                "marketState": "REGULAR",
+            }
+        }
 
         ticker1 = MagicMock()
         ticker1.quotes = bad

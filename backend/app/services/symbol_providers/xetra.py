@@ -89,12 +89,14 @@ def _parse_csv(raw_text: str) -> list[SymbolEntry]:
             continue
         seen.add(yahoo_symbol)
 
-        results.append(SymbolEntry(
-            symbol=yahoo_symbol,
-            name=name,
-            exchange="Xetra",
-            currency=currency,
-            type=_TYPE_MAP[instrument_type],
-        ))
+        results.append(
+            SymbolEntry(
+                symbol=yahoo_symbol,
+                name=name,
+                exchange="Xetra",
+                currency=currency,
+                type=_TYPE_MAP[instrument_type],
+            )
+        )
 
     return results

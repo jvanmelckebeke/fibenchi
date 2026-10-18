@@ -18,8 +18,12 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 def _make_source(id: int = 1, name: str = "Test", provider_type: str = "euronext") -> SymbolSource:
     """Create a SymbolSource model instance."""
     source = SymbolSource(
-        id=id, name=name, provider_type=provider_type,
-        enabled=True, config={}, symbol_count=0,
+        id=id,
+        name=name,
+        provider_type=provider_type,
+        enabled=True,
+        config={},
+        symbol_count=0,
     )
     return source
 
@@ -58,8 +62,10 @@ class TestSyncSource:
 
         # Mock db.execute to avoid PG-specific ON CONFLICT syntax
         original_execute = db.execute
+
         async def _mock_execute(stmt, *args, **kwargs):
             from sqlalchemy.dialects.postgresql import Insert
+
             if isinstance(stmt, Insert):
                 return MagicMock()
             return await original_execute(stmt, *args, **kwargs)
@@ -81,8 +87,10 @@ class TestSyncSource:
         mock_get_provider.return_value = provider
 
         original_execute = db.execute
+
         async def _mock_execute(stmt, *args, **kwargs):
             from sqlalchemy.dialects.postgresql import Insert
+
             if isinstance(stmt, Insert):
                 return MagicMock()
             return await original_execute(stmt, *args, **kwargs)
@@ -143,6 +151,7 @@ class TestNullifySourceSymbols:
         await db.commit()
 
         from app.models.symbol_directory import SymbolDirectory
+
         sym = SymbolDirectory(symbol="AAPL", name="Apple", source_id=source.id)
         db.add(sym)
         await db.commit()

@@ -54,9 +54,7 @@ async def create_source(body: SymbolSourceCreate, db: AsyncSession = Depends(get
 
 
 @router.patch("/{source_id}", response_model=SymbolSourceResponse, summary="Update symbol source")
-async def update_source(
-    source_id: int, body: SymbolSourceUpdate, db: AsyncSession = Depends(get_db)
-):
+async def update_source(source_id: int, body: SymbolSourceUpdate, db: AsyncSession = Depends(get_db)):
     """Update a symbol source's config, enabled state, or name."""
     source = await db.get(SymbolSource, source_id)
     if source is None:

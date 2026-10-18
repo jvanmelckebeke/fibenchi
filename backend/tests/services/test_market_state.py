@@ -48,7 +48,10 @@ def test_settled_states_read_as_closed_phase():
 def test_phase_speaks_venue_vocabulary():
     """phase is the join key to Venue.phase() — same four values."""
     assert {info.phase for info in MARKET_STATES.values()} <= {
-        "premarket", "open", "aftermarket", "closed",
+        "premarket",
+        "open",
+        "aftermarket",
+        "closed",
     }
 
 

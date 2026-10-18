@@ -47,9 +47,7 @@ class Thesis(Base):
     opened_at: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    assets: Mapped[list["Asset"]] = relationship(
-        secondary=thesis_assets, lazy="selectin", overlaps="theses"
-    )
+    assets: Mapped[list["Asset"]] = relationship(secondary=thesis_assets, lazy="selectin", overlaps="theses")
 
 
 from app.models.asset import Asset  # noqa: E402, F401

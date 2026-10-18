@@ -18,16 +18,54 @@ from app.services.yahoo import (
 # The retired EXCHANGE_CURRENCY_MAP, kept verbatim as the migration reference:
 # every suffix it knew must resolve identically through Symbol.currency.
 _LEGACY_SUFFIX_CURRENCIES = {
-    "KS": "KRW", "KQ": "KRW", "T": "JPY", "HK": "HKD", "SS": "CNY",
-    "SZ": "CNY", "TW": "TWD", "TWO": "TWD", "SI": "SGD", "AX": "AUD",
-    "NZ": "NZD", "NS": "INR", "BO": "INR", "JK": "IDR", "BK": "THB",
-    "L": "GBP", "IL": "GBP", "PA": "EUR", "DE": "EUR", "F": "EUR",
-    "MI": "EUR", "MC": "EUR", "AS": "EUR", "BR": "EUR", "LS": "EUR",
-    "HE": "EUR", "AT": "EUR", "VI": "EUR", "IR": "EUR", "OL": "NOK",
-    "ST": "SEK", "CO": "DKK", "IC": "ISK", "WA": "PLN", "PR": "CZK",
-    "BD": "HUF", "SW": "CHF", "IS": "TRY", "TA": "ILS", "SR": "SAR",
-    "QA": "QAR", "JO": "ZAR", "TO": "CAD", "V": "CAD", "SA": "BRL",
-    "MX": "MXN", "SN": "CLP", "BA": "ARS",
+    "KS": "KRW",
+    "KQ": "KRW",
+    "T": "JPY",
+    "HK": "HKD",
+    "SS": "CNY",
+    "SZ": "CNY",
+    "TW": "TWD",
+    "TWO": "TWD",
+    "SI": "SGD",
+    "AX": "AUD",
+    "NZ": "NZD",
+    "NS": "INR",
+    "BO": "INR",
+    "JK": "IDR",
+    "BK": "THB",
+    "L": "GBP",
+    "IL": "GBP",
+    "PA": "EUR",
+    "DE": "EUR",
+    "F": "EUR",
+    "MI": "EUR",
+    "MC": "EUR",
+    "AS": "EUR",
+    "BR": "EUR",
+    "LS": "EUR",
+    "HE": "EUR",
+    "AT": "EUR",
+    "VI": "EUR",
+    "IR": "EUR",
+    "OL": "NOK",
+    "ST": "SEK",
+    "CO": "DKK",
+    "IC": "ISK",
+    "WA": "PLN",
+    "PR": "CZK",
+    "BD": "HUF",
+    "SW": "CHF",
+    "IS": "TRY",
+    "TA": "ILS",
+    "SR": "SAR",
+    "QA": "QAR",
+    "JO": "ZAR",
+    "TO": "CAD",
+    "V": "CAD",
+    "SA": "BRL",
+    "MX": "MXN",
+    "SN": "CLP",
+    "BA": "ARS",
 }
 
 
@@ -156,13 +194,15 @@ class TestResolveCurrency:
 class TestNormalizeOhlcvDf:
     @pytest.fixture
     def sample_df(self):
-        return pd.DataFrame({
-            "open": [3200.0, 3250.0],
-            "high": [3300.0, 3350.0],
-            "low": [3100.0, 3150.0],
-            "close": [3250.0, 3300.0],
-            "volume": [1_000_000, 1_200_000],
-        })
+        return pd.DataFrame(
+            {
+                "open": [3200.0, 3250.0],
+                "high": [3300.0, 3350.0],
+                "low": [3100.0, 3150.0],
+                "close": [3250.0, 3300.0],
+                "volume": [1_000_000, 1_200_000],
+            }
+        )
 
     def test_divisor_1_returns_same(self, sample_df):
         result = _normalize_ohlcv_df(sample_df, 1)
@@ -185,27 +225,31 @@ class TestNormalizeOhlcvDf:
         assert sample_df["open"].tolist() == original_open
 
     def test_handles_adjclose(self):
-        df = pd.DataFrame({
-            "open": [3200.0],
-            "high": [3300.0],
-            "low": [3100.0],
-            "close": [3250.0],
-            "adjclose": [3250.0],
-            "volume": [1_000_000],
-        })
+        df = pd.DataFrame(
+            {
+                "open": [3200.0],
+                "high": [3300.0],
+                "low": [3100.0],
+                "close": [3250.0],
+                "adjclose": [3250.0],
+                "volume": [1_000_000],
+            }
+        )
         result = _normalize_ohlcv_df(df, 100)
         assert result["adjclose"].tolist() == [32.5]
         assert result["volume"].tolist() == [1_000_000]
 
     def test_converts_dividends_with_the_prices(self):
         """A GBp dividend left in pence beside a GBP close is a 100x σ-Move."""
-        df = pd.DataFrame({
-            "open": [3200.0],
-            "high": [3300.0],
-            "low": [3100.0],
-            "close": [3250.0],
-            "volume": [1_000_000],
-            "dividends": [8.5],
-        })
+        df = pd.DataFrame(
+            {
+                "open": [3200.0],
+                "high": [3300.0],
+                "low": [3100.0],
+                "close": [3250.0],
+                "volume": [1_000_000],
+                "dividends": [8.5],
+            }
+        )
         result = _normalize_ohlcv_df(df, 100)
         assert result["dividends"].tolist() == [0.085]

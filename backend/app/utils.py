@@ -42,9 +42,7 @@ class TTLCache:
                      leave this False to avoid unnecessary locking overhead.
     """
 
-    def __init__(
-        self, default_ttl: float, max_size: int = 0, *, thread_safe: bool = False
-    ):
+    def __init__(self, default_ttl: float, max_size: int = 0, *, thread_safe: bool = False):
         self._data: dict = {}
         self.default_ttl = default_ttl
         self.max_size = max_size

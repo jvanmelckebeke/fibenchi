@@ -22,7 +22,10 @@ async def _seed_assets(db, count=3, n_days=200):
     assets = []
     for i, sym in enumerate(symbols):
         asset = await seed_asset_with_prices(
-            db, symbol=sym, base_price=100.0 + i * 50, n_days=n_days,
+            db,
+            symbol=sym,
+            base_price=100.0 + i * 50,
+            n_days=n_days,
         )
         assets.append(asset)
     return assets
@@ -97,6 +100,7 @@ async def test_duplicate_group_name(client):
 
 # --- GET /groups/:id/sparklines ---
 
+
 async def test_sparklines_returns_all_symbols(client, db):
     gid = await _get_default_group_id(db)
     await _seed_assets(db, count=3)
@@ -148,6 +152,7 @@ async def test_sparklines_excludes_ungrouped(client, db):
 
 # --- GET /groups/:id/indicators ---
 
+
 async def test_indicators_returns_all_symbols(client, db):
     gid = await _get_default_group_id(db)
     await _seed_assets(db, count=3)
@@ -168,6 +173,7 @@ async def test_indicators_has_expected_fields(client, db):
     assert "close" in ind
     assert ind["bars"] > 26  # full seeded history behind the snapshot
     from app.services.compute.indicators import get_all_output_fields
+
     expected_fields = set(get_all_output_fields())
     assert expected_fields.issubset(set(ind["values"].keys()))
 
@@ -189,8 +195,10 @@ async def test_indicators_null_with_insufficient_data(client, db):
     """With very few data points, indicators should be null."""
     gid = await _get_default_group_id(db)
     asset = Asset(
-        symbol="TINY", name="Tiny Inc.",
-        type=AssetType.STOCK, currency="USD",
+        symbol="TINY",
+        name="Tiny Inc.",
+        type=AssetType.STOCK,
+        currency="USD",
     )
     db.add(asset)
     await db.flush()
@@ -201,10 +209,17 @@ async def test_indicators_null_with_insufficient_data(client, db):
     today = date.today()
     for i in range(5):
         d = today - timedelta(days=4 - i)
-        db.add(PriceHistory(
-            asset_id=asset.id, date=d,
-            open=100.0, high=101.0, low=99.0, close=100.0, volume=1000,
-        ))
+        db.add(
+            PriceHistory(
+                asset_id=asset.id,
+                date=d,
+                open=100.0,
+                high=101.0,
+                low=99.0,
+                close=100.0,
+                volume=1000,
+            )
+        )
     await db.commit()
 
     resp = await client.get(f"/api/groups/{gid}/indicators")

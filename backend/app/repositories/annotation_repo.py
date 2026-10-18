@@ -10,9 +10,7 @@ class AnnotationRepository:
 
     async def list_by_asset(self, asset_id: int) -> list[Annotation]:
         result = await self.db.execute(
-            select(Annotation)
-            .where(Annotation.asset_id == asset_id)
-            .order_by(Annotation.date)
+            select(Annotation).where(Annotation.asset_id == asset_id).order_by(Annotation.date)
         )
         return list(result.scalars().all())
 

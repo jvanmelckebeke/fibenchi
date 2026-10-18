@@ -35,12 +35,17 @@ async def _seed_pseudo_etf(db, name: str = "Tech ETF", n_days: int = 60) -> Pseu
             if d.weekday() >= 5:
                 continue
             price = 100.0 + i * 0.5
-            db.add(PriceHistory(
-                asset_id=asset.id, date=d,
-                open=price - 0.5, high=price + 1.0,
-                low=price - 1.0, close=price,
-                volume=1_000_000,
-            ))
+            db.add(
+                PriceHistory(
+                    asset_id=asset.id,
+                    date=d,
+                    open=price - 0.5,
+                    high=price + 1.0,
+                    low=price - 1.0,
+                    close=price,
+                    volume=1_000_000,
+                )
+            )
     await db.commit()
     return etf
 

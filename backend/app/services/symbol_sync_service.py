@@ -86,9 +86,5 @@ async def sync_all_enabled(db: AsyncSession) -> dict[int, int]:
 
 async def nullify_source_symbols(source_id: int, db: AsyncSession) -> None:
     """Set source_id to NULL for all symbols belonging to this source."""
-    stmt = (
-        update(SymbolDirectory)
-        .where(SymbolDirectory.source_id == source_id)
-        .values(source_id=None)
-    )
+    stmt = update(SymbolDirectory).where(SymbolDirectory.source_id == source_id).values(source_id=None)
     await db.execute(stmt)

@@ -33,12 +33,15 @@ async def test_note_nonexistent_asset(client):
 
 async def test_create_annotation(client):
     await create_asset_via_api(client, "AAPL", "Apple")
-    resp = await client.post("/api/assets/AAPL/annotations", json={
-        "date": "2025-01-15",
-        "title": "Earnings beat",
-        "body": "Beat estimates by 10%",
-        "color": "#22c55e",
-    })
+    resp = await client.post(
+        "/api/assets/AAPL/annotations",
+        json={
+            "date": "2025-01-15",
+            "title": "Earnings beat",
+            "body": "Beat estimates by 10%",
+            "color": "#22c55e",
+        },
+    )
     assert resp.status_code == 201
     assert resp.json()["title"] == "Earnings beat"
 

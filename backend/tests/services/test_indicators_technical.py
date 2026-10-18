@@ -79,22 +79,28 @@ def test_nefi_scales_with_price_not_volume():
     prices = [100.0 + i * 0.5 for i in range(n)]
 
     # Asset A: low volume
-    df_a = pd.DataFrame({
-        "open": [p - 0.3 for p in prices],
-        "high": [p + 0.5 for p in prices],
-        "low": [p - 0.5 for p in prices],
-        "close": prices,
-        "volume": [100_000] * n,
-    }, index=dates)
+    df_a = pd.DataFrame(
+        {
+            "open": [p - 0.3 for p in prices],
+            "high": [p + 0.5 for p in prices],
+            "low": [p - 0.5 for p in prices],
+            "close": prices,
+            "volume": [100_000] * n,
+        },
+        index=dates,
+    )
 
     # Asset B: 10× higher volume, same prices
-    df_b = pd.DataFrame({
-        "open": [p - 0.3 for p in prices],
-        "high": [p + 0.5 for p in prices],
-        "low": [p - 0.5 for p in prices],
-        "close": prices,
-        "volume": [1_000_000] * n,
-    }, index=dates)
+    df_b = pd.DataFrame(
+        {
+            "open": [p - 0.3 for p in prices],
+            "high": [p + 0.5 for p in prices],
+            "low": [p - 0.5 for p in prices],
+            "close": prices,
+            "volume": [1_000_000] * n,
+        },
+        index=dates,
+    )
 
     nefi_a = normalized_force_index(df_a)["nefi_short"].dropna().iloc[-1]
     nefi_b = normalized_force_index(df_b)["nefi_short"].dropna().iloc[-1]
@@ -149,13 +155,16 @@ def test_cmf_positive_for_closes_near_high():
     """CMF should be positive when closes are consistently near highs."""
     n = 100
     dates = pd.date_range("2024-01-01", periods=n, freq="B")
-    df = pd.DataFrame({
-        "open": [100.0] * n,
-        "high": [105.0] * n,
-        "low": [95.0] * n,
-        "close": [104.0] * n,  # Close near high → positive MF multiplier
-        "volume": [1_000_000] * n,
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": [100.0] * n,
+            "high": [105.0] * n,
+            "low": [95.0] * n,
+            "close": [104.0] * n,  # Close near high → positive MF multiplier
+            "volume": [1_000_000] * n,
+        },
+        index=dates,
+    )
     result = chaikin_money_flow(df)
     last_valid = result.dropna().iloc[-1]
     assert last_valid > 0, f"CMF should be positive for closes near highs, got {last_valid}"
@@ -174,13 +183,16 @@ def _make_volume_df(volumes: list[float]) -> pd.DataFrame:
     """Build a price frame with an explicit volume series (prices held flat)."""
     n = len(volumes)
     dates = pd.date_range("2024-01-01", periods=n, freq="B")
-    return pd.DataFrame({
-        "open": [100.0] * n,
-        "high": [101.0] * n,
-        "low": [99.0] * n,
-        "close": [100.0] * n,
-        "volume": volumes,
-    }, index=dates)
+    return pd.DataFrame(
+        {
+            "open": [100.0] * n,
+            "high": [101.0] * n,
+            "low": [99.0] * n,
+            "close": [100.0] * n,
+            "volume": volumes,
+        },
+        index=dates,
+    )
 
 
 def test_rvol_calculation():

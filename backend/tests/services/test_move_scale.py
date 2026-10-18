@@ -77,7 +77,14 @@ def test_short_history_uses_what_exists_above_the_threshold():
 
 @pytest.mark.parametrize(
     ("key", "weeks", "present"),
-    [("1wk", 26, True), ("1wk", 25, False), ("2wk", 26, True), ("2wk", 25, False), ("1mo", 52, True), ("1mo", 51, False)],
+    [
+        ("1wk", 26, True),
+        ("1wk", 25, False),
+        ("2wk", 26, True),
+        ("2wk", 25, False),
+        ("1mo", 52, True),
+        ("1mo", 51, False),
+    ],
 )
 def test_threshold(key, weeks, present):
     w = MOVE_WINDOWS[key]

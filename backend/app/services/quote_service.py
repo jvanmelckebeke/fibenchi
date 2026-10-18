@@ -104,9 +104,7 @@ def attach_recent_sessions(quotes: list[Quote]) -> list[Quote]:
         key = (venue.name, q.session_date)
         if key not in resolved:
             try:
-                sessions = venue.recent_sessions(
-                    date.fromisoformat(q.session_date), QUOTE_SESSION_WINDOW
-                )
+                sessions = venue.recent_sessions(date.fromisoformat(q.session_date), QUOTE_SESSION_WINDOW)
             except ValueError:  # provider gave a non-ISO date; not our problem to fix here
                 sessions = None
             resolved[key] = [s.isoformat() for s in sessions] if sessions else None
@@ -189,9 +187,7 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
                 await asyncio.sleep(60)
                 continue
 
-            quotes = enrich_quotes(
-                await get_price_provider().batch_fetch_quotes(list(refs))
-            )
+            quotes = enrich_quotes(await get_price_provider().batch_fetch_quotes(list(refs)))
 
             # Build keyed payload
             full_payload: dict[str, Quote] = {}
@@ -203,11 +199,7 @@ async def quote_event_generator(intraday_symbols: frozenset[str] | None = None):
 
             # Compute delta: only symbols that changed since last push
             if last_payload:
-                delta = {
-                    sym: data
-                    for sym, data in full_payload.items()
-                    if last_payload.get(sym) != data
-                }
+                delta = {sym: data for sym, data in full_payload.items() if last_payload.get(sym) != data}
             else:
                 # First event — send everything
                 delta = full_payload

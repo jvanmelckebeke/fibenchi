@@ -8,6 +8,7 @@ requests (consent + crumb). This script tests two things:
    accesses (e.g. `t.price` then `t.history(...)` later)?
 2. Does the YahooClient pay the 3-call setup tax on EVERY `_call`?
 """
+
 from __future__ import annotations
 
 import asyncio

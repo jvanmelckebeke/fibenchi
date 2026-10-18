@@ -40,9 +40,7 @@ def ema(data: pd.Series, period: int) -> pd.Series:
     return data.ewm(span=period, adjust=False).mean()
 
 
-def bollinger_bands(
-    closes: pd.Series, period: int = 20, std_dev: float = 2.0
-) -> dict[str, pd.Series]:
+def bollinger_bands(closes: pd.Series, period: int = 20, std_dev: float = 2.0) -> dict[str, pd.Series]:
     """Bollinger Bands: middle (SMA), upper (SMA + 2*std), lower (SMA - 2*std)."""
     middle = sma(closes, period)
     rolling_std = closes.rolling(window=period).std()
@@ -193,7 +191,8 @@ def session_gap_days(index: pd.Index, session_dates: set[date] | None = None) ->
 
 
 def daily_total_returns(
-    closes: pd.Series, dividends: pd.Series | None = None,
+    closes: pd.Series,
+    dividends: pd.Series | None = None,
 ) -> pd.Series:
     """Bar-to-bar total return: price move plus the cash paid to hold it.
 
@@ -284,9 +283,16 @@ def _ewma_daily_vol(
     """
     returns = vnr_usable_returns(closes, gaps, dividends)
     # RiskMetrics zero-mean EWMA variance: sigma^2_t = lam*sigma^2_{t-1} + (1-lam)*r^2_{t-1}
-    ewma_var = (returns**2).ewm(
-        alpha=1 - lam, adjust=False, ignore_na=False, min_periods=warmup,
-    ).mean()
+    ewma_var = (
+        (returns**2)
+        .ewm(
+            alpha=1 - lam,
+            adjust=False,
+            ignore_na=False,
+            min_periods=warmup,
+        )
+        .mean()
+    )
     sigma = np.sqrt(ewma_var)
     floor = returns.expanding(min_periods=sigma_floor_min_obs).std() * sigma_floor_frac
     # `floor > sigma` is False wherever floor is NaN, so early bars keep sigma.
@@ -344,7 +350,13 @@ def volatility_normalized_return(
     # It gets the same dividends for the same reason: an ex-date drop left in
     # the variance overstates σ for weeks, understating every score after it.
     sigma_forecast = _ewma_daily_vol(
-        closes, lam, gaps, sigma_floor_frac, sigma_floor_min_obs, warmup, dividends,
+        closes,
+        lam,
+        gaps,
+        sigma_floor_frac,
+        sigma_floor_min_obs,
+        warmup,
+        dividends,
     ).shift(1)
     return (returns / sigma_forecast).where(~(gaps > 1))
 
@@ -399,7 +411,10 @@ def choppiness_index(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
 
 def normalized_force_index(
-    df: pd.DataFrame, ema_period: int = 13, short_vol: int = 20, long_vol: int = 200,
+    df: pd.DataFrame,
+    ema_period: int = 13,
+    short_vol: int = 20,
+    long_vol: int = 200,
 ) -> dict[str, pd.Series]:
     """Normalized Elder's Force Index — EFI divided by average volume.
 
@@ -490,6 +505,7 @@ def bb_position(close: float, upper: float, middle: float, lower: float) -> str:
 # ---------------------------------------------------------------------------
 # Indicator registry
 # ---------------------------------------------------------------------------
+
 
 def _macd_snapshot_derived(row: pd.Series) -> dict:
     """Derive MACD signal direction from latest row."""
@@ -633,17 +649,23 @@ INDICATOR_REGISTRY: dict[str, IndicatorDef] = {
         func=macd,
         params={"fast": 12, "slow": 26, "signal": 9},
         output_fields=[
-            "macd", "macd_signal", "macd_hist",
-            "macd_hist_delta", "macd_hist_delta_sigma",
-            "macd_delta", "macd_delta_sigma",
+            "macd",
+            "macd_signal",
+            "macd_hist",
+            "macd_hist_delta",
+            "macd_hist_delta_sigma",
+            "macd_delta",
+            "macd_delta_sigma",
         ],
         result_mapping={"macd": "macd", "signal": "macd_signal", "histogram": "macd_hist"},
         decimals=4,
         warmup_periods=35,
         snapshot_derived=_macd_snapshot_derived,
         field_decimals={
-            "macd_hist_delta": 2, "macd_hist_delta_sigma": 1,
-            "macd_delta": 2, "macd_delta_sigma": 1,
+            "macd_hist_delta": 2,
+            "macd_hist_delta_sigma": 1,
+            "macd_delta": 2,
+            "macd_delta_sigma": 1,
         },
     ),
     "atr": IndicatorDef(
@@ -848,13 +870,12 @@ def _compute_deltas(result: pd.DataFrame, window: int = 20, gaps: pd.Series | No
 
         sigma = (abs_delta - rolling_mean) / rolling_std
         # Only keep sigma when |Δ| exceeds the 2σ threshold
-        result[f"{field_name}_delta_sigma"] = sigma.where(
-            abs_delta > rolling_mean + 2 * rolling_std
-        )
+        result[f"{field_name}_delta_sigma"] = sigma.where(abs_delta > rolling_mean + 2 * rolling_std)
 
 
 def compute_indicators(
-    df: pd.DataFrame, session_dates: set[date] | None = None,
+    df: pd.DataFrame,
+    session_dates: set[date] | None = None,
 ) -> pd.DataFrame:
     """Compute all indicators and return a DataFrame with indicator columns.
 
@@ -907,7 +928,10 @@ def compute_indicators(
     # flags the bars the gap guard suppressed with the gap width, so the UI can
     # explain the blank (NaN everywhere else → None in responses).
     result["vnr_sigma"] = _ewma_daily_vol(
-        closes, VNR_LAMBDA, gap_series, dividends=dividends,
+        closes,
+        VNR_LAMBDA,
+        gap_series,
+        dividends=dividends,
     )
     result["vnr_gap_sessions"] = gap_series.where(gap_series > 1)
     # The cash σ-Move added back on this bar, NaN elsewhere. Published because
@@ -915,8 +939,7 @@ def compute_indicators(
     # this much — on a large payout by enough to flip the sign — and a reader
     # is owed the reason rather than left to call one of them broken.
     result["vnr_ex_div"] = (
-        dividends.where(dividends > 0) if dividends is not None
-        else pd.Series(np.nan, index=df.index)
+        dividends.where(dividends > 0) if dividends is not None else pd.Series(np.nan, index=df.index)
     )
 
     _compute_deltas(result, gaps=gap_series)
@@ -948,18 +971,28 @@ async def compute_batch_indicator_snapshots(
         currency = currencies.get(sym, "USD")
         df = histories.get(sym)
         if df is None or df.empty or len(df) < 2:
-            results.append(SymbolIndicatorSnapshot(
-                symbol=sym, currency=currency, bars=0 if df is None else len(df),
-            ))
+            results.append(
+                SymbolIndicatorSnapshot(
+                    symbol=sym,
+                    currency=currency,
+                    bars=0 if df is None else len(df),
+                )
+            )
             continue
 
         venue = AssetRef(sym).venue
         sessions = venue.session_dates_for_index(df.index) if venue else None
         snapshot = build_indicator_snapshot(compute_indicators(df, session_dates=sessions))
-        results.append(SymbolIndicatorSnapshot(
-            symbol=sym, currency=currency, close=snapshot.close,
-            change_pct=snapshot.change_pct, bars=snapshot.bars, values=snapshot.values,
-        ))
+        results.append(
+            SymbolIndicatorSnapshot(
+                symbol=sym,
+                currency=currency,
+                close=snapshot.close,
+                change_pct=snapshot.change_pct,
+                bars=snapshot.bars,
+                values=snapshot.values,
+            )
+        )
 
     # Fundamentals are merged from cache by the caller (non-blocking).
     # See fundamentals_cache.merge_fundamentals_into_batch().

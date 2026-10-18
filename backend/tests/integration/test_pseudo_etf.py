@@ -6,11 +6,14 @@ pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 
 async def test_create_pseudo_etf(client):
-    resp = await client.post("/api/pseudo-etfs", json={
-        "name": "Quantum",
-        "description": "Quantum computing stocks",
-        "base_date": "2025-01-01",
-    })
+    resp = await client.post(
+        "/api/pseudo-etfs",
+        json={
+            "name": "Quantum",
+            "description": "Quantum computing stocks",
+            "base_date": "2025-01-01",
+        },
+    )
     assert resp.status_code == 201
     data = resp.json()
     assert data["name"] == "Quantum"
@@ -60,9 +63,7 @@ async def test_add_constituents(client):
     resp = await client.post("/api/pseudo-etfs", json={"name": "Quantum", "base_date": "2025-01-01"})
     etf_id = resp.json()["id"]
 
-    resp = await client.post(f"/api/pseudo-etfs/{etf_id}/constituents", json={
-        "asset_ids": [a1["id"], a2["id"]]
-    })
+    resp = await client.post(f"/api/pseudo-etfs/{etf_id}/constituents", json={"asset_ids": [a1["id"], a2["id"]]})
     assert resp.status_code == 200
     assert len(resp.json()["constituents"]) == 2
 
@@ -74,9 +75,7 @@ async def test_remove_constituent(client):
     resp = await client.post("/api/pseudo-etfs", json={"name": "Quantum", "base_date": "2025-01-01"})
     etf_id = resp.json()["id"]
 
-    await client.post(f"/api/pseudo-etfs/{etf_id}/constituents", json={
-        "asset_ids": [a1["id"], a2["id"]]
-    })
+    await client.post(f"/api/pseudo-etfs/{etf_id}/constituents", json={"asset_ids": [a1["id"], a2["id"]]})
 
     resp = await client.delete(f"/api/pseudo-etfs/{etf_id}/constituents/{a1['id']}")
     assert resp.status_code == 200

@@ -174,7 +174,10 @@ class TestSmallSplitsAreNotAppliedTwice:
 
         unadjusted = quiet_frame([0, 0, 1.1, 0], adjusted=False, ratio=1.1)
         assert list(normalize_splits(unadjusted, "X")["close"].round(2)) == [
-            100.0, 100.5, 101.0, 101.5,
+            100.0,
+            100.5,
+            101.0,
+            101.5,
         ]
 
 

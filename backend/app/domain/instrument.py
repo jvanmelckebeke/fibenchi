@@ -23,7 +23,7 @@ class AssetKind(str, Enum):
     app never stores as assets (FX, futures).
     """
 
-    EQUITY = "equity"    # exchange-listed security (incl. ETFs)
+    EQUITY = "equity"  # exchange-listed security (incl. ETFs)
     INDEX = "index"
     CRYPTO = "crypto"
     FX = "fx"
@@ -61,9 +61,9 @@ class UnitKind(str, Enum):
     currency code because the column is non-null.
     """
 
-    CURRENCY = "currency"   # $71.40 — the currency field says which
-    PERCENT = "percent"     # 4.63% — the number is a rate
-    POINTS = "points"       # 6,912.34 — an index level, no unit
+    CURRENCY = "currency"  # $71.40 — the currency field says which
+    PERCENT = "percent"  # 4.63% — the number is a rate
+    POINTS = "points"  # 6,912.34 — an index level, no unit
 
     @property
     def is_currency(self) -> bool:
@@ -110,7 +110,7 @@ def classify(ticker: str) -> Instrument:
     if sym.startswith("^"):
         return index(sym)  # unknown index — don't guess a venue
     if sym.endswith("=X"):
-        return Instrument(AssetKind.FX)      # not exchange-session shaped
+        return Instrument(AssetKind.FX)  # not exchange-session shaped
     if sym.endswith("=F"):
         return Instrument(AssetKind.FUTURE)  # not exchange-session shaped
     if "-" in sym:

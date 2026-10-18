@@ -157,24 +157,30 @@ async def get_attachments(db: AsyncSession, symbol: str) -> AssetAttachments:
     asset = await get_asset(symbol, db)  # tags/theses eager-loaded (lazy="selectin")
 
     group_names = (
-        await db.execute(
-            select(Group.name)
-            .join(group_assets, Group.id == group_assets.c.group_id)
-            .where(group_assets.c.asset_id == asset.id)
-            .order_by(Group.name)
+        (
+            await db.execute(
+                select(Group.name)
+                .join(group_assets, Group.id == group_assets.c.group_id)
+                .where(group_assets.c.asset_id == asset.id)
+                .order_by(Group.name)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     pseudo_names = (
-        await db.execute(
-            select(PseudoETF.name)
-            .join(pseudo_etf_constituents, PseudoETF.id == pseudo_etf_constituents.c.pseudo_etf_id)
-            .where(pseudo_etf_constituents.c.asset_id == asset.id)
-            .order_by(PseudoETF.name)
+        (
+            await db.execute(
+                select(PseudoETF.name)
+                .join(pseudo_etf_constituents, PseudoETF.id == pseudo_etf_constituents.c.pseudo_etf_id)
+                .where(pseudo_etf_constituents.c.asset_id == asset.id)
+                .order_by(PseudoETF.name)
+            )
         )
-    ).scalars().all()
-    note_content = (
-        await db.execute(select(Note.content).where(Note.asset_id == asset.id))
-    ).scalar_one_or_none()
+        .scalars()
+        .all()
+    )
+    note_content = (await db.execute(select(Note.content).where(Note.asset_id == asset.id))).scalar_one_or_none()
     annotation_count = (
         await db.execute(select(func.count()).select_from(Annotation).where(Annotation.asset_id == asset.id))
     ).scalar_one()

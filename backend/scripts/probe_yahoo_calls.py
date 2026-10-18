@@ -11,6 +11,7 @@ Run inside the backend container:
 
 Makes ~20-30 real network calls to query2.finance.yahoo.com. Throwaway.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -38,10 +39,7 @@ def _patched_request(self, method, url, *args, **kwargs):
         path = parsed.path
         # Strip noisy/sensitive query params; keep ones that disambiguate endpoints.
         q = parsed.query or ""
-        keep = [
-            p for p in q.split("&")
-            if p.startswith(("modules=", "interval=", "range=", "period1=", "period2="))
-        ]
+        keep = [p for p in q.split("&") if p.startswith(("modules=", "interval=", "range=", "period1=", "period2="))]
         suffix = ("?" + "&".join(keep)) if keep else ""
         _counter[_active_label].append(f"{method} {parsed.netloc}{path}{suffix}")
     return _orig_request(self, method, url, *args, **kwargs)

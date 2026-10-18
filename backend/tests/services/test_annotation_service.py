@@ -37,9 +37,7 @@ async def test_create_annotation_passes_asset_id_and_kwargs(MockRepo):
     result = await create_annotation(db, asset_id=7, date="2025-06-01", title="Earnings")
 
     MockRepo.assert_called_once_with(db)
-    mock_repo.create.assert_awaited_once_with(
-        asset_id=7, date="2025-06-01", title="Earnings"
-    )
+    mock_repo.create.assert_awaited_once_with(asset_id=7, date="2025-06-01", title="Earnings")
     assert result == new_annotation
 
 

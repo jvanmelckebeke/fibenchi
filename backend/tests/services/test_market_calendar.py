@@ -74,8 +74,11 @@ def test_session_dates_issue_559_range():
     and the weekend days are not."""
     sessions = AssetRef("IWDA.AS").venue.session_dates(date(2026, 7, 29), date(2026, 8, 4))
     assert sessions == {
-        date(2026, 7, 29), date(2026, 7, 30), date(2026, 7, 31),
-        date(2026, 8, 3), date(2026, 8, 4),
+        date(2026, 7, 29),
+        date(2026, 7, 30),
+        date(2026, 7, 31),
+        date(2026, 8, 3),
+        date(2026, 8, 4),
     }
 
 
@@ -143,13 +146,13 @@ def test_phase_us_regular_day():
     Premarket = open − 5:30 (4:00 ET), aftermarket until close + 4:00 (20:00 ET).
     """
     venue = AssetRef("AAPL").venue
-    assert venue.phase(_utc(2024, 4, 3, 7, 0)) == "closed"       # 3:00 ET
-    assert venue.phase(_utc(2024, 4, 3, 8, 0)) == "premarket"    # 4:00 ET sharp
-    assert venue.phase(_utc(2024, 4, 3, 12, 0)) == "premarket"   # 8:00 ET
+    assert venue.phase(_utc(2024, 4, 3, 7, 0)) == "closed"  # 3:00 ET
+    assert venue.phase(_utc(2024, 4, 3, 8, 0)) == "premarket"  # 4:00 ET sharp
+    assert venue.phase(_utc(2024, 4, 3, 12, 0)) == "premarket"  # 8:00 ET
     assert venue.phase(_utc(2024, 4, 3, 15, 0)) == "open"
     assert venue.phase(_utc(2024, 4, 3, 20, 0)) == "aftermarket"  # 16:00 ET sharp
     assert venue.phase(_utc(2024, 4, 3, 21, 0)) == "aftermarket"  # 17:00 ET
-    assert venue.phase(_utc(2024, 4, 4, 1, 0)) == "closed"       # 21:00 ET Apr 3
+    assert venue.phase(_utc(2024, 4, 4, 1, 0)) == "closed"  # 21:00 ET Apr 3
 
 
 def test_phase_us_half_day():
@@ -159,9 +162,9 @@ def test_phase_us_half_day():
     ends 17:00 ET — a hardcoded 20:00 ET would misreport this.
     """
     venue = AssetRef("AAPL").venue
-    assert venue.phase(_utc(2023, 11, 24, 17, 0)) == "open"          # 12:00 ET
-    assert venue.phase(_utc(2023, 11, 24, 20, 0)) == "aftermarket"   # 15:00 ET
-    assert venue.phase(_utc(2023, 11, 24, 23, 0)) == "closed"        # 18:00 ET
+    assert venue.phase(_utc(2023, 11, 24, 17, 0)) == "open"  # 12:00 ET
+    assert venue.phase(_utc(2023, 11, 24, 20, 0)) == "aftermarket"  # 15:00 ET
+    assert venue.phase(_utc(2023, 11, 24, 23, 0)) == "closed"  # 18:00 ET
     # A normal close+4h instant on a *regular* day is still aftermarket.
     assert venue.phase(_utc(2023, 11, 27, 23, 0)) == "aftermarket"
 
@@ -178,7 +181,7 @@ def test_phase_venue_without_extended_hours():
     # XAMS regular hours 09:00–17:30 CEST = 07:00–15:30 UTC on 2024-04-03.
     assert venue.phase(_utc(2024, 4, 3, 10, 0)) == "open"
     assert venue.phase(_utc(2024, 4, 3, 16, 0)) == "closed"  # 18:00 CEST
-    assert venue.phase(_utc(2024, 4, 3, 6, 0)) == "closed"   # 08:00 CEST
+    assert venue.phase(_utc(2024, 4, 3, 6, 0)) == "closed"  # 08:00 CEST
 
 
 def test_any_venue_open_all_closed_weekend():
@@ -274,7 +277,7 @@ def test_symbol_currency_shapes():
     assert AssetRef("AAPL").currency == "USD"
     assert AssetRef("BRK-B").currency == "USD"
     assert AssetRef("BTC-EUR").currency == "EUR"  # fiat quote leg
-    assert AssetRef("SOL-BTC").currency is None   # crypto-quoted: no display fiat
+    assert AssetRef("SOL-BTC").currency is None  # crypto-quoted: no display fiat
     assert AssetRef("^GSPC").currency is None
     assert AssetRef("EURUSD=X").currency is None
     assert AssetRef("FOO.ZZ").currency is None
@@ -286,8 +289,8 @@ def test_recent_sessions_is_ordered_and_calendar_exact():
     nyse = AssetRef("^GSPC").venue
     assert nyse is not None
     assert nyse.recent_sessions(date(2025, 4, 21), 4) == [
-        date(2025, 4, 21),   # Easter Monday — a session
-        date(2025, 4, 17),   # Good Friday is not, so Thursday follows
+        date(2025, 4, 21),  # Easter Monday — a session
+        date(2025, 4, 17),  # Good Friday is not, so Thursday follows
         date(2025, 4, 16),
         date(2025, 4, 15),
     ]
@@ -354,8 +357,7 @@ def test_every_percent_quoted_index_resolves_a_calendar():
     """
     for symbol in sorted(PERCENT_QUOTED_INDICES):
         assert AssetRef(symbol).calendar_name is not None, (
-            f"{symbol} is tracked as a percent-quoted index but has no calendar "
-            f"— add it to INDEX_CALENDARS"
+            f"{symbol} is tracked as a percent-quoted index but has no calendar — add it to INDEX_CALENDARS"
         )
 
 
@@ -368,10 +370,10 @@ def test_yield_indices_follow_the_nyse_session_set():
     assert venue is not None
     # Bond market closed, NYSE open — Yahoo still has a bar, so it must be a
     # session or the gap guard fabricates a hole.
-    assert venue.is_session(date(2025, 10, 13)) is True   # Columbus Day
-    assert venue.is_session(date(2025, 11, 11)) is True   # Veterans Day
+    assert venue.is_session(date(2025, 10, 13)) is True  # Columbus Day
+    assert venue.is_session(date(2025, 11, 11)) is True  # Veterans Day
     # Both closed — correctly not a session.
-    assert venue.is_session(date(2025, 4, 18)) is False   # Good Friday
+    assert venue.is_session(date(2025, 4, 18)) is False  # Good Friday
     assert AssetRef("^TNX").calendar_name == AssetRef("^GSPC").calendar_name
 
 
@@ -389,6 +391,7 @@ def test_new_calendar_coverage():
 
 
 # --- AssetRef -------------------------------------------------------------
+
 
 def test_asset_ref_is_a_ticker_with_optional_id():
     """One domain object, both faces: a str drop-in ticker with venue traits,

@@ -32,7 +32,9 @@ def padded_history_frame(ticker, data, params: dict, symbols: list[str]) -> pd.D
         if missing:
             logger.warning(
                 "Yahoo chart response omitted %d/%d symbol(s): %s",
-                len(missing), len(symbols), ", ".join(sorted(missing)),
+                len(missing),
+                len(symbols),
+                ", ".join(sorted(missing)),
             )
             data = {**data, **{s: {} for s in missing}}
     return ticker._historical_data_to_dataframe(data, params, True)
@@ -57,6 +59,7 @@ class _HistoryMixin(_YahooBase):
         Raises :class:`ValueError` when Yahoo returns no data or the
         breaker is open.
         """
+
         def _fetch() -> pd.DataFrame:
             ticker = self._ticker(symbol)
             try:
@@ -85,9 +88,7 @@ class _HistoryMixin(_YahooBase):
             info = price_info if isinstance(price_info, dict) else {}
             _, divisor = resolve_currency(info, symbol)
             if divisor is None:
-                raise ValueError(
-                    f"Unknown currency basis for {symbol} — Yahoo sent no currency"
-                )
+                raise ValueError(f"Unknown currency basis for {symbol} — Yahoo sent no currency")
             df = _normalize_ohlcv_df(df, divisor)
             df = normalize_frame(df, symbol)
             return normalize_date_index(df)
@@ -98,7 +99,9 @@ class _HistoryMixin(_YahooBase):
         return await asyncio.to_thread(self._call, _fetch, _fallback)
 
     async def batch_history(
-        self, symbols: list[str], period: str = "1y",
+        self,
+        symbols: list[str],
+        period: str = "1y",
     ) -> dict[str, pd.DataFrame]:
         """Fetch OHLCV for many symbols in one batch.
 
@@ -144,7 +147,8 @@ class _HistoryMixin(_YahooBase):
                     if divisor is None:
                         logger.warning(
                             "batch_history: no currency for %s and its venue quotes in "
-                            "subunits; skipping rather than guessing a basis", sym,
+                            "subunits; skipping rather than guessing a basis",
+                            sym,
                         )
                         continue
                     df = _normalize_ohlcv_df(df, divisor)

@@ -12,6 +12,7 @@ class _ValidationMixin(_YahooBase):
         """Validate a ticker. Returns ``{symbol, name, type, currency,
         currency_code}`` or ``None`` if Yahoo doesn't recognise it.
         """
+
         def _fetch() -> dict | None:
             ticker = self._ticker(symbol)
             quote = ticker.quote_type.get(symbol, {})

@@ -10,9 +10,7 @@ class ThesisRepository:
         self.db = db
 
     async def list_all(self) -> list[Thesis]:
-        result = await self.db.execute(
-            select(Thesis).options(selectinload(Thesis.assets)).order_by(Thesis.name)
-        )
+        result = await self.db.execute(select(Thesis).options(selectinload(Thesis.assets)).order_by(Thesis.name))
         return list(result.scalars().all())
 
     async def get_by_id(self, thesis_id: int) -> Thesis | None:

@@ -12,33 +12,25 @@ class AssetRepository:
         self.db = db
 
     async def find_by_symbol(self, symbol: str) -> Asset | None:
-        result = await self.db.execute(
-            select(Asset).where(Asset.symbol == symbol.upper())
-        )
+        result = await self.db.execute(select(Asset).where(Asset.symbol == symbol.upper()))
         return result.scalar_one_or_none()
 
     async def list_in_any_group(self) -> list[Asset]:
         """Return all assets that belong to at least one group, ordered by symbol."""
         result = await self.db.execute(
-            select(Asset)
-            .where(exists().where(group_assets.c.asset_id == Asset.id))
-            .order_by(Asset.symbol)
+            select(Asset).where(exists().where(group_assets.c.asset_id == Asset.id)).order_by(Asset.symbol)
         )
         return list(result.scalars().all())
 
     async def list_in_any_group_ids(self) -> list[int]:
         """Return IDs of all assets that belong to at least one group."""
-        result = await self.db.execute(
-            select(Asset.id)
-            .where(exists().where(group_assets.c.asset_id == Asset.id))
-        )
+        result = await self.db.execute(select(Asset.id).where(exists().where(group_assets.c.asset_id == Asset.id)))
         return list(result.scalars().all())
 
     async def list_in_any_group_refs(self) -> list[AssetRef]:
         """Return an :class:`AssetRef` per asset in at least one group."""
         result = await self.db.execute(
-            select(Asset.id, Asset.symbol)
-            .where(exists().where(group_assets.c.asset_id == Asset.id))
+            select(Asset.id, Asset.symbol).where(exists().where(group_assets.c.asset_id == Asset.id))
         )
         return [AssetRef(sym, aid) for aid, sym in result.all()]
 
@@ -57,10 +49,7 @@ class AssetRepository:
 
     async def list_in_any_group_symbols(self) -> list[str]:
         """Return symbols for all assets in at least one group."""
-        result = await self.db.execute(
-            select(Asset.symbol)
-            .where(exists().where(group_assets.c.asset_id == Asset.id))
-        )
+        result = await self.db.execute(select(Asset.symbol).where(exists().where(group_assets.c.asset_id == Asset.id)))
         return [row[0] for row in result.all()]
 
     async def list_in_group_refs(self, group_id: int) -> list[AssetRef]:
@@ -81,9 +70,7 @@ class AssetRepository:
         if not symbols:
             return []
         upper = [s.upper() for s in symbols]
-        result = await self.db.execute(
-            select(Asset.id, Asset.symbol).where(Asset.symbol.in_(upper))
-        )
+        result = await self.db.execute(select(Asset.id, Asset.symbol).where(Asset.symbol.in_(upper)))
         return [AssetRef(sym, aid) for aid, sym in result.all()]
 
     async def list_all(self) -> list[Asset]:

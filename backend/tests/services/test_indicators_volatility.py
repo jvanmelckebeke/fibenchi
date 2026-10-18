@@ -32,11 +32,13 @@ from tests.helpers import (
 
 def test_true_range_basic():
     """True Range should equal High - Low when there's no gap."""
-    df = pd.DataFrame({
-        "high": [12.0, 12.0, 12.0],
-        "low": [10.0, 10.0, 10.0],
-        "close": [11.0, 11.0, 11.0],
-    })
+    df = pd.DataFrame(
+        {
+            "high": [12.0, 12.0, 12.0],
+            "low": [10.0, 10.0, 10.0],
+            "close": [11.0, 11.0, 11.0],
+        }
+    )
     tr = _true_range(df)
     # First row: prev close is NaN, but hl = 2.0 is valid so max(skipna) = 2.0
     assert tr.iloc[0] == pytest.approx(2.0)
@@ -47,11 +49,13 @@ def test_true_range_basic():
 
 def test_true_range_with_gap():
     """True Range should account for gaps (prev close outside today's range)."""
-    df = pd.DataFrame({
-        "high": [10.0, 15.0],
-        "low": [8.0, 13.0],
-        "close": [9.0, 14.0],
-    })
+    df = pd.DataFrame(
+        {
+            "high": [10.0, 15.0],
+            "low": [8.0, 13.0],
+            "close": [9.0, 14.0],
+        }
+    )
     tr = _true_range(df)
     # Row 1: hl = 2, |high - prev_close| = |15 - 9| = 6, |low - prev_close| = |13 - 9| = 4
     # TR = max(2, 6, 4) = 6
@@ -137,12 +141,15 @@ def test_adx_strong_trend():
     dates = pd.date_range("2024-01-01", periods=n, freq="B")
     # Strong uptrend: price increases monotonically
     prices = [100.0 + i * 1.0 for i in range(n)]
-    df = pd.DataFrame({
-        "open": [p - 0.2 for p in prices],
-        "high": [p + 0.5 for p in prices],
-        "low": [p - 0.5 for p in prices],
-        "close": prices,
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": [p - 0.2 for p in prices],
+            "high": [p + 0.5 for p in prices],
+            "low": [p - 0.5 for p in prices],
+            "close": prices,
+        },
+        index=dates,
+    )
     result = adx(df)
     # Last ADX value should indicate a strong trend (> 25)
     last_valid = result["adx"].dropna().iloc[-1]
@@ -184,6 +191,7 @@ def test_atr_pct_none_when_close_zero():
     """atr_pct should be None when close price is zero (division guard)."""
     row = pd.Series({"atr": 5.0, "close": 0.0})
     from app.services.compute.indicators import _atr_snapshot_derived
+
     result = _atr_snapshot_derived(row)
     assert result == {"atr_pct": None}
 
@@ -192,6 +200,7 @@ def test_atr_pct_none_when_atr_nan():
     """atr_pct should be None when ATR is NaN."""
     row = pd.Series({"atr": float("nan"), "close": 100.0})
     from app.services.compute.indicators import _atr_snapshot_derived
+
     result = _atr_snapshot_derived(row)
     assert result == {"atr_pct": None}
 
@@ -245,12 +254,15 @@ def test_chop_high_for_ranging_market():
     dates = pd.date_range("2024-01-01", periods=n, freq="B")
     # Ranging market: oscillate between 100 and 102
     prices = [100.0 + (i % 4) * 0.5 for i in range(n)]
-    df = pd.DataFrame({
-        "open": [p - 0.3 for p in prices],
-        "high": [p + 0.5 for p in prices],
-        "low": [p - 0.5 for p in prices],
-        "close": prices,
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": [p - 0.3 for p in prices],
+            "high": [p + 0.5 for p in prices],
+            "low": [p - 0.5 for p in prices],
+            "close": prices,
+        },
+        index=dates,
+    )
     result = choppiness_index(df)
     last_valid = result.dropna().iloc[-1]
     assert last_valid > 50, f"CHOP should be >50 for ranging market, got {last_valid}"
@@ -381,10 +393,14 @@ def test_vnr_sigma_reconstructs_live_move():
 def test_session_gap_days_basic():
     """1 for adjacent sessions (weekends free), >1 across a missing business day."""
     # Thu, Fri, Mon (weekend — fine), Wed (Tuesday missing)
-    idx = pd.Index([
-        pd.Timestamp("2026-07-30"), pd.Timestamp("2026-07-31"),
-        pd.Timestamp("2026-08-03"), pd.Timestamp("2026-08-05"),
-    ])
+    idx = pd.Index(
+        [
+            pd.Timestamp("2026-07-30"),
+            pd.Timestamp("2026-07-31"),
+            pd.Timestamp("2026-08-03"),
+            pd.Timestamp("2026-08-05"),
+        ]
+    )
     gaps = session_gap_days(idx)
     assert pd.isna(gaps.iloc[0])
     assert gaps.iloc[1] == 1
@@ -417,7 +433,8 @@ def test_vnr_gap_bar_is_nan():
     assert pd.isna(vnr.iloc[-4])
     # …while bars before the hole are untouched (identical to the full series).
     pd.testing.assert_series_equal(
-        vnr.iloc[10:-4], volatility_normalized_return(full["close"]).iloc[10:-5],
+        vnr.iloc[10:-4],
+        volatility_normalized_return(full["close"]).iloc[10:-5],
         check_freq=False,
     )
 
@@ -443,7 +460,7 @@ def test_vnr_no_gap_no_flag():
     full = _make_price_df(100)
     result = compute_indicators(full)
     assert result["vnr_gap_sessions"].isna().all()
-    assert result["vnr"].iloc[VNR_WARMUP_SESSIONS + 1:].notna().all()
+    assert result["vnr"].iloc[VNR_WARMUP_SESSIONS + 1 :].notna().all()
 
 
 def test_vnr_regression_issue_559():
@@ -458,22 +475,23 @@ def test_vnr_regression_issue_559():
     # Alternating ±0.6%-ish closes ending exactly at the observed 124.23.
     closes = [124.23 if (n - 1 - i) % 2 == 0 else 123.50 for i in range(n)]
 
-    contiguous = pd.Series(
-        closes + [127.65], index=list(warmup_dates) + [pd.Timestamp("2026-08-03")]
-    )
+    contiguous = pd.Series(closes + [127.65], index=list(warmup_dates) + [pd.Timestamp("2026-08-03")])
     inflated = volatility_normalized_return(contiguous).iloc[-1]
     assert inflated > 4  # what the bug displayed (4.48 on the live data)
 
-    gapped = pd.Series(
-        closes + [127.65], index=list(warmup_dates) + [pd.Timestamp("2026-08-04")]
-    )
+    gapped = pd.Series(closes + [127.65], index=list(warmup_dates) + [pd.Timestamp("2026-08-04")])
     vnr = volatility_normalized_return(gapped)
     assert pd.isna(vnr.iloc[-1])
 
-    df = pd.DataFrame({
-        "open": gapped, "high": gapped, "low": gapped, "close": gapped,
-        "volume": 1_000_000,
-    })
+    df = pd.DataFrame(
+        {
+            "open": gapped,
+            "high": gapped,
+            "low": gapped,
+            "close": gapped,
+            "volume": 1_000_000,
+        }
+    )
     result = compute_indicators(df)
     assert result["vnr_gap_sessions"].iloc[-1] == 2
     snapshot = build_indicator_snapshot(result)
@@ -508,7 +526,10 @@ def test_session_gap_days_exact_hole_is_flagged():
     # Fri 2026-07-31 -> Tue 2026-08-04 with Mon 2026-08-03 a scheduled session.
     idx = _dates("2026-07-30", "2026-07-31", "2026-08-04")
     sessions = {
-        date(2026, 7, 30), date(2026, 7, 31), date(2026, 8, 3), date(2026, 8, 4),
+        date(2026, 7, 30),
+        date(2026, 7, 31),
+        date(2026, 8, 3),
+        date(2026, 8, 4),
     }
     gaps = session_gap_days(idx, sessions)
     assert gaps.iloc[1] == 1
@@ -529,19 +550,22 @@ def test_vnr_holiday_bar_keeps_value_with_sessions():
     n = 80
     dates = list(pd.bdate_range(end="2024-03-28", periods=n))  # ends Thu pre-Easter
     dates.append(pd.Timestamp("2024-04-02"))  # Tue after Easter Monday
-    closes = pd.Series(
-        [100 + (i % 2) for i in range(n)] + [103.0], index=pd.Index(dates)
-    )
+    closes = pd.Series([100 + (i % 2) for i in range(n)] + [103.0], index=pd.Index(dates))
 
     # Fallback: Thu -> Tue looks like a 3-business-day gap and is blanked.
     assert pd.isna(volatility_normalized_return(closes).iloc[-1])
 
     # Exact sessions: every stored date is a session and they are adjacent.
     sessions = {d.date() for d in dates}
-    df = pd.DataFrame({
-        "open": closes, "high": closes, "low": closes, "close": closes,
-        "volume": 1_000_000,
-    })
+    df = pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": 1_000_000,
+        }
+    )
     result = compute_indicators(df, session_dates=sessions)
     assert np.isfinite(result["vnr"].iloc[-1])
     assert result["vnr_gap_sessions"].isna().all()
@@ -558,10 +582,15 @@ def test_vnr_hole_still_suppressed_with_sessions():
     )
     sessions = {d.date() for d in dates} | {date(2026, 8, 3)}
 
-    df = pd.DataFrame({
-        "open": closes, "high": closes, "low": closes, "close": closes,
-        "volume": 1_000_000,
-    })
+    df = pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": 1_000_000,
+        }
+    )
     result = compute_indicators(df, session_dates=sessions)
     assert pd.isna(result["vnr"].iloc[-1])
     assert result["vnr_gap_sessions"].iloc[-1] == 2
@@ -579,11 +608,16 @@ def _trending_gapped_df(n: int = 100, drop_offset: int = 10) -> pd.DataFrame:
     two sessions (~+1.21%) — the exact shape that used to contaminate the EWMA.
     """
     dates = pd.bdate_range("2024-01-01", periods=n)
-    closes = pd.Series([100.0 * (1.006 ** i) for i in range(n)], index=dates)
-    df = pd.DataFrame({
-        "open": closes, "high": closes, "low": closes, "close": closes,
-        "volume": 1_000_000,
-    })
+    closes = pd.Series([100.0 * (1.006**i) for i in range(n)], index=dates)
+    df = pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": 1_000_000,
+        }
+    )
     return df.drop(df.index[n - drop_offset])
 
 
@@ -655,8 +689,8 @@ def test_sigma_floor_bounds_a_flat_series_blowup():
     series = _flat_then_move(120)
     unfloored = volatility_normalized_return(series, sigma_floor_frac=0.0).iloc[-1]
     floored = volatility_normalized_return(series).iloc[-1]
-    assert unfloored > 90       # the bug: a +3% day scoring like a market crash
-    assert floored < 25         # bounded, though still large — see the constant
+    assert unfloored > 90  # the bug: a +3% day scoring like a market crash
+    assert floored < 25  # bounded, though still large — see the constant
     assert floored < unfloored / 4
 
 
@@ -739,7 +773,7 @@ def test_vnr_emits_once_the_baseline_exists():
     df = _make_price_df(VNR_WARMUP_SESSIONS + 20)
     result = compute_indicators(df)
     assert result["vnr"].iloc[:VNR_WARMUP_SESSIONS].isna().all()
-    assert result["vnr"].iloc[VNR_WARMUP_SESSIONS + 1:].notna().all()
+    assert result["vnr"].iloc[VNR_WARMUP_SESSIONS + 1 :].notna().all()
 
 
 def test_vnr_kernel_gate_matches_the_published_warmup():
@@ -765,7 +799,8 @@ def _ex_div_series(n: int = 120, yield_pct: float = 0.05) -> tuple[pd.Series, pd
     dates = pd.bdate_range("2025-01-01", periods=n)
     rng = np.random.default_rng(11)
     closes = pd.Series(
-        100 * np.cumprod(1 + rng.normal(0, 0.008, n)), index=dates,
+        100 * np.cumprod(1 + rng.normal(0, 0.008, n)),
+        index=dates,
     )
     cash = closes.iloc[-2] * yield_pct
     closes.iloc[-1] = closes.iloc[-2] - cash
@@ -780,7 +815,9 @@ def test_daily_total_returns_adds_the_cash_back():
     assert daily_total_returns(closes, dividends).iloc[-1] == pytest.approx(0.0)
     # No dividends at all reproduces the price return exactly.
     pd.testing.assert_series_equal(
-        daily_total_returns(closes), closes.pct_change(), check_names=False,
+        daily_total_returns(closes),
+        closes.pct_change(),
+        check_names=False,
     )
 
 
@@ -803,10 +840,16 @@ def test_ex_dividend_drop_stays_out_of_the_vol_forecast():
 
 def test_compute_indicators_reads_dividends_off_the_frame():
     closes, dividends = _ex_div_series()
-    df = pd.DataFrame({
-        "open": closes, "high": closes, "low": closes, "close": closes,
-        "volume": 1_000_000, "dividends": dividends,
-    })
+    df = pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": 1_000_000,
+            "dividends": dividends,
+        }
+    )
     result = compute_indicators(df)
 
     assert result["vnr"].iloc[-1] == pytest.approx(0.0, abs=0.01)
@@ -829,10 +872,16 @@ def test_frame_without_dividends_is_unchanged():
 def test_ex_div_bar_reaches_the_snapshot():
     """The board needs the amount to explain σ disagreeing with the change %."""
     closes, dividends = _ex_div_series()
-    df = pd.DataFrame({
-        "open": closes, "high": closes, "low": closes, "close": closes,
-        "volume": 1_000_000, "dividends": dividends,
-    })
+    df = pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": 1_000_000,
+            "dividends": dividends,
+        }
+    )
     snap = build_indicator_snapshot(compute_indicators(df))
 
     assert snap.values["vnr_ex_div"] == pytest.approx(dividends.iloc[-1], abs=1e-6)

@@ -63,9 +63,7 @@ async def build_config(db: AsyncSession) -> CompanionConfig:
         for asset in members:
             if asset.symbol not in tickers:
                 tickers[asset.symbol] = _ticker(asset)
-        config_theses.append(
-            ConfigThesis(name=thesis.name, color=thesis.color, symbols=[a.symbol for a in members])
-        )
+        config_theses.append(ConfigThesis(name=thesis.name, color=thesis.color, symbols=[a.symbol for a in members]))
 
     return CompanionConfig(
         version=CONFIG_VERSION,

@@ -37,11 +37,14 @@ async def test_list_assets_empty(client):
 async def test_create_asset_with_name(client):
     mock_info = {"symbol": "AAPL", "name": "Apple Inc.", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
     with _mock_validate(return_value=mock_info):
-        resp = await client.post("/api/assets", json={
-            "symbol": "AAPL",
-            "name": "Apple Inc.",
-            "type": "stock",
-        })
+        resp = await client.post(
+            "/api/assets",
+            json={
+                "symbol": "AAPL",
+                "name": "Apple Inc.",
+                "type": "stock",
+            },
+        )
     assert resp.status_code == 201
     data = resp.json()
     assert data["symbol"] == "AAPL"
@@ -51,7 +54,13 @@ async def test_create_asset_with_name(client):
 
 
 async def test_create_asset_auto_resolve(client):
-    mock_info = {"symbol": "NVDA", "name": "NVIDIA Corporation", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
+    mock_info = {
+        "symbol": "NVDA",
+        "name": "NVIDIA Corporation",
+        "type": "EQUITY",
+        "currency": "USD",
+        "currency_code": "USD",
+    }
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "nvda"})
     assert resp.status_code == 201
@@ -61,7 +70,13 @@ async def test_create_asset_auto_resolve(client):
 
 
 async def test_create_asset_with_currency(client):
-    mock_info = {"symbol": "VWCE.DE", "name": "Vanguard FTSE All-World", "type": "ETF", "currency": "EUR", "currency_code": "EUR"}
+    mock_info = {
+        "symbol": "VWCE.DE",
+        "name": "Vanguard FTSE All-World",
+        "type": "ETF",
+        "currency": "EUR",
+        "currency_code": "EUR",
+    }
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "vwce.de"})
     assert resp.status_code == 201
@@ -210,9 +225,14 @@ async def test_hard_delete_cascades(client, db):
     db.add(Note(asset_id=aid, content="thesis note"))
     db.add(Annotation(asset_id=aid, date=date(2026, 1, 1), title="entry"))
     db.add(PriceHistory(asset_id=aid, date=date(2026, 1, 1), open=1, high=1, low=1, close=1, volume=1))
-    db.add(IntradayPrice(
-        asset_id=aid, timestamp=datetime(2026, 1, 1, 15, 0, tzinfo=timezone.utc), price=1.0, volume=10,
-    ))
+    db.add(
+        IntradayPrice(
+            asset_id=aid,
+            timestamp=datetime(2026, 1, 1, 15, 0, tzinfo=timezone.utc),
+            price=1.0,
+            volume=10,
+        )
+    )
     await db.commit()
 
     tid = (await client.post("/api/theses", json={"name": "El Niño"})).json()["id"]
@@ -222,6 +242,7 @@ async def test_hard_delete_cascades(client, db):
 
     # Verify with a fresh session so we read the committed state cleanly.
     async with TestSession() as check:
+
         async def count(selectable, where):
             return (await check.execute(select(func.count()).select_from(selectable).where(where))).scalar_one()
 
@@ -276,6 +297,7 @@ async def test_list_assets_includes_orphans(client):
 # not get to overrule a human — provenance is what keeps a recommendation a
 # recommendation.
 
+
 async def test_caret_symbol_detected_as_index(client):
     """The exact ^GSPC failure: Yahoo says EQUITY, shape says index."""
     mock_info = {"symbol": "^GSPC", "name": "S&P 500", "type": "EQUITY", "currency": "USD", "currency_code": "USD"}
@@ -289,7 +311,13 @@ async def test_caret_symbol_detected_as_index(client):
 
 
 async def test_yield_index_is_quoted_in_percent(client):
-    mock_info = {"symbol": "^TYX", "name": "Treasury Yield 30 Years", "type": "INDEX", "currency": "USD", "currency_code": "USD"}
+    mock_info = {
+        "symbol": "^TYX",
+        "name": "Treasury Yield 30 Years",
+        "type": "INDEX",
+        "currency": "USD",
+        "currency_code": "USD",
+    }
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "^TYX"})
     assert resp.json()["unit_kind"] == "percent"
@@ -310,7 +338,13 @@ async def test_explicit_type_is_honoured_and_marked_user(client):
 
 async def test_yahoo_still_decides_etf_vs_stock(client):
     """Shape can't see the ETF/stock distinction, so Yahoo keeps that call."""
-    mock_info = {"symbol": "VWCE.DE", "name": "Vanguard FTSE All-World", "type": "ETF", "currency": "EUR", "currency_code": "EUR"}
+    mock_info = {
+        "symbol": "VWCE.DE",
+        "name": "Vanguard FTSE All-World",
+        "type": "ETF",
+        "currency": "EUR",
+        "currency_code": "EUR",
+    }
     with _mock_validate(return_value=mock_info):
         resp = await client.post("/api/assets", json={"symbol": "VWCE.DE"})
     assert resp.json()["type"] == "etf"
@@ -382,7 +416,7 @@ async def test_patching_currency_also_claims_the_unit(client):
 
 
 async def test_user_set_field_stays_visible_and_resettable(client, db):
-    """"Don't argue with you" must not collapse into "never speak again".
+    """ "Don't argue with you" must not collapse into "never speak again".
 
     A field the user set leaves `disagrees` (no nagging) but stays in
     `differs` — otherwise the recommendation vanishes the moment you touch the
@@ -396,7 +430,7 @@ async def test_user_set_field_stays_visible_and_resettable(client, db):
     resp = await client.patch(f"/api/assets/{aid}", json={"type": "etf", "unit_kind": "currency"})
     data = resp.json()
     assert data["type"] == "etf"
-    assert data["suggested"]["disagrees"] == []          # quiet
+    assert data["suggested"]["disagrees"] == []  # quiet
     assert set(data["suggested"]["differs"]) == {"type", "unit_kind"}  # but visible
 
 

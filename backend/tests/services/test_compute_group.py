@@ -33,11 +33,13 @@ def _make_price(asset_id: int, d: date, close: float):
 
 def _mock_merge_fundamentals(fund_data: dict):
     """Create a mock merge_fundamentals_from_cache that injects fund_data."""
+
     def _merge(symbols, target, values_key="values"):
         for sym in symbols:
             data = fund_data.get(sym)
             if data and sym in target:
                 target[sym].setdefault(values_key, {}).update(data)
+
     return _merge
 
 
@@ -50,8 +52,10 @@ class TestGetBatchSparklines:
 
         d1, d2 = date.today() - timedelta(days=2), date.today() - timedelta(days=1)
         prices = [
-            _make_price(1, d1, 150.0), _make_price(1, d2, 152.0),
-            _make_price(2, d1, 400.0), _make_price(2, d2, 405.0),
+            _make_price(1, d1, 150.0),
+            _make_price(1, d2, 152.0),
+            _make_price(2, d1, 400.0),
+            _make_price(2, d2, 405.0),
         ]
         mock_price_repo_cls.return_value.list_by_assets_since = AsyncMock(return_value=prices)
 
@@ -65,7 +69,9 @@ class TestGetBatchSparklines:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     @patch("app.services.compute.group.GroupRepository")
-    async def test_uses_default_group_when_no_id(self, mock_group_repo_cls, mock_asset_repo_cls, mock_price_repo_cls, db):
+    async def test_uses_default_group_when_no_id(
+        self, mock_group_repo_cls, mock_asset_repo_cls, mock_price_repo_cls, db
+    ):
         default_group = MagicMock()
         default_group.id = 1
         mock_group_repo_cls.return_value.get_default = AsyncMock(return_value=default_group)
@@ -91,8 +97,14 @@ class TestComputeAndCacheIndicators:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_computes_snapshots(
-        self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
-        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
+        self,
+        mock_asset_repo_cls,
+        mock_price_repo_cls,
+        mock_prices_to_df,
+        mock_compute_ind,
+        mock_build_snap,
+        mock_merge_fund,
+        db,
     ):
         _indicator_cache._data.clear()
 
@@ -122,7 +134,11 @@ class TestComputeAndCacheIndicators:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_skips_assets_with_too_few_prices(
-        self, mock_asset_repo_cls, mock_price_repo_cls, mock_merge_fund, db,
+        self,
+        mock_asset_repo_cls,
+        mock_price_repo_cls,
+        mock_merge_fund,
+        db,
     ):
         _indicator_cache._data.clear()
 
@@ -157,8 +173,14 @@ class TestComputeAndCacheIndicators:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_cache_hit_skips_computation(
-        self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
-        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
+        self,
+        mock_asset_repo_cls,
+        mock_price_repo_cls,
+        mock_prices_to_df,
+        mock_compute_ind,
+        mock_build_snap,
+        mock_merge_fund,
+        db,
     ):
         _indicator_cache._data.clear()
 
@@ -193,8 +215,14 @@ class TestComputeIndicatorsForSymbols:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_computes_snapshots_for_symbols(
-        self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
-        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
+        self,
+        mock_asset_repo_cls,
+        mock_price_repo_cls,
+        mock_prices_to_df,
+        mock_compute_ind,
+        mock_build_snap,
+        mock_merge_fund,
+        db,
     ):
         _indicator_cache._data.clear()
 
@@ -216,9 +244,7 @@ class TestComputeIndicatorsForSymbols:
 
         assert set(result) == {"AAPL"}
         assert result["AAPL"]["values"]["rsi"] == 55.0
-        mock_asset_repo_cls.return_value.list_refs_by_symbols.assert_awaited_once_with(
-            ["AAPL", "GHOST"]
-        )
+        mock_asset_repo_cls.return_value.list_refs_by_symbols.assert_awaited_once_with(["AAPL", "GHOST"])
 
         _indicator_cache._data.clear()
 
@@ -237,8 +263,14 @@ class TestComputeIndicatorsForSymbols:
     @patch("app.services.compute.group.PriceRepository")
     @patch("app.services.compute.group.AssetRepository")
     async def test_cache_shared_across_scopes(
-        self, mock_asset_repo_cls, mock_price_repo_cls, mock_prices_to_df,
-        mock_compute_ind, mock_build_snap, mock_merge_fund, db,
+        self,
+        mock_asset_repo_cls,
+        mock_price_repo_cls,
+        mock_prices_to_df,
+        mock_compute_ind,
+        mock_build_snap,
+        mock_merge_fund,
+        db,
     ):
         """Regression for #529: the cache key is scope-independent, so a group
         page (group_id) and the symbol-addressed endpoint (None) share the entry
@@ -273,6 +305,7 @@ class TestComputeIndicatorsForSymbols:
 
 
 # --- cache invalidation: the key cannot see a repair on its own (#628) -------
+
 
 def test_invalidate_drops_every_entry_containing_the_symbol():
     """Entries are keyed by the *set* of symbols they cover, so one repaired

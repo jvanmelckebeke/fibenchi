@@ -44,8 +44,7 @@ def _reads_as_opens(df: pd.DataFrame) -> bool:
     high = pd.to_numeric(df["high"], errors="coerce")
     low = pd.to_numeric(df["low"], errors="coerce")
     span = (high - low).where(lambda s: s > 0)
-    body = (pd.to_numeric(df["close"], errors="coerce")
-            - pd.to_numeric(df["open"], errors="coerce")).abs() / span
+    body = (pd.to_numeric(df["close"], errors="coerce") - pd.to_numeric(df["open"], errors="coerce")).abs() / span
     usable = body.dropna()
     if len(usable) < MIN_BODY_SAMPLE:
         return False
@@ -81,6 +80,7 @@ def recover_fx_close(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFram
 
     logger.info(
         "%s: recovered %d close(s) from the following bar's open",
-        symbol or "?", len(out) - 1,
+        symbol or "?",
+        len(out) - 1,
     )
     return out

@@ -36,8 +36,7 @@ BACKOFF_SCHEDULE = (60.0, 300.0, 900.0)  # 1m, 5m, 15m
 class YahooThrottle:
     """Process-wide throttle + circuit breaker. Thread-safe."""
 
-    def __init__(self, min_interval: float = MIN_INTERVAL,
-                 backoff_schedule: tuple[float, ...] = BACKOFF_SCHEDULE):
+    def __init__(self, min_interval: float = MIN_INTERVAL, backoff_schedule: tuple[float, ...] = BACKOFF_SCHEDULE):
         self._lock = threading.Lock()
         self._last_call_at = 0.0
         self._blocked_until = 0.0
@@ -92,7 +91,8 @@ class YahooThrottle:
             self._blocked_until = time.monotonic() + backoff
             logger.warning(
                 "Yahoo Invalid Crumb — pausing all Yahoo calls for %.0fs (failure #%d)",
-                backoff, self._consecutive_failures,
+                backoff,
+                self._consecutive_failures,
             )
 
     def reset(self) -> None:
@@ -118,10 +118,7 @@ def crumb_rejected(price_data: dict | None, threshold: float = 0.5) -> bool:
     """
     if not price_data:
         return False
-    invalid = sum(
-        1 for v in price_data.values()
-        if isinstance(v, str) and "Invalid Crumb" in v
-    )
+    invalid = sum(1 for v in price_data.values() if isinstance(v, str) and "Invalid Crumb" in v)
     return invalid / len(price_data) > threshold
 
 

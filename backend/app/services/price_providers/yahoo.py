@@ -28,11 +28,17 @@ class YahooPriceProvider(PriceProvider):
         end: date | None = None,
     ) -> pd.DataFrame:
         return await yahoo_client.history(
-            symbol, period=period, interval=interval, start=start, end=end,
+            symbol,
+            period=period,
+            interval=interval,
+            start=start,
+            end=end,
         )
 
     async def batch_fetch_history(
-        self, symbols: list[str], period: str = "1y",
+        self,
+        symbols: list[str],
+        period: str = "1y",
     ) -> dict[str, pd.DataFrame]:
         return await yahoo_client.batch_history(symbols, period=period)
 

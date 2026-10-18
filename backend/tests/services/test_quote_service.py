@@ -63,6 +63,7 @@ async def test_get_quotes_empty_returns_empty():
 
 # --- recent_sessions: the calendar half of session identity (#626, #642) -----
 
+
 def test_attach_recent_sessions_skips_a_holiday():
     """Easter Monday's prior session is the Thursday — Good Friday isn't one.
     A naive "session_date minus one business day" would name the holiday and
@@ -110,8 +111,8 @@ def test_attach_recent_sessions_leaves_unknown_venues_null():
 
 def test_attach_recent_sessions_tolerates_missing_or_bad_session_date():
     quotes = [
-        Quote(symbol="AAPL"),                              # degraded quote
-        Quote(symbol="MSFT", session_date="not-a-date"),   # provider garbage
+        Quote(symbol="AAPL"),  # degraded quote
+        Quote(symbol="MSFT", session_date="not-a-date"),  # provider garbage
     ]
     assert [q.recent_sessions for q in attach_recent_sessions(quotes)] == [None, None]
 
@@ -143,6 +144,7 @@ async def test_stream_emits_full_payload_first():
     ]
 
     call_count = 0
+
     async def mock_sleep(seconds):
         nonlocal call_count
         call_count += 1
@@ -187,6 +189,7 @@ async def test_stream_delta_only_changed():
     ]
 
     call_count = 0
+
     async def mock_sleep(seconds):
         nonlocal call_count
         call_count += 1
@@ -207,7 +210,9 @@ async def test_stream_delta_only_changed():
         patch("app.services.quote_service.asyncio.sleep", side_effect=mock_sleep),
         patch("app.services.quote_service.get_intraday_bars", new_callable=AsyncMock, return_value={}),
     ):
-        MockRepo.return_value.list_in_any_group_refs = AsyncMock(return_value=[AssetRef("AAPL", 1), AssetRef("MSFT", 2)])
+        MockRepo.return_value.list_in_any_group_refs = AsyncMock(
+            return_value=[AssetRef("AAPL", 1), AssetRef("MSFT", 2)]
+        )
 
         events = []
         async for event in quote_event_generator():
@@ -278,9 +283,13 @@ async def test_stream_without_subscription_sends_no_intraday():
     used to be sent 738 KiB anyway.
     """
     mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"})]
-    bars_call = AsyncMock(return_value={"AAPL": [
-        IntradayBar(time=1771000000, price=185.5, volume=1200, session="regular"),
-    ]})
+    bars_call = AsyncMock(
+        return_value={
+            "AAPL": [
+                IntradayBar(time=1771000000, price=185.5, volume=1200, session="regular"),
+            ]
+        }
+    )
 
     async def mock_sleep(seconds):
         raise asyncio.CancelledError()
@@ -348,6 +357,7 @@ async def test_stream_adaptive_interval_regular():
     mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "REGULAR"})]
 
     sleep_intervals = []
+
     async def mock_sleep(seconds):
         sleep_intervals.append(seconds)
         raise asyncio.CancelledError()
@@ -381,6 +391,7 @@ async def test_stream_adaptive_interval_closed():
     mock_quotes = [Quote(**{"symbol": "AAPL", "price": 185.50, "market_state": "CLOSED"})]
 
     sleep_intervals = []
+
     async def mock_sleep(seconds):
         sleep_intervals.append(seconds)
         raise asyncio.CancelledError()

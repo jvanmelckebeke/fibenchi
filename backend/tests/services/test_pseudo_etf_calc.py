@@ -74,8 +74,8 @@ def test_quarterly_rebalance():
         1: [
             (date(2025, 1, 2), 100.0),
             (date(2025, 3, 31), 200.0),  # A doubled
-            (date(2025, 4, 1), 200.0),   # Quarter boundary -> rebalance
-            (date(2025, 4, 2), 200.0),   # Same price after rebalance
+            (date(2025, 4, 1), 200.0),  # Quarter boundary -> rebalance
+            (date(2025, 4, 2), 200.0),  # Same price after rebalance
         ],
         2: [
             (date(2025, 1, 2), 100.0),

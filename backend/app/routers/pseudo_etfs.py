@@ -23,8 +23,11 @@ async def list_pseudo_etfs(db: AsyncSession = Depends(get_db)):
 @router.post("", response_model=PseudoETFResponse, status_code=201, summary="Create a pseudo-ETF basket")
 async def create_pseudo_etf(data: PseudoETFCreate, db: AsyncSession = Depends(get_db)):
     return await pseudo_etf_service.create_pseudo_etf(
-        db, name=data.name, description=data.description,
-        base_date=data.base_date, base_value=data.base_value,
+        db,
+        name=data.name,
+        description=data.description,
+        base_date=data.base_date,
+        base_value=data.base_value,
     )
 
 
@@ -43,21 +46,24 @@ async def delete_pseudo_etf(etf_id: int, db: AsyncSession = Depends(get_db)):
     await pseudo_etf_service.delete_pseudo_etf(db, etf_id)
 
 
-@router.post("/{etf_id}/constituents", response_model=PseudoETFResponse, summary="Add constituent assets to a pseudo-ETF")
-async def add_constituents(
-    etf_id: int, data: PseudoETFAddConstituents, db: AsyncSession = Depends(get_db)
-):
+@router.post(
+    "/{etf_id}/constituents", response_model=PseudoETFResponse, summary="Add constituent assets to a pseudo-ETF"
+)
+async def add_constituents(etf_id: int, data: PseudoETFAddConstituents, db: AsyncSession = Depends(get_db)):
     return await pseudo_etf_service.add_constituents(db, etf_id, data.asset_ids)
 
 
-@router.delete("/{etf_id}/constituents/{asset_id}", response_model=PseudoETFResponse, summary="Remove a constituent from a pseudo-ETF")
-async def remove_constituent(
-    etf_id: int, asset_id: int, db: AsyncSession = Depends(get_db)
-):
+@router.delete(
+    "/{etf_id}/constituents/{asset_id}",
+    response_model=PseudoETFResponse,
+    summary="Remove a constituent from a pseudo-ETF",
+)
+async def remove_constituent(etf_id: int, asset_id: int, db: AsyncSession = Depends(get_db)):
     return await pseudo_etf_service.remove_constituent(db, etf_id, asset_id)
 
 
 # --- Note ---
+
 
 @router.get("/{etf_id}/note", response_model=NoteResponse, summary="Get pseudo-ETF note")
 async def get_etf_note(etf_id: int, db: AsyncSession = Depends(get_db)):
@@ -71,15 +77,28 @@ async def update_etf_note(etf_id: int, data: NoteUpdate, db: AsyncSession = Depe
 
 # --- Annotations ---
 
-@router.get("/{etf_id}/annotations", response_model=list[AnnotationResponse], summary="List pseudo-ETF chart annotations")
+
+@router.get(
+    "/{etf_id}/annotations", response_model=list[AnnotationResponse], summary="List pseudo-ETF chart annotations"
+)
 async def list_etf_annotations(etf_id: int, db: AsyncSession = Depends(get_db)):
     return await pseudo_etf_service.list_annotations(db, etf_id)
 
 
-@router.post("/{etf_id}/annotations", response_model=AnnotationResponse, status_code=201, summary="Create a pseudo-ETF chart annotation")
+@router.post(
+    "/{etf_id}/annotations",
+    response_model=AnnotationResponse,
+    status_code=201,
+    summary="Create a pseudo-ETF chart annotation",
+)
 async def create_etf_annotation(etf_id: int, data: AnnotationCreate, db: AsyncSession = Depends(get_db)):
     return await pseudo_etf_service.create_annotation(
-        db, etf_id, date=data.date, title=data.title, body=data.body, color=data.color,
+        db,
+        etf_id,
+        date=data.date,
+        title=data.title,
+        body=data.body,
+        color=data.color,
     )
 
 

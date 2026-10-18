@@ -63,6 +63,8 @@ async def add_assets(thesis_id: int, data: ThesisAddAssets, db: AsyncSession = D
     return await thesis_service.add_assets(db, thesis_id, data.asset_ids)
 
 
-@router.delete("/{thesis_id}/assets/{asset_id}", response_model=ThesisResponse, summary="Remove a member asset from a thesis")
+@router.delete(
+    "/{thesis_id}/assets/{asset_id}", response_model=ThesisResponse, summary="Remove a member asset from a thesis"
+)
 async def remove_asset(thesis_id: int, asset_id: int, db: AsyncSession = Depends(get_db)):
     return await thesis_service.remove_asset(db, thesis_id, asset_id)

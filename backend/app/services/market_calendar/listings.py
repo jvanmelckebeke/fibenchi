@@ -44,59 +44,59 @@ class Listing:
 # yahoo/currency.py) over the same key space.
 SUFFIX_LISTINGS: dict[str, Listing] = {
     # Euronext
-    "AS": Listing("XAMS", "EUR"),   # Amsterdam
-    "BR": Listing("XBRU", "EUR"),   # Brussels
-    "PA": Listing("XPAR", "EUR"),   # Paris
-    "LS": Listing("XLIS", "EUR"),   # Lisbon
-    "IR": Listing("XDUB", "EUR"),   # Dublin
+    "AS": Listing("XAMS", "EUR"),  # Amsterdam
+    "BR": Listing("XBRU", "EUR"),  # Brussels
+    "PA": Listing("XPAR", "EUR"),  # Paris
+    "LS": Listing("XLIS", "EUR"),  # Lisbon
+    "IR": Listing("XDUB", "EUR"),  # Dublin
     # Rest of Europe
-    "DE": Listing("XETR", "EUR"),   # Xetra
-    "F": Listing("XFRA", "EUR"),    # Frankfurt floor
-    "MI": Listing("XMIL", "EUR"),   # Borsa Italiana
-    "L": Listing("XLON", "GBP", quote_divisor=None),   # London — mixed GBp/GBP
+    "DE": Listing("XETR", "EUR"),  # Xetra
+    "F": Listing("XFRA", "EUR"),  # Frankfurt floor
+    "MI": Listing("XMIL", "EUR"),  # Borsa Italiana
+    "L": Listing("XLON", "GBP", quote_divisor=None),  # London — mixed GBp/GBP
     "IL": Listing("XLON", "GBP", quote_divisor=None),  # London IOB
-    "SW": Listing("XSWX", "CHF"),   # SIX Swiss
-    "MC": Listing("XMAD", "EUR"),   # Madrid
-    "VI": Listing("XWBO", "EUR"),   # Vienna
-    "ST": Listing("XSTO", "SEK"),   # Stockholm
-    "HE": Listing("XHEL", "EUR"),   # Helsinki
-    "OL": Listing("XOSL", "NOK"),   # Oslo
-    "CO": Listing("XCSE", "DKK"),   # Copenhagen
-    "IC": Listing("XICE", "ISK"),   # Iceland
-    "WA": Listing("XWAR", "PLN"),   # Warsaw
-    "PR": Listing("XPRA", "CZK"),   # Prague
-    "BD": Listing("XBUD", "HUF"),   # Budapest
-    "AT": Listing("ASEX", "EUR"),   # Athens
-    "IS": Listing("XIST", "TRY"),   # Istanbul
+    "SW": Listing("XSWX", "CHF"),  # SIX Swiss
+    "MC": Listing("XMAD", "EUR"),  # Madrid
+    "VI": Listing("XWBO", "EUR"),  # Vienna
+    "ST": Listing("XSTO", "SEK"),  # Stockholm
+    "HE": Listing("XHEL", "EUR"),  # Helsinki
+    "OL": Listing("XOSL", "NOK"),  # Oslo
+    "CO": Listing("XCSE", "DKK"),  # Copenhagen
+    "IC": Listing("XICE", "ISK"),  # Iceland
+    "WA": Listing("XWAR", "PLN"),  # Warsaw
+    "PR": Listing("XPRA", "CZK"),  # Prague
+    "BD": Listing("XBUD", "HUF"),  # Budapest
+    "AT": Listing("ASEX", "EUR"),  # Athens
+    "IS": Listing("XIST", "TRY"),  # Istanbul
     # Middle East & Africa
-    "TA": Listing("XTAE", "ILS", quote_divisor=None),   # Tel Aviv — ILA (agorot)
-    "SR": Listing("XSAU", "SAR"),   # Saudi (Tadawul)
-    "QA": Listing(None, "QAR"),     # Qatar — no exchange_calendars calendar
-    "JO": Listing("XJSE", "ZAR", quote_divisor=None),   # Johannesburg — ZAc (cents)
+    "TA": Listing("XTAE", "ILS", quote_divisor=None),  # Tel Aviv — ILA (agorot)
+    "SR": Listing("XSAU", "SAR"),  # Saudi (Tadawul)
+    "QA": Listing(None, "QAR"),  # Qatar — no exchange_calendars calendar
+    "JO": Listing("XJSE", "ZAR", quote_divisor=None),  # Johannesburg — ZAc (cents)
     # Americas
-    "TO": Listing("XTSE", "CAD"),   # Toronto
-    "V": Listing("XTSE", "CAD"),    # TSX Venture — shares Toronto's schedule
-    "MX": Listing("XMEX", "MXN"),   # Mexico
-    "SA": Listing("BVMF", "BRL"),   # São Paulo
-    "BA": Listing("XBUE", "ARS"),   # Buenos Aires
-    "SN": Listing("XSGO", "CLP"),   # Santiago
+    "TO": Listing("XTSE", "CAD"),  # Toronto
+    "V": Listing("XTSE", "CAD"),  # TSX Venture — shares Toronto's schedule
+    "MX": Listing("XMEX", "MXN"),  # Mexico
+    "SA": Listing("BVMF", "BRL"),  # São Paulo
+    "BA": Listing("XBUE", "ARS"),  # Buenos Aires
+    "SN": Listing("XSGO", "CLP"),  # Santiago
     # Asia-Pacific
-    "T": Listing("XTKS", "JPY"),    # Tokyo
-    "HK": Listing("XHKG", "HKD"),   # Hong Kong
-    "SS": Listing("XSHG", "CNY"),   # Shanghai
-    "SZ": Listing("XSHG", "CNY"),   # Shenzhen — no own calendar; same holidays
-    "KS": Listing("XKRX", "KRW"),   # Korea (KOSPI)
-    "KQ": Listing("XKRX", "KRW"),   # KOSDAQ (same holidays)
-    "TW": Listing("XTAI", "TWD"),   # Taiwan (TWSE)
+    "T": Listing("XTKS", "JPY"),  # Tokyo
+    "HK": Listing("XHKG", "HKD"),  # Hong Kong
+    "SS": Listing("XSHG", "CNY"),  # Shanghai
+    "SZ": Listing("XSHG", "CNY"),  # Shenzhen — no own calendar; same holidays
+    "KS": Listing("XKRX", "KRW"),  # Korea (KOSPI)
+    "KQ": Listing("XKRX", "KRW"),  # KOSDAQ (same holidays)
+    "TW": Listing("XTAI", "TWD"),  # Taiwan (TWSE)
     "TWO": Listing("XTAI", "TWD"),  # Taiwan OTC (same holidays)
-    "SI": Listing("XSES", "SGD"),   # Singapore
-    "AX": Listing("XASX", "AUD"),   # Australia
-    "NZ": Listing("XNZE", "NZD"),   # New Zealand
-    "JK": Listing("XIDX", "IDR"),   # Jakarta
-    "BK": Listing("XBKK", "THB"),   # Bangkok
+    "SI": Listing("XSES", "SGD"),  # Singapore
+    "AX": Listing("XASX", "AUD"),  # Australia
+    "NZ": Listing("XNZE", "NZD"),  # New Zealand
+    "JK": Listing("XIDX", "IDR"),  # Jakarta
+    "BK": Listing("XBKK", "THB"),  # Bangkok
     # South Asia
-    "NS": Listing("XBOM", "INR"),   # NSE India — XBOM (BSE) shares holidays
-    "BO": Listing("XBOM", "INR"),   # BSE India
+    "NS": Listing("XBOM", "INR"),  # NSE India — XBOM (BSE) shares holidays
+    "BO": Listing("XBOM", "INR"),  # BSE India
 }
 
 # Common Yahoo index symbols → calendar of the venue they track.
@@ -140,12 +140,14 @@ INDEX_CALENDARS: dict[str, str] = {
 # yield index outside those four rendered as bare points with no way for the
 # user to say otherwise. It's venue-adjacent trait data keyed by symbol, same
 # as INDEX_CALENDARS above, so it belongs in the same table file.
-PERCENT_QUOTED_INDICES: frozenset[str] = frozenset({
-    "^TYX",   # CBOE 30-year Treasury yield
-    "^TNX",   # CBOE 10-year Treasury yield
-    "^FVX",   # CBOE 5-year Treasury yield
-    "^IRX",   # CBOE 13-week T-bill rate
-})
+PERCENT_QUOTED_INDICES: frozenset[str] = frozenset(
+    {
+        "^TYX",  # CBOE 30-year Treasury yield
+        "^TNX",  # CBOE 10-year Treasury yield
+        "^FVX",  # CBOE 5-year Treasury yield
+        "^IRX",  # CBOE 13-week T-bill rate
+    }
+)
 
 # Unsuffixed Yahoo symbols are US listings (NYSE/NASDAQ share the holiday set).
 DEFAULT_US_CALENDAR = "XNYS"
@@ -155,9 +157,21 @@ DEFAULT_US_CALENDAR = "XNYS"
 # (BAC-PL) are hyphenated too; those must fall through to the US default.
 # European share classes carry a suffix after the hyphenated part (NOVO-B.CO),
 # so the '.' branch resolves them before the hyphen could matter.
-CRYPTO_QUOTE_CURRENCIES = frozenset({
-    "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "BTC", "ETH", "USDT", "USDC",
-})
+CRYPTO_QUOTE_CURRENCIES = frozenset(
+    {
+        "USD",
+        "EUR",
+        "GBP",
+        "JPY",
+        "CAD",
+        "AUD",
+        "CHF",
+        "BTC",
+        "ETH",
+        "USDT",
+        "USDC",
+    }
+)
 # The fiat subset — a BTC-quoted pair has no meaningful display currency.
 FIAT_QUOTES = frozenset({"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF"})
 
@@ -183,7 +197,5 @@ class ExtendedHours:
 # window Yahoo's PRE/POST market states cover. European venues have auction
 # phases, not retail extended sessions, so they are deliberately absent.
 EXTENDED_HOURS: dict[str, ExtendedHours] = {
-    "XNYS": ExtendedHours(
-        pre_offset=timedelta(hours=5, minutes=30), post_offset=timedelta(hours=4)
-    ),
+    "XNYS": ExtendedHours(pre_offset=timedelta(hours=5, minutes=30), post_offset=timedelta(hours=4)),
 }

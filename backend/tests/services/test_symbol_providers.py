@@ -135,6 +135,7 @@ def _make_mock_client(stocks_csv, etfs_csv):
         def __init__(self, text):
             self.text = text
             self.status_code = 200
+
         def raise_for_status(self):
             pass
 
@@ -143,8 +144,10 @@ def _make_mock_client(stocks_csv, etfs_csv):
             if "track" in url:
                 return MockResponse(etfs_csv)
             return MockResponse(stocks_csv)
+
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, *args):
             pass
 
@@ -154,6 +157,7 @@ def _make_mock_client(stocks_csv, etfs_csv):
 async def test_euronext_provider_parses_csv(monkeypatch):
     """Test full CSV parsing with mocked HTTP response."""
     import httpx
+
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: _make_mock_client(SAMPLE_STOCKS_CSV, SAMPLE_ETFS_CSV)())
 
     provider = EuronextProvider()
@@ -186,6 +190,7 @@ async def test_euronext_provider_parses_csv(monkeypatch):
 async def test_euronext_provider_filters_by_market(monkeypatch):
     """Test that market filter restricts results."""
     import httpx
+
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: _make_mock_client(SAMPLE_STOCKS_CSV, SAMPLE_ETFS_CSV)())
 
     provider = EuronextProvider()
@@ -248,14 +253,17 @@ def _make_xetra_mock_client(csv_text):
         def __init__(self, text):
             self.text = text
             self.status_code = 200
+
         def raise_for_status(self):
             pass
 
     class MockClient:
         async def get(self, url):
             return MockResponse(csv_text)
+
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, *args):
             pass
 
@@ -265,6 +273,7 @@ def _make_xetra_mock_client(csv_text):
 async def test_xetra_provider_parses_csv(monkeypatch):
     """Test full CSV parsing with mocked HTTP response."""
     import httpx
+
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: _make_xetra_mock_client(SAMPLE_XETRA_CSV)())
 
     provider = XetraProvider()

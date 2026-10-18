@@ -22,9 +22,7 @@ class PriceHistory(Base):
     # ``close``. None means unknown (the bar predates the column, or the
     # provider frame carried no event data), which the compute path reads as
     # zero — see ``daily_total_returns``.
-    dividend: Mapped[float | None] = mapped_column(
-        Numeric(12, 6, asdecimal=False), nullable=True, default=None
-    )
+    dividend: Mapped[float | None] = mapped_column(Numeric(12, 6, asdecimal=False), nullable=True, default=None)
 
     asset: Mapped["Asset"] = relationship(back_populates="prices")
 

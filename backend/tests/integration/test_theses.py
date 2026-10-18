@@ -21,9 +21,15 @@ async def _seed_asset_with_closes(db, symbol: str, closes: dict[date, float]) ->
 
 
 async def test_create_and_list_thesis(client):
-    resp = await client.post("/api/theses", json={
-        "name": "El Niño", "description": "advisories", "status": "live", "opened_at": "2026-03-01",
-    })
+    resp = await client.post(
+        "/api/theses",
+        json={
+            "name": "El Niño",
+            "description": "advisories",
+            "status": "live",
+            "opened_at": "2026-03-01",
+        },
+    )
     assert resp.status_code == 201
     body = resp.json()
     assert body["name"] == "El Niño"
@@ -41,9 +47,9 @@ async def test_create_defaults(client):
     resp = await client.post("/api/theses", json={"name": "Cables"})
     assert resp.status_code == 201
     body = resp.json()
-    assert body["status"] == "watching"      # default lifecycle
-    assert body["opened_at"]                 # defaulted to today
-    assert body["color"] == "#3b82f6"        # default colour
+    assert body["status"] == "watching"  # default lifecycle
+    assert body["opened_at"]  # defaulted to today
+    assert body["color"] == "#3b82f6"  # default colour
 
 
 async def test_duplicate_name_rejected(client):
@@ -64,9 +70,14 @@ async def test_invalid_status_rejected(client):
 
 async def test_update_thesis(client):
     tid = (await client.post("/api/theses", json={"name": "Orig"})).json()["id"]
-    resp = await client.put(f"/api/theses/{tid}", json={
-        "name": "Renamed", "status": "played_out", "color": "#ff0000",
-    })
+    resp = await client.put(
+        f"/api/theses/{tid}",
+        json={
+            "name": "Renamed",
+            "status": "played_out",
+            "color": "#ff0000",
+        },
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["name"] == "Renamed"
@@ -191,8 +202,8 @@ async def test_performance_endpoint_curve(db, client):
     pts = next(s for s in resp.json() if s["thesis_id"] == tid)["points"]
     assert pts, "expected a non-empty curve"
     assert [p["date"] for p in pts] == sorted(p["date"] for p in pts)  # ascending
-    assert pts[0] == {"date": "2026-03-01", "pct": 0.0}                # open anchor
-    assert pts[-1]["pct"] == 15.0                                      # matches aggregate_pct
+    assert pts[0] == {"date": "2026-03-01", "pct": 0.0}  # open anchor
+    assert pts[-1]["pct"] == 15.0  # matches aggregate_pct
 
 
 async def test_performance_endpoint_empty_thesis(client):

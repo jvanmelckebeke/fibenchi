@@ -30,6 +30,7 @@ def _make_group(id: int = 1, name: str = "Tech", description: str = "Tech stocks
 
 def _make_asset(id: int, symbol: str = "AAPL"):
     from tests.helpers import make_mock_asset
+
     return make_mock_asset(symbol=symbol, id=id)
 
 
@@ -161,6 +162,7 @@ async def test_remove_asset_filters_correctly(MockRepo):
 
 
 # --- Default group protection ---
+
 
 async def test_delete_default_group_raises_400():
     from fastapi import HTTPException

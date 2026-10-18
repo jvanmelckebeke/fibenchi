@@ -30,6 +30,4 @@ class VolumeCurvePoint(Base):
     #: Symbol-sessions the median was taken over. Consumers refuse a thin fit
     #: rather than normalise by a curve drawn through two noisy days.
     samples: Mapped[int] = mapped_column(Integer, default=0)
-    fitted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    fitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

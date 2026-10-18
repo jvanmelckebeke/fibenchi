@@ -11,7 +11,7 @@ from app.services.compute.volume_curve import (
     pace_at,
 )
 
-OPEN = datetime(2026, 9, 18, 7, 0, tzinfo=timezone.utc)   # 09:00 Oslo
+OPEN = datetime(2026, 9, 18, 7, 0, tzinfo=timezone.utc)  # 09:00 Oslo
 CLOSE = datetime(2026, 9, 18, 14, 25, tzinfo=timezone.utc)  # 16:25 Oslo
 
 

@@ -9,9 +9,7 @@ class NoteRepository:
         self.db = db
 
     async def get_by_asset(self, asset_id: int) -> Note | None:
-        result = await self.db.execute(
-            select(Note).where(Note.asset_id == asset_id)
-        )
+        result = await self.db.execute(select(Note).where(Note.asset_id == asset_id))
         return result.scalar_one_or_none()
 
     async def upsert(self, asset_id: int, content: str) -> Note:

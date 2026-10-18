@@ -97,8 +97,11 @@ async def test_create_annotation(db):
 
     repo = PseudoEtfRepository(db)
     annotation = await repo.create_annotation(
-        pseudo_etf_id=etf.id, date=date(2025, 1, 15),
-        title="Earnings", body="Beat estimates", color="#22c55e",
+        pseudo_etf_id=etf.id,
+        date=date(2025, 1, 15),
+        title="Earnings",
+        body="Beat estimates",
+        color="#22c55e",
     )
     assert annotation.id is not None
     assert annotation.title == "Earnings"
@@ -110,7 +113,9 @@ async def test_get_annotation_by_id_and_etf(db):
 
     repo = PseudoEtfRepository(db)
     annotation = await repo.create_annotation(
-        pseudo_etf_id=etf.id, date=date(2025, 1, 15), title="Event",
+        pseudo_etf_id=etf.id,
+        date=date(2025, 1, 15),
+        title="Event",
     )
 
     result = await repo.get_annotation(annotation.id, etf.id)
@@ -127,7 +132,9 @@ async def test_delete_annotation(db):
 
     repo = PseudoEtfRepository(db)
     annotation = await repo.create_annotation(
-        pseudo_etf_id=etf.id, date=date(2025, 1, 15), title="ToDelete",
+        pseudo_etf_id=etf.id,
+        date=date(2025, 1, 15),
+        title="ToDelete",
     )
     await repo.delete_annotation(annotation)
 

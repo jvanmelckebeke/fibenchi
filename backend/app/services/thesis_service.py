@@ -65,10 +65,7 @@ async def _batch_thesis_curves(db: AsyncSession, theses: list[Thesis]) -> dict[i
     price_repo = PriceRepository(db)
     latest_date = await price_repo.get_latest_date(all_ids) if all_ids else None
     cache_key = (
-        frozenset(
-            (t.id, t.opened_at.isoformat(), frozenset(a.id for a in t.assets))
-            for t in theses
-        ),
+        frozenset((t.id, t.opened_at.isoformat(), frozenset(a.id for a in t.assets)) for t in theses),
         latest_date,
     )
     cached = _thesis_perf_cache.get_value(cache_key)
