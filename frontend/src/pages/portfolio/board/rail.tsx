@@ -17,7 +17,7 @@ import { usePortfolioIndex } from "@/lib/queries"
 import { changeColor, formatChangePct } from "@/lib/format"
 import { PCT_WINDOWS, pctWindowDef, type PctWindow } from "./color-scale"
 import { maxAbsMove, moverBarWidth } from "./mover-bars"
-import type { Tile } from "./use-board-data"
+import { phaseFilterAdmits, type PhaseFilter, type Tile } from "./use-board-data"
 
 const INDEX_PERIODS = ["1mo", "3mo", "6mo", "1y", "2y", "5y"] as const
 
@@ -160,19 +160,40 @@ export function MoversCard({ tiles }: { tiles: Tile[] }) {
   )
 }
 
+type UnusualScope = Extract<PhaseFilter, "relevant" | "all">
+
+// Defaults to Relevant whatever the board shows: a venue that closed before
+// 04:00 still carries its last session's σ, so under "All" yesterday's US
+// moves would top this card all European morning as if they were live.
 export function MostUnusualCard({ tiles }: { tiles: Tile[] }) {
-  const scored = tiles
+  const [scope, setScope] = useState<UnusualScope>("relevant")
+  const admits = phaseFilterAdmits(scope)
+  const inScope = tiles.filter(admits)
+  const scored = inScope
     .filter((t): t is Tile & { sigma: number } => t.sigma != null)
     .sort((a, b) => Math.abs(b.sigma) - Math.abs(a.sigma))
     .slice(0, 6)
-  const unscored = tiles.filter((t) => t.sigma == null).length
+  const unscored = inScope.filter((t) => t.sigma == null).length
 
   return (
     <RailCard
       title="Most unusual"
-      control={<span className="text-xs text-muted-foreground">today</span>}>
+      control={
+        <SegmentedControl<UnusualScope>
+          options={[
+            { value: "relevant", label: "Relevant", title: "open now, or closed since 04:00" },
+            { value: "all", label: "All", title: "include the previous session" },
+          ]}
+          value={scope}
+          onChange={setScope}
+        />
+      }>
       {scored.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No readings.</p>
+        <p className="text-xs text-muted-foreground">
+          {scope === "relevant" && tiles.length > 0
+            ? "Nothing has traded since 04:00."
+            : "No readings."}
+        </p>
       ) : (
         <div className="space-y-0.5">
           {scored.map((t) => (

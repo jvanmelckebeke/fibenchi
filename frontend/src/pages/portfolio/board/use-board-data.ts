@@ -118,23 +118,29 @@ export function relevanceCutoff(now: Date): Date {
   return cutoff
 }
 
-/** Narrow the tile map to what the filter admits. A `null` phase is an
- * unresolved calendar, not an open one, so it is hidden too — the filter
- * promises "these can move", and an unknown venue can't back that. */
+/** Whether `filter` admits a tile. A `null` phase is an unresolved calendar,
+ * not an open one, so it is hidden too — the filter promises "these can
+ * move", and an unknown venue can't back that. */
+export function phaseFilterAdmits(
+  filter: PhaseFilter,
+  now: Date = new Date()
+): (t: Tile) => boolean {
+  if (filter === "all") return () => true
+  if (filter === "open") return (t) => t.phase === "open"
+  const cutoff = relevanceCutoff(now).getTime()
+  return (t) =>
+    t.phase === "open" || (t.lastClose != null && new Date(t.lastClose).getTime() > cutoff)
+}
+
+/** Narrow the tile map to what the filter admits. */
 export function applyPhaseFilter(
   tiles: Map<string, Tile>,
   filter: PhaseFilter,
   now: Date = new Date()
 ): Map<string, Tile> {
   if (filter === "all") return tiles
-  if (filter === "open") return new Map([...tiles].filter(([, t]) => t.phase === "open"))
-  const cutoff = relevanceCutoff(now).getTime()
-  return new Map(
-    [...tiles].filter(
-      ([, t]) =>
-        t.phase === "open" || (t.lastClose != null && new Date(t.lastClose).getTime() > cutoff)
-    )
-  )
+  const admits = phaseFilterAdmits(filter, now)
+  return new Map([...tiles].filter(([, t]) => admits(t)))
 }
 
 /** Per-symbol % change series over the covering month, shared by the tiles'
@@ -334,8 +340,9 @@ export function useBoardData(groupBy: GroupBy, phaseFilter: PhaseFilter = "all")
   // length guard clears the sections that empty out, and thesis mode's
   // "No thesis" bucket follows without a second code path.
   //
-  // `tiles` itself stays whole — the rail and the coverage badge summarise the
-  // day, which includes the venues that have already gone home.
+  // `tiles` itself stays whole — Movers and the coverage badge summarise the
+  // day, which includes the venues that have already gone home. Most unusual
+  // scopes itself, see MostUnusualCard.
   const visibleTiles = useMemo(() => applyPhaseFilter(tiles, phaseFilter), [tiles, phaseFilter])
 
   const sections = useMemo<BoardSection[]>(() => {
