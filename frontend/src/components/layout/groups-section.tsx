@@ -105,7 +105,11 @@ function SortableGroupItem({
               <span>{group.name}</span>
             </Link>
           </SidebarMenuButton>
-          {group.assets.length > 0 && <SidebarMenuBadge>{group.assets.length}</SidebarMenuBadge>}
+          {group.assets.length > 0 && (
+            <SidebarMenuBadge className="justify-end font-normal text-muted-foreground normal-nums">
+              {group.assets.length}
+            </SidebarMenuBadge>
+          )}
         </div>
       </ContextActionable>
     </SidebarMenuItem>
@@ -206,7 +210,9 @@ export function GroupsSection() {
                 </Link>
               </SidebarMenuButton>
               {defaultGroup.assets.length > 0 && (
-                <SidebarMenuBadge>{defaultGroup.assets.length}</SidebarMenuBadge>
+                <SidebarMenuBadge className="justify-end font-normal text-muted-foreground normal-nums">
+                  {defaultGroup.assets.length}
+                </SidebarMenuBadge>
               )}
             </SidebarMenuItem>
           )}
