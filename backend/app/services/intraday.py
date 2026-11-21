@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain import AssetRef
 from app.domain.phases import PHASE_TO_SESSION, Phase, Session
 from app.models.intraday import IntradayPrice
+from app.repositories.intraday_repo import IntradayRepository, StoredBars
 from app.schemas.intraday import IntradayBar
 from app.services.yahoo import yahoo_client
 
@@ -78,29 +79,8 @@ def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -
 INTRADAY_UPSERT_CHUNK_ROWS = 500
 
 
-async def _load_stored_window(
-    db: AsyncSession, asset_ids: list[int]
-) -> dict[int, dict[datetime, tuple[float, int, str]]]:
-    """Read every stored bar for these assets, keyed by asset then timestamp."""
-    if not asset_ids:
-        return {}
-    result = await db.execute(
-        select(
-            IntradayPrice.asset_id,
-            IntradayPrice.timestamp,
-            IntradayPrice.price,
-            IntradayPrice.volume,
-            IntradayPrice.session,
-        ).where(IntradayPrice.asset_id.in_(asset_ids))
-    )
-    stored: dict[int, dict[datetime, tuple[float, int, str]]] = {}
-    for asset_id, ts, price, volume, session in result:
-        stored.setdefault(asset_id, {})[ts] = (float(price), int(volume or 0), session)
-    return stored
-
-
-def _changed_rows(rows: list[dict], stored: dict[datetime, tuple[float, int, str]]) -> list[dict]:
-    """Keep only the rows whose stored counterpart is absent or different.
+def _changed_rows(rows: list[dict], stored: StoredBars | None) -> list[dict]:
+    """Keep only the rows that are new or whose stored counterpart moved.
 
     A closed 1-minute bar never changes: the price is a close, the volume is
     settled, and the divisor that normalises it is a per-currency constant,
@@ -113,13 +93,20 @@ def _changed_rows(rows: list[dict], stored: dict[datetime, tuple[float, int, str
     day, because ON CONFLICT burns a sequence value per *attempted* row
     (migrations 0018/0019 dropped the id rather than slow the churn).
 
-    Comparing against what is stored costs one indexed SELECT per poll and
-    leaves only the handful of bars that genuinely moved.
+    Only the newest stored bar can still be moving, so it is the only stored
+    bar read back (:meth:`IntradayRepository.load_stored_edges`). Everything older is settled
+    and skipped without a lookup. The price is that a bar Yahoo fills in
+    later, behind one we already stored, is not backfilled. An asset with
+    nothing stored has no ``stored``, so every fetched bar is new.
     """
+    if stored is None:
+        return rows
     changed = []
     for row in rows:
-        prev = stored.get(row["timestamp"])
-        if prev == (row["price"], row["volume"], row["session"]):
+        ts = row["timestamp"]
+        if ts < stored.newest:
+            continue
+        if ts == stored.newest and stored.newest_values == (row["price"], row["volume"], row["session"]):
             continue
         changed.append(row)
     return changed
@@ -152,17 +139,17 @@ async def fetch_and_store_intraday(
     if not fetched:
         return 0
 
-    stored = await _load_stored_window(db, [asset_id for asset_id, _, _ in fetched])
+    stored = await IntradayRepository(db).load_stored_edges([asset_id for asset_id, _, _ in fetched])
 
     total = 0
     for asset_id, ref, raw_bars in fetched:
-        stored_bars = stored.get(asset_id, {})
+        stored_bars = stored.get(asset_id)
 
         # Remove bars from previous sessions that Yahoo no longer returns.
         # Skipped unless something is actually older, which is every poll but
         # the first after a session rollover.
         oldest_ts = min(bar.timestamp for bar in raw_bars)
-        if any(ts < oldest_ts for ts in stored_bars):
+        if stored_bars is not None and stored_bars.oldest < oldest_ts:
             await db.execute(
                 delete(IntradayPrice).where(
                     IntradayPrice.asset_id == asset_id,

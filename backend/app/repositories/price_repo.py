@@ -7,7 +7,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import AssetRef
-from app.models import PriceHistory
+from app.models import Asset, PriceHistory
 
 logger = logging.getLogger(__name__)
 
@@ -132,38 +132,28 @@ class PriceRepository:
         return {row.asset_id: row.first_date for row in result}
 
     async def get_last_dates(self, asset_ids: list[int]) -> dict[int, date]:
-        if not asset_ids:
-            return {}
-        result = await self.db.execute(
-            select(
-                PriceHistory.asset_id,
-                func.max(PriceHistory.date).label("last_date"),
-            )
-            .where(PriceHistory.asset_id.in_(asset_ids))
-            .group_by(PriceHistory.asset_id)
-        )
-        return {row.asset_id: row.last_date for row in result}
+        return {asset_id: last_date for asset_id, (last_date, _) in (await self.get_latest_closes(asset_ids)).items()}
 
     async def get_latest_closes(self, asset_ids: list[int]) -> dict[int, tuple[date, float]]:
-        """Latest stored (date, close) per asset."""
+        """Latest stored (date, close) per asset.
+
+        Two correlated subqueries per asset, each one probe of ``uq_asset_date``.
+        ``GROUP BY asset_id`` with ``max(date)`` read every stored bar of every
+        asset to answer the same question. Correlated subqueries rather than
+        ``LATERAL`` because the test database is SQLite, which has no ``LATERAL``.
+        """
         if not asset_ids:
             return {}
-        last_dates = (
-            select(
-                PriceHistory.asset_id,
-                func.max(PriceHistory.date).label("last_date"),
-            )
-            .where(PriceHistory.asset_id.in_(asset_ids))
-            .group_by(PriceHistory.asset_id)
-            .subquery()
+        last_date = select(func.max(PriceHistory.date)).where(PriceHistory.asset_id == Asset.id).scalar_subquery()
+        last_close = (
+            select(PriceHistory.close)
+            .where(PriceHistory.asset_id == Asset.id)
+            .order_by(PriceHistory.date.desc())
+            .limit(1)
+            .scalar_subquery()
         )
-        result = await self.db.execute(
-            select(PriceHistory.asset_id, PriceHistory.date, PriceHistory.close).join(
-                last_dates,
-                (PriceHistory.asset_id == last_dates.c.asset_id) & (PriceHistory.date == last_dates.c.last_date),
-            )
-        )
-        return {row.asset_id: (row.date, row.close) for row in result}
+        result = await self.db.execute(select(Asset.id, last_date, last_close).where(Asset.id.in_(asset_ids)))
+        return {asset_id: (d, close) for asset_id, d, close in result if d is not None}
 
     async def get_prices_at_dates(self, asset_ids: list[int], dates: set[date]) -> dict[tuple[int, date], float]:
         if not asset_ids or not dates:

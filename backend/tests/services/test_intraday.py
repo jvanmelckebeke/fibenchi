@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from app.domain import AssetRef
+from app.repositories.intraday_repo import StoredBars
 from app.services.intraday import (
     INTRADAY_UPSERT_CHUNK_ROWS,
     _changed_rows,
@@ -288,14 +289,19 @@ def _bar(minute, price=30.0, volume=100, hour=9):
 
 
 def _stored(bars, session="pre"):
-    """Storage shape matching what _load_stored_window returns for one asset."""
-    return {b.timestamp: (b.price, b.volume, session) for b in bars}
+    """The StoredBars a refresh sees when ``bars`` are what the table holds."""
+    newest = max(bars, key=lambda b: b.timestamp)
+    return StoredBars(
+        oldest=min(b.timestamp for b in bars),
+        newest=newest.timestamp,
+        newest_values=(newest.price, newest.volume, session),
+    )
 
 
 class TestChangedRows:
-    """Only bars absent from storage or with moved values get written."""
+    """Only bars newer than, or moved at, the newest stored one get written."""
 
-    async def test_identical_rows_are_dropped(self):
+    async def test_identical_newest_row_is_dropped(self):
         rows = [
             {"timestamp": _bar(0).timestamp, "price": 30.0, "volume": 100, "session": "pre"},
         ]
@@ -325,10 +331,25 @@ class TestChangedRows:
         ]
         assert len(_changed_rows(rows, _stored([_bar(0)]))) == 1
 
+    async def test_bar_older_than_the_newest_stored_is_skipped_unread(self):
+        """Settled: it is not compared with anything, even if it differs."""
+        rows = [
+            {"timestamp": _bar(0).timestamp, "price": 99.0, "volume": 1, "session": "pre"},
+        ]
+        assert _changed_rows(rows, _stored([_bar(0), _bar(1)])) == []
+
+    async def test_asset_with_nothing_stored_keeps_every_row(self):
+        rows = [{"timestamp": _bar(m).timestamp, "price": 30.0, "volume": 100, "session": "pre"} for m in range(3)]
+        assert _changed_rows(rows, None) == rows
+
     async def test_stored_timestamp_in_another_zone_still_matches(self):
         """Storage hands back UTC; the fetch classifies in exchange-local time."""
         bar = _bar(0)
-        stored = {bar.timestamp.astimezone(timezone.utc): (30.0, 100, "pre")}
+        stored = StoredBars(
+            oldest=bar.timestamp.astimezone(timezone.utc),
+            newest=bar.timestamp.astimezone(timezone.utc),
+            newest_values=(30.0, 100, "pre"),
+        )
         rows = [{"timestamp": bar.timestamp, "price": 30.0, "volume": 100, "session": "pre"}]
         assert _changed_rows(rows, stored) == []
 
@@ -342,11 +363,15 @@ class TestFetchAndStoreIntraday:
         stale_ts = datetime(2026, 2, 24, 10, 0, tzinfo=ET)
 
         mock_db = AsyncMock()
-        stored = {1: {stale_ts: (1.0, 1, "regular")}}
+        stored = {1: StoredBars(stale_ts, stale_ts, (1.0, 1, "regular"))}
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges",
+                new_callable=AsyncMock,
+                return_value=stored,
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -364,7 +389,9 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges", new_callable=AsyncMock, return_value={}
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -382,7 +409,11 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges",
+                new_callable=AsyncMock,
+                return_value=stored,
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -400,7 +431,11 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value=stored),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges",
+                new_callable=AsyncMock,
+                return_value=stored,
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -422,7 +457,9 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_window", new_callable=AsyncMock, return_value={}),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges", new_callable=AsyncMock, return_value={}
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
