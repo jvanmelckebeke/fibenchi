@@ -2,17 +2,17 @@
 
 import logging
 from datetime import date, datetime, time, timedelta, timezone
-from typing import NamedTuple, cast
+from typing import cast
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, func, select, true
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import AssetRef
 from app.domain.phases import PHASE_TO_SESSION, Phase, Session
-from app.models.asset import Asset
 from app.models.intraday import IntradayPrice
+from app.repositories.intraday_repo import IntradayRepository, StoredBars
 from app.schemas.intraday import IntradayBar
 from app.services.yahoo import yahoo_client
 
@@ -79,51 +79,7 @@ def _classify_session(ts: datetime, ref: AssetRef, tz_name: str | None = None) -
 INTRADAY_UPSERT_CHUNK_ROWS = 500
 
 
-class _StoredBars(NamedTuple):
-    """What the table holds for one asset, as far as a refresh needs to know."""
-
-    oldest: datetime
-    # The newest stored bar, the one that may still have been forming when it
-    # was stored.
-    newest: datetime
-    newest_values: tuple[float, int, str]
-
-
-async def _load_stored_edges(db: AsyncSession, asset_ids: list[int]) -> dict[int, _StoredBars]:
-    """Per asset: its oldest stored timestamp and its newest stored bar.
-
-    Both are single probes of the (asset_id, timestamp) primary key, one per
-    asset: a ``MIN`` subquery and a ``LATERAL ... ORDER BY timestamp DESC
-    LIMIT 1``. A ``GROUP BY`` or a plain ``IN`` would read every stored row of
-    the asset instead. Assets with nothing stored are absent from the result.
-    """
-    if not asset_ids:
-        return {}
-    newest = (
-        select(
-            IntradayPrice.timestamp,
-            IntradayPrice.price,
-            IntradayPrice.volume,
-            IntradayPrice.session,
-        )
-        .where(IntradayPrice.asset_id == Asset.id)
-        .order_by(IntradayPrice.timestamp.desc())
-        .limit(1)
-        .lateral()
-    )
-    oldest = select(func.min(IntradayPrice.timestamp)).where(IntradayPrice.asset_id == Asset.id).scalar_subquery()
-    result = await db.execute(
-        select(Asset.id, oldest, newest.c.timestamp, newest.c.price, newest.c.volume, newest.c.session)
-        .join(newest, true())
-        .where(Asset.id.in_(asset_ids))
-    )
-    return {
-        asset_id: _StoredBars(first, last, (float(price), int(volume or 0), session))
-        for asset_id, first, last, price, volume, session in result
-    }
-
-
-def _changed_rows(rows: list[dict], stored: _StoredBars | None) -> list[dict]:
+def _changed_rows(rows: list[dict], stored: StoredBars | None) -> list[dict]:
     """Keep only the rows that are new or whose stored counterpart moved.
 
     A closed 1-minute bar never changes: the price is a close, the volume is
@@ -138,7 +94,7 @@ def _changed_rows(rows: list[dict], stored: _StoredBars | None) -> list[dict]:
     (migrations 0018/0019 dropped the id rather than slow the churn).
 
     Only the newest stored bar can still be moving, so it is the only stored
-    bar read back (:func:`_load_stored_edges`). Everything older is settled
+    bar read back (:meth:`IntradayRepository.load_stored_edges`). Everything older is settled
     and skipped without a lookup. The price is that a bar Yahoo fills in
     later, behind one we already stored, is not backfilled. An asset with
     nothing stored has no ``stored``, so every fetched bar is new.
@@ -183,7 +139,7 @@ async def fetch_and_store_intraday(
     if not fetched:
         return 0
 
-    stored = await _load_stored_edges(db, [asset_id for asset_id, _, _ in fetched])
+    stored = await IntradayRepository(db).load_stored_edges([asset_id for asset_id, _, _ in fetched])
 
     total = 0
     for asset_id, ref, raw_bars in fetched:

@@ -1,4 +1,4 @@
-"""``_load_stored_edges`` against a real Postgres.
+"""``IntradayRepository.load_stored_edges`` against a real Postgres.
 
 The query is a per-asset LATERAL join, which SQLite can't run, so every other
 intraday test patches it out. Needs MIGRATIONS_DATABASE_URL (CI's postgres
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base
 from app.models.asset import Asset, AssetType
 from app.models.intraday import IntradayPrice
-from app.services.intraday import _load_stored_edges
+from app.repositories.intraday_repo import IntradayRepository
 
 URL = os.environ.get("MIGRATIONS_DATABASE_URL")
 SCHEMA = "intraday_edges_test"
@@ -55,7 +55,7 @@ async def test_each_asset_gets_its_own_oldest_and_newest_bar():
             )
             await db.commit()
 
-            edges = await _load_stored_edges(db, [bars.id, null_volume.id, empty.id])
+            edges = await IntradayRepository(db).load_stored_edges([bars.id, null_volume.id, empty.id])
 
             assert set(edges) == {bars.id, null_volume.id}
             assert edges[bars.id].oldest == _ts(0)

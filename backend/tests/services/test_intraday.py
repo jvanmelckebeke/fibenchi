@@ -8,11 +8,11 @@ import pandas as pd
 import pytest
 
 from app.domain import AssetRef
+from app.repositories.intraday_repo import StoredBars
 from app.services.intraday import (
     INTRADAY_UPSERT_CHUNK_ROWS,
     _changed_rows,
     _classify_session,
-    _StoredBars,
     fetch_and_store_intraday,
 )
 from app.services.yahoo import yahoo_client
@@ -289,9 +289,9 @@ def _bar(minute, price=30.0, volume=100, hour=9):
 
 
 def _stored(bars, session="pre"):
-    """The _StoredBars a refresh sees when ``bars`` are what the table holds."""
+    """The StoredBars a refresh sees when ``bars`` are what the table holds."""
     newest = max(bars, key=lambda b: b.timestamp)
-    return _StoredBars(
+    return StoredBars(
         oldest=min(b.timestamp for b in bars),
         newest=newest.timestamp,
         newest_values=(newest.price, newest.volume, session),
@@ -345,7 +345,7 @@ class TestChangedRows:
     async def test_stored_timestamp_in_another_zone_still_matches(self):
         """Storage hands back UTC; the fetch classifies in exchange-local time."""
         bar = _bar(0)
-        stored = _StoredBars(
+        stored = StoredBars(
             oldest=bar.timestamp.astimezone(timezone.utc),
             newest=bar.timestamp.astimezone(timezone.utc),
             newest_values=(30.0, 100, "pre"),
@@ -363,11 +363,15 @@ class TestFetchAndStoreIntraday:
         stale_ts = datetime(2026, 2, 24, 10, 0, tzinfo=ET)
 
         mock_db = AsyncMock()
-        stored = {1: _StoredBars(stale_ts, stale_ts, (1.0, 1, "regular"))}
+        stored = {1: StoredBars(stale_ts, stale_ts, (1.0, 1, "regular"))}
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_edges", new_callable=AsyncMock, return_value=stored),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges",
+                new_callable=AsyncMock,
+                return_value=stored,
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -385,7 +389,9 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_edges", new_callable=AsyncMock, return_value={}),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges", new_callable=AsyncMock, return_value={}
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -403,7 +409,11 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_edges", new_callable=AsyncMock, return_value=stored),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges",
+                new_callable=AsyncMock,
+                return_value=stored,
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -421,7 +431,11 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_edges", new_callable=AsyncMock, return_value=stored),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges",
+                new_callable=AsyncMock,
+                return_value=stored,
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
@@ -443,7 +457,9 @@ class TestFetchAndStoreIntraday:
 
         with (
             patch.object(yahoo_client, "intraday", new_callable=AsyncMock, return_value={"KTOS": fresh_bars}),
-            patch("app.services.intraday._load_stored_edges", new_callable=AsyncMock, return_value={}),
+            patch(
+                "app.services.intraday.IntradayRepository.load_stored_edges", new_callable=AsyncMock, return_value={}
+            ),
         ):
             count = await fetch_and_store_intraday(mock_db, [AssetRef("KTOS", 1)])
 
